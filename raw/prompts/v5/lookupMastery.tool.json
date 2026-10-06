@@ -1,0 +1,11 @@
+{
+  "name": "lookupMastery",
+  "description": "개념 이름들의 숙련도를 조회한다. 사전에 없으면 matched=false 이며, 이는 사용자가 아직 학습한 적이 없다는 뜻이다. 왕복을 줄이기 위해 한 번에 여러 개념을 넣어 호출할 것.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "conceptNames": { "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 20 }
+    },
+    "required": ["conceptNames"]
+  }
+}

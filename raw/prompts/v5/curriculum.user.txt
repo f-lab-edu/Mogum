@@ -1,0 +1,8 @@
+주제: {{topic}}
+목적: {{purpose}}
+기간: {{weeks}}주
+구조 상한: 주당 3~5강, 총 {{minLessons}}~{{maxLessons}}강 (40강 이하)
+
+── 학습자가 학습한 개념 (전량 · R 높은 순) ──
+{{masteryList}}
+{{feedbackLine}}

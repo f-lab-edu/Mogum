@@ -1,0 +1,11 @@
+커리큘럼: {{curriculumTitle}}
+주제: {{topic}}
+목적: {{purpose}}
+강의: {{lessonOrder}}강 · {{lessonTitle}}
+학습 목표: {{lessonObjective}}
+다음 강의: {{nextLesson}}
+
+개요:
+{{outlineJson}}
+
+이 개요대로 강의자료를 써라.
