@@ -1,0 +1,83 @@
+# CLAUDE.md — 머금 · Mogum
+
+AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결과(FSRS)가 다음 강의를 바꾸는 학습 서비스.
+**설계 문서는 `docs/` 에 있다 — 작업 전에 관련 문서를 읽는다.** 이름은 `docs/01-overview.md §12` 가 단일 출처다.
+`docs/PRD.md` · `ARCHITECTURE.md` · `UI_GUIDE.md` · `ADR.md` 는 **요약 입구**다 — 상세와 근거는 `01`~`07` 에 있고, 둘이 다르면 `01`~`07` 이 맞다.
+
+| 문서 | 볼 때 |
+|---|---|
+| `docs/PRD.md` · `docs/ARCHITECTURE.md` · `docs/ADR.md` | 처음 볼 때 — 범위 · 구조 · 결정 요약 |
+| `docs/UI_GUIDE.md` | 화면 코드를 쓸 때 — 색 · 글꼴 · 컴포넌트 · 금지 패턴 |
+| `docs/01-overview.md` | 범위 · 안 만드는 것과 그 트리거 · 성공 기준 · 용어 |
+| `docs/02-domain-data.md` | 테이블 · 숙련도 · 개념 동일성 · 핵심 쿼리 |
+| `docs/03-generation.md` | 생성 파이프라인 · 프롬프트 규칙 · LLM 호출 규약 |
+| `docs/04-jobs-and-cost.md` | 패키지 경계 · 배포 · 역할 전환 · 잡 수명주기 · 리스 · 비용 통제 |
+| `docs/05-api.md` · `docs/06-screens.md` | API 계약 · 인증(쿠키 세션) · 화면 문구 |
+| `docs/07-testing.md` | 장애 주입 · 용량 측정 · LLM 스텁 |
+
+**스택** — Java 21 · Spring Boot 3(MVC, 플랫폼 스레드) · Spring Security(구글 OAuth) + Spring Session JDBC · PostgreSQL + pgvector · Flyway · OpenAI SDK(`gpt-5.6-terra` · `gpt-5.6-luna` · `text-embedding-3-large`) · FSRS 라이브러리 · ArchUnit · Testcontainers · Micrometer.
+**화면** — `frontend/` · React + TypeScript(strict) · Vite · React Router · TanStack Query · Tailwind CSS · react-markdown + KaTeX + mermaid · Vitest + Testing Library. 빌드 결과를 Spring Boot `static/` 에 넣어 **jar 하나**로 배포한다(같은 사이트 — 쿠키 세션 · CSRF 그대로).
+**패키지** — `core`(도메인 · 유스케이스 · 포트) ← `api` · `worker` · `infra`. 단일 Gradle 모듈.
+**운영** — EC2 한 대 · 프로세스 하나(`app.role=all` — API + 워커 실행기 `N` 개). 필요하면 실행 인자만으로 `api` / `worker` 로 나눈다. 정원제 실사용자.
+
+---
+
+## 금지 목록 — 어기면 무슨 일이 나는가
+
+**구조**
+
+1. **`api` 가 `core.generation` 이나 `LlmClient` 를 참조하지 않는다.** → 컨트롤러가 생성을 직접 부르면 1분짜리 요청이 조용히 되살아난다. ArchUnit 이 빌드를 깬다 — 규칙을 무르지 말고 코드를 고친다.
+2. **`core` 에 Spring Web · Spring Data · `@Transactional` · LLM SDK 를 들이지 않는다.** → 경계가 무너지고 프로바이더를 바꿀 때 도메인이 같이 바뀐다.
+3. **트랜잭션은 `TransactionRunner` 로 드러낸다. LLM 호출 중에는 DB 커넥션을 쥐지 않는다.** → 1분짜리 호출이 커넥션을 쥐면 풀이 마르고 복습 조회까지 멈춘다. `spring.jpa.open-in-view=false`.
+4. **리포지토리 포트는 완전히 로딩된 데이터를 돌려준다.** → 트랜잭션 밖 detached 엔티티에서 `LazyInitializationException` 이 난다.
+5. **`docs/01-overview.md §6` 의 제외 항목을 트리거 없이 넣지 않는다**(Redis · 레이트리미터 · 가상 스레드 · 선행 생성 · 다크 모드 …). → 측정 근거 없이 복잡도만 는다. 필요해 보이면 트리거부터 확인하고 문서를 먼저 고친다.
+6. **파생값(숙련도 · `GENERATING` 상태)을 저장하지 않는다 — 조회 때 계산하거나 잡으로 판단한다.** → 저장한 숙련도는 바로 낡고, 두 곳에서 관리한 상태는 어긋난다. 주기 작업(스케줄러 · 배치)은 쓸 수 있지만 파생값을 저장하는 데 쓰지 않는다.
+
+**잡(`jobs`)**
+
+7. **`jobs` 를 JPA 엔티티로 만들지 않는다. 모든 쓰기는 명시적 SQL + `lease_epoch` 조건.** → `@Version` 이 저장마다 올라 멀쩡한 실행기가 자기 잡을 버리고, merge 가 카운터를 옛 값으로 덮는다.
+8. **수령 쿼리에서 `SKIP LOCKED` 를 빼지 않는다.** → 실행기들이 같은 행에서 줄을 선다. 기능 테스트는 통과하고 부하에서만 드러난다.
+9. **실행기는 빈손일 때만 잡을 하나 집는다.** → `N` 보다 많이 들면 기다리는 동안 리스와 시한이 탄다.
+10. **리스 갱신 · 저장이 `0 rows` 면 즉시 중단한다.** → 무시하면 회수된 잡을 둘이 계속 돌려 돈이 두 번 나간다.
+11. **완료 트랜잭션은 `jobs` 의 `UPDATE` 를 맨 앞에 둔다.** → 회차가 틀렸을 때 자료 · 카드가 먼저 써져 고아가 된다.
+12. **타임아웃이나 백오프 상한을 올리면 리스도 다시 계산한다**(`리스 300 > 백오프 60 + 시도 타임아웃 최대 100`). → 식이 깨지면 살아 있는 잡이 회수된다.
+13. **진행 중 2개 검사는 사용자 advisory lock 안에서 세고 같은 트랜잭션에서 적재한다.** → 연타 두 번이 함께 상한을 넘는다.
+
+**LLM**
+
+14. **SDK 자동 재시도를 끈다(`maxRetries(0)`). 재시도는 `GuardedLlmClient` 가 쥔다.** → SDK 가 안에서 재시도하면 시도 경계가 사라져 리스 계산이 깨진다.
+15. **잘린 응답을 같은 상한으로 다시 부르지 않는다 — 이어 쓰기 1회만.** → 또 잘리고 이미 쓴 토큰을 버린다.
+16. **`insufficient_quota` 429 는 재시도하지 않는다.** → 충전 전까지 계속 실패하며 시간만 쓴다.
+17. **`usage` 가 없는 응답의 비용을 0 으로 적지 않는다** — `llm.call.no_usage` 만 올린다. → 장부가 실제보다 적다는 사실이 숨는다.
+18. **프롬프트를 바꾸면 버전을 올린다**(`prompts/vN/` · `material.prompt_version`). → 품질 전후 비교가 불가능해진다.
+
+**데이터 · 보안**
+
+19. **개념 쓰기는 `resolveConcepts` 한 곳에서만, 전역 advisory lock 안에서.** → `name` 에 unique 가 없어 DB 가 유일성을 지켜주지 않는다. 경로가 둘이면 같은 개념이 두 행이 된다.
+20. **"오늘"은 `Asia/Seoul` 로 계산한다** — 서버 · DB 기본 타임존을 쓰지 않는다. → UTC 면 쿼터가 오전 9시에 리셋되고 복습 한도가 하루 중간에 풀린다.
+21. **`{id}` 로 찾은 리소스는 주인 확인 후 반환하고, 남의 것이면 `404`.** → 남의 커리큘럼 · 잡이 보인다. `403` 은 존재 자체를 알려준다.
+22. **사용자 소유 테이블을 만들면 탈퇴 삭제 목록에 넣는다.** → 탈퇴한 사람의 데이터가 남는다. 탈퇴 테스트가 센다.
+23. **사용자 API 응답 · 화면에 시스템 정보(토큰 · 비용 · 큐 건수 · 재시도 횟수)를 싣지 않는다** — 관리자 API 로만. → 사용자에겐 소음이고 다른 사용자의 활동량이 샌다.
+24. **`R` 공식을 바꾸면 SQL 과 라이브러리 일치 테스트를 함께 고친다. FSRS 간격을 직접 덮어쓰지 않는다**(학습 단계는 비우고 간격은 라이브러리에 맡긴다). → 숙련도 판정이 조용히 틀어진다.
+25. **프로세스 메모리에 공유 상태(카운터 · 캐시 · 잠금)를 새로 두지 않는다 — DB 에 둔다.** 예외는 API 레이트리밋 버킷 하나. → 역할 전환(`app.role`)으로 프로세스를 나누는 순간 상태가 쪼개져 상한 · 중복 방지가 조용히 깨진다.
+26. **역할 판단(`app.role`)은 루트 설정의 빈 등록에서만 한다.** `api` · `worker` · `core` 코드에 *"지금 내 역할이 뭐지"* 분기를 넣지 않는다. → 역할이 코드 곳곳에 퍼지면 나눠 띄울 때 무엇이 켜지는지 알 수 없다.
+27. **세션에는 사용자 id 만 둔다. 상태 · 역할은 요청마다 `users` 에서 읽는다.** → 세션에 상태를 넣으면 대기자를 승인하거나 약관이 바뀌어도 로그인 중인 사람에게 반영되지 않는다.
+
+## 작업 방식
+
+- CRITICAL: 새 기능은 **테스트를 먼저 쓰고**, 그 테스트가 통과하는 구현을 쓴다(TDD). 작업을 검증 가능한 목표로 바꾸고 통과할 때까지 반복한다.
+- 커밋 메시지는 conventional commits(`feat:` · `fix:` · `docs:` · `refactor:` · `test:`).
+- 설계와 다르게 가야 하면 **코드보다 `docs/` 를 먼저 고친다.** 문서와 코드가 다르면 문서가 틀린 것으로 보고 묻는다.
+- 실제 LLM API 를 부르는 테스트는 기본 실행에서 뺀다(비용). 스텁으로 돈다.
+- `.env` · API 키를 읽거나 출력하지 않는다.
+
+## 명령어
+
+```
+./gradlew bootRun            # 개발 서버 (API + 워커, app.role=all)
+./gradlew test               # 백엔드 테스트 (Testcontainers — Docker 필요)
+./gradlew build              # 프론트 빌드를 static/ 에 넣고 jar 생성
+cd frontend && npm run dev   # 화면 개발 서버 (Vite — API 는 proxy 로 같은 사이트처럼)
+cd frontend && npm run test  # 화면 테스트 (Vitest)
+cd frontend && npm run lint  # ESLint
+```

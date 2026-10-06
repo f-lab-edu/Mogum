@@ -15,6 +15,7 @@
 | 저장소 | **PostgreSQL 하나 + pgvector** | MySQL + 벡터 DB · Redis | 개념 수십만 · 큐 초당 수백 건 |
 | 큐 | **`jobs` 테이블 + `FOR UPDATE SKIP LOCKED`** | Redis ZSET · Kafka | 초당 수백 건(hot row · VACUUM) |
 | 마이그레이션 | Flyway | Liquibase | — |
+| 화면 | **React SPA**(TypeScript · Vite · React Router · TanStack Query · Tailwind) — 빌드 결과를 Spring Boot `static/` 에 넣어 **jar 하나** | Next.js(Node 서버 별도) · Thymeleaf | 검색 노출(SSR)이 필요해진다 · 화면을 다른 도메인에서 띄운다 |
 | 경계 강제 | **단일 Gradle 모듈 + ArchUnit** | 멀티모듈 | 규칙이 버거워지거나 배포 단위가 갈릴 때 |
 | 관측 | Micrometer · Prometheus · Grafana(**로컬**) · 운영은 관리자 화면 U6 | OpenTelemetry 트레이싱 | 메트릭 + 로그로 *"왜 오래 걸렸나"* 에 답하지 못할 때 |
 | 부하 · 장애 테스트 | k6 + LLM 스텁 서버 · Testcontainers(Postgres) | 실제 API 부하 | — |
@@ -91,8 +92,15 @@ flowchart LR
 | LLM | 스텁(테스트) · 실제 API(실사용 전 확인) | 실제 API |
 
 - 🅿️ **AWS 계정 생성일을 먼저 확인한다** — 2025-07-15 이전 계정은 *월 750시간 합산*, 이후 계정은 *크레딧 방식* 이라 예산 계산이 갈린다.
-- 🅿️ Postgres 를 같은 인스턴스에 둘지 RDS 로 뺄지는 실제 메모리 사용량을 보고 정한다. 백업 방식(자동 백업 vs `pg_dump`)도 같이.
-- 공개 운영에 더하는 것 — 도메인 · HTTPS(구글 콜백 · `Secure` 쿠키) · DB 백업 · 장애 · 킬스위치 알림(🅿️ 수단).
+- 🅿️ **Postgres 위치**(같은 인스턴스 vs RDS)는 실제 메모리 사용량을 보고 정한다. 백업 방식도 같이. **용량 측정 전에 정한다** — 측정은 운영과 같은 메모리 조건으로 잰다([07 §2](./07-testing.md)).
+
+  | 후보 | 측정 조건 | 백업 | 추가 비용(월 · 프리티어 이후) |
+  |---|---|---|---|
+  | ① **같은 EC2 · 2GB 로 상향** — 1순위 | 앱 + Postgres 합쳐 2GB | `pg_dump` → S3 cron | 약 1.5만 원 |
+  | ② RDS(db.t4g.micro) | 앱만 1GB | RDS 자동 백업 | 약 2만 원 |
+  | ③ 같은 EC2 · 1GB 그대로 | 앱 + Postgres 합쳐 1GB — 매우 빠듯하다 | `pg_dump` → S3 cron | 0원 |
+
+- 공개 운영에 더하는 것 — 도메인 · HTTPS(구글 콜백 · `Secure` 쿠키) · DB 백업 · 슬랙 알림 · 외부 헬스체크(§9.1).
 
 ### 3.1 역할 전환 — 비상용 배선
 
@@ -115,7 +123,7 @@ java -jar app.jar --app.role=worker \
 - **이건 평소 기능이 아니라 비상용 배선이다.** *"트리거 없이 미리 만들지 않는다"* 의 예외로 둔 이유 — 비용이 수십 줄인데, 장애 때 *"코드를 고쳐 다시 배포"* 와 *"실행 인자만 바꾸기"* 의 차이가 크다.
 - 나누는 조건 — **워커가 API 응답을 느리게 만드는 것이 관측될 때**(예: 복습 조회 지연이 생성 중에만 튄다). 프로세스를 나누는 실험(격리 측정)은 하지 않는다.
 
-**나눠도 그대로인 것** — 잡 수령(`SKIP LOCKED`) · 리스 · 수령 회차 펜싱 · 반납(`worker_id` 는 프로세스마다 유일) · 진행 중 2개 · 정원 · 개념 쓰기 잠금(전부 DB advisory lock) · 쿼터 · 킬스위치(DB) · **로그인 세션(DB)**. 우리 스케줄러가 없어 *같은 배치가 두 번 도는* 문제도 없다(세션 정리는 §3.2).
+**나눠도 그대로인 것** — 잡 수령(`SKIP LOCKED`) · 리스 · 수령 회차 펜싱 · 반납(`worker_id` 는 프로세스마다 유일) · 진행 중 2개 · 정원 · 개념 쓰기 잠금(전부 DB advisory lock) · 쿼터 · 킬스위치(DB) · **로그인 세션(DB)**. **주기 작업을 새로 넣으면** 프로세스를 나눴을 때 둘이 함께 돌아도 되는지(멱등인지) · 아니면 한 역할에서만 돌지를 같이 정한다(세션 정리는 §3.2).
 
 **나눌 때 같이 바꾸는 것**
 
@@ -126,13 +134,13 @@ java -jar app.jar --app.role=worker \
 | 메모리 | 한 대(1GB)에 JVM 둘이면 빠듯하다 — 인스턴스 크기를 같이 본다 |
 | 배포 순서 | 워커를 먼저 내리면 잡을 반납하고, 새 워커가 이어받는다 |
 
-### 3.2 배치 금지의 예외 하나 — 만료 세션 정리
+### 3.2 만료 세션 정리
 
 로그인 세션은 Spring Session JDBC 로 Postgres 에 둔다([05 §1.1](./05-api.md)). 이 라이브러리는 **만료된 세션 행을 주기적으로 지우는 작업**을 스스로 돈다(기본 1분마다).
 
-- **예외로 받아들인다.** 우리가 만든 배치가 아니라 라이브러리의 정리이고, `DELETE … WHERE 만료` 라 **멱등**이다 — 프로세스를 나눠 둘이 함께 돌아도 결과가 같다.
-- 도메인 로직(숙련도 · 쿼터 · 잡 회수)에는 여전히 스케줄러를 쓰지 않는다. 이 예외를 근거로 다른 배치를 들이지 않는다.
+- `DELETE … WHERE 만료` 라 **멱등**이다 — 프로세스를 나눠 둘이 함께 돌아도 결과가 같다.
 - 주기는 설정(`spring.session.jdbc.cleanup-cron`)으로 늦출 수 있다 — 25명 규모면 시간 단위로 충분하다.
+- 주기 작업(스케줄러 · 배치)은 금지가 아니다. 다만 **파생값(숙련도 · `GENERATING` 상태)을 저장하는 배치는 만들지 않는다** — 저장한 값은 바로 낡는다([02 §1](./02-domain-data.md)).
 
 ---
 
@@ -175,7 +183,7 @@ CREATE UNIQUE INDEX idx_jobs_one_active_per_curriculum ON jobs (curriculum_id) W
 CREATE INDEX idx_jobs_user_active ON jobs (user_id) WHERE status IN ('QUEUED', 'RUNNING');
 ```
 
-완료 · 실패 행은 인덱스에 들어오지 않는다 → **행을 지우지 않아도** 수령 성능이 그대로다(삭제는 배치를 부른다).
+완료 · 실패 행은 인덱스에 들어오지 않는다 → **행을 지우지 않아도** 수령 성능이 그대로다(정리 작업이 필요 없다).
 
 ```mermaid
 stateDiagram-v2
@@ -238,7 +246,7 @@ JPA `@Version` 으로 펜싱하면 단계 산출물을 저장할 때마다 버�
 | 리스 갱신 · 카운터 · 단계 산출물 · 완료 · 실패 | `lease_epoch = :claimed` | **즉시 중단**(`LeaseLostException`). 완료면 트랜잭션 전체 롤백 |
 | 반납(정상 종료) | `worker_id = :me` · 회차 +1 | 들고 있던 잡이 없다 |
 | 취소(커리큘럼 그만두기) | `status = 'QUEUED'` | 대기 잡이 없다 |
-| 재시도(API) | `status = 'FAILED'` | `409 JOB_NOT_FAILED` |
+| 재시도(API) | `status = 'FAILED'` · `failure_code <> 'TOPIC_REJECTED'` | `409 JOB_NOT_FAILED` · `409 JOB_NOT_RETRYABLE` |
 
 **완료 트랜잭션은 `jobs` 의 `UPDATE` 를 맨 앞에 둔다** — 회차가 틀렸으면 자료 · 카드 · 개념을 쓰기 전에 롤백된다. 펜싱이 탈퇴까지 덮는다(행이 지워지면 다음 쓰기가 `0 rows`).
 
@@ -259,7 +267,7 @@ JPA `@Version` 으로 펜싱하면 단계 산출물을 저장할 때마다 버�
 ```
 
 - 단계가 끝날 때마다 `step` · `payload` 를 저장한다(짧은 트랜잭션). `Material` 은 **성공 시에만** 만든다.
-- 완료 — 같은 트랜잭션에서 `status='SUCCEEDED'` · `payload='{}'` · `available_at=NULL` 후 `Material` · `Flashcard` · 개념 · `Lesson.READY`. payload 를 비우는 것이 배치 없이 용량을 지키는 방법이다.
+- 완료 — 같은 트랜잭션에서 `status='SUCCEEDED'` · `payload='{}'` · `available_at=NULL` 후 `Material` · `Flashcard` · 개념 · `Lesson.READY`. payload 를 비우는 것이 정리 작업 없이 용량을 지키는 방법이다.
 - **재시도는 같은 행을 되살린다** — `status='QUEUED'` · `available_at=now()` · `started_at=NULL` · 실패 사유 비움. 새 행을 만들면 산출물이 따라오지 않는다. 무한 반복은 쿼터가 막는다.
 
 ### 4.7 중복 생성 방지
@@ -303,7 +311,7 @@ var result = llmClient.call(ctx);                    // 커넥션 없음
 | 층 | 수단 | 걸리는 곳 |
 |---|---|---|
 | 1. 구조 상한 | 기간 1~8주 · 주당 3~5강 · 총 40강 · 단계별 `max_tokens` · 이어 쓰기 1회 · 카드 10장 · 툴 라운드 3 · 다시 짜기 3회 | 요청 검증 · 프롬프트 |
-| 2. 사용자 | **일일 토큰 쿼터** · **진행 중 생성 ≤ 2** | API 진입(잡 적재 전) |
+| 2. 사용자 | **일일 비용 쿼터**(원) · **진행 중 생성 ≤ 2** | API 진입(잡 적재 전) |
 | 3. 전역 킬스위치 | 서비스 전체 일일 비용 상한 | API 진입(잡 적재 전) |
 
 ```mermaid
@@ -331,7 +339,9 @@ SELECT count(*) FROM jobs WHERE user_id = :userId AND status IN ('QUEUED', 'RUNN
 
 - 발동하면 **새 잡 적재를 전부 거부**한다. 이미 적재된 잡(대기 · 실행 중)은 **끝까지 간다** — 사용자가 기다리고 있고, 도중에 끊으면 이미 쓴 돈이 버려진다.
 - 학습 · 복습은 계속된다. 화면은 *"오늘은 새로 만들기가 마감됐어요"* 로 정직하게 보인다.
-- 리셋은 스케줄러 없이 **한국 날짜**가 바뀌면 0부터(`daily_usage`).
+- 리셋은 **한국 날짜**가 바뀌면 0부터(`daily_usage` 날짜 비교 — 리셋 작업이 없다).
+- 쿼터와 킬스위치는 **같은 단위(원)** 다 — 사용자당 월 비용 ≤ 예산 ÷ 정원을 그대로 계산할 수 있다. 화면은 비율(`usedRatio`)만 본다.
+- 발동하면 슬랙으로 알린다(§9.1).
 
 ### 7.3 사후 기록 — 초과분은 유계다
 
@@ -380,6 +390,21 @@ SELECT count(*) FROM jobs WHERE user_id = :userId AND status IN ('QUEUED', 'RUNN
 - 운영 서버에는 Prometheus 가 없다 → **U6 는 DB 만 읽는다**(`jobs` 카운터 · `daily_usage` · `concept_match_log` · `users`).
 - 운영 기록은 **주 1회 스냅숏**으로 남긴다 — 포트폴리오의 실사용 증거([01 §8](./01-overview.md)).
 
+### 9.1 알림 — 슬랙
+
+U6 는 들어가 봐야 보인다. **사람이 바로 움직여야 하는 일**만 슬랙 Incoming Webhook 으로 민다.
+
+| 이벤트 | 왜 바로 알아야 하나 | 보내는 곳 |
+|---|---|---|
+| `PROVIDER_SPEND_CAP` | 크레딧을 채우기 전까지 **모든 생성이 실패**한다 | 앱 — 실패 판정 직후 |
+| 킬스위치 발동 | 오늘 신규 생성이 닫혔다 | 앱 — 적재 거부 직후 |
+| `LLM_REQUEST_REJECTED` | **우리 버그**다 — 다시 시도해도 같다 | 앱 — 실패 판정 직후 |
+| 헬스체크 실패 | 앱이 죽으면 앱이 알릴 수 없다 | **외부 헬스체크**(UptimeRobot 등) → `/actuator/health` |
+
+- 같은 이벤트는 **하루 한 번** — `alert_log` 에 `INSERT … ON CONFLICT DO NOTHING` 이 성공했을 때만 보낸다([02 §6.7](./02-domain-data.md)). 프로세스를 나눠도 DB 라 한 번이다.
+- 전송은 잡 · 요청 경로를 막지 않는다 — 짧은 타임아웃(3초) · 실패는 로그와 `alert.send.failure` 만. 알림 실패로 잡이 실패하지 않는다.
+- 웹훅 URL 은 설정(환경 변수)이다. `.env` · 키는 읽거나 출력하지 않는다.
+
 ---
 
 ## 10. 🅿️ 아직 정하지 않은 값
@@ -389,5 +414,5 @@ SELECT count(*) FROM jobs WHERE user_id = :userId AND status IN ('QUEUED', 'RUNN
 | 실행기 `N` · 워커 폴링 주기 | 용량 측정 ([07 §2](./07-testing.md)) |
 | 정원 `U_max` 최종값 | 용량 측정 vs 예산 중 작은 쪽 |
 | 잡 1건 최대비용 · 사용자 일일 쿼터 값 · 전역 킬스위치 금액 | 실사용 단가 기록 |
-| AWS 계정 방식 · Postgres 배치 · 백업 · 알림 수단 | 배포 준비 |
+| AWS 계정 방식 · Postgres 위치 · 백업 | 배포 준비 — **Postgres 위치는 용량 측정 전에**(§3) |
 | 타임아웃 재계산 · 백오프 상한 60초 적정성 | 실사용 기록 · 429 주입 테스트 |

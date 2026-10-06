@@ -48,14 +48,15 @@
 | `ACCOUNT_WAITLISTED` | 403 | 대기 명단 — 위 네 개만 된다 |
 | `RATE_LIMITED` | 429 | 우리 API 레이트리밋 · `Retry-After` |
 | `NOT_FOUND` | 404 | 없거나 **남의 것**(§1.3) |
-| `STRUCTURAL_LIMIT` | 400 | 기간 1~8주 · 주당 3~5강 · 총 40강 위반 |
-| `USER_QUOTA_EXCEEDED` | 429 | 일일 토큰 쿼터 · `Retry-After` = 한국 시간 자정까지 |
+| `STRUCTURAL_LIMIT` | 400 | 기간 1~8주 · 주당 3~5강 · 총 40강 · 입력 길이(주제 100 · 목적 200 · 피드백 500자) 위반 |
+| `USER_QUOTA_EXCEEDED` | 429 | 일일 생성 비용 한도 · `Retry-After` = 한국 시간 자정까지 |
 | `ACTIVE_JOB_LIMIT` | 429 | 진행 중 생성이 이미 2개. 하나 끝나면 풀린다 |
 | `GLOBAL_BUDGET_EXHAUSTED` | 503 | 전역 킬스위치 · `Retry-After` |
 | `REGENERATION_LIMIT` | 409 | 다시 짜기 3회 초과 |
-| `CURRICULUM_NOT_DRAFT` · `CURRICULUM_GENERATING` · `CURRICULUM_NOT_ACTIVE` | 409 | 상태 충돌 |
+| `CURRICULUM_NOT_DRAFT` · `CURRICULUM_GENERATING` · `CURRICULUM_NOT_ACTIVE` | 409 | 상태 충돌 — 버리기도 `DRAFT` 가 아니면 `NOT_DRAFT`, 짜는 중이면 `GENERATING` |
 | `LESSON_NOT_READY` | 409 | 자료 없는 강의에 학습 완료 |
 | `JOB_NOT_FAILED` | 409 | 실패하지 않은 잡에 재시도 |
+| `JOB_NOT_RETRYABLE` | 409 | 거절된 주제(`TOPIC_REJECTED`) 잡에 재시도 |
 | `NO_CARDS_DUE` | 409 | 복습할 카드가 없는데 세션 요청 |
 
 - `429` = *"이 사용자가 많이 썼다 · 시간이 지나면 풀린다"*. `503` = *"서비스 전체가 지금 신규를 안 받는다"*. `403` = *"누구인지는 알지만 아직 못 쓴다"* — `401` 과 구분해야 화면이 로그인으로 튕기지 않는다.
@@ -89,7 +90,8 @@
 | 상세 | `GET /curriculums/{id}` | 강의 목록 · 키워드 · `masteryReflection` · `generation` |
 | 다시 짜기 | `POST /curriculums/{id}/regenerate` `{ feedback? }`(500자 이내) | `202 { jobId }` · 한도 초과 `409` |
 | 승인 | `POST /curriculums/{id}/approve` | `DRAFT → ACTIVE`. 생성 잡이 진행 중이면 `409 CURRICULUM_GENERATING` |
-| 그만두기 | `POST /curriculums/{id}/abandon` | `ACTIVE → ABANDONED`. 이 커리큘럼의 **대기 중 잡은 `CANCELLED`**, 실행 중인 잡은 끝낸다 |
+| 그만두기 | `POST /curriculums/{id}/abandon` | `ACTIVE → ABANDONED`. 이 커리큘럼의 **대기 중 잡은 `CANCELLED`**, 실행 중인 잡은 끝낸다. 공부한 카드는 복습에 남는다 |
+| 버리기 | `DELETE /curriculums/{id}` | `204`. **`DRAFT` 이고 활성 잡이 없을 때만** — 한 트랜잭션에서 `lesson` · 이 커리큘럼의 `jobs` · `curriculum` 삭제. `DRAFT` 가 아니면 `409 CURRICULUM_NOT_DRAFT`, 짜는 중이면 `409 CURRICULUM_GENERATING` |
 
 ```jsonc
 // GET /curriculums/{id}
@@ -168,8 +170,9 @@ GET /jobs/{jobId}          Cache-Control: no-store       — 화면은 2초마�
 | `LLM_UNAVAILABLE` | 재시도 소진(429 · 5xx · 타임아웃) · `retry-after` > 60초 | ✅ |
 | `LLM_REQUEST_REJECTED` | 프로바이더가 요청 거부(400 · 401 · 403 · 413) — **우리 버그** | ✅ |
 | `PROVIDER_SPEND_CAP` | 프로바이더 크레딧 소진(`insufficient_quota`) | ❌ |
+| `TOPIC_REJECTED` | 잡 A 가 주제를 거절했다 — 위험 · 불법 · 연습형([03 §2](./03-generation.md)) | ❌ — 같은 주제는 같은 결과다. 새 주제로 만든다 |
 
-`CANCELLED`(커리큘럼 그만두기)는 실패가 아니라 재시도 대상이 아니다.
+`CANCELLED`(커리큘럼 그만두기)는 실패가 아니라 재시도 대상이 아니다. `TOPIC_REJECTED` 잡에 `POST /jobs/{id}/retry` 를 부르면 `409 JOB_NOT_RETRYABLE` — 같은 주제는 다시 돌려도 같은 거절에 돈만 쓴다. `PROVIDER_SPEND_CAP` 은 화면에 버튼이 없을 뿐 API 는 막지 않는다 — 크레딧을 채운 뒤 강의를 다시 열면 그 잡이 재시도된다(§3.1).
 
 ---
 
@@ -177,7 +180,7 @@ GET /jobs/{jobId}          Cache-Control: no-store       — 화면은 2초마�
 
 | | 엔드포인트 | 비고 |
 |---|---|---|
-| 오늘의 복습 | `GET /reviews/due` | 첫 복습 카드 전부 + 하루 50장 중 남은 만큼 오래 밀린 순(한국 시간) |
+| 오늘의 복습 | `GET /reviews/due` | **한국 날짜로 오늘 안에 예정된** 카드 — 첫 복습 카드 전부 + 하루 50장 중 남은 만큼 오래 밀린 순([02 §8.1](./02-domain-data.md)) |
 | 평가 | `POST /reviews` `{ flashcardId, rating }` | `card_state` 갱신(FSRS) + `review` 삽입 — 한 트랜잭션 |
 
 ```jsonc
@@ -221,12 +224,12 @@ GET /system/status          관리자 아니면 404 · 화면은 진입 시 1회
 |---|---|
 | U1 로그인 | `GET /auth/google` · `/callback` · `GET /me` |
 | U2 홈 | `GET /curriculums` · `POST /curriculums` · `GET /reviews/due` · `GET /me` |
-| U3 커리큘럼 | `GET /curriculums/{id}` · `/approve` · `/regenerate` · `/abandon` · `GET /jobs/{id}` · `POST /jobs/{id}/retry` |
+| U3 커리큘럼 | `GET /curriculums/{id}` · `/approve` · `/regenerate` · `/abandon` · `DELETE /curriculums/{id}` · `GET /jobs/{id}` · `POST /jobs/{id}/retry` |
 | U4 강의 | `POST /lessons/{id}/materials` · `GET /jobs/{id}` · `POST /jobs/{id}/retry` · `GET /lessons/{id}/material` · `POST /lessons/{id}/complete` |
 | U5 복습 | `GET /reviews/due` · `POST /reviews` |
 | U6 시스템 상태 | `GET /system/status` |
 | U7 가입 · U8 대기 · U9 설정 | `POST /me/terms` · `GET /me` · `POST /auth/logout` · `DELETE /me` |
 
-**20개**(계정 6 · 커리큘럼 6 · 강의 3 · 잡 2 · 복습 2 · 상태 1, `/dev/session` 제외).
+**21개**(계정 6 · 커리큘럼 7 · 강의 3 · 잡 2 · 복습 2 · 상태 1, `/dev/session` 제외).
 
 **만들지 않는 것** — 커리큘럼 목록 페이징(사용자당 몇 개뿐) · `/v1/` 경로 버저닝 · 개념 병합 · 정원 · 대기 승인 관리 API(SQL 로) · SSE.

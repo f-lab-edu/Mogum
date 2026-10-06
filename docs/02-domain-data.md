@@ -39,6 +39,7 @@ stateDiagram-v2
         [*] --> DRAFT : 생성
         DRAFT --> DRAFT : 다시 짜기 · 3회까지
         DRAFT --> ACTIVE : 승인
+        DRAFT --> [*] : 버리기 · 활성 잡 없을 때만 · 행 삭제
         ACTIVE --> COMPLETED : 전 강의 완료
         ACTIVE --> ABANDONED : 그만두기
     }
@@ -55,6 +56,10 @@ stateDiagram-v2
 ```
 
 잡 상태는 [04 §4](./04-jobs-and-cost.md).
+
+- **버리기는 `DRAFT` 만, 행을 지운다** — 검토만 하다 버린 커리큘럼에는 자료 · 카드 · 복습 기록이 없어 남길 것이 없다. `ABANDONED` 로 두면 U2 의 끝난 묶음에 소음으로 남는다.
+- **짜는 중(활성 잡 있음)에는 버리지 못한다**(`409 CURRICULUM_GENERATING`, 승인과 같은 규칙) — 그래서 버리기는 잡을 건드리지 않는다.
+- **그만둔(`ABANDONED`) 커리큘럼의 카드는 계속 오늘의 복습에 나온다** — 배운 것은 배운 것이고, 숙련도 데이터가 쌓여야 가설이 선다. 빼는 조건은 [01 §6](./01-overview.md).
 
 ## 3. 학습 완료와 카드 상태
 
@@ -74,8 +79,13 @@ FSRS 의 인출확률 `R` 은 **마지막 복습 이후 경과 시간과 `S` 의
 
 | | 담당 |
 |---|---|
-| 복습 때 `D` · `S` · 다음 복습일 갱신(**쓰기**) | FSRS 라이브러리 `io.github.open-spaced-repetition:fsrs` · 기본 파라미터 |
+| 복습 때 `D` · `S` · 다음 복습일 갱신(**쓰기**) | FSRS 라이브러리 `io.github.open-spaced-repetition:fsrs` · 기본 파라미터 · **학습 · 재학습 단계를 비운다** |
 | `R` 조회 · 집계(**읽기**) | SQL (§8.3) |
+
+**단기 학습 단계(1분 · 10분)를 쓰지 않는다.** 복습은 *"하루 한 번 · 자투리 시간"* 모델이라 몇 분 뒤 다시 보는 단계가 세션 구조와 맞지 않는다(세션은 목록을 한 번 받는다).
+단계를 비우면 카드는 처음부터 복습 상태로 들어가고 간격은 `S` 로 정해진다 — **일 단위 · 최소 1일**. `AGAIN` 은 결과적으로 대개 1일 뒤다.
+- **간격을 직접 덮어쓰지 않는다**(*"AGAIN 은 무조건 1일"* 같은 규칙 금지) — 라이브러리의 `S` 와 실제 간격이 어긋나 숙련도 판정(`S ≥ 1일 · 7일`)과 `R` 일치 테스트의 전제가 틀어진다.
+- 🅿️ **구현 첫 작업에서 확인** — Java 라이브러리가 단계 비활성화를 지원하는가. 안 되면 이 절을 먼저 고친다.
 
 > ⚠️ `R` 공식이 두 곳(라이브러리 · SQL)에 있다 → **일치 테스트**: 같은 `(S, 경과일)` 에서 둘의 `R` 이 같은지. 라이브러리를 올려 상수가 바뀌면 이 테스트가 깨진다. 상수(`factor` · `decay`)는 채택 버전에 맞추고 **테스트가 단일 출처**다.
 
@@ -173,7 +183,7 @@ COMMIT;
 | `created_at` | `timestamptz` | 대기 명단 순서 |
 
 **세션 테이블** — `spring_session` · `spring_session_attributes`(Spring Session JDBC 의 스키마). 프레임워크가 쓰는 테이블이지만 **Flyway 마이그레이션에 넣는다**(자동 생성은 끈다). 로그인 성공 때 인증 주체 이름(`principal_name`)을 `users.id` 로 둔다 — 탈퇴 때 그 사용자의 세션을 한 번에 지우려고.
-만료 세션은 라이브러리의 정리 작업이 지운다 — **배치 금지의 유일한 예외**다([04 §3.2](./04-jobs-and-cost.md)).
+만료 세션은 라이브러리의 정리 작업이 지운다([04 §3.2](./04-jobs-and-cost.md)).
 
 ### 6.2 `curriculum` · `lesson`
 
@@ -194,6 +204,8 @@ COMMIT;
 
 - 커리큘럼 생성은 **빈 `DRAFT`(강의 0개)를 먼저 만들고** 그 id 로 잡을 적재한다. 워커가 강의를 채운다.
 - 다시 짜기는 `lesson` 을 **지우고 새로 만든다** — `DRAFT` 에는 자료가 없어 안전하다. 버전을 보관하지 않는다.
+- 버리기(§2)는 한 트랜잭션에서 `lesson` · 그 커리큘럼의 `jobs`(전부 끝난 짜기 잡) · `curriculum` 을 지운다. `daily_usage` 는 남는다 — 쓴 돈은 쓴 돈이다.
+- 입력 길이 — `topic` 100자 · `purpose` 200자 · 다시 짜기 피드백 500자. 넘으면 `400 STRUCTURAL_LIMIT`.
 
 ### 6.3 `material` · `flashcard`
 
@@ -240,7 +252,7 @@ COMMIT;
 |---|---|
 | `flashcard_id` | PK · FK · 1:1 |
 | `user_id` | **비정규화** — 오늘의 복습 조회가 4단 조인이 되지 않게 |
-| `fsrs_state` · `fsrs_step` | 라이브러리 `Card` 의 `state` · `step` — 빠지면 학습 단계(1분 · 10분)가 매번 처음부터 돈다 |
+| `fsrs_state` · `fsrs_step` | 라이브러리 `Card` 의 `state` · `step`. 학습 단계를 비워 `step` 은 늘 비어 있지만(§4), 라이브러리 `Card` 를 그대로 복원하려고 둔다 |
 | `difficulty` · `stability` | `NEW` 에서는 NULL |
 | `last_reviewed_at` · `next_review_at` · `review_count` | `review_count = 0` = 미복습 |
 
@@ -258,13 +270,27 @@ COMMIT;
 |---|---|
 | `user_id` | **NULL 인 행이 전역**(킬스위치 합계) |
 | `usage_date` | `(now() AT TIME ZONE 'Asia/Seoul')::date` — 서버 기본(UTC)이면 한국 시간 오전 9시에 리셋된다 |
-| `input_tokens` · `output_tokens` · `embedding_tokens` · `cost` | 단가가 달라 분리 |
+| `input_tokens` · `output_tokens` · `embedding_tokens` · `cost` | 단가가 달라 분리. **사용자 쿼터와 킬스위치는 둘 다 `cost`(원)로 잰다** — 토큰은 모델 · 방향마다 단가가 달라 같은 토큰이 다른 돈이다 |
 
 ```sql
 CREATE UNIQUE INDEX idx_usage_key ON daily_usage (COALESCE(user_id, 0), usage_date);
 ```
 
-리셋에 스케줄러를 쓰지 않는다 — 날짜가 바뀌면 행이 없고 upsert 가 0부터 시작한다.
+리셋은 날짜 비교로 한다 — 날짜가 바뀌면 행이 없고 upsert 가 0부터 시작한다. 리셋 작업이 따로 없다.
+
+### 6.7 `alert_log`
+
+| 컬럼 | 비고 |
+|---|---|
+| `event` | `PROVIDER_SPEND_CAP` / `KILL_SWITCH` / `LLM_REQUEST_REJECTED` |
+| `alert_date` | 한국 날짜 |
+| `sent_at` | |
+
+```sql
+CREATE UNIQUE INDEX idx_alert_once ON alert_log (event, alert_date);   -- INSERT … ON CONFLICT DO NOTHING 이 성공했을 때만 슬랙으로 보낸다
+```
+
+같은 이벤트를 **하루 한 번만** 보낸다 — 크레딧 소진이면 이후 모든 잡이 같은 이유로 실패한다. 사용자 소유가 아니라 탈퇴 목록에 없다. 알림 경로는 [04 §9.1](./04-jobs-and-cost.md).
 
 ---
 
@@ -279,6 +305,7 @@ SELECT count(*) FROM users WHERE status = 'ACTIVE';        -- < U_max 면 ACTIVE
 
 - 대기 순번 = `count(*) WHERE status='WAITLISTED' AND created_at < :mine` + 1. 승인은 관리자 SQL `UPDATE users SET status='ACTIVE' WHERE id=?`.
 - 이미 가입한 사람은 정원이 줄어도 밀려나지 않는다. 동의하지 않고 나가면 `PENDING` 행을 지운다.
+- **휴면 사용자도 밀려나지 않는다** — 오래 쓰지 않는 `ACTIVE` 를 내리거나 지우지 않는다. 대기 명단이 쌓이면 **관리자가 `U_max` 를 늘린다.** 휴면 사용자는 비용을 쓰지 않으므로, 늘릴 때 예산 쪽 계산은 *실제 활동 인원* 으로 다시 한다. 회수 조건은 [01 §6](./01-overview.md).
 
 **회원 탈퇴 — 한 트랜잭션**
 
@@ -305,7 +332,7 @@ COMMIT;
 
 ## 8. 핵심 쿼리
 
-### 8.1 오늘의 복습 — 하루 50장, 첫 복습은 한도 밖
+### 8.1 오늘의 복습 — 오늘 안에 예정된 카드 · 하루 50장 · 첫 복습은 한도 밖
 
 ```sql
 CREATE INDEX idx_cardstate_due ON card_state (user_id, next_review_at);
@@ -313,19 +340,20 @@ CREATE INDEX idx_review_today  ON review (user_id, reviewed_at);
 ```
 
 ```sql
--- :todayStart = 오늘 00:00 Asia/Seoul · :remaining = 50 − (첫 쿼리 결과)
+-- :todayStart = 오늘 00:00 Asia/Seoul · :tomorrowStart = 내일 00:00 Asia/Seoul · :remaining = 50 − (첫 쿼리 결과)
 SELECT count(*) FROM review
  WHERE user_id = :u AND reviewed_at >= :todayStart AND NOT is_first;
 
 (SELECT * FROM card_state                       -- 첫 복습 — 한도 밖, 전부
-  WHERE user_id = :u AND next_review_at <= now() AND review_count = 0
+  WHERE user_id = :u AND next_review_at < :tomorrowStart AND review_count = 0
   ORDER BY next_review_at)
 UNION ALL
 (SELECT * FROM card_state                       -- 나머지 — 남은 한도만큼, 오래 밀린 순
-  WHERE user_id = :u AND next_review_at <= now() AND review_count > 0
+  WHERE user_id = :u AND next_review_at < :tomorrowStart AND review_count > 0
   ORDER BY next_review_at LIMIT :remaining);
 ```
 
+> **"오늘"은 시각이 아니라 한국 날짜다** — 간격이 일 단위인데 `next_review_at` 은 시각이라, `<= now()` 로 자르면 밤 9시에 1일 간격을 받은 카드가 다음 날 아침엔 안 나오고 배지가 하루 종일 늘어난다. 몇 시간 일찍 보는 것은 FSRS 가 실제 경과 시간으로 반영하고, 숙련도 `R` 도 실제 경과 시간으로 계산한다(§8.3).
 > 한도는 *"오늘 이미 푼 수"* 를 세야 선다 — `LIMIT 50` 한 줄은 조회 한 번당 50장이다. 첫 복습을 빼는 이유 — 강의 직후 10장이 한도를 먹으면 기존 카드가 밀린다.
 > 🅿️ 50장은 빨리 넘기는 카드 기준이다. 설명형 카드는 한 장에 30초~1분이라 실사용에서 세션 시간을 재서 조정한다.
 
