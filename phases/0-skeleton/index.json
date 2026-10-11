@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "database",
-      "status": "pending"
+      "status": "completed",
+      "summary": "Boot 관리 JUnit 6·JPA·Flyway·PostgreSQL 의존성, pgvector V1·로컬 Compose·JPA 설정 및 JVM 공유 Testcontainers DB와 통합 테스트 구성(./gradlew test 19개 통과)",
+      "started_at": "2026-10-12T06:55:15+0900",
+      "completed_at": "2026-10-12T06:59:07+0900"
     },
     {
       "step": 2,
