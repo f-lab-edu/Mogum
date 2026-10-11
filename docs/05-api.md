@@ -48,16 +48,20 @@
 | `ACCOUNT_WAITLISTED` | 403 | 대기 명단 — 위 네 개만 된다 |
 | `RATE_LIMITED` | 429 | 우리 API 레이트리밋 · `Retry-After` |
 | `NOT_FOUND` | 404 | 없거나 **남의 것**(§1.3) |
-| `STRUCTURAL_LIMIT` | 400 | 기간 1~8주 · 주당 3~5강 · 총 40강 · 입력 길이(주제 100 · 목적 200 · 피드백 500자) 위반 |
+| `STRUCTURAL_LIMIT` | 400 | 입력 길이(주제 100 · 목적 200 · 피드백 500자) 위반. 생성 목록의 총 1~40강 위반은 수정 요청 후에도 잘못되면 잡 `LLM_OUTPUT_INVALID`([03 §2](./03-generation.md)) |
 | `USER_QUOTA_EXCEEDED` | 429 | 일일 생성 비용 한도 · `Retry-After` = 한국 시간 자정까지 |
 | `ACTIVE_JOB_LIMIT` | 429 | 진행 중 생성이 이미 2개. 하나 끝나면 풀린다 |
 | `GLOBAL_BUDGET_EXHAUSTED` | 503 | 전역 킬스위치 · `Retry-After` |
 | `REGENERATION_LIMIT` | 409 | 다시 짜기 3회 초과 |
-| `CURRICULUM_NOT_DRAFT` · `CURRICULUM_GENERATING` · `CURRICULUM_NOT_ACTIVE` | 409 | 상태 충돌 — 버리기도 `DRAFT` 가 아니면 `NOT_DRAFT`, 짜는 중이면 `GENERATING` |
+| `CURRICULUM_NOT_DRAFT` · `CURRICULUM_GENERATING` · `CURRICULUM_NOT_ACTIVE` | 409 | 승인 · 다시 짜기 · 학습 상태 충돌. 커리큘럼 삭제는 생성 중에도 허용 |
+| `CURRICULUM_NOT_READY` | 409 | 승인 요청에 검증을 통과해 저장된 강의 목록이 없음 — 단계 상세 생성 실패의 빈 초안 포함. 초기 생성 실패에는 커리큘럼 자체가 없음 |
 | `LESSON_NOT_READY` | 409 | 자료 없는 강의에 학습 완료 |
 | `JOB_NOT_FAILED` | 409 | 실패하지 않은 잡에 재시도 |
-| `JOB_NOT_RETRYABLE` | 409 | 거절된 주제(`TOPIC_REJECTED`) 잡에 재시도 |
+| `JOB_NOT_RETRYABLE` | 409 | 거절된 주제(`TOPIC_REJECTED`) · 누적 호출 상한 소진 · 입력 상한 초과 잡, 또는 커리큘럼이 이미 `DRAFT` 를 벗어난 커리큘럼 생성 잡에 재시도. 강의 자료의 앞 두 경우는 처음부터 다시 만들기(§3.1)로 |
+| `LESSON_RESTART_LIMIT` | 409 | 강의 자료 처음부터 다시 만들기 2회 초과 — 그 강의의 잡이 이미 3개 |
 | `NO_CARDS_DUE` | 409 | 복습할 카드가 없는데 세션 요청 |
+| `REVIEW_ALREADY_PROCESSED` | 409 | 다른 평가로 카드 상태가 이미 바뀜 — 제출한 평가는 반영하지 않는다 |
+| `REVIEW_REQUEST_CONFLICT` | 409 | 같은 `reviewRequestId`를 다른 카드 · 등급 · 요청 버전에 재사용 |
 
 - `429` = *"이 사용자가 많이 썼다 · 시간이 지나면 풀린다"*. `503` = *"서비스 전체가 지금 신규를 안 받는다"*. `403` = *"누구인지는 알지만 아직 못 쓴다"* — `401` 과 구분해야 화면이 로그인으로 튕기지 않는다.
 - **우리 `429` 와 프로바이더 `429` 는 다른 층이다** — 메트릭에서 `api.reject{code}` 와 `llm.call.retry{reason}` 로 나눈다.
@@ -77,7 +81,7 @@
 
 ### 1.5 새 잡을 만드는 요청의 공통 검사
 
-`POST /curriculums` · `POST /curriculums/{id}/regenerate` · `POST /lessons/{id}/materials`(신규) · `POST /jobs/{id}/retry` 는 적재 전에 **킬스위치 → 쿼터 → 진행 중 2개** 순서로 검사한다([04 §7.1](./04-jobs-and-cost.md)).
+`POST /curriculums` · `POST /curriculums/{id}/regenerate` · `POST /lessons/{id}/materials`(신규 · 처음부터 다시 만들기) · `POST /jobs/{id}/retry` 는 적재 전에 **킬스위치 → 쿼터 → 진행 중 2개** 순서로 검사한다([04 §7.1](./04-jobs-and-cost.md)).
 
 ---
 
@@ -85,30 +89,49 @@
 
 | | 엔드포인트 | 응답 |
 |---|---|---|
-| 목록 | `GET /curriculums` | 진행 중 · 완료 + 진도 + `nextLesson: { id, orderNo, title }`(처음으로 안 끝난 강의, `ACTIVE` 가 아니면 `null`) |
-| 생성 | `POST /curriculums` `{ topic, purpose, weeks }` | `202 { curriculumId, jobId }` — **빈 `DRAFT` 를 먼저 만든다** |
+| 목록 | `GET /curriculums` | 진행 중 · 완료 + 진도 + `nextLesson: { id, orderNo, title }`(처음으로 안 끝난 강의 — 막힌 강의([04 §4.9](./04-jobs-and-cost.md))는 건너뛴다, `ACTIVE` 가 아니면 `null`) |
+| 초기 생성 접수 | `POST /curriculum-requests` `{ topic, purpose }` | `202 { jobId }` — 입력을 초기 잡 I에 먼저 저장. 커리큘럼/그룹 ID는 성공 후 반환 |
+| 초기 요청 복귀 | `GET /curriculum-requests` | 본인 초기 잡 중 `QUEUED` / `RUNNING` / `FAILED`의 `{ jobId, topic, purpose, status }` 목록. 결과가 아직 없는 요청을 커리큘럼 목록과 구분 |
 | 상세 | `GET /curriculums/{id}` | 강의 목록 · 키워드 · `masteryReflection` · `generation` |
 | 다시 짜기 | `POST /curriculums/{id}/regenerate` `{ feedback? }`(500자 이내) | `202 { jobId }` · 한도 초과 `409` |
-| 승인 | `POST /curriculums/{id}/approve` | `DRAFT → ACTIVE`. 생성 잡이 진행 중이면 `409 CURRICULUM_GENERATING` |
-| 그만두기 | `POST /curriculums/{id}/abandon` | `ACTIVE → ABANDONED`. 이 커리큘럼의 **대기 중 잡은 `CANCELLED`**, 실행 중인 잡은 끝낸다. 공부한 카드는 복습에 남는다 |
-| 버리기 | `DELETE /curriculums/{id}` | `204`. **`DRAFT` 이고 활성 잡이 없을 때만** — 한 트랜잭션에서 `lesson` · 이 커리큘럼의 `jobs` · `curriculum` 삭제. `DRAFT` 가 아니면 `409 CURRICULUM_NOT_DRAFT`, 짜는 중이면 `409 CURRICULUM_GENERATING` |
+| 승인 | `POST /curriculums/{id}/approve` | `DRAFT → ACTIVE`. `DRAFT` 가 아니면 `409 CURRICULUM_NOT_DRAFT`, 활성 생성 잡이 있으면 `409 CURRICULUM_GENERATING`, 검증된 강의 목록이 없으면 `409 CURRICULUM_NOT_READY` |
+| 완전 삭제 | `DELETE /curriculums/{id}` | `204`. `DRAFT` / `ACTIVE` / `COMPLETED` 및 생성 중에도 허용. 연결 잡 A/B · 강의 · 자료 · 플래시카드 · 카드 상태/복습 이력 · 해당 자료의 판정 기록을 한 트랜잭션으로 삭제([02 §6.2](./02-domain-data.md)). 다른 커리큘럼의 기록과 생성 비용 합계는 유지. 없거나 남의 것이면 `404` |
 
 ```jsonc
 // GET /curriculums/{id}
 {
-  "id": 12, "title": "경제 기초 4주", "topic": "경제 기초", "status": "DRAFT",
+  "id": 12, "title": "경제 기초", "topic": "경제 기초", "status": "DRAFT",
   "regenerationCount": 1, "regenerationLimit": 3,
   "masteryReflection": [ { "concept": "기회비용", "action": "EXCLUDED" } ],
-  "lessons": [ { "id": 101, "orderNo": 1, "week": 1, "title": "…", "objective": "…",
+  "lessons": [ { "id": 101, "orderNo": 1, "title": "…", "objective": "…",
                  "keywords": ["기회비용", "희소성"], "status": "NOT_STARTED",
                  "hasMaterial": false, "generating": false } ],      // generating 은 파생값 — 진행 중 잡이 있나
   "generation": { "jobId": 90, "status": "FAILED" }                   // 이 커리큘럼의 최근 잡 · 없으면 null
 }
 ```
 
-생성 요청을 보낸 화면은 **곧바로 U3 로 이동해 거기서 기다린다**(주소에 커리큘럼 id 가 있어 새로고침에도 안전).
+초기 접수 응답에는 `jobId`만 있다. 화면은 이 ID로 대기 상태에 연결해 `GET /jobs/{jobId}`를 폴링하며, URL에 `jobId`를 보존해 새로고침 뒤에도 같은 잡으로 복귀한다. 성공한 `result.kind`/ID에 따라 단일 커리큘럼 검토 또는 그룹 분할안 검토로 연결한다. 결과 리소스가 없을 때 가짜 커리큘럼 ID로 U3 상세를 조회하지 않는다. 다른 기기/재로그인에는 `GET /curriculum-requests`의 미완료 요청과 실제 결과 리소스 목록에서 복귀한다.
+
+접수 시 기존 인증/입력 길이/킬스위치/쿼터/진행 중 2개 검사를 적용하고 같은 트랜잭션에서 입력과 잡을 저장한다. 실패한 초기 잡은 `POST /jobs/{jobId}/retry`로 같은 입력/체크포인트/예산을 유지해 재개한다. 기존 거절/호출 상한/입력 초과의 재시도 제한도 적용한다. 승인 대상은 성공 후 만들어진 커리큘럼이며 초기 실패에는 승인하거나 삭제할 커리큘럼이 없다. 초기 동일 요청의 응답 유실/연타를 하나로 접수하는 키/유일성 계약과 미완료 초기 요청을 지우는 동작은 후속 결정이다.
+
+기간 · 주당 학습량 입력과 예상 완료 기간/주차별 일정 응답은 없다. 다시 짜기는 강의 내용 · 범위 · 깊이 · 권장 순서를 조정하며 일정 조정은 제공하지 않는다([03 §2](./03-generation.md)).
+
+승인은 최근 잡이 `FAILED` 여도 이전에 성공한 목록이 남아 있으면 가능하다. 승인과 다시 짜기 적재 · 커리큘럼 잡 재시도 · 결과 저장은 같은 커리큘럼 잠금 안에서 검사와 변경을 수행한다. 다시 짜기는 `DRAFT` 에서만 가능하며, 승인 후 예전 실패 잡의 재시도는 `409 JOB_NOT_RETRYABLE` 로 막는다. 재시도가 먼저 적재되면 승인 요청은 `409 CURRICULUM_GENERATING` 이다.
+
+삭제 전에 화면에서 연결된 학습 기록과 플래시카드도 삭제되고 되돌릴 수 없음을 안내한다([06 §2.5](./06-screens.md)). 삭제 요청 중에는 버튼 중복 제출을 막는다. 삭제 응답이 유실돼 다시 요청했을 때 `404` 면 상세를 확인하고 이미 삭제된 것으로 화면을 정리한다. 삭제 후 해당 커리큘럼/강의/카드/잡의 조회 · 변경 요청도 `404` 이며 데이터를 다시 만들지 않는다.
 
 ---
+
+### 2.1 분할안 · 다음 단계 생성 — 추가 계약 설계 필요
+
+단일/그룹 구분은 LLM이 주제/학습 목적의 의미를 판단하고 사용자가 결과를 검토한다. **최초 생성 호출에서 유형 판단과 해당 결과를 함께 반환한다** — 단일이면 강의 목록, 그룹이면 분할안이다([03 §2.1](./03-generation.md)). 판단만 한 뒤 목록/분할안을 생성하는 별도 호출은 두지 않는다. 초기 요청은 `POST /curriculum-requests`로 잡 I(`CURRICULUM_INITIAL`)에 먼저 접수하고 성공할 때 해당 리소스를 생성한다. 미완료 요청은 `GET /curriculum-requests`, 상태와 결과는 `GET /jobs/{jobId}`로 복귀한다. 그룹 화면의 상세 구성은 사용자 결정으로 보류했으며, 확정된 순차 생성 동작을 기준으로 계약을 정한다([06 §7.6](./06-screens.md)).
+
+§2 표는 초기 접수/복귀와 실제 단일 커리큘럼을 다루는 API다. 초기 생성의 빈 `DRAFT` 선생성과 `202 { curriculumId, jobId }` 계약은 대체했다. 그룹의 특정 단계 생성은 대상이 정해져 있으므로 기존 단계 초안/잡 A 적재 모델을 유지한다. 분할안은 `CurriculumGroup`/`CurriculumStep`에 저장하고 실제 커리큘럼은 `step_id`로 연결한다([02 §6.2.1](./02-domain-data.md)). 분할안 생성/조회와 단계 생성은 추가 API 계약이 필요한 MVP 기능이다. 엔드포인트 이름과 요청/응답 스키마는 구현 전에 확정한다. 현재 표만으로 분할안 화면의 API가 완성됐다고 볼 수 없다.
+
+- 조회에는 묶음 ID와 전체 목표, 단계 ID와 제목/범위/목적/순서, 연결된 커리큘럼/잡과 생성 가능 여부가 필요하다. 미생성 단계를 `DRAFT` 커리큘럼으로 가장하지 않는다
+- 생성 요청은 사용자가 클릭할 때만 보낸다. `curriculum_step.id`로 저장된 주제/목적과 묶음 소유권을 확인하고, 다음 단계는 직전 커리큘럼 `COMPLETED`를 재확인한다. 다른 사용자/없는 분할안이나 단계는 기존 소유권 규칙에 따라 `404`
+- 유료 생성은 기존 비동기 워커 경로 · 킬스위치 · 비용 쿼터 · 진행 중 2개 검사를 받는다. 완료 이벤트만으로 요청을 적재하지 않는다
+- 같은 단계의 동시/응답 유실 재요청은 기존 커리큘럼/잡으로 연결하며, 이미 생성된 단계에는 새 초안을 만들지 않는다. 삭제/탈퇴와의 경합 및 실패 재시도도 확장 설계에서 다룬다
 
 ## 3. 강의 — U4
 
@@ -119,60 +142,78 @@
 | 자료가 이미 있다 | `200 { materialId }` |
 | 신규 | `202 { jobId, position }` |
 | 이 강의에 진행 중인 잡이 있다 | `202` + **기존 `jobId`** — 에러가 아니다 |
-| 이 강의의 최근 잡이 `FAILED` | `202` + 기존 `jobId` — **그 잡을 재시도한다**(산출물이 이어진다) |
+| 이 강의의 최근 잡이 `FAILED` | 재시도 가능하면 `202` + 기존 `jobId` — **그 잡을 재시도한다**(산출물이 이어진다). 누적 호출 상한 소진 · 입력 상한 초과는 `409 JOB_NOT_RETRYABLE` |
+| 위 두 경우에 `{ "restart": true }` | **처음부터 다시 만들기** — `202 { jobId, position }` 새 잡(새 호출 몫 · 1단계부터). 강의당 2번, 넘으면 `409 LESSON_RESTART_LIMIT` |
 | 검사에 걸림 | §1.5 의 `429` · `503` |
 
 동시 요청 둘은 부분 unique 인덱스가 하나를 실패시키고, API 가 그 예외를 잡아 기존 잡을 돌려준다([04 §4.7](./04-jobs-and-cost.md)).
+
+`restart` 는 사용자가 버튼을 눌렀을 때만 보낸다 — 강의를 다시 열 때의 자동 재시도는 새 잡을 만들지 않는다. 최근 잡이 위 두 코드로 끝난 경우가 아니면 `restart` 는 무시되고 일반 요청과 같다. 2번을 다 쓴 강의는 *막힌 강의* 로 남고 관리자 SQL 로 되살린다([04 §4.9](./04-jobs-and-cost.md)).
 
 ### 3.2 열람 · 학습 완료
 
 | | 엔드포인트 | 비고 |
 |---|---|---|
-| 열람 | `GET /lessons/{id}/material` | 마크다운 6섹션 + `truncated` |
-| 학습 완료 | `POST /lessons/{id}/complete` | **같은 트랜잭션에서 그 강의 카드들의 `card_state` 를 만든다**(`NEW` · `next_review_at=now()`) |
+| 열람 | `GET /lessons/{id}/material` | 정상 종료 · 필수 6섹션 검증을 통과한 마크다운 자료. 잘린 본문은 제공하지 않음 |
+| 학습 완료 | `POST /lessons/{id}/complete` | 최초 완료 때 강의 상태 · 카드별 `card_state` 최초 삽입 · 전 강의 완료 시 커리큘럼 전환을 같은 트랜잭션으로 처리. 이미 완료한 강의도 `200`, 기존 FSRS/복습 상태 · 이력 변경 없음([02 §3](./02-domain-data.md)) |
 
 ```jsonc
 // POST /lessons/{id}/complete → 200
 { "lessonStatus": "COMPLETED",
-  "reviewCards": [ { "flashcardId": 1, "question": "…", "modelAnswer": "…", "keyPoints": ["…"], "concept": "기준금리",
-                     "source": { "curriculumTitle": "경제 기초 4주", "lessonOrder": 6 } } ] }   // 방금 그 강의 카드만
+  "reviewCards": [ { "flashcardId": 1, "cardVersion": 0, "question": "…", "modelAnswer": "…", "keyPoints": ["…"], "concept": "기준금리",
+                     "source": { "curriculumTitle": "경제 기초", "lessonOrder": 6 } } ] }   // 그 강의에서 현재 아직 첫 평가를 하지 않은 카드만
 ```
 
-응답의 카드는 **편의**다. 화면이 무시하고 떠나도 카드는 이미 오늘의 복습에 들어 있다.
+응답의 카드는 **편의**다. 화면이 무시하고 떠나도 미평가 카드는 이미 오늘의 복습에 들어 있다.
+
+같은 커리큘럼 잠금 안에서 최초 완료/중복 요청을 구분한다. 응답 유실 · 동시 두 요청 · 커리큘럼 전체 완료 후 재요청 모두 완료한 강의에는 `200` 이며, 카드 상태를 초기화하거나 복습 기록을 새로 만들지 않는다. `reviewCards` 는 현재 `review_count=0` 인 해당 강의 카드와 현재 버전이다. 그 사이 평가한 카드가 있으면 최초 응답과 목록이 다를 수 있고, 모두 평가했으면 빈 배열이다. 첫 복습 버튼은 남은 카드가 있을 때만 표시한다. 최초 완료는 `ACTIVE` 커리큘럼의 준비된 강의에만 허용하며, 삭제/소유권 없음은 중복 요청에도 `404` 다.
 
 ---
 
-## 4. 잡 — U3 · U4
+## 4. 잡 — 초기 생성 대기 · U3 · U4
 
 ```
 GET /jobs/{jobId}          Cache-Control: no-store       — 화면은 2초마다
 ```
 
 ```jsonc
-{ "jobId": 77, "status": "RUNNING",          // QUEUED | RUNNING | SUCCEEDED | FAILED | CANCELLED
+{ "jobId": 77, "status": "RUNNING",          // QUEUED | RUNNING | SUCCEEDED | FAILED
   "step": 2, "totalSteps": 3, "stepName": "본문 작성",
-  "queuePosition": null,                     // QUEUED 일 때만 — 나보다 먼저 적재된 QUEUED 수 + 1
+  "queuePosition": null,                     // QUEUED 일 때만 — 수령 순서(available_at, 같으면 id)로 나보다 앞선 QUEUED 수 + 1.
+                                             //   enqueued_at 으로 세면 재시도한 잡(available_at = now())이 실제로는 줄 끝인데 "앞에 0명"으로 보인다
   "retried": true,                           // 재시도가 한 번이라도 있었나 — 화면은 "평소보다 조금 더 걸려요" 로만
-  "materialId": null,                        // SUCCEEDED 면 채워진다 (커리큘럼 잡은 curriculumId)
+  "result": null,                            // SUCCEEDED일 때만 { kind, id }. 아래 결과 계약 참조
   "failure": null }                          // FAILED 면 { code, message }
 ```
+
+**결과 연결 계약** — `result`는 성공 전 NULL이다. 잡 I의 단일 결과는 `{ "kind": "CURRICULUM", "id": 12 }`, 그룹 결과는 `{ "kind": "CURRICULUM_GROUP", "id": 8 }`다. 잡 A는 `CURRICULUM`, 잡 B는 `MATERIAL`과 해당 ID를 반환한다. 초기 잡 I의 결과 종류는 연결된 FK에서 읽고 `jobs.type`을 바꾸지 않는다. 결과 생성/연결/잡 성공은 같은 커밋이므로 성공인데 결과 ID가 없는 응답을 만들지 않는다. 삭제된 잡과 남의 잡은 `404`다. 내부 `payload`/체크포인트는 사용자 응답으로 반환하지 않는다.
 
 토큰 · 비용은 사용자 응답에 싣지 않는다 — 사용자가 할 수 있는 게 없는 정보다. 관리자 U6 에 있다.
 
 **재시도** — `POST /jobs/{jobId}/retry` → `202 { jobId, position }`. 같은 행을 되살려 **실패한 단계부터** 재개한다. §1.5 검사를 똑같이 받는다.
+
+초기 잡 I의 재시도는 커리큘럼/그룹이 아직 없으므로 계정/잡 소유권과 실패 상태를 확인하고, 같은 입력/체크포인트/누적 호출 몫을 유지한다. 이미 성공한 초기 잡은 재시도로 새 결과를 만들지 않는다. 대상이 정해진 커리큘럼 잡 A는 해당 커리큘럼이 여전히 `DRAFT` 인지 잠금 안에서 확인한다. 승인 후에는 `409 JOB_NOT_RETRYABLE` 이며, 재적재 · 추가 외부 호출 · 강의 목록 변경을 하지 않는다. 같은 커리큘럼에 이미 활성 생성 잡이 있으면 `409 CURRICULUM_GENERATING` 이다.
+
+누적 외부 호출 이력과 적재 시 확정한 상한을 유지한다. `JOB_CALL_LIMIT_EXCEEDED` 는 `409 JOB_NOT_RETRYABLE` 이며, 강의 다시 열기의 자동 재시도도 같은 규칙을 따른다. 소진한 실패 잡을 자동으로 새 행으로 바꿔 주지 않는다 — 강의 자료는 사용자가 처음부터 다시 만들기를 고를 때만 새 잡이다(§3.1). **재시도 거절은 실패 코드(주제 거절 · 호출 상한 소진 · 입력 초과)와 커리큘럼 상태로만 판단한다.** 다음 단계가 어떤 호출을 얼마나 쓸지는 API 가 따지지 않는다 — 그건 생성 단계의 지식이라 API 쪽(`core.job`)이 알면 패키지 경계가 깨진다([04 §2](./04-jobs-and-cost.md)). 다른 실패 코드의 재시도에서 몫이 모자라면 첫 호출 등록이 외부 전송 없이 `JOB_CALL_LIMIT_EXCEEDED` 로 끝내고, 그때 강의 자료는 처음부터 다시 만들기가 열린다. 모든 새 외부 전송은 등록 시 다시 검사한다([04 §4.8](./04-jobs-and-cost.md)).
 
 ## 5. 실패 코드 — `failure.code`
 
 | `code` | 언제 | 다시 시도 |
 |---|---|---|
 | `DEADLINE_EXCEEDED` | 잡 시한 10분 초과 | ✅ |
-| `LLM_OUTPUT_INVALID` | 재요청까지 파싱 실패 · 개요 없음 · 섹션 누락 | ✅ |
+| `LLM_OUTPUT_INVALID` | 재요청까지 파싱 실패 · 개요 없음 · 섹션 누락/빈 섹션 · 이어 쓰기 뒤에도 본문 잘림 | ✅ — 본문 실패는 검증된 개요를 유지하고 ②부터 새 본문 생성 |
 | `LLM_UNAVAILABLE` | 재시도 소진(429 · 5xx · 타임아웃) · `retry-after` > 60초 | ✅ |
+| `USAGE_RECORD_FAILED` | 호출 등록 · 사용량 기록의 DB 재시도 소진. 추가 외부 호출을 멈춤 | ✅ — DB 복구 후 |
+| `JOB_CALL_LIMIT_EXCEEDED` | 작업 전체 누적 외부 시도 상한 소진. 재시작 · 사용자 재시도로 초기화하지 않음 | ❌ — 강의 자료는 처음부터 다시 만들기(§3.1 · 강의당 2번) |
+| `INPUT_TOO_LARGE` | 시스템 · 대화 이력 · 툴 결과를 포함한 입력이 단계별 토큰 상한 초과. 해당 요청 전송 없음 | ❌ — 같은 입력은 다시 보내지 않음. 강의 자료는 처음부터 다시 만들기(§3.1 · 강의당 2번) |
 | `LLM_REQUEST_REJECTED` | 프로바이더가 요청 거부(400 · 401 · 403 · 413) — **우리 버그** | ✅ |
 | `PROVIDER_SPEND_CAP` | 프로바이더 크레딧 소진(`insufficient_quota`) | ❌ |
 | `TOPIC_REJECTED` | 잡 A 가 주제를 거절했다 — 위험 · 불법 · 연습형([03 §2](./03-generation.md)) | ❌ — 같은 주제는 같은 결과다. 새 주제로 만든다 |
 
-`CANCELLED`(커리큘럼 그만두기)는 실패가 아니라 재시도 대상이 아니다. `TOPIC_REJECTED` 잡에 `POST /jobs/{id}/retry` 를 부르면 `409 JOB_NOT_RETRYABLE` — 같은 주제는 다시 돌려도 같은 거절에 돈만 쓴다. `PROVIDER_SPEND_CAP` 은 화면에 버튼이 없을 뿐 API 는 막지 않는다 — 크레딧을 채운 뒤 강의를 다시 열면 그 잡이 재시도된다(§3.1).
+커리큘럼 삭제 시 연결 잡도 삭제되므로 조회/재시도는 `404` 다. `TOPIC_REJECTED` 잡에 `POST /jobs/{id}/retry` 를 부르면 `409 JOB_NOT_RETRYABLE` — 같은 주제는 다시 돌려도 같은 거절에 돈만 쓴다. `PROVIDER_SPEND_CAP` 은 화면에 버튼이 없을 뿐 API 는 막지 않는다 — 크레딧을 채운 뒤 강의를 다시 열면 그 잡이 재시도된다(§3.1).
+
+위 표의 ✅는 재시도를 받는다는 뜻이고, 누적 몫이 모자라면 재시도된 잡이 첫 호출 등록에서 외부 전송 없이 `JOB_CALL_LIMIT_EXCEEDED` 로 끝난다. 일일 쿼터가 새 날짜에 초기화되어도 작업 전체 호출 상한은 유지된다.
+`INPUT_TOO_LARGE` 도 재시도 API · 강의 다시 열기의 자동 재시도에서 `409 JOB_NOT_RETRYABLE` 이다. 이전 단계 산출물과 실패한 다시 짜기의 이전 커리큘럼을 보존한다. 설정 오류는 `LLM_REQUEST_REJECTED` 로 분류해 운영자가 구성 수정 후 재시도할 수 있다.
 
 ---
 
@@ -180,20 +221,28 @@ GET /jobs/{jobId}          Cache-Control: no-store       — 화면은 2초마�
 
 | | 엔드포인트 | 비고 |
 |---|---|---|
-| 오늘의 복습 | `GET /reviews/due` | **한국 날짜로 오늘 안에 예정된** 카드 — 첫 복습 카드 전부 + 하루 50장 중 남은 만큼 오래 밀린 순([02 §8.1](./02-domain-data.md)) |
-| 평가 | `POST /reviews` `{ flashcardId, rating }` | `card_state` 갱신(FSRS) + `review` 삽입 — 한 트랜잭션 |
+| 오늘의 복습 | `GET /reviews/due` | **한국 날짜로 오늘 안에 예정된 카드 전부** — 일일 개수 제한 없이 오래 밀린 순, 동률이면 카드 ID 순([02 §8.1](./02-domain-data.md)) |
+| 평가 | `POST /reviews` `{ reviewRequestId, flashcardId, rating, expectedCardVersion }` | 같은 요청은 최초 성공 응답 반환. 새 요청은 카드 버전 검사 후 FSRS 갱신 + 복습 기록을 한 트랜잭션으로 저장 |
 
 ```jsonc
 // GET /reviews/due
-{ "cards": [ { "flashcardId": 1, "question": "…", "modelAnswer": "…", "keyPoints": ["…"], "concept": "기준금리",
-               "source": { "curriculumTitle": "경제 기초 4주", "lessonOrder": 6 } } ],   // 출처 — 섞여 나와도 맥락을 알게
-  "overdueCount": 4, "dailyLeft": 43 }
+{ "cards": [ { "flashcardId": 1, "cardVersion": 3, "question": "…", "modelAnswer": "…", "keyPoints": ["…"], "concept": "기준금리",
+               "source": { "curriculumTitle": "경제 기초", "lessonOrder": 6 } } ],   // 출처 — 섞여 나와도 맥락을 알게
+  "overdueCount": 4 }
 
 // POST /reviews → 200
-{ "nextReviewAt": "2026-10-02T09:00:00Z", "remaining": 7, "dailyLeft": 43 }
+{ "nextReviewAt": "2026-10-02T09:00:00Z", "remaining": 7 }
 ```
 
 복습이 밀려도 다음 강의는 막지 않는다 — `overdueCount` 로 배지만 띄운다. 평가 되돌리기는 없다(알려진 한계).
+
+일일 복습 장수로 조회/평가를 막지 않는다. `remaining` 은 평가 후 해당 사용자의 오늘까지 예정된 카드 수이며, 현재 세션의 진행률은 화면에 고정한 목록으로 계산한다. 사용자는 도중에 나갈 수 있고 저장한 평가까지 유지된다. 다음 복습일은 기존 FSRS 규칙을 따른다.
+
+**평가의 멱등성** — `reviewRequestId`는 평가를 누를 때 생성하는 UUID다. 응답 유실 · 네트워크 오류 후 재시도는 **같은 ID · 같은 요청 내용**을 보낸다. `expectedCardVersion`에는 목록 또는 학습 완료 응답의 `cardVersion`을 넣는다.
+- 이미 성공한 동일 요청이면 현재 카드 버전과 관계없이 최초 `200` 응답을 그대로 반환한다. FSRS와 복습 횟수를 다시 갱신하지 않는다.
+- 다른 요청이 먼저 평가해 버전이 바뀌었으면 `409 REVIEW_ALREADY_PROCESSED`. 화면은 「이미 평가한 카드예요.」를 알리고 해당 카드를 건너뛴다. 최신 버전으로 자동 재제출하지 않는다.
+- 같은 요청 ID에 다른 내용을 보내면 `409 REVIEW_REQUEST_CONFLICT`. 자동 재시도하지 않고 복습 목록을 다시 불러오게 한다.
+- 처리 후 복습 목록 · 배지 · 남은 카드 수를 갱신한다. 재전송의 최초 응답에 담긴 장수는 최신값으로 간주하지 않는다. 저장 순서는 [02 §6.5](./02-domain-data.md).
 
 ---
 
@@ -204,17 +253,31 @@ GET /system/status          관리자 아니면 404 · 화면은 진입 시 1회
 ```
 
 ```jsonc
-{ "jobs":        { "queued": 3, "running": 2, "executors": 4, "oldestQueuedSeconds": 40 },
-  "cost":        { "todayTokens": 84000, "todayCost": 620, "killSwitchRemaining": 9380 },
-  "reliability": { "rate429": 0.02, "retries": 5, "failureRate": 0.01, "reclaimed": 0 },   // 최근 24시간
+{ "asOf": "2026-10-11T05:32:05Z",                // 이 응답의 모든 시간창에 사용하는 DB 기준 시각
+  "jobs":        { "queued": 3, "running": 2, "executors": 4, "oldestQueuedSeconds": 40 },
+  "cost":        { "todayTokens": 84000, "todayCost": 620, "killSwitchRemaining": 9380, "unknownCalls": 2 },
+  "reliability": { "rate429": 0.02, "retries": 5, "failureRate": 0.01, "reclaimed": 0,     // 최근 24시간
+                   "succeededAttempts": 99, "failedAttempts": 1,                         // failureRate의 분모는 둘의 합
+                   "stuckLessons": 0 },                                                    // 막힌 강의 — 날짜 제한 없음
   "conceptMatch": { "linked": 41, "split": 3, "created": 128,
-                    "borderline":      [ { "a": "인플레이션", "b": "inflation", "sim": 0.76 } ],
-                    "mergeCandidates": [ { "keepId": 12, "dropId": 57, "sim": 0.77 } ] },
+                    "borderline":      [ { "userId": 7, "inputName": "엔트로피", "conceptId": 201, "concept": "엔트로피", "sim": 0.48 } ],
+                    "mergeCandidates": [ { "userId": 7, "keepId": 12, "dropId": 57, "sim": 0.77 } ] },
   "users":       { "active": 14, "cap": 25, "waitlisted": 3, "activeToday": 6 } }
 ```
 
-**전부 DB 에서 읽는다** — 운영 서버에 Prometheus 가 없다. `jobs` 카운터 · `daily_usage` · `concept_match_log` · `users`.
-`borderline` 과 `mergeCandidates` 는 같은 데이터원(이름 다름 분기 · 임계값 −0.05)이다 — **임계값을 내릴지, 이 쌍만 병합할지**를 같은 자리에서 판단한다.
+**전부 DB 에서 읽는다** — 운영 서버에 Prometheus 가 없다. `jobs` · `job_event` · `llm_call` · `concept_match_log` · `users`. 비용 합계는 원장을 오늘 날짜로 더한 값이다([02 §6.6](./02-domain-data.md)).
+
+**신뢰성 집계 계약** — DB의 기준 시각을 한 번 정해 `asOf`로 반환하고 `[asOf - 24시간, asOf)`를 최근 24시간으로 쓴다. 날짜를 ‘오늘’로 잘라 계산하지 않는다.
+
+- `succeededAttempts` · `failedAttempts` · `reclaimed`: `job_event.occurred_at`이 창 안인 각 이벤트 건수. 현재 `jobs.status`와 조인해 과거 결과를 버리지 않는다. 삭제로 `job_id`가 NULL인 이벤트도 포함한다
+- `failureRate`: `failedAttempts / (succeededAttempts + failedAttempts)`. 합이 0이면 NULL. 재시도 전 실패와 재시도 후 성공을 각각 세는 **종결된 실행 기준**이며 고유 작업의 최종 실패율/가용성이 아니다. 주제 거절 등 정식 `FAILED`도 포함하며 실패 원인은 이벤트의 고정 코드로 진단한다
+- `rate429`: 창 안에 `finished_at`이 있고 HTTP 응답 코드가 기록된 `llm_call` 중 `http_status=429`의 비율. HTTP 코드가 없는 미확인/타임아웃은 분모에서 제외한다. 해당 HTTP 응답이 0개면 NULL
+- `retries`: 창 안의 `registered_at`과 `is_retry=true`를 가진 `llm_call` 건수. **외부 호출 재시도 등록 횟수**이며 잡 재실행 횟수가 아니다. 등록 후 실제 전송 여부가 미확인인 시도도 포함한다
+
+성공/실패/회수의 저장 원자성 · 삭제 후 연결 해제는 [02 §6.9](./02-domain-data.md)에 따른다. 일반 사용자 API에는 이 운영 이력을 노출하지 않는다.
+`stuckLessons` 는 처음부터 다시 만들기 2번까지 다 쓰고도 자료를 못 받은 강의 수다([04 §4.9](./04-jobs-and-cost.md)) — 사용자가 알릴 경로가 없으니 관리자가 여기서 보고 SQL 로 되살린다.
+`todayCost` 는 확인된 사용량을 설정 단가로 환산한 오늘 합계다. `unknownCalls` 는 날짜 제한 없이 남아 있는 `UNKNOWN` + 시한 지난 `PENDING` 건수로, 오늘 비용에 들어 있지 않은 과금 가능성을 함께 보여 준다. 실제 청구액과의 일치를 뜻하지 않는다.
+둘 다 `concept_match_log` 에서 읽고 방향이 반대다([02 §6.4](./02-domain-data.md)). `borderline` 은 임계값 **위** +0.05 안에서 연결한 판정 — 잘못 합쳤을 수 있는 것이다. 들어온 이름 · 정의와 연결된 개념의 정의를 나란히 보고 판단한다. `mergeCandidates` 는 이름 다름 분기에서 임계값 **아래** −0.05 안으로 새로 만든 쌍 — 놓친 동의어다. **임계값을 옮길지, 이 쌍만 고칠지**를 같은 자리에서 판단한다. 개념 사전이 사용자별이라 쌍은 늘 같은 사용자의 개념이고, `userId` 는 병합 SQL 의 사용자 락에 쓴다.
 
 ---
 
@@ -223,13 +286,13 @@ GET /system/status          관리자 아니면 404 · 화면은 진입 시 1회
 | 화면 | 엔드포인트 |
 |---|---|
 | U1 로그인 | `GET /auth/google` · `/callback` · `GET /me` |
-| U2 홈 | `GET /curriculums` · `POST /curriculums` · `GET /reviews/due` · `GET /me` |
-| U3 커리큘럼 | `GET /curriculums/{id}` · `/approve` · `/regenerate` · `/abandon` · `DELETE /curriculums/{id}` · `GET /jobs/{id}` · `POST /jobs/{id}/retry` |
+| U2 홈 · 초기 생성 대기 | `GET /curriculums` · `GET /curriculum-requests` · `POST /curriculum-requests` · `GET /jobs/{id}` · `POST /jobs/{id}/retry` · `GET /reviews/due` · `GET /me` |
+| U3 커리큘럼 | `GET /curriculums/{id}` · `/approve` · `/regenerate` · `DELETE /curriculums/{id}` · `GET /jobs/{id}` · `POST /jobs/{id}/retry` |
 | U4 강의 | `POST /lessons/{id}/materials` · `GET /jobs/{id}` · `POST /jobs/{id}/retry` · `GET /lessons/{id}/material` · `POST /lessons/{id}/complete` |
 | U5 복습 | `GET /reviews/due` · `POST /reviews` |
 | U6 시스템 상태 | `GET /system/status` |
 | U7 가입 · U8 대기 · U9 설정 | `POST /me/terms` · `GET /me` · `POST /auth/logout` · `DELETE /me` |
 
-**21개**(계정 6 · 커리큘럼 7 · 강의 3 · 잡 2 · 복습 2 · 상태 1, `/dev/session` 제외).
+**현재 계약 21개**(계정 6 · 초기 요청 2 · 커리큘럼 5 · 강의 3 · 잡 2 · 복습 2 · 상태 1, `/dev/session` 제외). 그룹 조회/단계 생성 API는 §2.1에서 추가 설계 중이며 전체 개수는 확정 후 갱신한다. U2/U3에는 분할안 조회/단계 생성 연결도 필요하다.
 
 **만들지 않는 것** — 커리큘럼 목록 페이징(사용자당 몇 개뿐) · `/v1/` 경로 버저닝 · 개념 병합 · 정원 · 대기 승인 관리 API(SQL 로) · SSE.

@@ -1,4 +1,0 @@
-curriculum=4000
-outline=2500
-body=8000
-cards=6000

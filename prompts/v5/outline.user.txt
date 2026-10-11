@@ -1,8 +1,0 @@
-커리큘럼: {{curriculumTitle}}
-주제: {{topic}}
-목적: {{purpose}}
-강의: {{lessonOrder}}강 · {{lessonTitle}}
-학습 목표: {{lessonObjective}}
-키워드: {{lessonKeywords}}
-
-필요하면 숙련도를 조회하고, 이 강의의 개요를 설계하라.
