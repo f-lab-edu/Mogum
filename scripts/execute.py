@@ -78,14 +78,17 @@ class StepExecutor:
     def __init__(self, phase_dir_name: str, *, auto_push: bool = False):
         self._root = str(ROOT)
         self._phases_dir = ROOT / "phases"
-        self._phase_dir = self._phases_dir / phase_dir_name
-        self._phase_dir_name = phase_dir_name
+        # phases/ 바로 아래에 실제로 있는 디렉터리만 고른다 — 인자를 경로에 이어 붙이지 않는다(경로 조작 방지).
+        self._phase_dir = next(
+            (d for d in self._phases_dir.iterdir() if d.is_dir() and d.name == phase_dir_name), None
+        ) if self._phases_dir.is_dir() else None
         self._top_index_file = self._phases_dir / "index.json"
         self._auto_push = auto_push
 
-        if not self._phase_dir.is_dir():
-            print(f"ERROR: {self._phase_dir} not found")
+        if self._phase_dir is None:
+            print(f"ERROR: phases/{phase_dir_name} not found")
             sys.exit(1)
+        self._phase_dir_name = self._phase_dir.name
 
         self._index_file = self._phase_dir / "index.json"
         if not self._index_file.exists():
