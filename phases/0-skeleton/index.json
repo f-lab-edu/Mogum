@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "transaction-runner",
-      "status": "pending"
+      "status": "completed",
+      "summary": "TransactionRunner 포트·기본 REQUIRED TransactionTemplate 빈 구현 및 Postgres 커밋·롤백·동일 예외 전파·트랜잭션/리소스 해제 통합 테스트 구성(./gradlew test 24개 통과)",
+      "started_at": "2026-10-12T06:59:07+0900",
+      "completed_at": "2026-10-12T07:01:19+0900"
     },
     {
       "step": 3,
