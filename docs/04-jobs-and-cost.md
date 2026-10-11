@@ -10,7 +10,7 @@
 | 영역 | 선택 | 비교한 것 | 이 선택이 틀리는 때 |
 |---|---|---|---|
 | 언어 · 런타임 | **Java 21**(LTS) | Java 17 · Kotlin | — (1단계 하네스 · SDK 를 21 에서 검증했다) |
-| 프레임워크 | **Spring Boot 3 · Spring MVC** · 플랫폼 스레드 | WebFlux · 가상 스레드 | 초당 수만 건의 가벼운 요청 · 오래 기다리는 연결 수백 개 |
+| 프레임워크 | **Spring Boot 4 · Spring MVC** · 플랫폼 스레드 | WebFlux · 가상 스레드 | 초당 수만 건의 가벼운 요청 · 오래 기다리는 연결 수백 개 |
 | LLM | **OpenAI 공식 SDK + 자체 포트** | Spring AI · Anthropic | 프로바이더를 상시 여럿 지원해야 할 때 |
 | 저장소 | **PostgreSQL 하나 + pgvector** | MySQL + 벡터 DB · Redis | 개념 수십만 · 큐 초당 수백 건 |
 | 큐 | **`jobs` 테이블 + `FOR UPDATE SKIP LOCKED`** | Redis ZSET · Kafka | 초당 수백 건(hot row · VACUUM) |

@@ -15,7 +15,7 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 | `docs/05-api.md` · `docs/06-screens.md` | API 계약 · 인증(쿠키 세션) · 화면 문구 |
 | `docs/07-testing.md` | 장애 주입 · 용량 측정 · LLM 스텁 |
 
-**스택** — Java 21 · Spring Boot 3(MVC, 플랫폼 스레드) · Spring Security(구글 OAuth) + Spring Session JDBC · PostgreSQL + pgvector · Spring Data JPA(엔티티는 `infra` · Postgres 고유 기능은 `EntityManager` 네이티브 쿼리) · Flyway · OpenAI SDK(`gpt-5.6-terra` · `gpt-5.6-luna` · `text-embedding-3-large`) · FSRS 라이브러리 · ArchUnit · Testcontainers · Micrometer.
+**스택** — Java 21 · Spring Boot 4(MVC, 플랫폼 스레드) · Spring Security(구글 OAuth) + Spring Session JDBC · PostgreSQL + pgvector · Spring Data JPA(엔티티는 `infra` · Postgres 고유 기능은 `EntityManager` 네이티브 쿼리) · Flyway · OpenAI SDK(`gpt-5.6-terra` · `gpt-5.6-luna` · `text-embedding-3-large`) · FSRS 라이브러리 · ArchUnit · Testcontainers · Micrometer.
 **화면** — `frontend/` · React + TypeScript(strict) · Vite · React Router · TanStack Query · Tailwind CSS · react-markdown + KaTeX + mermaid · Vitest + Testing Library. 빌드 결과를 Spring Boot `static/` 에 넣어 **jar 하나**로 배포한다(같은 사이트 — 쿠키 세션 · CSRF 그대로).
 **패키지** — `core`(도메인 · 유스케이스 · 포트) ← `api` · `worker` · `infra`. 단일 Gradle 모듈.
 **운영** — EC2 한 대 · 프로세스 하나(`app.role=all` — API + 워커 실행기 `N` 개). 필요하면 실행 인자만으로 `api` / `worker` 로 나눈다. 정원제 실사용자.

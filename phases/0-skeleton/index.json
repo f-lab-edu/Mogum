@@ -1,0 +1,13 @@
+{
+  "project": "Mogum",
+  "phase": "0-skeleton",
+  "steps": [
+    { "step": 0, "name": "gradle-archunit", "status": "pending" },
+    { "step": 1, "name": "database", "status": "pending" },
+    { "step": 2, "name": "transaction-runner", "status": "pending" },
+    { "step": 3, "name": "seoul-clock", "status": "pending" },
+    { "step": 4, "name": "fsrs-check", "status": "pending" },
+    { "step": 5, "name": "frontend-skeleton", "status": "pending" },
+    { "step": 6, "name": "jar-bundle", "status": "pending" }
+  ]
+}

@@ -7,6 +7,8 @@
 
 ## 1. 공통
 
+**경로** — JSON API 는 모두 `/api` 아래에 둔다. 이 문서의 경로는 접두사를 뺀 표기다(`GET /me` = `GET /api/me`). 화면 주소([06 §2.3](./06-screens.md))와 겹치기 때문이다 — `/curriculums/{id}` · `/lessons/{id}` 는 화면이기도 하고 API 이기도 해서, 접두사가 없으면 새로고침 때 화면 대신 JSON 이 온다. 브라우저가 직접 이동하는 OAuth 경로(`/auth/google` · `/auth/google/callback`)는 접두사 없이 둔다.
+
 ### 1.1 인증 — 구글 OAuth + 쿠키 세션(DB 저장)
 
 | 엔드포인트 | 동작 |
