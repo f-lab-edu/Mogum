@@ -3,11 +3,13 @@ execute.py 리팩터링 안전망 테스트.
 리팩터링 전후 동작이 동일한지 검증한다.
 """
 
+import contextlib
 import json
 import os
 import subprocess
 import sys
 import textwrap
+import types
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -40,8 +42,10 @@ def phase_dir(tmp_project):
         "project": "TestProject",
         "phase": "mvp",
         "steps": [
-            {"step": 0, "name": "setup", "status": "completed", "summary": "프로젝트 초기화 완료"},
-            {"step": 1, "name": "core", "status": "completed", "summary": "핵심 로직 구현"},
+            {"step": 0, "name": "setup", "status": "completed", "summary": "프로젝트 초기화 완료",
+             "completed_at": "2026-10-12T06:00:00+0900"},
+            {"step": 1, "name": "core", "status": "completed", "summary": "핵심 로직 구현",
+             "completed_at": "2026-10-12T06:10:00+0900"},
             {"step": 2, "name": "ui", "status": "pending"},
         ],
     }
@@ -210,6 +214,16 @@ class TestBuildPreamble:
         result = executor._build_preamble("")
         assert "phases/0-mvp/index.json" in result
         assert "/phases/" not in result
+
+    def test_no_resume_section_by_default(self, executor):
+        result = executor._build_preamble("")
+        assert "이전 실행에서 멈췄다" not in result
+
+    def test_resume_section_with_reason(self, executor):
+        result = executor._build_preamble("", resume_reason="[blocked] Docker 미실행")
+        assert "이전 실행에서 멈췄다" in result
+        assert "Docker 미실행" in result
+        assert "처음부터 다시 만들지 말고" in result
 
 
 # ---------------------------------------------------------------------------
@@ -409,6 +423,20 @@ class TestInvokeCodex:
 
         assert mock_run.call_args[1]["timeout"] == 1800
 
+    @pytest.mark.parametrize("partial", [b'{"type": "turn.started"}', '{"type": "turn.started"}', None])
+    def test_timeout_is_recorded_not_raised(self, executor, partial):
+        """시간 초과는 실패한 시도다 — 하네스가 예외로 죽어 상태 기록 없이 끝나면 안 된다."""
+        step = {"step": 2, "name": "ui"}
+        timeout = subprocess.TimeoutExpired(cmd="codex", timeout=1800, output=partial)
+
+        with patch("subprocess.run", side_effect=timeout):
+            output = executor._invoke_codex(step, "preamble")
+
+        assert output["timedOut"] is True
+        saved = json.loads((executor._phase_dir / "step2-output.json").read_text())
+        assert saved["timedOut"] is True
+        assert saved["stdout"] == ('{"type": "turn.started"}' if partial else "")
+
 
 # ---------------------------------------------------------------------------
 # _review_step (mocked)
@@ -470,6 +498,17 @@ class TestReviewStep:
 
         with patch("subprocess.run", return_value=mock_result):
             assert executor._review_step(step, "abc123") is None
+
+    def test_timeout_returns_none_not_raised(self, executor):
+        step = {"step": 2, "name": "ui"}
+        timeout = subprocess.TimeoutExpired(cmd="claude", timeout=1800)
+
+        with patch("subprocess.run", side_effect=timeout):
+            assert executor._review_step(step, "abc123") is None
+
+        saved = json.loads((executor._phase_dir / "step2-review.json").read_text())
+        assert saved["timedOut"] is True
+        assert saved["review"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -534,7 +573,7 @@ class TestExecuteSingleStep:
         assert "리뷰" in step["error_message"]
 
     def test_review_failure_is_error_without_commit(self, executor):
-        preambles, commits = self._wire(executor, [None])
+        preambles, commits = self._wire(executor, [None] * ex.StepExecutor.REVIEW_ATTEMPTS)
 
         with pytest.raises(SystemExit) as exc_info:
             executor._execute_single_step(self._step2(executor))
@@ -543,6 +582,150 @@ class TestExecuteSingleStep:
         assert len(preambles) == 1
         assert commits == []
         assert self._step2(executor)["status"] == "error"
+
+    def test_review_failure_retries_review_only(self, executor):
+        """판정을 못 얻으면 리뷰만 다시 한다 — Codex 를 다시 돌리거나 실행 전체를 멈추지 않는다."""
+        preambles, commits = self._wire(executor, [None, self.APPROVE])
+
+        assert executor._execute_single_step(self._step2(executor)) is True
+        assert len(preambles) == 1
+        assert commits == [2]
+
+    def test_prints_codex_elapsed_after_it_is_measured(self, executor, capsys):
+        @contextlib.contextmanager
+        def fake_progress(label):
+            info = types.SimpleNamespace(elapsed=0.0)
+            yield info
+            info.elapsed = 42.7  # 실제 progress_indicator 처럼 블록이 끝날 때 채운다
+
+        self._wire(executor, [self.APPROVE])
+        with patch.object(ex, "progress_indicator", fake_progress):
+            executor._execute_single_step(self._step2(executor))
+
+        assert "[42s]" in capsys.readouterr().out
+
+    def test_codex_timeout_is_fed_to_next_attempt(self, executor):
+        preambles, commits = self._wire(executor, [self.APPROVE])
+        complete = executor._invoke_codex
+        attempts = {"n": 0}
+
+        def codex_times_out_first(step, preamble):
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                preambles.append(preamble)
+                return {"timedOut": True}  # status 를 갱신하지 못하고 끊겼다
+            return complete(step, preamble)
+
+        executor._invoke_codex = codex_times_out_first
+
+        assert executor._execute_single_step(self._step2(executor)) is True
+        assert len(preambles) == 2
+        assert f"{ex.StepExecutor.CODEX_TIMEOUT}초 안에 끝나지 않" in preambles[1]
+
+    @pytest.mark.parametrize("field, value", [
+        ("blocked_reason", "Docker 데몬에 연결할 수 없다"),
+        ("error_message", "[3회 시도 후 실패] 빌드 실패"),
+    ])
+    def test_resume_reason_is_fed_once_and_cleared(self, executor, field, value):
+        """사용자가 status 만 pending 으로 되돌리면 남은 사유가 첫 시도에 전달되고 지워진다."""
+        index = json.loads(executor._index_file.read_text())
+        step = next(s for s in index["steps"] if s["step"] == 2)
+        step[field] = value
+        step["blocked_at" if field == "blocked_reason" else "failed_at"] = "2026-10-12T07:00:00+0900"
+        executor._index_file.write_text(json.dumps(index))
+        preambles, commits = self._wire(executor, [self.APPROVE])
+
+        assert executor._execute_single_step(self._step2(executor)) is True
+        assert value in preambles[0]
+        assert "이전 실행에서 멈췄다" in preambles[0]
+        after = self._step2(executor)
+        for gone in ("blocked_reason", "error_message", "blocked_at", "failed_at"):
+            assert gone not in after
+
+    def test_review_only_skips_codex_on_first_attempt(self, executor):
+        """Codex 는 끝냈지만 리뷰 전에 하네스가 멈춘 step — 리뷰부터 다시 한다."""
+        preambles, commits = self._wire(executor, [self.APPROVE])
+        index = json.loads(executor._index_file.read_text())
+        next(s for s in index["steps"] if s["step"] == 2)["status"] = "completed"
+        executor._index_file.write_text(json.dumps(index))
+
+        assert executor._execute_single_step(self._step2(executor), review_only=True) is True
+        assert preambles == []
+        assert commits == [2]
+
+    def test_review_only_rejection_sends_findings_to_codex(self, executor):
+        preambles, commits = self._wire(executor, [self.REJECT, self.APPROVE])
+        index = json.loads(executor._index_file.read_text())
+        next(s for s in index["steps"] if s["step"] == 2)["status"] = "completed"
+        executor._index_file.write_text(json.dumps(index))
+
+        assert executor._execute_single_step(self._step2(executor), review_only=True) is True
+        assert len(preambles) == 1
+        assert "FooTest 추가" in preambles[0]
+
+
+# ---------------------------------------------------------------------------
+# _execute_all_steps — 다음 step 고르기 · 멈춤 요청 (mocked)
+# ---------------------------------------------------------------------------
+
+class TestExecuteAllSteps:
+    def _wire(self, executor, tmp_project):
+        """한 step 을 실행하면 리뷰 승인까지 끝난 것으로 표시한다."""
+        calls = []
+
+        def fake_single(step, review_only=False):
+            calls.append((step["step"], review_only))
+            index = json.loads(executor._index_file.read_text())
+            for s in index["steps"]:
+                if s["step"] == step["step"]:
+                    s["status"] = "completed"
+                    s["completed_at"] = "2026-10-12T08:00:00+0900"
+            executor._index_file.write_text(json.dumps(index))
+            return True
+
+        executor._execute_single_step = fake_single
+        executor._run_git = lambda *a: MagicMock(returncode=0, stdout=".git/harness-stop\n", stderr="")
+        (tmp_project / ".git").mkdir(exist_ok=True)
+        return calls
+
+    def _add_step3(self, executor):
+        index = json.loads(executor._index_file.read_text())
+        index["steps"].append({"step": 3, "name": "api", "status": "pending"})
+        executor._index_file.write_text(json.dumps(index))
+
+    def test_runs_pending_steps_in_order(self, executor, tmp_project):
+        calls = self._wire(executor, tmp_project)
+        self._add_step3(executor)
+
+        executor._execute_all_steps()
+
+        assert calls == [(2, False), (3, False)]
+
+    def test_stop_file_halts_before_next_step_and_is_removed(self, executor, tmp_project):
+        calls = self._wire(executor, tmp_project)
+        stop = tmp_project / ".git" / "harness-stop"
+        stop.touch()
+
+        with pytest.raises(SystemExit) as exc_info:
+            executor._execute_all_steps()
+
+        assert exc_info.value.code == 0
+        assert calls == []
+        assert not stop.exists()
+        step2 = next(s for s in json.loads(executor._index_file.read_text())["steps"] if s["step"] == 2)
+        assert "started_at" not in step2
+
+    def test_unreviewed_completed_step_is_reviewed_before_pending(self, executor, tmp_project):
+        """completed 인데 completed_at(리뷰 승인 기록)이 없으면 건너뛰지 않고 리뷰부터 한다."""
+        calls = self._wire(executor, tmp_project)
+        index = json.loads(executor._index_file.read_text())
+        next(s for s in index["steps"] if s["step"] == 2)["status"] = "completed"
+        executor._index_file.write_text(json.dumps(index))
+        self._add_step3(executor)
+
+        executor._execute_all_steps()
+
+        assert calls == [(2, True), (3, False)]
 
 
 # ---------------------------------------------------------------------------

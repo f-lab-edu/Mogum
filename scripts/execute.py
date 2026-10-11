@@ -55,6 +55,9 @@ class StepExecutor:
     """Phase 디렉토리 안의 step들을 순차 실행하는 하네스."""
 
     MAX_RETRIES = 3
+    REVIEW_ATTEMPTS = 2  # 판정을 못 얻으면(파싱 실패 · 시간 초과) 리뷰만 한 번 더 — Codex 는 다시 돌리지 않는다
+    CODEX_TIMEOUT = 1800
+    REVIEW_TIMEOUT = 1800
     FEAT_MSG = "feat({phase}): step {num} — {name}"
     CHORE_MSG = "chore({phase}): step {num} output"
     TZ = timezone(timedelta(hours=9))
@@ -206,7 +209,16 @@ class StepExecutor:
             return ""
         return "## 이전 Step 산출물\n\n" + "\n".join(lines) + "\n\n"
 
-    def _build_preamble(self, step_context: str, prev_error: Optional[str] = None) -> str:
+    def _build_preamble(self, step_context: str, prev_error: Optional[str] = None,
+                        resume_reason: Optional[str] = None) -> str:
+        resume_section = ""
+        if resume_reason:
+            resume_section = (
+                f"\n## ⚠ 이 step 은 이전 실행에서 멈췄다 — 사용자가 해결한 뒤 재개했다\n\n"
+                f"멈춘 사유:\n{resume_reason}\n\n"
+                f"이전 실행의 변경이 작업 트리에 남아 있을 수 있다. 처음부터 다시 만들지 말고 이어서 끝내라. "
+                f"사용자의 해결(결정 · 수정)은 step 파일과 문서에 반영되어 있다 — step 파일을 기준으로 삼아라.\n\n---\n\n"
+            )
         retry_section = ""
         if prev_error:
             retry_section = (
@@ -217,7 +229,7 @@ class StepExecutor:
         return (
             f"당신은 {self._project} 프로젝트의 구현 담당입니다. 아래 step을 수행하세요.\n"
             f"프로젝트 규칙은 AGENTS.md 를 따른다. 설계 문서는 step의 '읽어야 할 파일'을 먼저 읽어라.\n\n---\n\n"
-            f"{step_context}{retry_section}"
+            f"{step_context}{resume_section}{retry_section}"
             f"## 작업 규칙\n\n"
             f"1. 이전 step에서 작성된 코드를 확인하고 일관성을 유지하라.\n"
             f"2. 이 step에 명시된 작업만 수행하라. 추가 기능이나 파일을 만들지 마라.\n"
@@ -229,6 +241,18 @@ class StepExecutor:
             f"   - 사용자 개입이 필요한 경우 (API 키, 인증, 수동 설정, 문서와 코드가 어긋나 판단이 필요한 경우 등) → \"blocked\" + \"blocked_reason\" 기록 후 즉시 중단\n"
             f"6. 커밋하지 마라. \"completed\"로 끝내면 Claude가 변경을 리뷰하고, 승인되면 하네스가 커밋한다.\n\n---\n\n"
         )
+
+    # --- 에이전트 실행 (Codex · Claude 공통) ---
+
+    def _run_agent(self, cmd: list, prompt: str, timeout: int) -> tuple:
+        """(exit_code, stdout, stderr, timed_out). 시간 초과는 예외로 하네스를 죽이지 않고 실패한 시도로 돌려준다."""
+        try:
+            r = subprocess.run(cmd, input=prompt, cwd=self._root, capture_output=True, text=True, timeout=timeout)
+            return r.returncode, r.stdout, r.stderr, False
+        except subprocess.TimeoutExpired as e:
+            # text=True 여도 시간 초과 때 남은 출력은 bytes 로 올 수 있다
+            text = lambda v: v.decode("utf-8", "replace") if isinstance(v, bytes) else (v or "")
+            return None, text(e.stdout), text(e.stderr), True
 
     # --- Codex 호출 ---
 
@@ -243,21 +267,23 @@ class StepExecutor:
         prompt = preamble + step_file.read_text()
         # 샌드박스를 끈다 — Gradle(~/.gradle · 네트워크)과 Testcontainers(Docker 소켓)가 workspace-write 에서 막힌다.
         # 훅 신뢰를 건너뛴다 — 승인받지 않은(또는 고친 뒤 재승인 전인) .codex/hooks.json 은 exec 에서 조용히 빠진다.
-        result = subprocess.run(
+        exit_code, stdout, stderr, timed_out = self._run_agent(
             ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust",
              "--json", "-C", self._root, "-"],
-            input=prompt, cwd=self._root, capture_output=True, text=True, timeout=1800,
+            prompt, self.CODEX_TIMEOUT,
         )
 
-        if result.returncode != 0:
-            print(f"\n  WARN: Codex가 비정상 종료됨 (code {result.returncode})")
-            if result.stderr:
-                print(f"  stderr: {result.stderr[:500]}")
+        if timed_out:
+            print(f"\n  WARN: Codex 가 {self.CODEX_TIMEOUT}초 안에 끝나지 않아 중단했다")
+        elif exit_code != 0:
+            print(f"\n  WARN: Codex가 비정상 종료됨 (code {exit_code})")
+            if stderr:
+                print(f"  stderr: {stderr[:500]}")
 
         output = {
             "step": step_num, "name": step_name,
-            "exitCode": result.returncode,
-            "stdout": result.stdout, "stderr": result.stderr,
+            "exitCode": exit_code, "timedOut": timed_out,
+            "stdout": stdout, "stderr": stderr,
         }
         out_path = self._phase_dir / f"step{step_num}-output.json"
         with open(out_path, "w") as f:
@@ -292,27 +318,39 @@ class StepExecutor:
             f"구현 담당은 이 목록만 보고 고친다.\n\n---\n\n"
             f"{step_file.read_text()}"
         )
-        result = subprocess.run(
+        exit_code, stdout, stderr, timed_out = self._run_agent(
             ["claude", "-p", "--permission-mode", "dontAsk",
              "--output-format", "json", "--json-schema", json.dumps(self.REVIEW_SCHEMA),
              "--allowedTools", *self.REVIEW_TOOLS],
-            input=prompt, cwd=self._root, capture_output=True, text=True, timeout=1800,
+            prompt, self.REVIEW_TIMEOUT,
         )
 
         review = None
         try:
-            review = json.loads(result.stdout).get("structured_output")
-        except json.JSONDecodeError:
+            review = json.loads(stdout).get("structured_output")
+        except (json.JSONDecodeError, AttributeError):
             pass
         if not isinstance(review, dict) or review.get("verdict") not in ("approve", "request_changes"):
             review = None
 
         out_path = self._phase_dir / f"step{step_num}-review.json"
         self._write_json(out_path, {
-            "step": step_num, "base": base, "exitCode": result.returncode,
-            "review": review, "stdout": result.stdout, "stderr": result.stderr,
+            "step": step_num, "base": base, "exitCode": exit_code, "timedOut": timed_out,
+            "review": review, "stdout": stdout, "stderr": stderr,
         })
         return review
+
+    def _review_with_retry(self, step: dict, base: str) -> Optional[dict]:
+        """판정을 얻을 때까지 리뷰만 최대 REVIEW_ATTEMPTS 번 돌린다. 끝내 못 얻으면 None."""
+        step_num = step["step"]
+        for attempt in range(1, self.REVIEW_ATTEMPTS + 1):
+            with progress_indicator(f"Step {step_num}: Claude 리뷰"):
+                review = self._review_step(step, base)
+            if review is not None:
+                return review
+            if attempt < self.REVIEW_ATTEMPTS:
+                print(f"  ↻ Step {step_num}: 리뷰 판정을 얻지 못했다 — 리뷰만 다시 한다")
+        return None
 
     @staticmethod
     def _format_review(review: dict) -> str:
@@ -353,34 +391,53 @@ class StepExecutor:
 
     # --- 실행 루프 ---
 
-    def _execute_single_step(self, step: dict) -> bool:
-        """단일 step 실행 (재시도 포함). Codex 구현 → Claude 리뷰 승인 시 커밋하고 True."""
+    def _take_resume_reason(self, step_num: int) -> Optional[str]:
+        """이전 실행이 남긴 멈춤 사유(blocked_reason · error_message)를 꺼내고 index 에서 지운다.
+        사용자가 status 만 pending 으로 되돌리면 사유가 재개한 첫 시도에 전달된다."""
+        index = self._read_json(self._index_file)
+        s = next(s for s in index["steps"] if s["step"] == step_num)
+        blocked, error = s.pop("blocked_reason", None), s.pop("error_message", None)
+        if blocked is None and error is None:
+            return None
+        s.pop("blocked_at", None)
+        s.pop("failed_at", None)
+        self._write_json(self._index_file, index)
+        return "\n".join(f"[{kind}] {text}" for kind, text in (("blocked", blocked), ("error", error)) if text)
+
+    def _execute_single_step(self, step: dict, review_only: bool = False) -> bool:
+        """단일 step 실행 (재시도 포함). Codex 구현 → Claude 리뷰 승인 시 커밋하고 True.
+        review_only — Codex 는 끝냈지만 리뷰 전에 하네스가 멈춘 step. 첫 시도는 Codex 없이 리뷰부터 한다."""
         step_num, step_name = step["step"], step["name"]
         done = sum(1 for s in self._read_json(self._index_file)["steps"] if s["status"] == "completed")
         # 리뷰는 이 step 이 시작된 커밋부터의 변경 전체를 본다 — 재시도분과 Codex 가 임의로 한 커밋까지.
         base = self._run_git("rev-parse", "HEAD").stdout.strip()
         prev_error = None
+        resume_reason = self._take_resume_reason(step_num)
 
         for attempt in range(1, self.MAX_RETRIES + 1):
-            index = self._read_json(self._index_file)
-            step_context = self._build_step_context(index)
-            preamble = self._build_preamble(step_context, prev_error)
+            elapsed, timed_out = 0, False
+            if review_only and attempt == 1:
+                print(f"  ↺ Step {step_num}: {step_name} — 리뷰 전에 멈춘 step 이다. 리뷰부터 다시 한다")
+            else:
+                index = self._read_json(self._index_file)
+                step_context = self._build_step_context(index)
+                preamble = self._build_preamble(step_context, prev_error, resume_reason)
 
-            tag = f"Step {step_num}/{self._total - 1} ({done} done): {step_name}"
-            if attempt > 1:
-                tag += f" [retry {attempt}/{self.MAX_RETRIES}]"
+                tag = f"Step {step_num}/{self._total - 1} ({done} done): {step_name}"
+                if attempt > 1:
+                    tag += f" [retry {attempt}/{self.MAX_RETRIES}]"
 
-            with progress_indicator(tag) as pi:
-                self._invoke_codex(step, preamble)
-                elapsed = int(pi.elapsed)
+                with progress_indicator(tag) as pi:
+                    output = self._invoke_codex(step, preamble)
+                elapsed = int(pi.elapsed)  # progress_indicator 는 블록이 끝날 때 elapsed 를 채운다
+                timed_out = bool(output and output.get("timedOut"))
 
             index = self._read_json(self._index_file)
             status = next((s.get("status", "pending") for s in index["steps"] if s["step"] == step_num), "pending")
             ts = self._stamp()
 
             if status == "completed":
-                with progress_indicator(f"Step {step_num}: Claude 리뷰"):
-                    review = self._review_step(step, base)
+                review = self._review_with_retry(step, base)
                 if review is None:
                     self._fail_step(step_num, step_name,
                                     f"Claude 리뷰 판정을 얻지 못했다 — phases/{self._phase_dir_name}/step{step_num}-review.json 확인")
@@ -404,6 +461,10 @@ class StepExecutor:
                 print(f"    Reason: {reason}")
                 self._update_top_index("blocked")
                 sys.exit(2)
+
+            elif timed_out:
+                err_msg = (f"Codex 가 {self.CODEX_TIMEOUT}초 안에 끝나지 않아 중단됐다 — "
+                           f"작업 트리에 남은 변경을 이어서 끝내고 status 를 갱신하라")
 
             else:
                 err_msg = next(
@@ -439,22 +500,41 @@ class StepExecutor:
         self._update_top_index("error")
         sys.exit(1)
 
+    @staticmethod
+    def _next_step(index: dict) -> Optional[dict]:
+        """다음에 할 step — pending, 또는 completed 인데 completed_at(리뷰 승인 기록)이 없는 step.
+        후자는 Codex 가 끝낸 뒤 리뷰 · 커밋 전에 하네스가 멈춘 경우다. 건너뛰면 리뷰 없이 다음 step 커밋에 섞인다."""
+        return next((s for s in index["steps"]
+                     if s["status"] == "pending" or (s["status"] == "completed" and "completed_at" not in s)), None)
+
+    def _stop_file(self) -> Path:
+        """멈춤 요청 파일 — .git 안에 둬서 커밋 · .gitignore 와 무관하다."""
+        r = self._run_git("rev-parse", "--git-path", "harness-stop")
+        rel = r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else ".git/harness-stop"
+        return Path(self._root) / rel
+
     def _execute_all_steps(self):
         while True:
             index = self._read_json(self._index_file)
-            pending = next((s for s in index["steps"] if s["status"] == "pending"), None)
-            if pending is None:
+            nxt = self._next_step(index)
+            if nxt is None:
                 print("\n  All steps completed!")
                 return
 
-            step_num = pending["step"]
+            step_num = nxt["step"]
+            stop = self._stop_file()
+            if stop.exists():
+                stop.unlink()
+                print(f"\n  ⏸ 멈춤 요청({stop.name}) — Step {step_num} 앞에서 멈춘다. 이어 하려면 다시 실행한다.")
+                sys.exit(0)
+
             for s in index["steps"]:
                 if s["step"] == step_num and "started_at" not in s:
                     s["started_at"] = self._stamp()
                     self._write_json(self._index_file, index)
                     break
 
-            self._execute_single_step(pending)
+            self._execute_single_step(nxt, review_only=nxt["status"] == "completed")
 
     def _finalize(self):
         index = self._read_json(self._index_file)
