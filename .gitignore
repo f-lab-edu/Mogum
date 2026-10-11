@@ -25,12 +25,18 @@ src/main/resources/static/
 # phase execution outputs
 phases/**/phase*-output.json
 phases/**/step*-output.json
+phases/**/step*-review.json
+
+# harness scripts (python)
+__pycache__/
+.pytest_cache/
 
 # 로컬 실험 — GitHub 에 올리지 않는다
 # 앞의 / 로 루트 폴더만 무시한다. 없으면 src/main/resources/prompts/(운영 프롬프트)까지 무시된다
 /prompts/
 /reference-code/
 /.claude/
+/.codex/
 
 # 개인 기록 — 포트폴리오 · 이력서용 사례(로컬에만)
 /docs/PORTFOLIO.md
