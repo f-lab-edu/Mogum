@@ -27,7 +27,7 @@
 │       ├── pages/               # U1~U9 · P1 · P2 — 화면 하나에 파일 하나
 │       ├── components/          # 상단 바 · 카드 · 막힘 문구 · 마크다운 렌더러(KaTeX · mermaid)
 │       ├── api/                 # fetch 래퍼(XSRF-TOKEN 헤더) · 05 응답 타입 · TanStack Query 훅
-│       └── lib/                 # 문구 표(06 §12) · 유틸
+│       └── lib/                 # 문구 표(06 §15) · 유틸
 ├── phases/                      # 하네스 step 파일(Claude 가 쓰고 Codex 가 구현) · index.json. 실행 산출물(*-output.json · *-review.json)은 커밋하지 않는다
 ├── scripts/                     # 하네스 — execute.py(step 실행 · 리뷰 · 커밋) · tdd_guard.py(TDD 가드 훅) · 그 테스트
 ├── .claude/                     # Claude Code 설정 — 훅 배선(settings.json) · /harness · /review 명령. 개인 설정(settings.local.json)만 커밋하지 않는다
