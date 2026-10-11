@@ -23,8 +23,8 @@
 ### 1. Gradle
 
 - `settings.gradle` — `rootProject.name = 'mogum'`
-- `build.gradle`(Groovy DSL) — `group = 'com.mogum'` · Java 21 toolchain · **Spring Boot 4.x 최신 안정판** · JUnit 5
-- 의존성은 이 step 에 필요한 것만 넣는다: Spring MVC starter · test starter · ArchUnit(JUnit 5). Boot 4 는 starter 가 기능별로 쪼개졌다(예: MVC 는 `spring-boot-starter-webmvc`) — 실제 아티팩트 이름은 확인해서 쓴다.
+- `build.gradle`(Groovy DSL) — `group = 'com.mogum'` · Java 21 toolchain · **Spring Boot 4.x 최신 안정판** · JUnit Jupiter(Boot 가 관리하는 버전 — JUnit 4 가 아니라는 뜻이다. 버전을 따로 고정하지 않는다)
+- 의존성은 이 step 에 필요한 것만 넣는다: Spring MVC starter · test starter · ArchUnit(JUnit Platform 용). Boot 4 는 starter 가 기능별로 쪼개졌다(예: MVC 는 `spring-boot-starter-webmvc`) — 실제 아티팩트 이름은 확인해서 쓴다.
 
 ### 2. 애플리케이션
 

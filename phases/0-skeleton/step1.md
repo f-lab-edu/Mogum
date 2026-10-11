@@ -18,6 +18,12 @@ PostgreSQL + pgvector · Flyway · JPA 설정 · Testcontainers 테스트 기반
 
 Docker 가 필요하다(Testcontainers). Docker 데몬에 연결할 수 없으면 `blocked`(사유: Docker 미실행)로 멈춘다.
 
+### 0. step 0 의 JUnit 버전 강제를 걷어낸다 (먼저)
+
+- `build.gradle` 의 `testImplementation enforcedPlatform('org.junit:junit-bom:5.14.4')` 와 그 주석을 지우고 **Boot 가 관리하는 JUnit 버전(6.x)** 을 쓴다.
+- 이유: step 0 파일의 "JUnit 5" 를 문자 그대로 따른 결과다 — 의도는 "JUnit 4 가 아니라 JUnit Jupiter" 였다. Spring Framework 7 의 `SpringExtension`(`@SpringBootTest`)은 **JUnit Jupiter 6 이상**이 필요해서, 이대로 두면 이 step 의 컨텍스트 테스트가 깨진다.
+- 걷어낸 뒤에도 `ArchitectureTest` 가 그대로 통과해야 한다. ArchUnit 의 JUnit 5 아티팩트가 JUnit 6 플랫폼에서 돌지 않으면 호환되는 ArchUnit 버전으로 올린다 — 규칙과 테스트 내용은 바꾸지 않는다.
+
 ### 1. 의존성
 
 - Spring Data JPA · Flyway(Boot 4 는 Flyway 전용 starter 가 있다 — 그것과 `flyway-database-postgresql`) · PostgreSQL JDBC 드라이버
@@ -78,5 +84,6 @@ Docker 가 필요하다(Testcontainers). Docker 데몬에 연결할 수 없으�
 - `compose.yaml` 에 LLM 스텁 · Prometheus · Grafana 를 넣지 마라. 이유: 04 §3 의 로컬 구성은 최종 모습이고, 각 TASK 에서 넣는다.
 - H2 · 임베디드 DB 로 테스트하지 마라. 이유: advisory lock · `SKIP LOCKED` · pgvector 는 실제 PostgreSQL 에서만 검증된다(07 §1.1).
 - `.env` 파일을 만들거나 읽지 마라. 이유: `AGENTS.md` — 비밀은 저장소와 에이전트 밖에 둔다.
+- JUnit · Spring · Testcontainers 버전을 Boot 관리 버전과 다르게 강제하지 마라(`enforcedPlatform` · 버전 직접 지정). 이유: Boot 가 함께 검증한 조합을 벗어나면 이번 JUnit 5 강제처럼 다음 step 에서 깨진다. 꼭 필요하면 이유를 `build.gradle` 주석과 summary 에 적는다.
 - 커밋하지 마라. 이유: Claude 리뷰가 승인한 뒤 하네스가 커밋한다.
 - 기존 테스트를 깨뜨리지 마라.
