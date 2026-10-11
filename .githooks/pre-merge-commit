@@ -1,0 +1,3 @@
+#!/bin/sh
+# main 위의 병합 커밋도 막는다. main 은 PR 병합 뒤 git pull --ff-only 로만 따라간다.
+exec "$(dirname "$0")/pre-commit"

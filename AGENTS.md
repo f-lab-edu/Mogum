@@ -81,6 +81,7 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 - CRITICAL: 새 기능은 **테스트를 먼저 쓰고**, 그 테스트가 통과하는 구현을 쓴다(TDD). 작업을 검증 가능한 목표로 바꾸고 통과할 때까지 반복한다.
     훅이 강제한다(`scripts/tdd_guard.py` — Claude · Codex 공통). 짝 테스트 없이 구현 파일을 쓰면 막히고, 구현만 바꾸고 끝내면 한 번 되돌려진다. 짝 테스트는 `src/main/java/…/Foo.java` → 같은 패키지의 `src/test/java/…/Foo*Test.java` 또는 `Foo*IT.java`, `frontend/src/…/foo.tsx` → 같은 폴더의 `foo.test.tsx` 또는 `__tests__/foo.test.tsx` 다. interface · record · enum · 예외 · `@Entity` · 타입 전용 파일은 검사하지 않는다.
 - 커밋 메시지는 conventional commits(`feat:` · `fix:` · `docs:` · `refactor:` · `test:`).
+- **`main` 은 PR 로만 바뀐다.** `main` 에서 커밋 · 병합하거나 `main` 으로 push 하지 않는다. GitHub 룰셋(PR 필수 · 강제 push/삭제 금지 · 예외 없음)이 서버에서 막고, `.githooks/` 가 로컬에서 먼저 막는다. PR 병합 뒤 로컬 `main` 은 `git pull --ff-only` 로만 따라간다.
 - 설계와 다르게 가야 하면 **코드보다 `docs/` 를 먼저 고친다.** 문서와 코드가 다르면 문서가 틀린 것으로 보고 묻는다.
 - 실제 LLM API 를 부르는 테스트는 기본 실행에서 뺀다(비용). 스텁으로 돈다.
 - 공개 전 실제 생성 표본 10개에서 치명 결함 0개 · 점수 평균 1.5 이상 · 항목별 평균 1.0 이상을 모두 확인한다. 치명 결함을 평균 점수로 상쇄하지 않는다. 결함을 발견해 프롬프트/모델/생성 구성을 고치면 새 표본 10개로 다시 채점하고, 이전 실패 기록은 남긴다. 스텁/구조 검사 통과를 콘텐츠 품질 검증 완료로 쓰지 않는다([01 §9](docs/01-overview.md)).
@@ -96,4 +97,5 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 cd frontend && npm run dev   # 화면 개발 서버 (Vite — API 는 proxy 로 같은 사이트처럼)
 cd frontend && npm run test  # 화면 테스트 (Vitest)
 cd frontend && npm run lint  # ESLint
+git config core.hooksPath .githooks  # 클론마다 처음 한 번 — main 직접 커밋 · push 를 막는 훅
 ```

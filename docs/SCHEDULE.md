@@ -32,7 +32,7 @@
 
 | 주 | TASK | 사람이 할 일 | 추정 |
 |---|---|---|---|
-| **W1** 10/12–18 | `0-skeleton` · `1-auth` | `docs/design-bundle` 을 `main` 에 병합하고 시작 · 구글 OAuth 클라이언트(localhost 콜백) · AWS 계정(생성일 확인 — [04 §3](./04-jobs-and-cost.md#3-배포)) | 약 11h |
+| **W1** 10/12–18 | `0-skeleton` · `1-auth` | `docs/design-bundle` 을 PR 로 `main` 에 병합하고 시작 · 구글 OAuth 클라이언트(localhost 콜백) · AWS 계정(생성일 확인 — [04 §3](./04-jobs-and-cost.md#3-배포)) | 약 11h |
 | **W2** 10/19–25 | `2-job-queue` · `3-llm-ledger` | — | 약 12h |
 | **W3** 10/26–11/1 | `4-curriculum-gen` · `5-deploy` | 도메인 구매 · 구글 OAuth 에 운영 콜백 추가 | 약 12h |
 | **W4** 11/2–8 | `6-material-gen` · `7-review` → 다시 배포 | OpenAI 프로젝트 사용 한도 설정 · **M2 실사용 시작** · 이후 매일 복습 | 약 13h |
@@ -44,7 +44,7 @@
 
 ## 4. TASK 목록
 
-`phases/{TASK}/` 디렉터리 이름이다. **TASK 완료 = 모든 step 승인 · `/review` 지적 반영 · `main` 병합.** `execute.py` 는 지금 HEAD 에서 `feat-{TASK}` 브랜치를 만들므로, 병합한 뒤에 다음 TASK 를 시작한다.
+`phases/{TASK}/` 디렉터리 이름이다. **TASK 완료 = 모든 step 승인 · `/review` 지적 반영 · PR 로 `main` 병합.** `main` 은 PR 로만 바뀐다(GitHub 룰셋 · `.githooks/`). `execute.py {TASK} --push` 로 `feat-{TASK}` 를 올리고 PR 을 열어 병합한 뒤, `main` 에서 `git pull --ff-only` 하고 다음 TASK 를 시작한다 — `execute.py` 는 지금 HEAD 에서 브랜치를 만든다.
 
 | TASK | 주 | 목표 | 먼저 읽을 문서 | 선행 |
 |---|---|---|---|---|

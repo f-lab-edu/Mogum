@@ -1,0 +1,8 @@
+#!/bin/sh
+# main 으로 push(삭제 포함)하지 않는다 — 브랜치를 push 하고 PR 을 연다.
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    echo "BLOCKED: main 으로 직접 push 할 수 없습니다 — 브랜치를 push 하고 PR 을 여세요." >&2
+    exit 1
+  fi
+done
