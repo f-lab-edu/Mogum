@@ -9,23 +9,25 @@
 
 ```mermaid
 erDiagram
-    USERS           ||--o{ CURRICULUM        : "소유"
-    USERS           ||--o{ CURRICULUM_GROUP  : "전체 목표 소유"
-    CURRICULUM_GROUP ||--o{ CURRICULUM_STEP   : "분할안 · 순서"
-    CURRICULUM_STEP  |o--o| CURRICULUM        : "생성 시 연결 · 단계당 최대 1개"
-    CURRICULUM_GROUP |o--o{ JOBS              : "초기 생성 성공 결과"
-    USERS           ||--o{ JOBS              : "요청"
-    USERS           ||--o{ CONCEPT           : "개념 사전 · 사용자별"
-    USERS           |o--o{ LLM_CALL          : "비용 귀속 · 탈퇴 시 연결 해제"
-    JOBS            |o--o{ LLM_CALL          : "호출 시도 · 잡 삭제 시 연결 해제"
-    JOBS            |o--o{ JOB_EVENT         : "성공 · 실패 · 회수 · 잡 삭제 시 연결 해제"
-    CURRICULUM      ||--o{ LESSON            : "생성 때 전부"
-    LESSON          ||--o| MATERIAL          : "지연 생성 · 최대 1개"
-    MATERIAL        ||--o{ FLASHCARD         : "최대 10장"
-    FLASHCARD       ||--|| CARD_STATE        : "FSRS 상태"
-    FLASHCARD       ||--o{ REVIEW            : "복습 이력"
-    CONCEPT         ||--o{ FLASHCARD         : "N:1 · 주된 개념 하나"
-    CONCEPT         ||--o{ CONCEPT_MATCH_LOG : "판정 기록"
+    USERS             ||--o{ CURRICULUMS        : "소유"
+    USERS             ||--o{ CURRICULUM_GROUPS  : "전체 목표 소유"
+    CURRICULUM_GROUPS ||--o{ CURRICULUM_STEPS   : "분할안 · 순서"
+    CURRICULUM_STEPS  |o--o| CURRICULUMS        : "생성 시 연결 · 단계당 최대 1개"
+    USERS             ||--o{ JOBS               : "요청"
+    CURRICULUM_GROUPS |o--o{ JOBS               : "초기 잡 I 의 그룹 결과"
+    CURRICULUMS       |o--o{ JOBS               : "초기 잡 I 의 단일 결과 · 잡 A 대상"
+    LESSONS           |o--o{ JOBS               : "잡 B 대상"
+    USERS             ||--o{ CONCEPTS           : "개념 사전 · 사용자별"
+    USERS             |o--o{ LLM_CALLS          : "비용 귀속 · 탈퇴 시 연결 해제"
+    JOBS              |o--o{ LLM_CALLS          : "호출 시도 · 잡 삭제 시 연결 해제"
+    JOBS              |o--o{ JOB_EVENTS         : "성공 · 실패 · 회수 · 잡 삭제 시 연결 해제"
+    CURRICULUMS       ||--o{ LESSONS            : "생성 때 전부"
+    LESSONS           ||--o| MATERIALS          : "지연 생성 · 최대 1개"
+    MATERIALS         ||--o{ FLASHCARDS         : "최대 10장"
+    FLASHCARDS        ||--o| CARD_STATES        : "FSRS 상태 · 최초 학습 완료 때 생긴다"
+    FLASHCARDS        ||--o{ REVIEWS            : "복습 이력"
+    CONCEPTS          ||--o{ FLASHCARDS         : "N:1 · 주된 개념 하나"
+    CONCEPTS          ||--o{ CONCEPT_MATCH_LOGS : "판정 기록"
 ```
 
 **없는 것이 설계다.**
@@ -33,10 +35,10 @@ erDiagram
 | 없는 것 | 왜 |
 |---|---|
 | `mastery` 테이블 | 시간의 함수라 저장하면 바로 낡는다 — §4 |
-| `material_concept` 조인 | 자료의 개념은 `SELECT DISTINCT concept_id FROM flashcard WHERE material_id=?` 로 나온다 |
+| `material_concepts` 조인 | 자료의 개념은 `SELECT DISTINCT concept_id FROM flashcards WHERE material_id=?` 로 나온다 |
 | 전역 개념 사전 | 숙련도는 사용자 × 개념이라 다른 사용자의 개념에 연결할 이유가 없다. 전역이면 다른 사용자가 먼저 붙인 이름 때문에 조회가 빗나가고, 쓰기 스캔 · 락 · 병합 · 탈퇴 범위가 서비스 전체로 커진다 — §5.2 |
 | `Lesson.GENERATING` · `Curriculum.GENERATING` · 미완성 `Material` | **"생성 중 · 실패"는 잡으로 판단한다.** 두 곳에서 관리하면 잡은 실패했는데 강의는 생성 중에 멈춰 있는 사고가 난다 |
-| 일일 비용 합계 테이블(`daily_usage`) | 원장 `llm_call` 의 합일 뿐이다. 저장하면 원장과 두 곳이 되어 같은 트랜잭션 · 중복 합산 방지 · 락 순서 · 날짜 보정 같은 맞추는 장치가 붙는다. **조회 때 원장에서 더한다** — §6.6 |
+| 일일 비용 합계 테이블(`daily_usage`) | 원장 `llm_calls` 의 합일 뿐이다. 저장하면 원장과 두 곳이 되어 같은 트랜잭션 · 중복 합산 방지 · 락 순서 · 날짜 보정 같은 맞추는 장치가 붙는다. **조회 때 원장에서 더한다** — §6.6 |
 
 ## 2. 상태
 
@@ -45,7 +47,7 @@ stateDiagram-v2
     direction LR
     state "Curriculum" as C {
         [*] --> DRAFT : 생성
-        DRAFT --> DRAFT : 다시 짜기 · 3회까지
+        DRAFT --> DRAFT : 다시 짜기 · 하루 3회까지
         DRAFT --> ACTIVE : 승인 · 유효한 강의 목록 · 활성 잡 없음
         DRAFT --> [*] : 삭제 · 연결 데이터 함께 삭제
         ACTIVE --> COMPLETED : 전 강의 완료
@@ -66,7 +68,7 @@ stateDiagram-v2
 
 잡 상태는 [04 §4](./04-jobs-and-cost.md).
 
-- **승인은 `DRAFT` 이고 활성 생성 잡(`QUEUED` / `RUNNING`)이 없으며, 검증을 통과해 저장된 강의 목록이 있을 때만** 가능하다. 최초 생성 실패로 강의가 0개면 `409 CURRICULUM_NOT_READY`. 다시 짜기가 실패해도 이전에 성공한 목록이 남아 있으면 승인할 수 있다 — 최근 잡의 성공 여부만으로 승인 가능 여부를 판단하지 않는다.
+- **승인은 `DRAFT` 이고 활성 생성 잡(`QUEUED` / `RUNNING`)이 없으며, 검증을 통과해 저장된 강의 목록이 있을 때만** 가능하다. 그룹 단계의 상세 생성이 최초에 실패해 강의가 0개면 `409 CURRICULUM_NOT_READY` 다(초기 잡 I 가 실패하면 커리큘럼 자체가 없다). 다시 짜기가 실패해도 이전에 성공한 목록이 남아 있으면 승인할 수 있다 — 최근 잡의 성공 여부만으로 승인 가능 여부를 판단하지 않는다.
 - 승인 · 다시 짜기 적재 · 커리큘럼 잡 재시도 · 생성 결과 저장은 같은 커리큘럼의 advisory lock으로 직렬화하고, 잠금 안에서 상태와 활성 잡을 다시 확인한다. 승인 이후에는 이전 커리큘럼 잡을 재시도할 수 없고, 생성 결과도 `DRAFT` 에만 저장한다([04 §4.4 · §4.6](./04-jobs-and-cost.md)).
 - **그만두기 대신 완전 삭제를 제공한다.** `DRAFT` / `ACTIVE` / `COMPLETED` 모두 삭제할 수 있고 별도 보관 상태를 두지 않는다. 커리큘럼 · 강의 · 자료 · 플래시카드 · 해당 카드의 상태/복습 이력 · 해당 자료의 개념 판정 기록을 함께 지운다. 삭제된 카드는 오늘의 복습과 이후 숙련도 집계에서 제외되며, 다른 커리큘럼의 카드 · 기록은 유지한다.
 - **생성 중에도 삭제할 수 있다.** 대기 · 실행 중을 포함한 연결 잡을 먼저 삭제해 워커의 실행 권한을 없앤다. 이미 전송한 외부 요청 자체를 취소했다고 보장하지 않으며, 늦게 온 생성 결과는 버리되 사용량은 기록한다. 삭제 트랜잭션 · 잠금 순서는 §6.2를 따른다.
@@ -83,7 +85,7 @@ stateDiagram-v2
 
 ## 3. 학습 완료와 카드 상태
 
-**`card_state` 는 최초 학습 완료 트랜잭션에서 한 번만 만든다** — `fsrs_state='NEW'` · `next_review_at=now()` · `version=0`. 학습 완료를 재요청해도 기존 상태를 초기화하거나 복습 이력을 추가하지 않는다.
+**`card_states` 는 최초 학습 완료 트랜잭션에서 한 번만 만든다** — `fsrs_state='NEW'` · `next_review_at=now()` · `version=0`. 학습 완료를 재요청해도 기존 상태를 초기화하거나 복습 이력을 추가하지 않는다.
 
 | 다른 시점이면 | 생기는 일 |
 |---|---|
@@ -96,7 +98,7 @@ stateDiagram-v2
 
 1. 같은 커리큘럼의 advisory transaction lock을 얻고, 소유권 · 커리큘럼/강의 존재 · 강의 상태를 다시 읽는다. 삭제되었거나 남의 것이면 `404` 다. 생성 완료/삭제와 같은 잠금을 쓰며 트랜잭션 안에서만 유지한다.
 2. 강의가 이미 `COMPLETED` 면 **`200` 으로 응답하고 쓰지 않는다.** 커리큘럼 전체가 `COMPLETED` 가 된 뒤의 재요청도 성공이다. FSRS 상태 · 복습 횟수/버전 · 다음 복습일 · 복습 이력 · 강의/커리큘럼 진도를 변경하지 않는다. 누락 상태를 재생성하거나 기존 상태를 upsert로 초기화하지 않는다.
-3. 최초 완료는 `Curriculum.ACTIVE` 와 `Lesson.READY` 및 저장된 자료를 확인한다. 커리큘럼 상태가 맞지 않으면 `409 CURRICULUM_NOT_ACTIVE`, 강의가 준비되지 않았으면 `409 LESSON_NOT_READY`. 강의를 `COMPLETED` 로 바꾸고 카드별 `card_state` 를 최초 삽입한다. 삽입 충돌/오류는 트랜잭션 전체를 롤백하며 기존 행을 덮어쓰지 않는다.
+3. 최초 완료는 `Curriculum.ACTIVE` 와 `Lesson.READY` 및 저장된 자료를 확인한다. 커리큘럼 상태가 맞지 않으면 `409 CURRICULUM_NOT_ACTIVE`, 강의가 준비되지 않았으면 `409 LESSON_NOT_READY`. 강의를 `COMPLETED` 로 바꾸고 카드별 `card_states` 를 최초 삽입한다. 삽입 충돌/오류는 트랜잭션 전체를 롤백하며 기존 행을 덮어쓰지 않는다.
 4. 같은 트랜잭션에서 전 강의 완료 여부를 확인해 모두 완료됐으면 커리큘럼도 `COMPLETED` 로 바꾼다. 서로 다른 마지막 강의들의 동시 완료도 커리큘럼 잠금으로 직렬화해 전환을 놓치지 않는다.
 5. 최초/중복 요청 모두 `lessonStatus=COMPLETED` 와 **현재 그 강의의 `review_count=0` 카드만** `reviewCards` 로 반환한다. 현재 `cardVersion` 을 담고 첫 평가를 이미 한 카드를 다시 첫 복습으로 제공하지 않는다. 모델/FSRS를 재실행하지 않고 상태를 읽는다. 남은 첫 복습 카드가 없으면 빈 배열이다.
 
@@ -105,7 +107,7 @@ stateDiagram-v2
 ## 4. 숙련도 — 저장하지 않는다
 
 FSRS 의 인출확률 `R` 은 **마지막 복습 이후 경과 시간과 `S` 의 함수**라 아무 일 없어도 시간이 지나면 떨어진다. 저장하면 즉시 낡는다.
-그래서 **`card_state` 만 저장하고, 숙련도는 조회 때 계산**한다. 카드 수백 장을 계산해도 1ms 미만이다.
+그래서 **`card_states` 만 저장하고, 숙련도는 조회 때 계산**한다. 카드 수백 장을 계산해도 1ms 미만이다.
 
 | | 담당 |
 |---|---|
@@ -120,7 +122,7 @@ FSRS 의 인출확률 `R` 은 **마지막 복습 이후 경과 시간과 `S` 의
 
 > ⚠️ `R` 공식이 두 곳(라이브러리 · SQL)에 있다 → **일치 테스트**: 같은 `(S, 경과일)` 에서 둘의 `R` 이 같은지. 라이브러리를 올려 상수가 바뀌면 이 테스트가 깨진다. 상수(`factor` · `decay`)는 채택 버전에 맞추고 **테스트가 단일 출처**다.
 
-**숙련도 = 개념 카드들의 `R` 평균 + `S` 평균 + 가장 적게 복습한 카드의 복습 횟수(`minReviewCount`).** 집계 대상은 해당 사용자가 학습 완료해 `card_state` 가 생긴 카드다. `R` · `S` 평균은 복습한 카드만으로 계산하지만, **`minReviewCount` 는 미복습(`0회`)까지 포함한 모든 대상 카드**에서 구한다.
+**숙련도 = 개념 카드들의 `R` 평균 + `S` 평균 + 가장 적게 복습한 카드의 복습 횟수(`minReviewCount`).** 집계 대상은 해당 사용자가 학습 완료해 `card_states` 가 생긴 카드다. `R` · `S` 평균은 복습한 카드만으로 계산하지만, **`minReviewCount` 는 미복습(`0회`)까지 포함한 모든 대상 카드**에서 구한다.
 **`R` 하나로 판정하지 않는다** — 복습 직후엔 누구나 `R ≈ 1` 이다. 그리고 첫 평가 `EASY` 의 초기 `S` 가 약 16일이라 `S` 하한만으로는 *방금 배운 개념* 을 못 거른다.
 
 | 판정 | 조건 | 강의 자료(잡 B ①) | 커리큘럼(잡 A) |
@@ -183,11 +185,12 @@ flowchart TD
 - **별칭도 이름 같음 분기로 본다** — 병합하거나 한 번 연결된 표기의 다음 카드는 0.46 기준으로 연결된다. 이게 없으면 `inflation` 을 `인플레이션` 에 병합해도 다음 `inflation` 카드가 이름 다름 분기(0.78)에서 다시 갈려 병합이 풀린다. 뜻이 다른 같은 표기(우주론의 `inflation`)는 정의 유사도가 0.46 아래라 지금처럼 갈린다. 대가 — 잘못 연결된 별칭은 이후 같은 표기의 카드도 끌어오므로 U6 경계 판정에서 보고 되돌린다.
 - **같은 개념의 두 번째 표기를 막는 첫 방어선은 프롬프트의 표기 규칙**이다([03 §6](./03-generation.md)). 별칭 · 병합은 규칙을 빠져나온 경우의 뒷수습이다. 규칙이 얼마나 통하는지는 판정 기록으로 잰다 — 이름이 다른데 연결된 건수 · 임계값 바로 아래에서 갈린 건수.
 - 임베딩 재시도까지 실패하면 **기존 개념에 연결하지 않고 별도 개념을 만든다**. 입력의 이름 · 정규화 이름 · 정의는 보존하고 `embedding = NULL` 로 저장한 뒤, 해당 카드를 새 개념에 연결해 **자료 생성은 계속한다**. 이름이 같은 기존 개념이 하나뿐이어도 이 규칙을 따른다 — 이름만으로 동명이의를 구별할 수 없기 때문이다.
-- NULL 행은 이후 임베딩 유사도 비교에서도 제외한다. 같은 개념이 중복될 수 있음을 받아들이고, 사람이 정의를 검토한 뒤 수동 병합할 수 있다. 자동으로 임베딩을 채우거나 병합하는 배치는 두지 않는다. `concept.embedding.missing` 과 `concept_match_log.branch = 'EMBEDDING_UNAVAILABLE'` 로 이 경로를 확인한다.
+- **예외 — 이번 강의의 `SKIP` 개념과 정규화 이름(또는 별칭)이 같은 카드는 임베딩이 실패하면 버린다**([03 §5](./03-generation.md)). 카드 단계는 `SKIP` 개념의 이름을 받고 그 개념으로는 카드를 만들지 말라는 지시를 받았으므로, 같은 강의에서 같은 이름이 나오면 거의 그 개념이다. 별도 개념으로 만들면 새 ID 라 `SKIP` 검사를 빠져나가 생략이 풀린다. 연결하는 것이 아니라 버리는 것이라 동명이의가 섞이지는 않는다 — 드물게 진짜 동명이의 카드 한 장을 잃는 것을 받아들인다.
+- NULL 행은 이후 임베딩 유사도 비교에서도 제외한다. 같은 개념이 중복될 수 있음을 받아들이고, 사람이 정의를 검토한 뒤 수동 병합할 수 있다. 자동으로 임베딩을 채우거나 병합하는 배치는 두지 않는다. `concept.embedding.missing` 과 `concept_match_logs.branch = 'EMBEDDING_UNAVAILABLE'` 로 이 경로를 확인한다.
 
 ### 5.2 유일성은 테이블이 아니라 코드가 만든다
 
-- **개념 사전은 사용자별이다**(`concept.user_id`). 매칭 · 조회 · 병합은 모두 그 사용자의 개념 안에서만 한다. 전역으로 두면 아끼는 것은 사용자 간 중복 저장뿐인데(개념 행은 카드 하나당 최대 하나라 사용자별로 두어도 `flashcard` 행 수를 넘지 않는다), 쓰기 스캔이 모든 사용자의 개념을 읽고, 다른 사용자가 붙인 이름 때문에 `lookupMastery` 가 빗나가고, 병합 한 번이 모든 사용자의 카드를 옮기고, 탈퇴 뒤에도 사용자 주제에서 나온 이름 · 정의가 남는다.
+- **개념 사전은 사용자별이다**(`concepts.user_id`). 매칭 · 조회 · 병합은 모두 그 사용자의 개념 안에서만 한다. 전역으로 두면 아끼는 것은 사용자 간 중복 저장뿐인데(개념 행은 카드 하나당 최대 하나라 사용자별로 두어도 `flashcards` 행 수를 넘지 않는다), 쓰기 스캔이 모든 사용자의 개념을 읽고, 다른 사용자가 붙인 이름 때문에 `lookupMastery` 가 빗나가고, 병합 한 번이 모든 사용자의 카드를 옮기고, 탈퇴 뒤에도 사용자 주제에서 나온 이름 · 정의가 남는다.
 - 동명이의를 허용하려고 **`name` · `name_normalized` 에 unique 를 걸지 않는다.** 유일성은 `resolveConcepts` **한 곳**의 규칙이다.
 - 같은 사용자의 잡 두 개(진행 중 2개)가 동시에 같은 개념을 만들 수 있으므로 **사용자 advisory lock** 으로 쓰기를 직렬화한다 — 이름 단위 락으로는 `인플레이션` / `inflation` 이 동시에 들어오는 동의어 경합을 못 막는다. 다른 사용자끼리는 서로 기다리지 않는다. 락 구간은 그 사용자 개념의 스캔 + INSERT 뿐이다.
 - 임베딩 실패 시 별도 개념을 만드는 경로도 같은 락과 완료 트랜잭션 안에서 쓴다. 이때의 중복은 숙련도 오염을 피하기 위해 의도적으로 허용한다.
@@ -202,12 +205,12 @@ flowchart TD
 BEGIN;
 SELECT pg_advisory_xact_lock(hashtext('concept-write'), :u::int);   -- resolveConcepts 와 같은 사용자 락
 SELECT count(*) FROM jobs WHERE user_id = :u AND status IN ('QUEUED', 'RUNNING');   -- 0 이어야 한다 — 아래 jsonb 근거
-SELECT id FROM concept WHERE id IN (:keep, :drop) AND user_id = :u;  -- 2행이어야 한다 — 둘 다 이 사용자의 개념
-UPDATE flashcard         SET concept_id   = :keep WHERE concept_id   = :drop;
-UPDATE concept_match_log SET concept_id   = :keep, corrected_at = now()
+SELECT id FROM concepts WHERE id IN (:keep, :drop) AND user_id = :u;  -- 2행이어야 한다 — 둘 다 이 사용자의 개념
+UPDATE flashcards         SET concept_id   = :keep WHERE concept_id   = :drop;
+UPDATE concept_match_logs SET concept_id   = :keep, corrected_at = now()
  WHERE concept_id = :drop;                                            -- 지우지 않고 옮긴다 · 사람이 고친 판정
-UPDATE concept_match_log SET candidate_id = :keep WHERE candidate_id = :drop;
-DELETE FROM concept WHERE id = :drop AND user_id = :u;
+UPDATE concept_match_logs SET candidate_id = :keep WHERE candidate_id = :drop;
+DELETE FROM concepts WHERE id = :drop AND user_id = :u;
 COMMIT;
 ```
 
@@ -220,22 +223,22 @@ COMMIT;
 ```sql
 -- 0) 트랜잭션 밖에서 확인 — 잘못된 판정과 옮길 카드
 SELECT l.id, l.material_id, l.concept_id, l.input_name, l.input_definition, l.similarity
-  FROM concept_match_log l JOIN concept c ON c.id = l.concept_id
+  FROM concept_match_logs l JOIN concepts c ON c.id = l.concept_id
  WHERE l.id = :logId AND l.action = 'LINKED' AND c.user_id = :u;
-SELECT f.id, f.question FROM flashcard f
+SELECT f.id, f.question FROM flashcards f
  WHERE f.material_id = :m AND f.concept_id = :wrong;       -- 같은 자료에 제대로 연결된 카드가 있을 수 있어 눈으로 고른다
 
 BEGIN;
 SELECT pg_advisory_xact_lock(hashtext('concept-write'), :u::int);
 SELECT count(*) FROM jobs WHERE user_id = :u AND status IN ('QUEUED', 'RUNNING');   -- 0 이어야 한다
-INSERT INTO concept (user_id, name, name_normalized, definition, embedding, embedding_model)
+INSERT INTO concepts (user_id, name, name_normalized, definition, embedding, embedding_model)
 SELECT c.user_id, l.input_name, l.input_name_normalized, l.input_definition, l.input_embedding, c.embedding_model
-  FROM concept_match_log l JOIN concept c ON c.id = l.concept_id
+  FROM concept_match_logs l JOIN concepts c ON c.id = l.concept_id
  WHERE l.id = :logId AND l.action = 'LINKED' AND c.user_id = :u
 RETURNING id;                                                               -- :new
-UPDATE flashcard SET concept_id = :new
+UPDATE flashcards SET concept_id = :new
  WHERE id IN (:cardIds) AND material_id = :m AND concept_id = :wrong;       -- 0)에서 고른 카드만
-UPDATE concept_match_log SET concept_id = :new, corrected_at = now()
+UPDATE concept_match_logs SET concept_id = :new, corrected_at = now()
  WHERE id = :logId;                                                         -- 잘못된 별칭이 사라진다
 COMMIT;
 ```
@@ -245,14 +248,16 @@ COMMIT;
 - 카드는 눈으로 고른다 — 어느 카드가 어느 이름으로 들어왔는지는 카드에 남지 않는다. 확인은 트랜잭션 밖에서 해서 락을 오래 쥐지 않는다.
 
 **jsonb 근거의 개념 ID는 고치지 않는다.** 병합 · 되돌리기로 ID 가 사라지거나 바뀌어도 그렇다.
-- 완료된 근거(`material.outline` · `material.mastery_findings` · `curriculum.mastery_reflection` · `curriculum.mastery_selection`)는 생성 당시 스냅숏이다. 이름까지 담고 있고 화면(U3 의 반영 내역)은 jsonb 의 이름을 쓴다. 현재 숙련도 조회에도 재사용하지 않는다 — **이 근거들은 `concept` 과 조인하지 않는다.**
+- 완료된 근거(`materials.outline` · `materials.mastery_findings` · `curriculums.mastery_reflection` · `curriculums.mastery_selection`)는 생성 당시 스냅숏이다. 이름까지 담고 있고 화면(U3 의 반영 내역)은 jsonb 의 이름을 쓴다. 현재 숙련도 조회에도 재사용하지 않는다 — **이 근거들은 `concepts` 과 조인하지 않는다.**
 - 진행 중인 잡의 `payload` 는 카드 단계의 `SKIP` 검사가 개념 ID 로 비교한다([03 §5](./03-generation.md)). 그래서 병합 · 되돌리기는 **그 사용자의 진행 중 잡이 없을 때만** 한다(위 SQL 의 확인 쿼리). 실패한 채 산출물이 남은 잡이 나중에 재시도되면 `SKIP` 검사를 한 번 빠져나갈 수 있다 — 영향이 카드 한 장이라 받아들인다.
 
 ### 5.4 커리큘럼 숙련도 선별 — 임베딩 검색 + 키워드 검색
 
-`selectMasteryConcepts` 는 관련 개념의 **읽기 전용 후보 선별**이다. 검색 유사도로 같은 개념이라고 판정하거나 카드 연결을 변경하지 않으며, `concept_match_log` 에 병합 판정을 기록하지 않는다. `lookupMastery` 의 이름 조회 계약도 그대로다.
+초기 잡 I도 이 선별/백엔드 판정/스냅숏 재사용 정책을 적용한다. 아래 잡 A의 호출/입력 예산 수치는 A의 설정이며 I의 공통/유형별 출력 예산은 별도로 확정한다. 초기 단일 결과도 같은 개인화 검증을 통과해야 한다([03 §2.1](./03-generation.md)).
 
-1. 후보 범위는 **해당 사용자가 학습 완료해 `card_state` 가 있는 개념**의 서로 다른 ID다. 그 사용자 사전에 있어도 생성만 하고 학습 완료하지 않은 카드의 개념은 제외한다. `R` 이 높은 순으로 먼저 500개를 자르지 않는다. 후보가 없으면 검색용 외부 호출도 하지 않는다.
+`selectMasteryConcepts` 는 관련 개념의 **읽기 전용 후보 선별**이다. 검색 유사도로 같은 개념이라고 판정하거나 카드 연결을 변경하지 않으며, `concept_match_logs` 에 병합 판정을 기록하지 않는다. `lookupMastery` 의 이름 조회 계약도 그대로다.
+
+1. 후보 범위는 **해당 사용자가 학습 완료해 `card_states` 가 있는 개념**의 서로 다른 ID다. 그 사용자 사전에 있어도 생성만 하고 학습 완료하지 않은 카드의 개념은 제외한다. `R` 이 높은 순으로 먼저 500개를 자르지 않는다. 후보가 없으면 검색용 외부 호출도 하지 않는다.
 2. `topic + purpose` 를 고정된 형식으로 합쳐 검색 문장으로 쓴다. 완성된 커리큘럼 · 강의 목록은 아직 없으므로 검색 입력으로 쓰지 않는다. 추가 LLM으로 키워드를 생성하지 않는다. 검색 문장을 기존 정의 임베딩과 같은 모델 · 차원으로 한 번 임베딩한다. 전송 재시도는 기존 최대 3회 규약과 작업 전체 누적 몫을 따른다([03 §8.5](./03-generation.md)).
 3. 의미 검색은 후보의 `definition` 임베딩과 코사인 유사도를 비교한다. `embedding IS NULL`, 모델 · 차원 불일치는 비교에서 제외한다. 별도의 검색 관련도 임계값 이상인 후보를 유사도 내림차순 · ID 오름차순으로 정렬한다. 동일성 판정의 `0.46/0.78` 을 검색 임계값으로 재사용하지 않는다.
 4. 키워드 검색은 같은 후보의 이름 · 정의에 적용한다. 쿼리와 검색 필드에 NFKC · 소문자 변환을 적용하고 쿼리를 공백/구두점으로 나눈다. 불용어 목록 · 최소 토큰 길이와 규칙은 검색 설정 버전에 둔다. 후보 이름의 쿼리 전체 문구 일치 → 이름에 일치한 서로 다른 검색어 수 → 정의에 일치한 검색어 수 → ID 순으로 정렬한다. 일치가 없는 개념은 이 목록에 넣지 않는다. 임베딩 없는 개념도 이 경로로 찾을 수 있다.
@@ -265,7 +270,7 @@ COMMIT;
 
 선별되지 않은 개념은 미학습이라고 단정하지 않지만, 생성에는 확인되지 않은 숙련도이므로 `EXPANDED` 를 적용한다. 검색 관련도는 `EXCLUDED/COMPRESSED` 의 근거가 아니다. 해당 개념을 실제 다룰 때만 기존 숙련도 판정을 적용한다. 선수 개념 누락 · 넓은 주제 · 동명이의 오선택은 콘텐츠 평가로 확인하며, 선별만으로 필요한 개념의 완전한 재현을 보장하지 않는다.
 
-선별 목록 · 조회 시각 · 수치/판정 · 설정 버전 · 검색 모드(`HYBRID` / `KEYWORD_ONLY` / `EMPTY`)와 후보 건수를 `jobs.payload.masterySelection` 에 체크포인트로 저장한다. 저장 이후 같은 잡의 재시도 · 형식 수정은 이 근거를 재사용하며 검색용 임베딩을 다시 생성하지 않는다. 저장 전에 죽은 경우의 재호출은 누적 몫으로 제한된다. 별도 다시 짜기 잡은 최신 이력으로 다시 선별한다. 완료 시 `curriculum.mastery_selection` 에 옮기며, 이는 생성 당시의 근거로만 사용하고 현재 숙련도 조회에 재사용하지 않는다.
+선별 목록 · 조회 시각 · 수치/판정 · 설정 버전 · 검색 모드(`HYBRID` / `KEYWORD_ONLY` / `EMPTY`)와 후보 건수를 `jobs.payload.masterySelection` 에 체크포인트로 저장한다. 저장 이후 같은 잡의 재시도 · 형식 수정은 이 근거를 재사용하며 검색용 임베딩을 다시 생성하지 않는다. 저장 전에 죽은 경우의 재호출은 누적 몫으로 제한된다. 별도 다시 짜기 잡은 최신 이력으로 다시 선별한다. 완료 시 `curriculums.mastery_selection` 에 옮기며, 이는 생성 당시의 근거로만 사용하고 현재 숙련도 조회에 재사용하지 않는다.
 
 ---
 
@@ -286,19 +291,18 @@ COMMIT;
 **세션 테이블** — `spring_session` · `spring_session_attributes`(Spring Session JDBC 의 스키마). 프레임워크가 쓰는 테이블이지만 **Flyway 마이그레이션에 넣는다**(자동 생성은 끈다). 로그인 성공 때 인증 주체 이름(`principal_name`)을 `users.id` 로 둔다 — 탈퇴 때 그 사용자의 세션을 한 번에 지우려고.
 만료 세션은 라이브러리의 정리 작업이 지운다([04 §3.2](./04-jobs-and-cost.md)).
 
-### 6.2 `curriculum` · `lesson`
+### 6.2 `curriculums` · `lessons`
 
-| `curriculum` | 비고 |
+| `curriculums` | 비고 |
 |---|---|
 | `user_id` · `topic` · `purpose` | 소유자 · 입력. 기간 · 주당 학습량은 받거나 저장하지 않는다 |
-| `step_id` | nullable FK → `curriculum_step.id`, **unique**. NULL이면 독립 커리큘럼, 값이 있으면 해당 단계에서 생성한 실제 커리큘럼 |
+| `step_id` | nullable FK → `curriculum_steps.id`, **unique**. NULL이면 독립 커리큘럼, 값이 있으면 해당 단계에서 생성한 실제 커리큘럼 |
 | `title` | LLM 이 지은 제목 |
 | `status` | `DRAFT` / `ACTIVE` / `COMPLETED` — 삭제는 행 제거 |
-| `regeneration_count` | 다시 짜기 횟수(한도 3) |
-| `mastery_reflection` | `jsonb` — 잡 A 의 반영 내역을 백엔드 판정과 대조해 검증한 결과 + 생성 시점 수치 근거. U3 에서 *"이미 아셔서 별도 강의로 만들지 않았어요"* 로 보인다 |
+| `mastery_reflection` | `jsonb` — 초기 단일 결과 또는 잡 A의 반영 내역을 백엔드 판정과 대조해 검증한 결과 + 생성 시점 수치 근거. U3 에서 *"이미 아셔서 별도 강의로 만들지 않았어요"* 로 보인다 |
 | `mastery_selection` | `jsonb` — 생성 당시 선별한 ID · 이름/정의 · 수치/판정 · 조회 시각 · 검색 순위/모드 · 후보 수 · 설정 버전 · 주입 바이트 수. 조회 근거이며 현재 숙련도 캐시가 아니다. 생성 성공 때 갱신, 실패한 다시 짜기는 이전 근거 유지 |
 
-| `lesson` | 비고 |
+| `lessons` | 비고 |
 |---|---|
 | `curriculum_id` · `order_no` | 권장 학습 순서. 주차를 배정하지 않는다 |
 | `title` · `objective` | |
@@ -306,26 +310,27 @@ COMMIT;
 | `status` | `NOT_STARTED` / `READY` / `COMPLETED` |
 
 - 초기 주제/목적 요청은 `CURRICULUM_INITIAL` 잡에 입력을 저장하고, 단일 결과의 검증/저장 성공 시 강의가 있는 `DRAFT`를 만든다. 실패 시 빈 커리큘럼은 없고 초기 잡의 입력/체크포인트만 유지한다([04 §4.2](./04-jobs-and-cost.md)). 그룹의 단계 생성은 유형/대상이 이미 정해져 있으므로 기존대로 `DRAFT(step_id)`와 잡 A를 함께 적재한다(§6.2.1).
-- 다시 짜기는 검증을 통과한 새 목록을 저장하는 성공 트랜잭션에서 `lesson` 을 **지우고 새로 만든다**. 그 전에는 이전 강의 목록 · 제목 · 숙련도 반영/선별 근거를 보존한다. `DRAFT` 에는 자료가 없어 교체가 가능하며, 이전 버전을 별도로 보관하지 않는다.
-- 삭제(§2)는 아래 트랜잭션으로 처리한다. `llm_call` 의 잡 연결만 해제하고 호출 기록은 남긴다 — 오늘 쓴 비용은 원장 합계(§6.6)로 계속 쿼터 · 킬스위치에 잡힌다. 생성 비용 한도는 삭제로 초기화하지 않는다.
+- 다시 짜기는 검증을 통과한 새 목록을 저장하는 성공 트랜잭션에서 `lessons` 을 **지우고 새로 만든다**. 그 전에는 이전 강의 목록 · 제목 · 숙련도 반영/선별 근거를 보존한다. `DRAFT` 에는 자료가 없어 교체가 가능하며, 이전 버전을 별도로 보관하지 않는다.
+- **다시 짜기는 커리큘럼당 하루 3회**(한국 날짜)다. 평생 횟수로 묶으면 마음에 드는 안이 나올 때까지 커리큘럼을 지우고 새로 만들게 되는데, 그룹의 단계 커리큘럼은 지우면 단계 연결까지 흔들린다(ADR-053). 횟수는 컬럼에 저장하지 않고 그날 이 커리큘럼에 적재된 다시 짜기 잡 수로 센다 — 잡 행은 커리큘럼 삭제 · 탈퇴 때만 지워진다. 실패한 다시 짜기 잡의 재시도는 같은 행이라 횟수를 쓰지 않는다. 다시 짜기 잡을 최초 생성 잡과 구별하는 방법은 해당 TASK 에서 정한다.
+- 삭제(§2)는 아래 트랜잭션으로 처리한다. `llm_calls` 의 잡 연결만 해제하고 호출 기록은 남긴다 — 오늘 쓴 비용은 원장 합계(§6.6)로 계속 쿼터 · 킬스위치에 잡힌다. 생성 비용 한도는 삭제로 초기화하지 않는다.
 - 입력 길이 — `topic` 100자 · `purpose` 200자 · 다시 짜기 피드백 500자. 넘으면 `400 STRUCTURAL_LIMIT`.
 - 커리큘럼은 검증된 강의 1~40개로 구성한다. `weeks` · `week` · 예상 완료 기간/주당 학습량 필드는 MVP 스키마에 두지 않는다. 학습 플랜은 후속 기능이며, 권장 순서와 실제 학습 속도/시점은 분리한다.
 
 **커리큘럼 완전 삭제 — 한 트랜잭션**
 
 1. 해당 사용자의 `usage-user` advisory lock → `POST /reviews` 와 같은 사용자 복습 advisory lock → 단계 연결이 있으면 해당 묶음 advisory lock → 커리큘럼 advisory lock 순서로 얻고, 소유권과 존재 여부를 다시 확인한다. 없거나 남의 것이면 `404`. 묶음 잠금은 다음 단계 생성의 선행 완료 검사와 삭제를 직렬화한다(§6.2.1). 자료 생성/재시도 · 처음부터 다시 만들기 · 학습 완료 · 워커 완료도 기존 커리큘럼 잠금 안에서 존재를 다시 확인한다. 잠금은 외부 LLM 호출 중에는 유지하지 않는다.
-2. 대상 강의 · 자료 · 카드 ID를 확정하고, 단일 결과를 연결한 초기 잡 I · 커리큘럼 잡 A · 해당 강의들의 잡 B **모두**의 `llm_call.job_id` 를 NULL로 해제한 뒤 잡 행을 삭제한다. 대기/실행/성공/실패 여부와 무관하다. `job_event.job_id`도 FK로 NULL이 되며 사용자/콘텐츠 필드 없는 운영 이벤트는 보존한다(§6.9). 계정은 남으므로 원장의 `user_id` · 날짜 · 단가 · 사용량 · 비용은 유지한다.
-3. 잡 행을 지운 뒤 사용자 `concept-write` lock을 얻는다. 대상 카드의 `review` · `card_state` → `flashcard` → 대상 자료의 `concept_match_log` 순으로 삭제한다. 복습 이력에 함께 저장한 성공 요청/응답도 지우므로 삭제된 카드의 평가 재전송은 `404` 이며 이력을 다시 만들지 않는다.
+2. 대상 강의 · 자료 · 카드 ID를 확정하고, 단일 결과를 연결한 초기 잡 I · 커리큘럼 잡 A · 해당 강의들의 잡 B **모두**의 `llm_calls.job_id` 를 NULL로 해제한 뒤 잡 행을 삭제한다. 대기/실행/성공/실패 여부와 무관하다. `job_events.job_id`도 FK로 NULL이 되며 사용자/콘텐츠 필드 없는 운영 이벤트는 보존한다(§6.9). 계정은 남으므로 원장의 `user_id` · 날짜 · 단가 · 사용량 · 비용은 유지한다.
+3. 잡 행을 지운 뒤 사용자 `concept-write` lock을 얻는다. 대상 카드의 `reviews` · `card_states` → `flashcards` → 대상 자료의 `concept_match_logs` 순으로 삭제한다. 복습 이력에 함께 저장한 성공 요청/응답도 지우므로 삭제된 카드의 평가 재전송은 `404` 이며 이력을 다시 만들지 않는다.
 4. 삭제 대상에서 사용하던 개념 중 남은 카드나 판정 기록의 `concept_id` 로 참조되지 않는 개념만 정리한다. 남은 판정 기록의 `candidate_id` 가 그 개념을 참조하면 NULL로 해제하고 삭제한다. 다른 커리큘럼이 사용하는 개념과 판정 기록은 유지한다. 삭제한 자료만 제공하던 별칭은 함께 사라진다.
-5. `material` → `lesson` → `curriculum` 순으로 삭제하고 커밋한다. 실패하면 잡/연결 해제를 포함해 전부 롤백한다. 세션과 계정은 유지한다.
+5. `materials` → `lessons` → `curriculums` 순으로 삭제하고 커밋한다. 실패하면 잡/연결 해제를 포함해 전부 롤백한다. 세션과 계정은 유지한다.
 
 워커 완료가 먼저 커밋됐으면 그 산출물까지 삭제한다. 삭제가 먼저 커밋됐으면 워커의 조건부 `UPDATE jobs` 는 `0 rows` 이므로 결과 저장/추가 호출을 중단한다. 비용은 독립 원장에 확정한다 — 사용자 · 전역 합계는 원장에서 더하므로 따로 반영할 것이 없다. 삭제 후 늦은 응답은 잡 연결이나 도메인 데이터를 복구하지 않는다([04 §4.4](./04-jobs-and-cost.md)).
 
-### 6.2.1 `curriculum_group` · `curriculum_step`
+### 6.2.1 `curriculum_groups` · `curriculum_steps`
 
-**묶음은 전체 목표, 단계는 분할안, 커리큘럼은 실제 학습 내용이다.** 미생성 단계가 존재해도 빈 `DRAFT`를 미리 만들지 않는다. `curriculum.step_id`를 통해 단계별 실제 커리큘럼을 조회하며, 단계 테이블에 반대 방향의 `curriculum_id`를 중복 저장하지 않는다.
+**묶음은 전체 목표, 단계는 분할안, 커리큘럼은 실제 학습 내용이다.** 미생성 단계가 존재해도 빈 `DRAFT`를 미리 만들지 않는다. `curriculums.step_id`를 통해 단계별 실제 커리큘럼을 조회하며, 단계 테이블에 반대 방향의 `curriculum_id`를 중복 저장하지 않는다.
 
-| `curriculum_group` | 비고 |
+| `curriculum_groups` | 비고 |
 |---|---|
 | `id` | PK |
 | `user_id` | FK → `users.id`. 전체 목표/분할안의 소유자 |
@@ -333,10 +338,10 @@ COMMIT;
 | `title` | 검증된 분할안의 묶음 제목. 초기 성공 시 전체 단계와 함께 저장하며 NOT NULL |
 | `created_at` | 생성 시각 |
 
-| `curriculum_step` | 비고 |
+| `curriculum_steps` | 비고 |
 |---|---|
 | `id` | PK. 단계 생성/조회에 사용하는 안정적인 식별자 |
-| `group_id` | FK → `curriculum_group.id` |
+| `group_id` | FK → `curriculum_groups.id` |
 | `order_no` | 1부터 시작하는 단계 순서. `UNIQUE(group_id, order_no)` · `CHECK(order_no >= 1)` |
 | `title` · `scope` | 단계 제목 · 포함할 학습 범위. 전체 목표와 단계별 내용을 구별해 보여준다 |
 | `topic` · `purpose` | 이 단계의 상세 커리큘럼 생성 입력. 기존 100자 · 200자 제한 적용 |
@@ -345,20 +350,20 @@ COMMIT;
 - **분할안 저장** — 초기 잡 I에 주제/목적을 먼저 보존하고 그룹 결과의 검증/저장 성공 시 묶음 제목 · 전체 단계를 새로 만든다. 초기 성공 상태 · 그룹 결과 FK · 성공 이벤트까지 같은 트랜잭션으로 저장한다([04 §4.2](./04-jobs-and-cost.md)). 실패/거절/저장 오류에는 빈 묶음이나 일부 단계가 남지 않는다. 상세 커리큘럼이 하나라도 연결된 뒤에는 단계 순서/생성 입력을 자동으로 바꾸지 않는다. 묶음/단계 단위 편집과 분할안 다시 짜기는 이번 확정 범위에 포함하지 않는다
 - **상태는 조회** — 미생성은 연결된 커리큘럼 없음, 생성 중/실패는 연결 커리큘럼의 잡, 검토/학습/완료는 그 커리큘럼 상태로 판단한다. 묶음의 현재 단계/진도/완료 상태와 단계의 학습 상태는 저장하지 않는다. 초기 생성 중/실패는 묶음이 아직 없으므로 사용자 소유 초기 잡에서 조회한다. 전체 완료는 단계가 1개 이상 있고 모든 단계에 연결된 커리큘럼이 `COMPLETED`인 경우다
 - **단계 생성의 원자성** — 서버가 단계 → 묶음을 읽어 요청 사용자와 소유자가 같은지 확인한다. 이미 연결된 커리큘럼이 있으면 먼저 그것을 반환한다. 새 생성은 1단계 또는 직전 단계가 `COMPLETED`인지 확인한 뒤 `Curriculum(DRAFT, step_id)` 생성과 기존 잡 A 적재를 한 트랜잭션으로 처리한다. 주제/목적은 클라이언트가 대체하지 않고 단계의 저장값을 사용한다. 실제 커리큘럼 `user_id`도 묶음 소유자와 같아야 한다
-- **중복/잠금** — 신규 적재에 필요한 기존 사용자 락(진행 중 2개 · 비용/탈퇴 경합) → 묶음 advisory lock → 필요한 선행/대상 커리큘럼 잠금 순서로 재검사한다. 커리큘럼 잠금이 여러 개면 ID 오름차순으로 얻는다. 대상 단계에 이미 커리큘럼이 있으면 그것으로 연결하고, 새 유료 작업 없이 조회만 하는 요청은 신규 생성 쿼터로 막지 않는다. 유일성은 `UNIQUE(curriculum.step_id)`가 최종 방어선이며, 충돌 뒤에는 롤백하고 새 트랜잭션에서 기존 결과를 읽는다. 다른 사용자의 커리큘럼 연결은 허용하지 않는다
-- **연결의 수명** — 단계 연결은 해당 커리큘럼을 생성할 때 한 번 정하고 다시 짜기에서도 유지한다. 다른 묶음/단계로 옮기는 기능은 없다. 단계가 있는 기존 커리큘럼을 부모 삭제의 FK cascade로 지우지 않는다(`curriculum.step_id` FK는 `ON DELETE RESTRICT`). 개별 커리큘럼 삭제는 기존 범위만 제거하며 같은 묶음의 다른 커리큘럼을 지우지 않는다. 묶음/단계의 계획 정보는 남지만, 삭제한 학습 기록이나 완료 상태를 별도 사본으로 보존하지 않는다. 이때 단계의 화면 표시/재생성/후속 단계 접근 정책과 묶음 전체 삭제 기능은 다음 결정에서 확정한다
+- **중복/잠금** — 신규 적재에 필요한 기존 사용자 락(진행 중 2개 · 비용/탈퇴 경합) → 묶음 advisory lock → 필요한 선행/대상 커리큘럼 잠금 순서로 재검사한다. 커리큘럼 잠금이 여러 개면 ID 오름차순으로 얻는다. 대상 단계에 이미 커리큘럼이 있으면 그것으로 연결하고, 새 유료 작업 없이 조회만 하는 요청은 신규 생성 쿼터로 막지 않는다. 유일성은 `UNIQUE(curriculums.step_id)`가 최종 방어선이며, 충돌 뒤에는 롤백하고 새 트랜잭션에서 기존 결과를 읽는다. 다른 사용자의 커리큘럼 연결은 허용하지 않는다
+- **연결의 수명** — 단계 연결은 해당 커리큘럼을 생성할 때 한 번 정하고 다시 짜기에서도 유지한다. 다른 묶음/단계로 옮기는 기능은 없다. 단계가 있는 기존 커리큘럼을 부모 삭제의 FK cascade로 지우지 않는다(`curriculums.step_id` FK는 `ON DELETE RESTRICT`). 개별 커리큘럼 삭제는 기존 범위만 제거하며 같은 묶음의 다른 커리큘럼을 지우지 않는다. 묶음/단계의 계획 정보는 남지만, 삭제한 학습 기록이나 완료 상태를 별도 사본으로 보존하지 않는다. 이때 단계의 화면 표시/재생성/후속 단계 접근 정책과 묶음 전체 삭제 기능은 다음 결정에서 확정한다
 - **탈퇴** — 초기 잡을 포함한 사용자 잡 제거 → 기존 학습 데이터/커리큘럼 제거 → 단계 제거 → 묶음 제거 → 사용자 제거. 다른 사용자 데이터는 건드리지 않으며 늦은 워커 응답은 부모/단계를 복원하지 않는다(§7)
 
-### 6.3 `material` · `flashcard`
+### 6.3 `materials` · `flashcards`
 
-| `material` | 비고 |
+| `materials` | 비고 |
 |---|---|
 | `lesson_id` | **unique** — 강의당 최대 1개. **완성품만** 저장한다 |
 | `body` | `text` — 정상 종료 · 필수 6섹션 검증을 통과한 마크다운 본문. 잘린 본문은 저장하지 않는다 |
 | `outline` · `mastery_findings` | `jsonb` — 백엔드가 설명 깊이 · 목표 분량을 채운 개요와 생성 시점 판정 근거. 현재 숙련도 조회에는 재사용하지 않는다 |
 | `prompt_version` · `model` | `text` — 품질 채점과 전후 비교용 |
 
-| `flashcard` | 비고 |
+| `flashcards` | 비고 |
 |---|---|
 | `material_id` · `concept_id` | 개념은 **N:1 — 주된 하나** |
 | `type` | `UNDERSTAND` / `APPLY` / `TERM` — 종류별 등급 분포를 보려고. 지난 이력에는 나중에 붙일 수 없다 |
@@ -366,9 +371,9 @@ COMMIT;
 | `model_answer` | 모범 답안 — 단답 한 문장 · 설명형 2~4문장, *"~해요 · ~예요"* |
 | `key_points` | `jsonb` 문자열 배열 1~3개 — 자기 채점 기준 |
 
-### 6.4 `concept` · `concept_match_log`
+### 6.4 `concepts` · `concept_match_logs`
 
-| `concept` | 비고 |
+| `concepts` | 비고 |
 |---|---|
 | `user_id` | FK → `users` · 개념 사전의 주인(§5.2). 탈퇴 때 함께 삭제 |
 | `name` | **unique 없음** · 50자 이하(카드 단계 출력 검증 — [03 §5](./03-generation.md)) |
@@ -377,7 +382,7 @@ COMMIT;
 | `embedding` | `vector` **차원 미지정** · 인덱스 없음 · NULL 가능 |
 | `embedding_model` | |
 
-| `concept_match_log` | 비고 |
+| `concept_match_logs` | 비고 |
 |---|---|
 | `created_at` · `concept_id` | 판정 결과로 연결 · 생성된 개념 |
 | `material_id` | 어느 강의 자료의 판정인가. 잘못 합친 판정을 되돌릴 때 옮길 카드 = 이 자료에서 `concept_id` 에 연결된 카드 |
@@ -392,7 +397,7 @@ COMMIT;
 | `corrected_at` | 사람이 결과 개념을 바꾼 시각(병합 · 되돌리기). 이 행의 `branch` · `similarity` · `action` 은 원래 판정 그대로이고 `concept_id` 만 고친 결과다 — 임계값 재계산에서 *실제로 틀린 판정* 의 라벨 |
 
 ```sql
-CREATE INDEX idx_match_log_alias ON concept_match_log (concept_id, input_name_normalized);
+CREATE INDEX idx_match_log_alias ON concept_match_logs (concept_id, input_name_normalized);
 ```
 
 판정마다 한 행(자료 1건에 최대 10행) — U6 의 경계 판정 · 병합 후보가 **쌍의 목록**이라 카운터 메트릭으로는 안 된다.
@@ -400,9 +405,9 @@ CREATE INDEX idx_match_log_alias ON concept_match_log (concept_id, input_name_no
 임베딩 실패 기록은 `branch='EMBEDDING_UNAVAILABLE'` · `action='CREATED'` · `candidate_id=NULL` · `similarity=NULL` · `borderline=false`다(들어온 이름 · 정의는 채운다). 유사도 임계값으로 새로 만든 경우와 구분한다.
 **판정 기록은 별칭 조회 · 매칭에도 쓰이므로 임의로 지우지 않는다.** 해당 커리큘럼을 완전 삭제할 때 그 자료의 기록을 지우며, 탈퇴 때는 해당 사용자의 기록을 전부 지운다. 병합은 행을 옮긴다(§5.3).
 
-### 6.5 `card_state` · `review`
+### 6.5 `card_states` · `reviews`
 
-| `card_state` | 비고 |
+| `card_states` | 비고 |
 |---|---|
 | `flashcard_id` | PK · FK · 1:1 |
 | `user_id` | **비정규화** — 오늘의 복습 조회가 4단 조인이 되지 않게 |
@@ -411,7 +416,7 @@ CREATE INDEX idx_match_log_alias ON concept_match_log (concept_id, input_name_no
 | `last_reviewed_at` · `next_review_at` · `review_count` | `review_count = 0` = 미복습 |
 | `version` | `bigint` · 처음 0, 평가 반영마다 +1. 화면이 읽은 상태와 제출 시점의 상태를 비교한다 |
 
-| `review` | 비고 |
+| `reviews` | 비고 |
 |---|---|
 | `flashcard_id` · `user_id` · `rating` · `reviewed_at` | |
 | `is_first` | 그 카드의 첫 복습이었나 — 이력 구분용. 복습 제공량을 제한하는 데 사용하지 않는다 |
@@ -419,8 +424,8 @@ CREATE INDEX idx_match_log_alias ON concept_match_log (concept_id, input_name_no
 | `expected_card_version` | 요청에 담긴 카드 상태 버전 — 같은 요청 ID의 다른 내용 재사용을 검사한다 |
 | `response_payload` | `jsonb` · 최초 성공 응답(`nextReviewAt` · `remaining`). 재전송 때 그대로 반환한다 |
 
-`review` 는 복습 이력과 성공 요청의 멱등 기록이다. **지나가면 복구할 수 없고**, 안 쌓으면 FSRS 개인화의 트리거(로그 수천 건)가 영원히 안 온다.
-`POST /reviews` 하나가 `card_state` 갱신과 `review` 삽입을 **한 트랜잭션**으로 한다. `is_first` 는 갱신 전 `review_count = 0` 이었는지로 채운다.
+`reviews` 는 복습 이력과 성공 요청의 멱등 기록이다. **지나가면 복구할 수 없고**, 안 쌓으면 FSRS 개인화의 트리거(로그 수천 건)가 영원히 안 온다.
+`POST /reviews` 하나가 `card_states` 갱신과 `reviews` 삽입을 **한 트랜잭션**으로 한다. `is_first` 는 갱신 전 `review_count = 0` 이었는지로 채운다.
 
 **중복 제출 정책** — 같은 평가의 재전송은 최초 성공 결과를 반환한다. 다른 요청 ID로 이미 바뀐 카드 상태를 평가하면 반영하지 않는다.
 
@@ -435,11 +440,11 @@ CREATE INDEX idx_match_log_alias ON concept_match_log (concept_id, input_name_no
 
 ```sql
 -- 사용자 쿼터 — 오늘 이 사용자가 쓴 돈
-SELECT COALESCE(SUM(cost), 0) FROM llm_call
+SELECT COALESCE(SUM(cost), 0) FROM llm_calls
  WHERE user_id = :u AND usage_date = :today AND usage_status = 'KNOWN';
 
 -- 전역 킬스위치 — 오늘 서비스 전체
-SELECT COALESCE(SUM(cost), 0) FROM llm_call
+SELECT COALESCE(SUM(cost), 0) FROM llm_calls
  WHERE usage_date = :today AND usage_status = 'KNOWN';
 ```
 
@@ -449,7 +454,7 @@ SELECT COALESCE(SUM(cost), 0) FROM llm_call
 - 탈퇴로 `user_id` 가 비워진 행은 사용자 합계에서 빠지고 전역 합계에는 남는다 — 쓴 돈은 쓴 돈이다. 커리큘럼 삭제는 잡 연결만 풀어 두 합계 모두 그대로다.
 - 하루 원장 행은 정원이 다 차도 천 단위라 매 적재 검사마다 더해도 가볍다. 요약 테이블을 다시 두는 조건은 [01 §6](./01-overview.md).
 
-### 6.7 `alert_log`
+### 6.7 `alert_logs`
 
 | 컬럼 | 비고 |
 |---|---|
@@ -458,12 +463,12 @@ SELECT COALESCE(SUM(cost), 0) FROM llm_call
 | `sent_at` | |
 
 ```sql
-CREATE UNIQUE INDEX idx_alert_once ON alert_log (event, alert_date);   -- INSERT … ON CONFLICT DO NOTHING 이 성공했을 때만 슬랙으로 보낸다
+CREATE UNIQUE INDEX idx_alert_once ON alert_logs (event, alert_date);   -- INSERT … ON CONFLICT DO NOTHING 이 성공했을 때만 슬랙으로 보낸다
 ```
 
 같은 이벤트를 **하루 한 번만** 보낸다 — 크레딧 소진이면 이후 모든 잡이 같은 이유로 실패한다. 사용자 소유가 아니라 탈퇴 목록에 없다. 알림 경로는 [04 §9.1](./04-jobs-and-cost.md).
 
-### 6.8 `llm_call` — 외부 호출 시도별 사용량 기록
+### 6.8 `llm_calls` — 외부 호출 시도별 사용량 기록
 
 채팅 · 임베딩 모두 **외부 전송 시도마다 한 행**이다. 재시도는 새 시도 ID를 쓰고, 같은 응답의 DB 기록을 재시도할 때만 기존 ID를 재사용한다. 잡 완료 · 실패 · 취소와 독립적으로 보존한다.
 
@@ -489,7 +494,7 @@ CREATE UNIQUE INDEX idx_alert_once ON alert_log (event, alert_date);   -- INSERT
 
 **결과 기록** — 자료 저장 트랜잭션과 분리한다. **원장 행 하나만 고친다** — 일일 합계는 저장하지 않으므로(§6.6) 함께 갱신할 것이 없다. **리스 소유권 조건 없이** 관측 결과를 기록한다.
 
-1. 처음 확인된 사용량은 조건부 UPDATE 한 문장으로 확정한다 — `UPDATE llm_call SET usage_status = 'KNOWN', … WHERE attempt_id = :id AND usage_status <> 'KNOWN'`. 같은 응답을 다시 기록하면 `0 rows` 라 두 번 더해질 일이 없다. 같은 시도 ID에 다른 사용량이 들어오면 불일치로 기록하고 기존 확정값을 덮어쓰지 않는다.
+1. 처음 확인된 사용량은 조건부 UPDATE 한 문장으로 확정한다 — `UPDATE llm_calls SET usage_status = 'KNOWN', … WHERE attempt_id = :id AND usage_status <> 'KNOWN'`. 같은 응답을 다시 기록하면 `0 rows` 라 두 번 더해질 일이 없다. 같은 시도 ID에 다른 사용량이 들어오면 불일치로 기록하고 기존 확정값을 덮어쓰지 않는다.
 2. 행 하나만 고치므로 사용자 락이 필요 없다 — 탈퇴와는 원장 행 잠금으로 직렬화된다. 탈퇴로 `user_id` 가 비었으면 `provider_request_id` 를 채우지 않는다.
 3. 아직 확정되지 않은 시도에 사용량이 없으면 `UNKNOWN` 으로 결과만 기록한다. 나중에 같은 시도의 사용량을 확보하면 위 확정 경로로 한 번만 반영한다. `KNOWN` 을 `UNKNOWN/PENDING` 으로 되돌리지 않는다. `attempt_deadline_at` 을 넘긴 `PENDING` 도 조회 시 미확인 건수에 포함한다. 과금 여부를 추측해 0으로 채우지 않는다.
 
@@ -499,9 +504,9 @@ CREATE UNIQUE INDEX idx_alert_once ON alert_log (event, alert_date);   -- INSERT
 
 ---
 
-### 6.9 `job_event` — 성공 · 실패 · 회수의 운영 이력
+### 6.9 `job_events` — 성공 · 실패 · 회수의 운영 이력
 
-`jobs`는 현재 상태이고, `job_event`는 실제로 커밋한 전환의 이력이다. 같은 잡이 실패한 뒤 재시도로 성공해도 실패 이벤트를 고치거나 지우지 않는다. LLM 사용량은 기존 `llm_call`에서 읽는다.
+`jobs`는 현재 상태이고, `job_events`는 실제로 커밋한 전환의 이력이다. 같은 잡이 실패한 뒤 재시도로 성공해도 실패 이벤트를 고치거나 지우지 않는다. LLM 사용량은 기존 `llm_calls`에서 읽는다.
 
 | 컬럼 | 비고 |
 |---|---|
@@ -516,10 +521,10 @@ CREATE UNIQUE INDEX idx_alert_once ON alert_log (event, alert_date);   -- INSERT
 `job_id` · `failure_code` 외에는 NOT NULL이다. 작업/이벤트 종류는 허용 값 CHECK, `lease_epoch >= 1` CHECK를 둔다. `FAILED`이면 `failure_code`가 필수이고 다른 이벤트면 NULL인 조합도 CHECK로 보장한다. 이벤트의 종류/시각/코드는 갱신하지 않으며 FK 연결 해제만 허용한다.
 
 ```sql
-CREATE INDEX idx_job_event_time ON job_event (occurred_at);
-CREATE UNIQUE INDEX idx_job_event_once ON job_event (job_id, lease_epoch, event_type)
+CREATE INDEX idx_job_event_time ON job_events (occurred_at);
+CREATE UNIQUE INDEX idx_job_event_once ON job_events (job_id, lease_epoch, event_type)
  WHERE job_id IS NOT NULL;
-CREATE UNIQUE INDEX idx_job_event_terminal ON job_event (job_id, lease_epoch)
+CREATE UNIQUE INDEX idx_job_event_terminal ON job_events (job_id, lease_epoch)
  WHERE job_id IS NOT NULL AND event_type IN ('SUCCEEDED', 'FAILED');
 ```
 
@@ -547,30 +552,32 @@ SELECT count(*) FROM users WHERE status = 'ACTIVE';        -- < U_max 면 ACTIVE
 
 ```sql
 BEGIN;
-SELECT pg_advisory_xact_lock(hashtext('usage-user'), :u::int);       -- 호출 등록과 같은 사용자 락
+SELECT pg_advisory_xact_lock(hashtext('usage-user'), :u::int);     -- 호출 등록과 같은 사용자 락
+SELECT pg_advisory_xact_lock(hashtext('review'), :u::int);         -- POST /reviews 와 같은 복습 락 — 커리큘럼 삭제와 같은 순서
 DELETE FROM spring_session WHERE principal_name = :u::text;        -- 모든 기기의 세션부터 끊는다(속성 행은 FK 로 함께)
-UPDATE llm_call SET user_id = NULL, job_id = NULL, provider_request_id = NULL
- WHERE user_id = :u;                                              -- 비용 기록은 남기고 계정 · 작업 연결 해제
-DELETE FROM jobs        WHERE user_id = :u;                         -- 대상 lesson · curriculum 보다 먼저. job_event.job_id는 FK로 NULL
-DELETE FROM review      WHERE user_id = :u;
-DELETE FROM card_state  WHERE user_id = :u;
-DELETE FROM flashcard   WHERE material_id IN (…이 사용자의 material…);
-DELETE FROM concept_match_log WHERE concept_id IN (SELECT id FROM concept WHERE user_id = :u);   -- candidate_id 도 같은 사용자의 개념이다
-DELETE FROM concept     WHERE user_id = :u;                         -- flashcard 다음 · 판정 기록 다음
-DELETE FROM material    WHERE lesson_id  IN (…이 사용자의 lesson…);
-DELETE FROM lesson      WHERE curriculum_id IN (SELECT id FROM curriculum WHERE user_id = :u);
-DELETE FROM curriculum  WHERE user_id = :u;
-DELETE FROM curriculum_step WHERE group_id IN (SELECT id FROM curriculum_group WHERE user_id = :u);
-DELETE FROM curriculum_group WHERE user_id = :u;
-DELETE FROM users       WHERE id = :u;
+UPDATE llm_calls SET user_id = NULL, job_id = NULL, provider_request_id = NULL
+ WHERE user_id = :u;                                               -- 비용 기록은 남기고 계정 · 작업 연결 해제
+DELETE FROM jobs              WHERE user_id = :u;                  -- lessons · curriculums 보다 먼저. job_events.job_id 는 FK 로 NULL
+DELETE FROM reviews           WHERE user_id = :u;
+DELETE FROM card_states       WHERE user_id = :u;
+DELETE FROM flashcards        WHERE material_id IN (…이 사용자의 materials…);
+DELETE FROM concept_match_logs WHERE concept_id IN (SELECT id FROM concepts WHERE user_id = :u);   -- candidate_id 도 같은 사용자의 개념이다
+DELETE FROM concepts          WHERE user_id = :u;                  -- flashcards 다음 · 판정 기록 다음
+DELETE FROM materials         WHERE lesson_id IN (…이 사용자의 lessons…);
+DELETE FROM lessons           WHERE curriculum_id IN (SELECT id FROM curriculums WHERE user_id = :u);
+DELETE FROM curriculums       WHERE user_id = :u;
+DELETE FROM curriculum_steps  WHERE group_id IN (SELECT id FROM curriculum_groups WHERE user_id = :u);
+DELETE FROM curriculum_groups WHERE user_id = :u;
+DELETE FROM users             WHERE id = :u;
 COMMIT;
 ```
 
-- 남는 것 — 계정과 작업 연결을 해제한 `llm_call`(쓴 돈은 쓴 돈이다)과 잡 연결을 해제한 `job_event`의 운영 이력(§6.9). 사용자 비용 합계에서는 빠지고 전역 합계(§6.6)에는 그대로 남는다. `concept` · `concept_match_log` · `curriculum_group` · `curriculum_step`는 사용자 소유라 함께 지운다 — 사용자 주제에서 나온 이름 · 정의 · 전체 목표/분할안을 남기지 않는다.
-- **이 트랜잭션은 개념 쓰기 락을 잡지 않는다.** 완료 트랜잭션이 `jobs` 행 → 개념 쓰기 락 순서로 잡으므로, 탈퇴가 개념 락을 먼저 잡고 `jobs` 를 지우면 서로 기다린다(교착). `jobs` 를 먼저 지우는 순서와 `concept.user_id` FK 로 충분하다 — 완료가 먼저면 `DELETE FROM jobs` 가 기다렸다가 완료가 만든 개념까지 지우고, 탈퇴가 먼저면 완료의 첫 `UPDATE jobs` 가 `0 rows` 로 롤백된다.
+- 남는 것 — 계정과 작업 연결을 해제한 `llm_calls`(쓴 돈은 쓴 돈이다)과 잡 연결을 해제한 `job_events`의 운영 이력(§6.9). 사용자 비용 합계에서는 빠지고 전역 합계(§6.6)에는 그대로 남는다. `concepts` · `concept_match_logs` · `curriculum_groups` · `curriculum_steps`는 사용자 소유라 함께 지운다 — 사용자 주제에서 나온 이름 · 정의 · 전체 목표/분할안을 남기지 않는다.
+- **복습 락을 잡는 이유** — 없으면 진행 중이던 평가 저장이 탈퇴 도중에 새 복습 기록을 커밋해, 뒤의 `flashcards` 삭제가 FK 오류로 실패하고 탈퇴 전체가 롤백된다. 커리큘럼 삭제(§6.2)와 같은 순서(사용량 → 복습)라 서로 교착하지 않는다.
+- **이 트랜잭션은 개념 쓰기 락을 잡지 않는다.** 완료 트랜잭션이 `jobs` 행 → 개념 쓰기 락 순서로 잡으므로, 탈퇴가 개념 락을 먼저 잡고 `jobs` 를 지우면 서로 기다린다(교착). `jobs` 를 먼저 지우는 순서와 `concepts.user_id` FK 로 충분하다 — 완료가 먼저면 `DELETE FROM jobs` 가 기다렸다가 완료가 만든 개념까지 지우고, 탈퇴가 먼저면 완료의 첫 `UPDATE jobs` 가 `0 rows` 로 롤백된다.
 - 탈퇴 뒤 돌아온 응답도 기존 `attempt_id` 의 사용량은 확정한다 — `user_id` 가 비어 있어 전역 합계에만 잡힌다. `user_id` · `job_id` · `provider_request_id` 를 다시 채우거나 잡을 재생성하지 않는다.
 - **진행 중이던 잡은 따로 멈추지 않는다** — 행이 지워지면 워커의 다음 쓰기가 `0 rows` 가 되어 리스를 잃은 것과 같은 경로로 멈춘다([04 §4.4](./04-jobs-and-cost.md)).
-- ⚠️ **사용자 소유 테이블을 새로 만들면 이 목록에 넣는다.** 탈퇴 테스트는 학습 데이터 삭제와 `llm_call` 의 계정 · 작업 연결 해제를 모두 확인한다.
+- ⚠️ **사용자 소유 테이블을 새로 만들면 이 목록에 넣는다.** 탈퇴 테스트는 학습 데이터 삭제와 `llm_calls` 의 계정 · 작업 연결 해제를 모두 확인한다.
 
 ---
 
@@ -579,12 +586,12 @@ COMMIT;
 ### 8.1 오늘의 복습 — 오늘 안에 예정된 카드 전부 · 일일 개수 제한 없음
 
 ```sql
-CREATE INDEX idx_cardstate_due ON card_state (user_id, next_review_at);
+CREATE INDEX idx_cardstate_due ON card_states (user_id, next_review_at);
 ```
 
 ```sql
 -- :tomorrowStart = 내일 00:00 Asia/Seoul
-SELECT * FROM card_state
+SELECT * FROM card_states
  WHERE user_id = :u AND next_review_at < :tomorrowStart
  ORDER BY next_review_at, flashcard_id;
 ```
@@ -597,15 +604,15 @@ SELECT * FROM card_state
 
 ```sql
 -- 이 사용자의 개념 중 이름 또는 별칭이 같은 후보 최고 — sim ≥ 0.46 이면 연결, 아니면 동명이의 신규
-SELECT c.id, 1 - (c.embedding <=> :q) AS sim FROM concept c
+SELECT c.id, 1 - (c.embedding <=> :q) AS sim FROM concepts c
  WHERE c.user_id = :u AND c.embedding IS NOT NULL AND c.embedding_model = :model
    AND (c.name_normalized = :norm
-        OR EXISTS (SELECT 1 FROM concept_match_log l                 -- 연결 · 병합된 적 있는 이름(별칭)
+        OR EXISTS (SELECT 1 FROM concept_match_logs l                 -- 연결 · 병합된 적 있는 이름(별칭)
                     WHERE l.concept_id = c.id AND l.input_name_normalized = :norm))
  ORDER BY c.embedding <=> :q LIMIT 1;
 
 -- 이 사용자의 개념 전체 중 최고 — sim ≥ 0.78 이면 동의어 연결, 아니면 신규
-SELECT id, 1 - (embedding <=> :q) AS sim FROM concept
+SELECT id, 1 - (embedding <=> :q) AS sim FROM concepts
  WHERE user_id = :u AND embedding IS NOT NULL AND embedding_model = :model
  ORDER BY embedding <=> :q LIMIT 1;
 ```
@@ -617,18 +624,21 @@ SELECT pg_advisory_xact_lock(hashtext('concept-write'), :u::int);   -- 사용자
 ### 8.2.1 이름 조회 — `lookupMastery`
 
 ```sql
--- 이 사용자의 학습한 개념을 이름으로 찾는다. 동명이의면 여러 행 — 각각 정의를 붙여 돌려준다
-SELECT c.id, c.name, c.definition FROM concept c
+-- 이 사용자의 학습한 개념을 이름으로 찾는다. 동명이의면 여러 행(최대 3) — 각각 정의를 붙여 돌려준다
+SELECT c.id, c.name, c.definition, learned.cards
+  FROM concepts c
+  JOIN LATERAL (SELECT count(*) AS cards FROM flashcards f JOIN card_states cs ON cs.flashcard_id = f.id
+                 WHERE f.concept_id = c.id AND cs.user_id = :u) learned ON learned.cards > 0   -- 학습 완료한 카드가 있어야 matched
  WHERE c.user_id = :u
    AND (c.name_normalized = :norm
-        OR EXISTS (SELECT 1 FROM concept_match_log l                 -- 연결된 적 있는 이름(별칭)
+        OR EXISTS (SELECT 1 FROM concept_match_logs l                 -- 연결된 적 있는 이름(별칭)
                     WHERE l.concept_id = c.id AND l.input_name_normalized = :norm))
-   AND EXISTS (SELECT 1 FROM flashcard f JOIN card_state cs ON cs.flashcard_id = f.id
-                WHERE f.concept_id = c.id AND cs.user_id = :u);      -- 학습 완료한 카드가 있어야 matched
+ ORDER BY learned.cards DESC, c.id
+ LIMIT 3;                                                             -- 재료 상한 — 빼면 툴 결과 크기가 묶이지 않는다
 ```
 
-- 사용자 사전에는 자료만 생성하고 학습 완료하지 않은 카드의 개념도 있다. `user_id` 만으로 찾으면 미학습 개념이 `matched=true` 로 나가므로 **학습 완료한 카드(`card_state`)가 1장 이상**인 개념만 돌려준다. 나머지는 `matched=false`.
-- 같은 이름의 후보는 **카드가 많은 순으로 최대 3개**만 돌려준다 — 툴 결과의 최대 크기를 묶는 재료 상한이다([03 §8.7](./03-generation.md)).
+- 사용자 사전에는 자료만 생성하고 학습 완료하지 않은 카드의 개념도 있다. `user_id` 만으로 찾으면 미학습 개념이 `matched=true` 로 나가므로 **학습 완료한 카드(`card_states`)가 1장 이상**인 개념만 돌려준다. 나머지는 `matched=false`.
+- 같은 이름의 후보는 **학습 완료한 카드가 많은 순으로 최대 3개**만 돌려준다 — 툴 결과의 최대 크기를 묶는 재료 상한이다([03 §8.7](./03-generation.md)).
 - 찾은 ID 로 §8.3 을 돌려 수치와 판정을 붙인다.
 
 ### 8.3 숙련도 — `R` · `S` · `minReviewCount`
@@ -642,9 +652,9 @@ SELECT c.id, c.name, c.definition,
        COUNT(*) AS card_count,
        SUM(cs.review_count) AS review_count,
        MIN(cs.review_count) AS min_review_count   -- 미복습도 포함. 0 또는 1이면 생략 금지
-  FROM concept c
-  JOIN flashcard f   ON f.concept_id = c.id
-  JOIN card_state cs ON cs.flashcard_id = f.id
+  FROM concepts c
+  JOIN flashcards f   ON f.concept_id = c.id
+  JOIN card_states cs ON cs.flashcard_id = f.id
  WHERE cs.user_id = :u AND c.id = ANY(:selectedConceptIds)
  GROUP BY c.id, c.name, c.definition
  ORDER BY c.id;
@@ -652,4 +662,4 @@ SELECT c.id, c.name, c.definition,
 
 - 학습 완료한 카드가 전부 미복습인 개념도 결과에 남는다(`r=NULL` · `s=NULL` · `min_review_count=0`). 집계 대상 카드가 없는 개념과 구분한다.
 - 복습한 카드와 미복습 카드가 섞여 있으면 평균은 복습한 카드로만 계산하고 `min_review_count=0` 으로 생략을 막는다. `loadUserMastery` 와 `lookupMastery` 는 같은 집계 규칙을 쓴다.
-- `selectedConceptIds` 는 잡 A의 관련 개념 선별 결과 또는 잡 B의 이름 조회 결과다. 입력 ID가 비어 있으면 결과도 비어 있으며, 다른 사용자 소유 카드는 같은 ID여도 집계하지 않는다. A의 주입 순서는 §5.4의 관련도 순위로 구성하고 `R` 순으로 바꾸지 않는다. 모든 카드의 최소 복습 횟수 집계는 선별 이후에도 그대로 지킨다.
+- `selectedConceptIds` 는 잡 I/A의 관련 개념 선별 결과 또는 잡 B의 이름 조회 결과다. 입력 ID가 비어 있으면 결과도 비어 있으며, 다른 사용자 소유 카드는 같은 ID여도 집계하지 않는다. A의 주입 순서는 §5.4의 관련도 순위로 구성하고 `R` 순으로 바꾸지 않는다. 모든 카드의 최소 복습 횟수 집계는 선별 이후에도 그대로 지킨다.

@@ -11,12 +11,12 @@
 ├── src/main/java/…/mogum/
 │   ├── MogumApplication.java    # 루트 — 설정 배선 · app.role 별 빈 등록만
 │   ├── core/                    # 공통 포트(JobStore · UsageLedger · TransactionRunner …)
-│   │   ├── <도메인>/             # curriculum · concept · review · account … — 엔티티 · 리포지토리 포트 · MasteryPolicy. api 와 생성이 같이 쓴다
+│   │   ├── <도메인>/             # curriculum · concept · review · account … — 도메인 모델(record) · 리포지토리 포트 · MasteryPolicy. api 와 생성이 같이 쓴다
 │   │   ├── job/                 # 적재 유스케이스(검사 · 적재 · 재시도) — core.generation 참조 금지
 │   │   └── generation/          # 생성 유스케이스(잡 A · 잡 B ①②③ · resolveConcepts) + 유료 호출 포트(LlmClient · EmbeddingClient · GuardedLlmClient · InputBudget) — worker · infra · 루트만 참조
 │   ├── api/                     # 컨트롤러 · 인증 · DTO · 레이트리밋
 │   ├── worker/                  # 수령 루프 · 실행기 N 개 · 단계 실행
-│   └── infra/                   # JPA 엔티티(여기에만) · Spring Data 리포지토리 · EntityManager 네이티브 쿼리(jobs · job_event · llm_call · 락 · 벡터) · OpenAI 어댑터 · 슬랙 웹훅
+│   └── infra/                   # JPA 엔티티(여기에만) · Spring Data 리포지토리 · EntityManager 네이티브 쿼리(jobs · job_events · llm_calls · 락 · 벡터) · OpenAI 어댑터 · 슬랙 웹훅
 ├── src/main/resources/
 │   ├── db/migration/            # Flyway 버전드 SQL(세션 테이블 포함)
 │   ├── prompts/v6/              # 운영 프롬프트 — 개발하며 새로 만든다. 명세는 03 §2~§6. 바꾸면 v7 로(금지 목록 18)
@@ -28,7 +28,10 @@
 │       ├── components/          # 상단 바 · 카드 · 막힘 문구 · 마크다운 렌더러(KaTeX · mermaid)
 │       ├── api/                 # fetch 래퍼(XSRF-TOKEN 헤더) · 05 응답 타입 · TanStack Query 훅
 │       └── lib/                 # 문구 표(06 §12) · 유틸
-├── scripts/                     # 하네스 실행 스크립트(execute.py) · 그 테스트
+├── phases/                      # 하네스 step 파일(Claude 가 쓰고 Codex 가 구현) · index.json. 실행 산출물(*-output.json · *-review.json)은 커밋하지 않는다
+├── scripts/                     # 하네스 — execute.py(step 실행 · 리뷰 · 커밋) · tdd_guard.py(TDD 가드 훅) · 그 테스트
+├── .claude/                     # Claude Code 설정 — 훅 배선(settings.json) · /harness · /review 명령. 개인 설정(settings.local.json)만 커밋하지 않는다
+├── .codex/                      # Codex 설정 — 훅 배선(hooks.json) · 위험 명령 금지 규칙(rules/)
 ├── prompts/v5/                  # 1단계 실험 프롬프트 — 로컬에만 · 저장소 밖(.gitignore). 실측 근거로만 참고
 └── reference-code/              # 1단계 실측 OpenAI 어댑터 — 로컬에만 · 저장소 밖 · 참고용
 ```
@@ -42,7 +45,7 @@
 | **수령 회차 펜싱** | `jobs` 의 모든 쓰기는 명시적 SQL + `lease_epoch` 조건. `0 rows` 면 즉시 중단. JPA 엔티티가 아니다 | [04 §4.4](./04-jobs-and-cost.md) |
 | **드러낸 트랜잭션** | `@Transactional` 대신 `TransactionRunner` — LLM 호출 중에는 커넥션을 쥐지 않는다 | [04 §5](./04-jobs-and-cost.md) |
 | **감싼 LLM 호출** | `GuardedLlmClient` 가 재시도 · `usage` 기록 · 리스 갱신을 모든 호출에 똑같이. 포트는 1턴 단위 | [03 §8](./03-generation.md#8-llm-호출-규약) |
-| **독립적인 사용량 기록** | 채팅 · 임베딩 시도별 `llm_call`. 사용량은 원장 행에 한 번만 확정하고(조건부 UPDATE) 일일 합계는 저장하지 않고 원장에서 더한다. 잡 결과 저장과는 분리. 리스를 잃어도 사용량을 기록한다 | [02 §6.8](./02-domain-data.md) |
+| **독립적인 사용량 기록** | 채팅 · 임베딩 시도별 `llm_calls`. 사용량은 원장 행에 한 번만 확정하고(조건부 UPDATE) 일일 합계는 저장하지 않고 원장에서 더한다. 잡 결과 저장과는 분리. 리스를 잃어도 사용량을 기록한다 | [02 §6.8](./02-domain-data.md) |
 | **작업 전체 호출 상한** | 원장의 종류별 누적 등록 건수를 잡 행 잠금 안에서 검사. 재시작 · 사용자 재시도에도 유지하며, 미확인 호출도 몫을 쓴다 | [04 §4.8](./04-jobs-and-cost.md) |
 | **입력 예산 검사** | 재료 상한의 합으로 단계별 정적 최대 입력을 설계 때 계산하고, 요청마다 전체 요청의 UTF-8 바이트 수(토큰 수의 증명된 상계)를 등록 전에 확인. 초과는 전송하지 않으며, 검사한 요청을 그대로 보낸다 | [03 §8.7](./03-generation.md) |
 | **관련 숙련도 선별** | 주제/목적 임베딩 검색 + 키워드 검색. 사용자 학습 개념만 후보로 삼고, 선별한 ID의 숙련도를 예산 안에서 주입. 검색 근거는 생성 시점 스냅샷으로 보존 | [02 §5.4](./02-domain-data.md) |
@@ -65,15 +68,15 @@ worker 실행기(빈손일 때만 1개 수령)
      → 실패 중 사람이 움직여야 하는 것(크레딧 소진 · 요청 거부) → 슬랙(하루 한 번)
 ```
 
-초기 요청은 워커의 첫 생성 호출에서 단일/그룹 판단과 해당 결과를 함께 받는다. 단일 강의 목록은 추가 목록 생성 없이 검토로, 그룹 분할안은 사용자 요청 시 1단계 상세 생성으로 이어진다. 유형 미정 요청의 저장/잡 대상과 결과 리소스 연결은 후속 설계다([03 §2.1](./03-generation.md)).
+초기 요청은 워커의 첫 생성 호출에서 단일/그룹 판단과 해당 결과를 함께 받는다. 단일 강의 목록은 추가 목록 생성 없이 검토로, 그룹 분할안은 사용자 요청 시 1단계 상세 생성으로 이어진다. 접수 시 `CURRICULUM_INITIAL` 잡에 입력을 저장하고 성공 시 해당 리소스를 새로 만들어 FK/성공/이벤트를 함께 커밋한다. 초기 실패에는 도메인 리소스가 없으며 잡 ID/미완료 요청 목록으로 복귀한다([03 §2.1](./03-generation.md)).
 
 **학습 · 복습 — 동기**
 
-넓은 주제는 전체 목표와 단계별 제목/범위/목적/권장 순서의 분할안을 먼저 보존한다. 상세 커리큘럼은 1단계부터 사용자 클릭으로 생성하고, 모든 강의 완료 후 다음 단계 생성 안내를 제공한다. 다음 단계 요청은 최신 숙련도를 선별하는 기존 비동기 생성 경로로 이어지며 복습 완료를 요구하거나 자동 적재하지 않는다. 저장 구조는 `curriculum_group` → `curriculum_step` ← `curriculum.step_id`이며 분할안 잡은 `CURRICULUM_GROUP`이다. 묶음/단계 상태는 저장하지 않고 연결 커리큘럼/잡에서 조회한다. API와 잡 G의 출력/호출 규약은 구현 전 설계 항목이다([02 §2.1](./02-domain-data.md) · [05 §2.1](./05-api.md)).
+넓은 주제는 전체 목표와 단계별 제목/범위/목적/권장 순서의 분할안을 먼저 보존한다. 상세 커리큘럼은 1단계부터 사용자 클릭으로 생성하고, 모든 강의 완료 후 다음 단계 생성 안내를 제공한다. 다음 단계 요청은 최신 숙련도를 선별하는 기존 비동기 생성 경로로 이어지며 복습 완료를 요구하거나 자동 적재하지 않는다. 저장 구조는 `curriculum_groups` → `curriculum_steps` ← `curriculums.step_id`이며 초기 통합 잡은 `CURRICULUM_INITIAL`이다. 묶음/단계 상태는 저장하지 않고 연결 커리큘럼/잡에서 조회한다. 그룹 조회/단계 생성 API와 잡 I의 출력/호출 규약은 구현 전 설계 항목이다([02 §2.1](./02-domain-data.md) · [05 §2.1](./05-api.md)).
 
 ```
-최초 학습 완료 → 강의 완료 · card_state 최초 생성(NEW · 오늘) · 전 강의 완료 시 커리큘럼 완료를 같은 트랜잭션으로 처리 → 응답에 그 강의의 현재 미평가 카드 → 즉시 첫 복습. 완료 재요청도 성공하며 기존 복습 상태/이력은 보존한다([02 §3](./02-domain-data.md)).
-오늘의 복습 → card_state 중 한국 날짜로 오늘 안에 예정된 것 → 평가 → FSRS 갱신 + review 삽입(한 트랜잭션)
+최초 학습 완료 → 강의 완료 · card_states 최초 생성(NEW · 오늘) · 전 강의 완료 시 커리큘럼 완료를 같은 트랜잭션으로 처리 → 응답에 그 강의의 현재 미평가 카드 → 즉시 첫 복습. 완료 재요청도 성공하며 기존 복습 상태/이력은 보존한다([02 §3](./02-domain-data.md)).
+오늘의 복습 → card_states 중 한국 날짜로 오늘 안에 예정된 것 → 평가 → FSRS 갱신 + reviews 삽입(한 트랜잭션)
 다음 생성 → 잡 A는 주제/목적 의미 · 키워드 검색으로 관련 개념 선별 / 잡 B는 이름으로 조회
          → 숙련도(R · S · minReviewCount) 조회 → 백엔드 MasteryPolicy 판정 → LLM이 판정에 맞춰 구성
          → 잡 A: 반영 내역 검증 / 잡 B: 백엔드가 개요의 SKIP · BRIEF · DETAIL 및 목표 분량 확정 후 본문 생성
@@ -90,6 +93,6 @@ worker 실행기(빈손일 때만 1개 수령)
 
 ## 배포
 
-성공/실패 전환과 이벤트 저장은 같은 트랜잭션이다. 리스 만료 RUNNING 수령도 회수 이벤트와 함께 커밋한다. U6의 최근 24시간 실패율/회수는 `job_event`, 호출 재시도 등록/429/비용은 `llm_call`, 현재 대기/실행 상태는 `jobs`에서 읽는다. 작업 삭제/탈퇴 시 이벤트의 잡 연결만 해제하며 사용자/콘텐츠 원문 없는 운영 이력은 보존한다([02 §6.9](./02-domain-data.md)).
+성공/실패 전환과 이벤트 저장은 같은 트랜잭션이다. 리스 만료 RUNNING 수령도 회수 이벤트와 함께 커밋한다. U6의 최근 24시간 실패율/회수는 `job_events`, 호출 재시도 등록/429/비용은 `llm_calls`, 현재 대기/실행 상태는 `jobs`에서 읽는다. 작업 삭제/탈퇴 시 이벤트의 잡 연결만 해제하며 사용자/콘텐츠 원문 없는 운영 이력은 보존한다([02 §6.9](./02-domain-data.md)).
 
 EC2 한 대 · JVM 하나(`app.role=all` — API + 화면 정적 파일 + 워커 실행기 `N` 개) · PostgreSQL + pgvector(🅿️ 위치는 용량 측정 전에) · OpenAI. 운영 관측은 관리자 화면 U6(DB 만 읽는다) + 슬랙 알림 + 외부 헬스체크. ([04 §3](./04-jobs-and-cost.md#3-배포))

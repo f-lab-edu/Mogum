@@ -6,7 +6,7 @@
 
 이 저장소의 구현은 Codex 가 한다(`scripts/execute.py` → `codex exec`). Claude Code 는:
 
-- **기획** — `/harness` 로 설계를 논의하고 `phases/` 에 step 파일을 쓴다. Codex 는 이 대화를 보지 못하므로 step 파일만 읽고 실행할 수 있게 쓴다.
+- **기획** — MVP 범위와 큰 사용자 흐름을 중심으로 논의한다. DB/API/경합/수치 등 구현 세부는 각 TASK에서 Codex가 설계하도록 맡기고, step 파일은 목표·확정 제약·검증 기준 중심으로 쓴다. `/harness` 로 설계를 논의하고 `phases/` 에 step 파일을 쓴다. Codex 는 이 대화를 보지 못하므로 step 파일만 읽고 실행할 수 있게 쓴다.
 - **리뷰** — step 마다 `execute.py` 가 Claude 를 읽기 전용 리뷰어(`claude -p`)로 부른다. phase 가 끝나면 `/review` 로 브랜치 전체를 리뷰하고, 고칠 것은 수정 step 으로 만들어 Codex 에 넘긴다.
 - `src/` · `frontend/` 의 제품 코드는 직접 고치지 않는다 — 사용자가 직접 요청한 경우만 예외. `docs/` · `phases/` · 하네스(`scripts/` · `.claude/` · `.codex/`)는 고친다.
 
