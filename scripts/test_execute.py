@@ -589,6 +589,18 @@ class TestMainCli:
                     ex.main()
                 assert exc_info.value.code == 1
 
+    @pytest.mark.parametrize("name", ["../outside", "0-mvp/nested"])
+    def test_phase_outside_phases_dir_exits(self, tmp_project, phase_dir, name):
+        """phases/ 바로 아래 디렉터리가 아니면 index.json 이 있어도 거절한다 — 경로 조작 방지."""
+        index = (phase_dir / "index.json").read_text()
+        for d in (tmp_project / "outside", phase_dir / "nested"):
+            d.mkdir()
+            (d / "index.json").write_text(index)
+        with patch.object(ex, "ROOT", tmp_project):
+            with pytest.raises(SystemExit) as exc_info:
+                ex.StepExecutor(name)
+            assert exc_info.value.code == 1
+
 
 # ---------------------------------------------------------------------------
 # _check_blockers (= 이전 main() error/blocked 체크)
