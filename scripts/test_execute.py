@@ -374,6 +374,7 @@ class TestInvokeCodex:
         cmd = mock_run.call_args[0][0]
         assert cmd[:2] == ["codex", "exec"]
         assert "--dangerously-bypass-approvals-and-sandbox" in cmd
+        assert "--dangerously-bypass-hook-trust" in cmd  # 없으면 .codex/hooks.json(TDD 가드)이 조용히 빠진다
         assert cmd[-1] == "-"
         prompt = mock_run.call_args[1]["input"]
         assert "PREAMBLE" in prompt

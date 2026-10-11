@@ -239,8 +239,10 @@ class StepExecutor:
 
         prompt = preamble + step_file.read_text()
         # 샌드박스를 끈다 — Gradle(~/.gradle · 네트워크)과 Testcontainers(Docker 소켓)가 workspace-write 에서 막힌다.
+        # 훅 신뢰를 건너뛴다 — 승인받지 않은(또는 고친 뒤 재승인 전인) .codex/hooks.json 은 exec 에서 조용히 빠진다.
         result = subprocess.run(
-            ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--json", "-C", self._root, "-"],
+            ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust",
+             "--json", "-C", self._root, "-"],
             input=prompt, cwd=self._root, capture_output=True, text=True, timeout=1800,
         )
 

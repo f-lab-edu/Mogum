@@ -77,6 +77,7 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 ## 작업 방식
 
 - CRITICAL: 새 기능은 **테스트를 먼저 쓰고**, 그 테스트가 통과하는 구현을 쓴다(TDD). 작업을 검증 가능한 목표로 바꾸고 통과할 때까지 반복한다.
+    훅이 강제한다(`scripts/tdd_guard.py` — Claude · Codex 공통). 짝 테스트 없이 구현 파일을 쓰면 막히고, 구현만 바꾸고 끝내면 한 번 되돌려진다. 짝 테스트는 `src/main/java/…/Foo.java` → 같은 패키지의 `src/test/java/…/Foo*Test.java` 또는 `Foo*IT.java`, `frontend/src/…/foo.tsx` → 같은 폴더의 `foo.test.tsx` 또는 `__tests__/foo.test.tsx` 다. interface · record · enum · 예외 · `@Entity` · 타입 전용 파일은 검사하지 않는다.
 - 커밋 메시지는 conventional commits(`feat:` · `fix:` · `docs:` · `refactor:` · `test:`).
 - 설계와 다르게 가야 하면 **코드보다 `docs/` 를 먼저 고친다.** 문서와 코드가 다르면 문서가 틀린 것으로 보고 묻는다.
 - 실제 LLM API 를 부르는 테스트는 기본 실행에서 뺀다(비용). 스텁으로 돈다.
