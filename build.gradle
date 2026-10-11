@@ -35,3 +35,46 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+def npmCi = tasks.register('npmCi', Exec) {
+    workingDir 'frontend'
+    commandLine 'npm', 'ci'
+    inputs.files('frontend/package.json', 'frontend/package-lock.json')
+    outputs.dir('frontend/node_modules')
+}
+
+def frontendBuild = tasks.register('frontendBuild', Exec) {
+    dependsOn npmCi
+    workingDir 'frontend'
+    commandLine 'npm', 'run', 'build'
+    inputs.dir('frontend/src')
+    inputs.files('frontend/index.html', 'frontend/package.json', 'frontend/package-lock.json')
+    inputs.files(fileTree('frontend') {
+        include 'vite.config.*', 'tsconfig*.json'
+    })
+    inputs.files(fileTree('frontend/public'))
+    outputs.dir('frontend/dist')
+}
+
+tasks.named('processResources') {
+    from(frontendBuild) {
+        into 'static'
+    }
+}
+
+def bootJar = tasks.named('bootJar')
+def verifyFrontendBundle = tasks.register('verifyFrontendBundle') {
+    dependsOn bootJar
+    inputs.file(bootJar.flatMap { it.archiveFile })
+    doLast {
+        new java.util.zip.ZipFile(bootJar.get().archiveFile.get().asFile).withCloseable { jar ->
+            if (jar.getEntry('BOOT-INF/classes/static/index.html') == null) {
+                throw new GradleException('실행 jar에 static/index.html이 없습니다.')
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn verifyFrontendBundle
+}
