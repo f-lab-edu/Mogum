@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "frontend-skeleton",
-      "status": "pending"
+      "status": "completed",
+      "summary": "Vite·React·TypeScript strict 화면 뼈대, QueryClientProvider·루트 라우트, Tailwind 4 색/글꼴 토큰·자체 호스팅 Pretendard·API/OAuth 프록시 및 Vitest 2개·lint·build·기존 백엔드 테스트 통과",
+      "started_at": "2026-10-12T07:11:31+0900",
+      "completed_at": "2026-10-12T07:15:39+0900"
     },
     {
       "step": 6,
