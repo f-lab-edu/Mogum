@@ -91,6 +91,7 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 ## 명령어
 
 ```
+docker compose up -d        # 로컬 Postgres(pgvector) — bootRun 전에
 ./gradlew bootRun            # 개발 서버 (API + 워커, app.role=all)
 ./gradlew test               # 백엔드 테스트 (Testcontainers — Docker 필요)
 ./gradlew build              # 프론트 빌드를 static/ 에 넣고 jar 생성
