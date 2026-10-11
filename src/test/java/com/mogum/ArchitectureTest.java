@@ -6,6 +6,9 @@ import com.mogum.archfixture.api.ApiToWorker;
 import com.mogum.archfixture.core.CoreToApi;
 import com.mogum.archfixture.core.CoreToInfra;
 import com.mogum.archfixture.core.CoreToWorker;
+import com.mogum.archfixture.core.JpaInCore;
+import com.mogum.archfixture.core.SpringDataInCore;
+import com.mogum.archfixture.core.SpringTransactionInCore;
 import com.mogum.archfixture.core.SpringWebInCore;
 import com.mogum.archfixture.core.job.JobToGeneration;
 import com.mogum.archfixture.worker.WorkerToInfra;
@@ -92,9 +95,10 @@ class ArchitectureTest {
         assertViolation(CORE_DOES_NOT_DEPEND_ON_OUTSIDE, fixture);
     }
 
-    @Test
-    void core에서_Spring_Web_참조를_거부한다() {
-        assertViolation(CORE_DOES_NOT_DEPEND_ON_INFRA_TECHNOLOGY, SpringWebInCore.class);
+    @ParameterizedTest
+    @ValueSource(classes = {SpringWebInCore.class, JpaInCore.class, SpringTransactionInCore.class, SpringDataInCore.class})
+    void core에서_인프라_기술_참조를_거부한다(Class<?> fixture) {
+        assertViolation(CORE_DOES_NOT_DEPEND_ON_INFRA_TECHNOLOGY, fixture);
     }
 
     @Test
