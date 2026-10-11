@@ -1,0 +1,20 @@
+# 하네스 가드 — execute.py 가 Codex 를 샌드박스 없이 돌리므로 되돌리기 어려운 명령을 막는다.
+# .claude/settings.json 의 PreToolUse 가드와 같은 의도다. 확인: codex execpolicy check -r .codex/rules/harness.rules git reset --hard
+
+prefix_rule(
+    pattern = ["rm", ["-rf", "-fr", "-Rf", "-rF"]],
+    decision = "forbidden",
+    justification = "rm -rf 금지 — 지울 파일을 하나씩 지정한다.",
+)
+
+prefix_rule(
+    pattern = ["git", "push", ["--force", "-f", "--force-with-lease"]],
+    decision = "forbidden",
+    justification = "강제 push 금지 — push 는 하네스(execute.py --push)가 한다.",
+)
+
+prefix_rule(
+    pattern = ["git", "reset", "--hard"],
+    decision = "forbidden",
+    justification = "git reset --hard 금지 — 리뷰 대상인 작업 트리 변경이 사라진다.",
+)
