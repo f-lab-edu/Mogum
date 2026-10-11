@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "fsrs-check",
-      "status": "pending"
+      "status": "completed",
+      "summary": "FSRS 1.0.0 채택·학습/재학습 단계 비활성화 및 최소 1일 간격·정수 경과일 R 일치/소수 절삭 학습 테스트(FACTOR=0.6935087808430285, DECAY=-0.2)·문서 확정·Card 복원 필드 누락 없음(NEW→LEARNING/step=0 및 cardId int 매핑 필요; user_id/review_count/version은 앱 전용)",
+      "started_at": "2026-10-12T07:03:36+0900",
+      "completed_at": "2026-10-12T07:11:31+0900"
     },
     {
       "step": 5,
