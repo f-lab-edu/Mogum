@@ -7,7 +7,7 @@
 
 ```
 /
-├── build.gradle                 # 단일 Gradle 모듈 — frontend 빌드 결과를 static/ 으로 복사
+├── build.gradle                 # 단일 Gradle 모듈 — frontend 빌드 결과를 jar 의 static/ 으로 넣는다(processResources → build/resources/main/static)
 ├── src/main/java/…/mogum/
 │   ├── MogumApplication.java    # 루트 — 설정 배선 · app.role 별 빈 등록만
 │   ├── core/                    # 공통 포트(JobStore · UsageLedger · TransactionRunner …)
@@ -20,7 +20,7 @@
 ├── src/main/resources/
 │   ├── db/migration/            # Flyway 버전드 SQL(세션 테이블 포함)
 │   ├── prompts/v6/              # 운영 프롬프트 — 개발하며 새로 만든다. 명세는 03 §2~§6. 바꾸면 v7 로(금지 목록 18)
-│   └── static/                  # frontend 빌드 결과(커밋하지 않는다)
+│   └── (static/ 없음)           # frontend 빌드 결과는 소스 트리가 아니라 build/ 안에서 jar 로 들어간다
 ├── src/test/java/…              # ArchUnit · Testcontainers · 장애 주입 · LLM 스텁
 ├── frontend/                    # React + TypeScript · Vite
 │   └── src/
