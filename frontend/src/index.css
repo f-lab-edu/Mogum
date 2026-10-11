@@ -1,0 +1,28 @@
+@import 'pretendard/dist/web/variable/pretendardvariable.css';
+@import 'tailwindcss';
+
+@theme {
+  --color-paper: #FAF8F3;
+  --color-surface: #FFFFFF;
+  --color-muted: #F1EEE7;
+  --color-line: #E4DFD5;
+  --color-ink: #1F1D1A;
+  --color-ink-body: #3A3632;
+  --color-ink-soft: #6B655C;
+  --color-ink-faint: #A39D93;
+  --color-accent: #2F4B7C;
+  --color-accent-strong: #253D66;
+  --color-accent-subtle: #E8EDF5;
+  --color-ok: #3D7A4F;
+  --color-warn: #94601A;
+  --color-danger: #B4443A;
+
+  --font-sans: 'Pretendard Variable', Pretendard, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-paper font-sans text-ink-body;
+  }
+}

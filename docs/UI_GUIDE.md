@@ -1,7 +1,7 @@
 # UI 디자인 가이드
 
 > **시각 디자인의 단일 출처다.** 화면 구조 · 상태 · 문구는 [06 화면](./06-screens.md)이 정한다 — 이 문서는 *어떻게 보이나* 만 정한다.
-> 화면 코드는 `frontend/` · React + Tailwind CSS. 아래 값은 `tailwind.config` 의 테마 토큰으로 둔다.
+> 화면 코드는 `frontend/` · React + Tailwind CSS. 아래 값은 `frontend/src/index.css` 의 `@theme` 테마 토큰으로 둔다(Tailwind CSS 4).
 
 ## 디자인 원칙
 
