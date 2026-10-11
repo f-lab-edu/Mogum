@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "seoul-clock",
-      "status": "pending"
+      "status": "completed",
+      "summary": "Asia/Seoul 기준 SeoulClock·루트 Clock/SeoulClock 빈 등록 및 한국/UTC 자정 경계·JVM 시간대 독립성·고정 Clock 주입 테스트 구성(./gradlew test 33개 통과)",
+      "started_at": "2026-10-12T07:01:20+0900",
+      "completed_at": "2026-10-12T07:03:36+0900"
     },
     {
       "step": 4,
