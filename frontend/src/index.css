@@ -24,5 +24,11 @@
 @layer base {
   body {
     @apply bg-paper font-sans text-ink-body;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+
+  [tabindex="-1"]:focus {
+    outline: none;
   }
 }

@@ -30,7 +30,7 @@ export default function LoginPage() {
             <p className="text-[28px] font-bold text-ink">머금</p>
             <p className="text-sm text-ink-soft">배운 건 머금고, 흔들리는 건 다시 한 모금</p>
           </div>
-          <h1 ref={heading} tabIndex={-1} className="mt-6 text-2xl leading-snug font-semibold text-balance text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">배운 걸 잊지 않게, 복습이 다음 강의를 바꾸는 학습</h1>
+          <h1 ref={heading} tabIndex={-1} className="mt-6 text-2xl leading-snug font-semibold text-balance text-ink">배운 걸 잊지 않게, 복습이 다음 강의를 바꾸는 학습</h1>
           <p className="text-base leading-7 text-pretty">주제만 정하면 AI가 강의를 짜고 만들어요. 복습 결과를 보고 이미 아는 건 짧게, 흔들리는 건 자세히 다음 강의를 만들어요.</p>
         </div>
         <div className="mt-10 w-full max-w-[22rem]">
@@ -44,7 +44,7 @@ export default function LoginPage() {
             <span>Google 계정으로 계속하기</span>
           </a>
         </div>
-        <p ref={notice} tabIndex={-1} role="status" aria-live="polite" aria-atomic="true" className={message ? 'mt-6 w-full max-w-[22rem] rounded-md border border-line bg-surface px-4 py-3 text-base text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent' : undefined}>{message}</p>
+        <p ref={notice} tabIndex={-1} role="status" aria-live="polite" aria-atomic="true" className={message ? 'mt-6 w-full max-w-[22rem] rounded-md border border-line bg-surface px-4 py-3 text-base text-ink' : undefined}>{message}</p>
       </div>
     </main>
   )
