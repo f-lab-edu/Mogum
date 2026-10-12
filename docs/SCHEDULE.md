@@ -20,7 +20,7 @@
 
 | 날짜 | 마일스톤 | 완료 기준 |
 |---|---|---|
-| **10/18(일)** | M1 뼈대 | `./gradlew build` 통과 — ArchUnit · Flyway · Testcontainers · 프론트 빌드 포함. `execute.py` 가 TASK 하나를 Codex 구현 → Claude 리뷰 → 커밋까지 끝까지 돈다 |
+| **10/18(일)** | M1 뼈대 | `./gradlew build` 통과 — ArchUnit · Flyway · Testcontainers. 화면은 `npm --prefix frontend run build` · `test` · `lint` 통과. `execute.py` 가 TASK 하나를 Codex 구현 → Claude 리뷰 → 커밋까지 끝까지 돈다 |
 | **11/8(일)** | M2 본인 실사용 시작 | 운영 서버에서 커리큘럼 → 강의 → 카드 → 복습을 한 바퀴 돈다. 나 말고는 생성할 수 없다. DB 백업이 돈다 |
 | **11/15(일)** | M3 품질 게이트 1차 채점 | 표본 10개의 채점 기록(CSV)이 있다 — 합격이든 불합격이든 |
 | **11/29(일)** | M4 공개 준비 | 공개 필수 목록 전부 체크 · 용량 측정으로 정원 확정 · 품질 게이트 통과 |
@@ -34,7 +34,7 @@
 |---|---|---|---|
 | **W1** 10/12–18 | `0-skeleton` · `1-auth` | `docs/design-bundle` 을 PR 로 `main` 에 병합하고 시작 · 구글 OAuth 클라이언트(localhost 콜백) · AWS 계정(생성일 확인 — [04 §3](./04-jobs-and-cost.md#3-배포)) | 약 11h |
 | **W2** 10/19–25 | `2-job-queue` · `3-llm-ledger` | — | 약 12h |
-| **W3** 10/26–11/1 | `4-curriculum-gen` · `5-deploy` | 도메인 구매 · 구글 OAuth 에 운영 콜백 추가 | 약 12h |
+| **W3** 10/26–11/1 | `4-curriculum-gen` · `5-deploy` | 도메인 구매 · 구글 OAuth 에 운영 콜백 추가 · Vercel 계정 · 요금제 약관 확인 | 약 12h |
 | **W4** 11/2–8 | `6-material-gen` · `7-review` → 다시 배포 | OpenAI 프로젝트 사용 한도 설정 · **M2 실사용 시작** · 이후 매일 복습 | 약 13h |
 | **W5** 11/9–15 | `8-mastery-loop` · `9-cost-control` | 슬랙 웹훅 · 외부 헬스체크 · **품질 게이트 1차 채점**(`8` 이 끝난 뒤 · 약 12h) | 약 21h |
 | **W6** 11/16–22 | `10-delete-restart` · `11-screens-complete` · `12-account-public` · `13-admin-status` | 약관 · 개인정보처리방침 문안 검토 · 구글 동의 화면 프로덕션 전환 신청. 1차 불합격이면 프롬프트 v7 + 새 표본 | 약 20h |
@@ -48,12 +48,12 @@
 
 | TASK | 주 | 목표 | 먼저 읽을 문서 | 선행 |
 |---|---|---|---|---|
-| `0-skeleton` | W1 | Gradle 단일 모듈 · 패키지(`core` ← `api` · `worker` · `infra`) · ArchUnit 규칙 · Flyway · Testcontainers(pgvector) · `TransactionRunner` · `Asia/Seoul` 시계 · 프론트 Vite 뼈대와 `static/` 복사 · 로컬 Docker Compose. **FSRS 라이브러리 채택 확인** — 학습 단계를 끌 수 있는지(PRD 🅿️ "구현 첫 작업") | [ARCHITECTURE](./ARCHITECTURE.md) · [04 §2 · §5](./04-jobs-and-cost.md) | — |
-| `1-auth` | W1 | 구글 OAuth · Spring Session JDBC · CSRF · 로그아웃 · `users` · 소유권 `404` 공통 처리 · U1 최소판 · JSON API `/api` 접두사([05 §1](./05-api.md)) · SPA 딥링크(화면 주소 새로고침 → `index.html`) · JPA · 네이티브 `flush` 규칙 테스트(첫 엔티티 `users` — [07 §1.2](./07-testing.md)). **공개 전 운영 서버에서 나 말고는 생성할 수 없게 한다** — 방식은 TASK 에서 정한다 | [05 §1](./05-api.md) · [02 §6.1 · §7](./02-domain-data.md) | 0 |
+| `0-skeleton` | W1 | Gradle 단일 모듈 · 패키지(`core` ← `api` · `worker` · `infra`) · ArchUnit 규칙 · Flyway · Testcontainers(pgvector) · `TransactionRunner` · `Asia/Seoul` 시계 · 프론트 Vite 뼈대(jar 에 넣지 않는다 — ADR-060) · 로컬 Docker Compose. **FSRS 라이브러리 채택 확인** — 학습 단계를 끌 수 있는지(PRD 🅿️ "구현 첫 작업") | [ARCHITECTURE](./ARCHITECTURE.md) · [04 §2 · §5](./04-jobs-and-cost.md) | — |
+| `1-auth` | W1 | 구글 OAuth · Spring Session JDBC · CSRF · 화면과 API 의 출처 분리(CORS · `XSRF-TOKEN` 쿠키 도메인 · 로그인 뒤 화면 주소로) · 로그아웃 · `users` · 소유권 `404` 공통 처리 · U1 최소판 · JSON API `/api` 접두사([05 §1](./05-api.md)) · JPA · 네이티브 `flush` 규칙 테스트(첫 엔티티 `users` — [07 §1.2](./07-testing.md)). **공개 전 운영 서버에서 나 말고는 생성할 수 없게 한다** — 방식은 TASK 에서 정한다 | [05 §1](./05-api.md) · [02 §6.1 · §7](./02-domain-data.md) | 0 |
 | `2-job-queue` | W2 | `jobs` · `job_events` · 적재(진행 중 2개 · 사용자 advisory lock) · `SKIP LOCKED` 수령 · 실행기 `N` · 리스 · 수령 회차 · 반납 · 회수 · `GET /jobs/{id}` · `aheadCount` · `app.role` 역할별 빈 등록과 역할별 기동 테스트([04 §3.1](./04-jobs-and-cost.md)). 장애 주입 #1~#4 | [04 §4 · §5 · §6](./04-jobs-and-cost.md) · [02 §6.9](./02-domain-data.md) · [05 §4](./05-api.md) | 1 |
 | `3-llm-ledger` | W2 | `LlmClient` · `EmbeddingClient` 포트 · `GuardedLlmClient`(재시도 · 응답 분류 · `insufficient_quota`) · `llm_calls` 원장 · 누적 호출 상한 · 입력 예산 검사 · OpenAI 어댑터(`maxRetries(0)`) · LLM 스텁. 장애 주입 #8~#15 | [03 §8](./03-generation.md) · [02 §6.8](./02-domain-data.md) · [04 §4.8](./04-jobs-and-cost.md) · [07 §3](./07-testing.md) · `reference-code/` | 2 |
 | `4-curriculum-gen` | W3 | 잡 I(단일/그룹 판단) · 잡 A(다시 짜기 · 단계 생성) · 프롬프트 v6(I · A) · 묶음/단계 · 요청 식별자 중복 처리 · 실패 요청 지우기 · U2 · U10 · U3 · U11 최소판. 숙련도 선별은 학습 이력이 아직 없으므로 `EMPTY` 경로만 — 선별 연결은 `8` 에서 | [03 §2](./03-generation.md) · [02 §2.1 · §6.2 · §6.2.1](./02-domain-data.md) · [05 §2](./05-api.md) · [06 §6~§9](./06-screens.md) | 3 |
-| `5-deploy` | W3 | 지금까지의 앱을 EC2 에 먼저 올린다 — **Postgres 위치 결정**(1순위: 같은 EC2 2GB) · 도메인 · HTTPS · `pg_dump` → S3 백업 · 배포 절차(SIGTERM 유예) | [04 §3](./04-jobs-and-cost.md#3-배포) · [01 §10](./01-overview.md) | 4 |
+| `5-deploy` | W3 | 지금까지의 앱을 EC2 에 먼저 올린다 — **Postgres 위치 결정**(1순위: 같은 EC2 2GB) · 도메인(화면 → Vercel · `api.` → EC2) · HTTPS · 화면 Vercel 배포(API 주소 환경 변수 · 화면 주소 새로고침 → `index.html`) · `pg_dump` → S3 백업 · 배포 절차(SIGTERM 유예) | [04 §3](./04-jobs-and-cost.md#3-배포) · [01 §10](./01-overview.md) | 4 |
 | `6-material-gen` | W4 | 잡 B ①②③ · 프롬프트 v6(B) · 이어 쓰기 · 개념 동일성(`resolveConcepts` · 정의 임베딩) · U4 최소판(KaTeX · mermaid). 숙련도 연결은 `8` 에서 — 그전에는 학습 이력이 없다 | [03 §3~§7](./03-generation.md) · [02 §5 · §6.3 · §6.4](./02-domain-data.md) · [05 §3](./05-api.md) · [06 §10](./06-screens.md) | 4 |
 | `7-review` | W4 | 학습 완료(강의 ID 기준 한 번) · `card_states` · `reviews` · FSRS · 오늘의 복습(한국 날짜) · U5 최소판 | [02 §3 · §6.5 · §8.1](./02-domain-data.md) · [05 §6](./05-api.md) · [06 §11](./06-screens.md) | 6 |
 | `8-mastery-loop` | W5 | 숙련도 `R` · `S` · `minReviewCount` 조회 SQL(라이브러리 일치 테스트) · `MasteryPolicy` · 잡 B 의 `lookupMastery` 연결 · 잡 I/A 숙련도 선별(잠정 설정 — [ADR-057](./ADR.md)). **피드백 루프가 여기서 닫힌다** | [02 §4 · §5.4 · §8.2.1 · §8.3](./02-domain-data.md) · [03 §2 · §3](./03-generation.md) | 7 |

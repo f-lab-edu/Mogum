@@ -2,8 +2,7 @@
   "phases": [
     {
       "dir": "0-skeleton",
-      "status": "completed",
-      "completed_at": "2026-10-12T07:29:15+0900"
+      "status": "pending"
     }
   ]
 }

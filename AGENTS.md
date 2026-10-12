@@ -16,9 +16,9 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 | `docs/07-testing.md` | 장애 주입 · 용량 측정 · LLM 스텁 |
 
 **스택** — Java 21 · Spring Boot 4(MVC, 플랫폼 스레드) · Spring Security(구글 OAuth) + Spring Session JDBC · PostgreSQL + pgvector · Spring Data JPA(엔티티는 `infra` · Postgres 고유 기능은 `EntityManager` 네이티브 쿼리) · Flyway · OpenAI SDK(`gpt-5.6-terra` · `gpt-5.6-luna` · `text-embedding-3-large`) · FSRS 라이브러리 · ArchUnit · Testcontainers · Micrometer.
-**화면** — `frontend/` · React + TypeScript(strict) · Vite · React Router · TanStack Query · Tailwind CSS · react-markdown + KaTeX + mermaid · Vitest + Testing Library. 빌드 결과를 Spring Boot `static/` 에 넣어 **jar 하나**로 배포한다(같은 사이트 — 쿠키 세션 · CSRF 그대로).
+**화면** — `frontend/` · React + TypeScript(strict) · Vite · React Router · TanStack Query · Tailwind CSS · react-markdown + KaTeX + mermaid · Vitest + Testing Library. 빌드 결과는 **Vercel** 에 정적 파일로 배포하고 jar 에는 넣지 않는다. 화면 `{도메인}` · API `api.{도메인}`(EC2) — 같은 사이트 · 다른 출처라 쿠키 세션은 그대로 쓰고 CORS · `XSRF-TOKEN` 쿠키 도메인을 맞춘다([05 §1.1](docs/05-api.md)).
 **패키지** — `core`(도메인 · 유스케이스 · 포트) ← `api` · `worker` · `infra`. 단일 Gradle 모듈.
-**운영** — EC2 한 대 · 프로세스 하나(`app.role=all` — API + 워커 실행기 `N` 개). 필요하면 실행 인자만으로 `api` / `worker` 로 나눈다. 정원제 실사용자.
+**운영** — EC2 한 대 · 프로세스 하나(`app.role=all` — API + 워커 실행기 `N` 개) · 화면은 Vercel. 필요하면 실행 인자만으로 `api` / `worker` 로 나눈다. 무중단 배포는 공개 후(ADR-061). 정원제 실사용자.
 
 **작업 분담** — 큰 흐름의 기획 · 리뷰는 Claude Code, TASK별 세부 설계 · 구현은 Codex가 한다. `scripts/execute.py` 가 `phases/{task}/step{N}.md` 를 하나씩 `codex exec` 로 구현시키고, step 이 끝날 때마다 Claude 가 읽기 전용으로 리뷰한다. 반려되면 지적 사항이 다음 구현 시도에 그대로 전달되고, 승인된 step 만 커밋된다.
 
@@ -93,9 +93,10 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 ```
 docker compose up -d        # 로컬 Postgres(pgvector) — bootRun 전에
 ./gradlew bootRun            # 개발 서버 (API + 워커, app.role=all)
-./gradlew test               # 백엔드 테스트 (Testcontainers — Docker 필요 · 프론트 빌드를 거친다 — Node/npm 필요, 첫 실행은 npm ci 로 네트워크 사용)
-./gradlew build              # 프론트 빌드를 static/ 에 넣고 jar 생성
-cd frontend && npm run dev   # 화면 개발 서버 (Vite — API 는 proxy 로 같은 사이트처럼)
+./gradlew test               # 백엔드 테스트 (Testcontainers — Docker 필요)
+./gradlew build              # 백엔드 jar 생성 — 화면은 넣지 않는다
+cd frontend && npm run dev   # 화면 개발 서버 (Vite — API 는 proxy 로 같은 출처처럼)
+cd frontend && npm run build # 화면 빌드 (배포는 Vercel)
 cd frontend && npm run test  # 화면 테스트 (Vitest)
 cd frontend && npm run lint  # ESLint
 git config core.hooksPath .githooks  # 클론마다 처음 한 번 — main 직접 커밋 · push 를 막는 훅

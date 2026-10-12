@@ -7,7 +7,7 @@
 
 ## 1. 공통
 
-**경로** — JSON API 는 모두 `/api` 아래에 둔다. 이 문서의 경로는 접두사를 뺀 표기다(`GET /me` = `GET /api/me`). 화면 주소([06 §2.3](./06-screens.md))와 겹치기 때문이다 — `/curriculums/{id}` · `/lessons/{id}` 는 화면이기도 하고 API 이기도 해서, 접두사가 없으면 새로고침 때 화면 대신 JSON 이 온다. 브라우저가 직접 이동하는 OAuth 경로(`/auth/google` · `/auth/google/callback`)는 접두사 없이 둔다.
+**경로** — JSON API 는 모두 `/api` 아래에 둔다. 이 문서의 경로는 접두사를 뺀 표기다(`GET /me` = `GET /api/me`). 화면 주소([06 §2.3](./06-screens.md))와 겹치기 때문이다 — `/curriculums/{id}` · `/lessons/{id}` 는 화면이기도 하고 API 이기도 해서, 접두사가 없으면 새로고침 때 화면 대신 JSON 이 온다. 운영은 화면(Vercel)과 API(`api.` 서브도메인)의 출처가 다르지만, 개발 서버는 Vite proxy 로 같은 출처를 쓰므로 접두사를 유지한다. 브라우저가 직접 이동하는 OAuth 경로(`/auth/google` · `/auth/google/callback`)는 접두사 없이 둔다.
 
 ### 1.1 인증 — 구글 OAuth + 쿠키 세션(DB 저장)
 
@@ -28,7 +28,14 @@
 
 - **세션은 Postgres 에 둔다**(Spring Security `oauth2Login` + **Spring Session JDBC**). 쿠키에는 세션 번호만 있다 — `HttpOnly` · `Secure` · `SameSite=Lax`. 로그인 때 세션 번호를 새로 발급한다(세션 고정 방어 — 프레임워크 기본).
 - **비활동 7일이면 만료.** 세션에는 **사용자 id 만** 둔다 — 상태(`ACTIVE` · `WAITLISTED` · `PENDING`) · 역할은 **요청마다 `users` 에서 읽는다.** 승인 · 약관 변경이 바로 반영되게.
-- **CSRF** — `SameSite=Lax` 에 더해 Spring Security 기본 CSRF 보호를 켠다(화면은 `XSRF-TOKEN` 쿠키를 읽어 헤더로 보낸다). API 와 화면은 같은 사이트에 둔다.
+- **CSRF** — `SameSite=Lax` 에 더해 Spring Security 기본 CSRF 보호를 켠다(화면은 `XSRF-TOKEN` 쿠키를 읽어 헤더로 보낸다).
+- **화면과 API 의 출처** — 화면은 `{도메인}`(Vercel), API 는 `api.{도메인}`(EC2)이다. 같은 등록 도메인이라 **같은 사이트 · 다른 출처**다(ADR-060).
+    - 세션 쿠키는 API 호스트에만 둔다(`Domain` 없음). 같은 사이트라 `SameSite=Lax` 그대로 화면의 요청에 실린다. 화면의 fetch 는 `credentials: 'include'` 로 보낸다.
+    - CORS — 허용 출처는 화면 출처 하나(설정값)이고 credentials 를 허용한다. `*` · 패턴 허용을 쓰지 않는다.
+    - `XSRF-TOKEN` 쿠키는 화면 스크립트가 읽을 수 있게 `Domain` 을 등록 도메인으로 둔다.
+    - 로그인 시작 · 콜백은 API 호스트의 `/auth/*` 에서 하고, 끝나면 화면 주소(설정값)의 U7 · U8 · U2 로 보낸다.
+    - 개발은 Vite proxy 로 같은 출처다 — 출처가 다른 운영 조건(CORS · 쿠키 도메인)은 테스트로 확인한다.
+    - PR 미리보기(`*.vercel.app`)는 다른 사이트라 세션 쿠키가 실리지 않는다 — 미리보기에서 로그인을 확인하지 않는다.
 - 요청마다 **세션 조회 + 사용자 조회**, 그리고 마지막 접근 시각 갱신(세션 행 UPDATE)이 붙는다 — 용량 측정에 포함한다.
 - **부하 테스트 세션** — `POST /dev/session { "userKey": "vu-17" }` 가 사용자(`ACTIVE` · 약관 동의)와 세션을 만들고 세션 쿠키를 준다. **`loadtest` 프로필에만 빈이 있다.** `loadtest` 와 `aws` 프로필이 함께 켜지면 **기동을 거부**한다. 제품 API 수에 세지 않는다.
 
