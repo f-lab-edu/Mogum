@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "session-api",
-      "status": "pending"
+      "status": "completed",
+      "summary": "V3 Spring Session JDBC 스키마·7일 쿠키 세션·요청별 사용자 조회·CSRF·GET /api/me·POST /api/auth/logout·공통 JSON 에러 구현; 세션은 FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME 속성 하나에 String users.id만 저장(SecurityContext 미저장), 현재 사용자는 @AuthenticationPrincipal User, 테스트 세션 지원은 src/test/java/com/mogum/support/TestSessions.java, 공통 예외는 com.mogum.core.NotFoundException; ERROR 디스패치 허용 및 ApiExceptionHandler/ApiErrorController로 400·405·500 상태와 JSON 형식 보존, 05 §1.2 코드 표 반영; ./gradlew test 105개 통과(실제 HTTP 회귀 테스트·ArchUnit 18개 포함)",
+      "started_at": "2026-10-12T12:14:23+0900",
+      "completed_at": "2026-10-12T12:40:15+0900"
     },
     {
       "step": 2,
