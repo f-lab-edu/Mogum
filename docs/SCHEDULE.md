@@ -32,7 +32,7 @@
 
 | 주 | TASK | 사람이 할 일 | 추정 |
 |---|---|---|---|
-| **W1** 10/12–18 | `0-skeleton` · `1-auth` | `docs/design-bundle` 을 PR 로 `main` 에 병합하고 시작 · 구글 OAuth 클라이언트(localhost 콜백) · AWS 계정(생성일 확인 — [04 §3](./04-jobs-and-cost.md#3-배포)) | 약 11h |
+| **W1** 10/12–18 | `0-skeleton` · `1-auth` | `docs/design-bundle` 을 PR 로 `main` 에 병합하고 시작 · 구글 OAuth 클라이언트(로컬 콜백 `http://localhost:5173/auth/google/callback` — Vite proxy 경유) · AWS 계정(생성일 확인 — [04 §3](./04-jobs-and-cost.md#3-배포)) | 약 11h |
 | **W2** 10/19–25 | `2-job-queue` · `3-llm-ledger` | — | 약 12h |
 | **W3** 10/26–11/1 | `4-curriculum-gen` · `5-deploy` | 도메인 구매 · 구글 OAuth 에 운영 콜백 추가 · Vercel 계정 · 요금제 약관 확인 | 약 12h |
 | **W4** 11/2–8 | `6-material-gen` · `7-review` → 다시 배포 | OpenAI 프로젝트 사용 한도 설정 · **M2 실사용 시작** · 이후 매일 복습 | 약 13h |
@@ -49,7 +49,7 @@
 | TASK | 주 | 목표 | 먼저 읽을 문서 | 선행 |
 |---|---|---|---|---|
 | `0-skeleton` | W1 | Gradle 단일 모듈 · 패키지(`core` ← `api` · `worker` · `infra`) · ArchUnit 규칙 · Flyway · Testcontainers(pgvector) · `TransactionRunner` · `Asia/Seoul` 시계 · 프론트 Vite 뼈대(jar 에 넣지 않는다 — ADR-060) · 로컬 Docker Compose. **FSRS 라이브러리 채택 확인** — 학습 단계를 끌 수 있는지(PRD 🅿️ "구현 첫 작업") | [ARCHITECTURE](./ARCHITECTURE.md) · [04 §2 · §5](./04-jobs-and-cost.md) | — |
-| `1-auth` | W1 | 구글 OAuth · Spring Session JDBC · CSRF · 화면과 API 의 출처 분리(CORS · `XSRF-TOKEN` 쿠키 도메인 · 로그인 뒤 화면 주소로) · 로그아웃 · `users` · 소유권 `404` 공통 처리 · U1 최소판 · JSON API `/api` 접두사([05 §1](./05-api.md)) · JPA · 네이티브 `flush` 규칙 테스트(첫 엔티티 `users` — [07 §1.2](./07-testing.md)). **공개 전 운영 서버에서 나 말고는 생성할 수 없게 한다** — 방식은 TASK 에서 정한다 | [05 §1](./05-api.md) · [02 §6.1 · §7](./02-domain-data.md) | 0 |
+| `1-auth` | W1 | 구글 OAuth · Spring Session JDBC · CSRF · 화면과 API 의 출처 분리(CORS · `XSRF-TOKEN` 쿠키 도메인 · 로그인 뒤 화면 주소로) · 로그아웃 · `users` · 소유권 `404` 공통 처리 · U1 최소판 · JSON API `/api` 접두사([05 §1](./05-api.md)) · JPA · 네이티브 `flush` 규칙 테스트(첫 엔티티 `users` — [07 §1.2](./07-testing.md)). **공개 전 운영 서버에서 나 말고는 생성할 수 없게 한다** — 관리자 이메일만 로그인한다([ADR-062](./ADR.md)) | [05 §1](./05-api.md) · [02 §6.1 · §7](./02-domain-data.md) | 0 |
 | `2-job-queue` | W2 | `jobs` · `job_events` · 적재(진행 중 2개 · 사용자 advisory lock) · `SKIP LOCKED` 수령 · 실행기 `N` · 리스 · 수령 회차 · 반납 · 회수 · `GET /jobs/{id}` · `aheadCount` · `app.role` 역할별 빈 등록과 역할별 기동 테스트([04 §3.1](./04-jobs-and-cost.md)). 장애 주입 #1~#4 | [04 §4 · §5 · §6](./04-jobs-and-cost.md) · [02 §6.9](./02-domain-data.md) · [05 §4](./05-api.md) | 1 |
 | `3-llm-ledger` | W2 | `LlmClient` · `EmbeddingClient` 포트 · `GuardedLlmClient`(재시도 · 응답 분류 · `insufficient_quota`) · `llm_calls` 원장 · 누적 호출 상한 · 입력 예산 검사 · OpenAI 어댑터(`maxRetries(0)`) · LLM 스텁. 장애 주입 #8~#15 | [03 §8](./03-generation.md) · [02 §6.8](./02-domain-data.md) · [04 §4.8](./04-jobs-and-cost.md) · [07 §3](./07-testing.md) · `reference-code/` | 2 |
 | `4-curriculum-gen` | W3 | 잡 I(단일/그룹 판단) · 잡 A(다시 짜기 · 단계 생성) · 프롬프트 v6(I · A) · 묶음/단계 · 요청 식별자 중복 처리 · 실패 요청 지우기 · U2 · U10 · U3 · U11 최소판. 숙련도 선별은 학습 이력이 아직 없으므로 `EMPTY` 경로만 — 선별 연결은 `8` 에서 | [03 §2](./03-generation.md) · [02 §2.1 · §6.2 · §6.2.1](./02-domain-data.md) · [05 §2](./05-api.md) · [06 §6~§9](./06-screens.md) | 3 |
@@ -60,7 +60,7 @@
 | `9-cost-control` | W5 | 사용자 일일 비용 쿼터 · 전역 킬스위치 · 우리 API 레이트리밋 · 슬랙 알림 · 외부 헬스체크 · 막힘 문구 | [04 §7 · §9](./04-jobs-and-cost.md) · [05 §1.2 · §1.4 · §1.5](./05-api.md) · [06 §15](./06-screens.md) | 7 |
 | `10-delete-restart` | W6 | 커리큘럼 완전 삭제 · 묶음 삭제 · 처음부터 다시 만들기 · 다시 짜기 하루 3회 · 늦은 응답이 지운 것을 되살리지 않는지 | [02 §6.2 · §6.2.1](./02-domain-data.md) · [04 §4.9](./04-jobs-and-cost.md) · [05 §2](./05-api.md) | 8 |
 | `11-screens-complete` | W6 | 화면 "공개 전 완성" 열 — 대기 블록 전부 · 목차 · 키보드 · 모바일 하단 고정 · 기다리는 동안 모드 · 접근성 | [06 §2 · §16](./06-screens.md) · [UI_GUIDE](./UI_GUIDE.md) | 10 |
-| `12-account-public` | W6 | U7 가입(약관 동의 · 정원 검사) · U8 대기 명단 · U9 설정 · 회원 탈퇴(삭제 범위 전부) · P1 · P2 · U1 바닥글 | [02 §7](./02-domain-data.md) · [06 §3~§5 · §12 · §13](./06-screens.md) | 10 |
+| `12-account-public` | W6 | U7 가입(약관 동의 · 정원 검사) · U8 대기 명단 · U9 설정 · 회원 탈퇴(삭제 범위 전부) · P1 · P2 · U1 바닥글 · 관리자 전용 로그인 걷어내기([ADR-062](./ADR.md)) | [02 §7](./02-domain-data.md) · [06 §3~§5 · §12 · §13](./06-screens.md) | 10 |
 | `13-admin-status` | W6 | U6 시스템 상태(관리자 전용 · DB 만 읽는다) · 가입 섹션 | [05 §7](./05-api.md) · [06 §14](./06-screens.md) · [02 §6.9](./02-domain-data.md) | 12 |
 | `14-fault-injection` | W7 | 앞 TASK 에서 못 한 프로세스 단위 장애 주입(`kill -9` · SIGTERM 등)과 [07 §1.1](./07-testing.md) 16개 전체 확인 | [07 §1](./07-testing.md) | 13 |
 | `15-capacity` | W7 | k6 · `loadtest` 프로필 · 운영과 같은 메모리 조건 → `N` · 워커 폴링 주기 · 정원 `U_max` 확정. 통과 기준은 측정 전에 정한다 | [07 §2 · §3](./07-testing.md) | 14 |

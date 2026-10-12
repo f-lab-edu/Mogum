@@ -1,0 +1,31 @@
+{
+  "project": "Mogum",
+  "phase": "1-auth",
+  "steps": [
+    {
+      "step": 0,
+      "name": "users-account",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "session-api",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "cross-origin",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "google-login",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "frontend-auth",
+      "status": "pending"
+    }
+  ]
+}
