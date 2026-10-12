@@ -5,7 +5,10 @@
     {
       "step": 0,
       "name": "users-account",
-      "status": "pending"
+      "status": "completed",
+      "summary": "V2__create_users.sql·User 계정 도메인·GoogleLogin.login/roleFor·LoginResult.Success(userId)/Rejected(EMAIL_NOT_VERIFIED·NOT_ALLOWED)·UserRepository.findById/findByGoogleSub/create/updateLogin·UserEntity/JpaUserRepository·루트 AuthProperties/AuthConfiguration(app.auth.admin-emails, APP_AUTH_ADMIN_EMAILS) 구현 및 users NOT NULL/CHECK 문서 반영; ./gradlew test 82개 통과; 명시적 flush 없이 네이티브 조회해도 Hibernate 자동 flush로 변경값 auto-flush@example.com 관찰",
+      "started_at": "2026-10-12T12:07:06+0900",
+      "completed_at": "2026-10-12T12:14:23+0900"
     },
     {
       "step": 1,
@@ -27,5 +30,6 @@
       "name": "frontend-auth",
       "status": "pending"
     }
-  ]
+  ],
+  "created_at": "2026-10-12T12:07:06+0900"
 }
