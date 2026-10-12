@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+body{margin:0;background:#FAF8F3}
+a{color:#2F4B7C;text-decoration:none;text-underline-offset:4px}
+a:hover{text-decoration:underline}
+</style>
+</helmet>
+<div ref="{{ rootRef }}" style="position:relative;height:100%;overflow:hidden;background:#FAF8F3;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#3A3632;font-size:16px;-webkit-font-smoothing:antialiased">
+  <header data-layer="상단 바" style="height:56px;background:#FFFFFF;border-bottom:1px solid #E4DFD5;box-sizing:border-box">
+    <nav style="max-width:calc(48rem + 32px);margin:0 auto;height:100%;padding:0 16px;box-sizing:border-box;display:flex;align-items:center;gap:20px">
+      <a href="#" style="font-size:18px;font-weight:700;color:#1F1D1A;min-height:44px;display:flex;align-items:center">머금</a>
+      <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center">홈</a>
+      <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center;font-variant-numeric:tabular-nums">복습 (23)</a>
+      <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center;margin-left:auto">설정</a>
+    </nav>
+  </header>
+  <main style="max-width:calc(48rem + 32px);margin:0 auto;padding:20px 16px 48px;box-sizing:border-box;display:flex;flex-direction:column;gap:32px">
+    <div data-layer="U11-1 머리" style="display:flex;flex-direction:column;gap:6px">
+      <p style="margin:0;font-size:14px;color:#6B655C">커리큘럼 묶음 · 3단계</p>
+      <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px">
+        <h1 style="margin:0;font-size:24px;line-height:1.35;font-weight:600;color:#1F1D1A">Spring 백엔드 실무</h1>
+        <span style="font-size:14px;color:{{ statusColor }}">{{ status }}</span>
+      </div>
+      <p style="margin:0;font-size:16px;line-height:1.6;color:#3A3632;text-wrap:pretty">Spring 백엔드 · 신입 백엔드 개발자로 실무에 투입될 수준까지</p>
+    </div>
+
+    <sc-if value="{{ isPlan }}" hint-placeholder-val="{{ false }}">
+      <p data-layer="U11-2 안내" style="margin:0;font-size:16px;line-height:1.6;color:#3A3632;text-wrap:pretty">배울 범위가 넓어서 3단계로 나눴어요. 한 단계씩 만들어 학습해요. 다음 단계는 앞 단계를 마친 뒤, 그때까지의 복습 기록을 반영해 짜요.</p>
+    </sc-if>
+    <sc-if value="{{ isNextTurn }}" hint-placeholder-val="{{ false }}">
+      <p data-layer="U11-2 안내" style="margin:0;font-size:16px;line-height:1.6;color:#3A3632">1단계를 마쳤어요. 다음 단계를 만들 수 있어요.</p>
+    </sc-if>
+    <sc-if value="{{ isAllDone }}" hint-placeholder-val="{{ false }}">
+      <div data-layer="U11-2 안내" style="display:flex;flex-direction:column;gap:4px">
+        <p style="margin:0;font-size:18px;font-weight:600;color:#1F1D1A">모든 단계를 마쳤어요.</p>
+        <p style="margin:0;font-size:16px;line-height:1.6;color:#3A3632">다음 커리큘럼은 이미 아는 내용을 줄여서 짜요.</p>
+        <a href="#" style="align-self:flex-start;font-size:16px;color:#2F4B7C;min-height:44px;display:flex;align-items:center;margin-bottom:-8px">새 커리큘럼 만들기</a>
+      </div>
+    </sc-if>
+
+    <ol data-layer="U11-3 단계 목록" style="list-style:none;margin:0;padding:0;background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;overflow:hidden">
+      <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+        <li style="padding:20px;border-bottom:1px solid #E4DFD5;display:grid;grid-template-columns:20px 1fr;gap:6px 10px;background:{{ s.bg }};cursor:{{ s.cursor }}">
+          <span aria-hidden="true" style="font-size:16px;line-height:1.5;color:{{ s.markColor }}">{{ s.mark }}</span>
+          <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px">
+            <span style="font-size:14px;color:#6B655C;font-variant-numeric:tabular-nums">{{ s.no }}</span>
+            <span style="font-size:17px;line-height:1.5;font-weight:600;color:#1F1D1A">{{ s.title }}</span>
+          </div>
+          <p style="grid-column:2;margin:0;font-size:14px;line-height:1.6;color:#6B655C;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ s.scope }}</p>
+          <div style="grid-column:2;display:flex;flex-direction:column;gap:8px;margin-top:4px">
+            <sc-if value="{{ s.hasBar }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div role="progressbar" style="flex:1;height:6px;border-radius:9999px;background:#F1EEE7;overflow:hidden"><div style="height:100%;border-radius:9999px;background:#2F4B7C;width:{{ s.pct }}"></div></div>
+                <span style="font-size:14px;color:#6B655C;font-variant-numeric:tabular-nums">{{ s.line }}</span>
+              </div>
+            </sc-if>
+            <sc-if value="{{ s.hasLine }}" hint-placeholder-val="{{ true }}">
+              <span style="font-size:14px;color:{{ s.lineColor }};font-variant-numeric:tabular-nums">{{ s.line }}</span>
+            </sc-if>
+            <sc-if value="{{ s.primary }}" hint-placeholder-val="{{ false }}">
+              <button style="align-self:flex-start;max-width:100%;height:44px;padding:0 16px;border-radius:6px;border:none;background:#2F4B7C;color:#FFFFFF;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background 100ms" style-hover="background:#253D66">{{ s.btn }}</button>
+            </sc-if>
+            <sc-if value="{{ s.canMake }}" hint-placeholder-val="{{ false }}">
+              <p style="margin:-2px 0 0;font-size:14px;color:#6B655C">지금까지의 복습 기록을 반영해 짜요.</p>
+            </sc-if>
+          </div>
+        </li>
+      </sc-for>
+    </ol>
+
+    <div ref="{{ endRef }}" data-layer="U11-4 관리" style="border-top:1px solid #E4DFD5;padding-top:16px;display:flex;flex-direction:column;gap:4px">
+      <sc-if value="{{ isPlan }}" hint-placeholder-val="{{ false }}">
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#6B655C;text-wrap:pretty">단계 나누기가 마음에 들지 않으면 지우고 주제나 목적을 바꿔 다시 만들 수 있어요.</p>
+        <a href="#" style="align-self:flex-start;font-size:14px;color:#6B655C;min-height:44px;display:flex;align-items:center;text-decoration:underline;text-underline-offset:4px">지우고 다시 쓰기</a>
+      </sc-if>
+      <sc-if value="{{ deleteClosed }}" hint-placeholder-val="{{ true }}">
+        <a href="#" style="align-self:flex-start;font-size:14px;color:#6B655C;min-height:44px;display:flex;align-items:center;text-decoration:underline;text-underline-offset:4px">이 묶음 삭제</a>
+      </sc-if>
+      <sc-if value="{{ isDeleteOpen }}" hint-placeholder-val="{{ false }}">
+        <div data-layer="확인 펼침 §2.7" style="display:flex;flex-direction:column;gap:16px;padding-top:4px">
+          <p tabindex="-1" style="margin:0;font-size:16px;line-height:1.6;color:#3A3632;text-wrap:pretty">이 묶음과 단계별 커리큘럼 1개, 강의 자료, 학습 기록, 관련 플래시카드가 모두 삭제돼요. 삭제한 플래시카드의 학습 기록은 앞으로의 맞춤 학습에 반영되지 않아요. 삭제하면 되돌릴 수 없어요.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:12px">
+            <button style="height:44px;padding:0 16px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;transition:background 100ms" style-hover="background:#F1EEE7">삭제하기</button>
+            <button style="height:44px;padding:0 16px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;transition:background 100ms" style-hover="background:#F1EEE7">취소</button>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;plan&quot;,&quot;learning&quot;,&quot;nextTurn&quot;,&quot;allDone&quot;,&quot;deleteOpen&quot;],&quot;default&quot;:&quot;nextTurn&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;scrollTo&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;top&quot;,&quot;bottom&quot;],&quot;default&quot;:&quot;top&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const BASE = [
+  { no: '1단계', title: 'Spring 핵심 원리', scope: '의존성 주입 · 빈 생명주기 · AOP · 트랜잭션의 동작 원리' },
+  { no: '2단계', title: '웹 MVC와 데이터 접근', scope: '요청 처리 흐름 · REST API 설계 · JPA와 영속성 관리' },
+  { no: '3단계', title: '운영과 배포', scope: '설정과 프로필 · 로깅과 모니터링 · 컨테이너 배포' },
+];
+const SOFT = '#6B655C';
+const done = n => ({ mark: '✔', markColor: '#3D7A4F', hasLine: true, line: `완료 · ${n} / ${n}강`, lineColor: '#3D7A4F', cursor: 'pointer' });
+const wait = prev => ({ mark: '○', markColor: '#A39D93', hasLine: true, line: `${prev}단계를 마치면 만들 수 있어요`, lineColor: SOFT, cursor: 'default' });
+const make = n => ({ mark: '●', markColor: '#2F4B7C', bg: '#E8EDF5', hasLine: true, line: '만들 수 있어요', lineColor: SOFT, primary: true, canMake: true, btn: `${n}단계 커리큘럼 만들기`, cursor: 'default' });
+const learn = { mark: '●', markColor: '#2F4B7C', bg: '#E8EDF5', hasBar: true, pct: '58.33%', line: '7 / 12강', primary: true, btn: '이어서 · 8강 프록시와 AOP 개념', cursor: 'pointer' };
+const PLAN = {
+  plan: [make(1), wait(1), wait(2)],
+  learning: [learn, wait(1), wait(2)],
+  nextTurn: [done(12), make(2), wait(2)],
+  allDone: [done(12), done(11), done(10)],
+};
+const STATUS = { plan: '1단계 만들 차례', learning: '1단계 학습 중', nextTurn: '2단계 만들 차례', allDone: '완료' };
+class Component extends DCLogic {
+  constructor(p) { super(p); this.rootRef = React.createRef(); this.endRef = React.createRef(); }
+  componentDidMount() { this.paint(); }
+  componentDidUpdate(prev) { if (prev.state !== this.props.state || prev.scrollTo !== this.props.scrollTo) this.paint(); }
+  async paint() {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    requestAnimationFrame(() => {
+      const root = this.rootRef.current; if (!root) return;
+      root.scrollTop = (this.props.scrollTo ?? 'top') === 'bottom' ? root.scrollHeight : 0;
+    });
+  }
+  renderVals() {
+    const st = this.props.state ?? 'nextTurn';
+    const key = st === 'deleteOpen' ? 'nextTurn' : st;
+    const steps = (PLAN[key] || PLAN.nextTurn).map((s, i) => ({ bg: 'transparent', hasBar: false, hasLine: false, primary: false, canMake: false, pct: '0%', ...BASE[i], ...s }));
+    return {
+      rootRef: this.rootRef, endRef: this.endRef, steps,
+      status: STATUS[key], statusColor: key === 'allDone' ? '#3D7A4F' : SOFT,
+      isPlan: key === 'plan', isNextTurn: key === 'nextTurn', isAllDone: key === 'allDone',
+      isDeleteOpen: st === 'deleteOpen', deleteClosed: st !== 'deleteOpen' && key !== 'plan',
+    };
+  }
+}
+</script>
+</body>
+</html>

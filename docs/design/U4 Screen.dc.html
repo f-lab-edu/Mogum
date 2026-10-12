@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<style>
+body{margin:0;background:#FAF8F3}
+a{color:#2F4B7C;text-decoration:none;text-underline-offset:4px}
+a:hover{text-decoration:underline}
+.katex{color:#3A3632;font-size:1.05em}
+</style>
+</helmet>
+<div ref="{{ rootRef }}" style="position:relative;height:100%;overflow:hidden;background:#FAF8F3;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#3A3632;font-size:16px;-webkit-font-smoothing:antialiased">
+  <header data-layer="상단 바" style="height:56px;background:#FFFFFF;border-bottom:1px solid #E4DFD5;box-sizing:border-box">
+    <nav style="max-width:calc(48rem + 32px);margin:0 auto;height:100%;padding:0 16px;box-sizing:border-box;display:flex;align-items:center;gap:20px">
+      <a href="#" style="font-size:18px;font-weight:700;color:#1F1D1A;min-height:44px;display:flex;align-items:center">머금</a>
+      <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center">홈</a>
+      <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center;font-variant-numeric:tabular-nums">{{ navReview }}</a>
+      <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center;margin-left:auto">설정</a>
+    </nav>
+  </header>
+  <main style="max-width:calc(65ch + 32px);margin:0 auto;padding:20px 16px 56px;box-sizing:border-box;display:flex;flex-direction:column;gap:32px">
+    <div data-layer="U4-1 강의 머리" style="display:flex;flex-direction:column;gap:6px">
+      <a href="#" style="align-self:flex-start;font-size:14px;color:#2F4B7C;min-height:44px;display:flex;align-items:center;margin:-6px 0 -8px">‹ 경제 기초</a>
+      <h1 style="margin:0;font-size:24px;line-height:1.35;font-weight:600;color:#1F1D1A;text-wrap:pretty">6강 · 기준금리와 인플레이션</h1>
+      <p style="margin:0;font-size:16px;line-height:1.6;color:#3A3632;text-wrap:pretty">기준금리가 물가에 영향을 주는 경로를 설명할 수 있다</p>
+    </div>
+
+    <sc-if value="{{ showWait }}" hint-placeholder-val="{{ false }}">
+      <section data-layer="U4-2 기다리는 영역 · 대기 블록" aria-live="polite" style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <h2 style="margin:0;font-size:18px;font-weight:600;color:#1F1D1A">강의를 만들고 있어요</h2>
+        <sc-if value="{{ isQueue }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:0;font-size:16px;color:#3A3632">앞에 2명이 기다리고 있어요.</p>
+        </sc-if>
+        <sc-if value="{{ isQueue }}" hint-placeholder-val="{{ false }}">
+          <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px">
+            <li style="display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:baseline;color:#6B655C;line-height:1.5"><span aria-hidden="true" style="color:#A39D93">○</span><span>강의 구성 — 알고 계신 개념을 확인하는 중<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap">, 남은 단계</span></span></li>
+            <li style="display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:baseline;color:#6B655C;line-height:1.5"><span aria-hidden="true" style="color:#A39D93">○</span><span>본문 작성<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap">, 남은 단계</span></span></li>
+            <li style="display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:baseline;color:#6B655C;line-height:1.5"><span aria-hidden="true" style="color:#A39D93">○</span><span>플래시카드 만들기<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap">, 남은 단계</span></span></li>
+          </ol>
+        </sc-if>
+        <sc-if value="{{ isRunning }}" hint-placeholder-val="{{ false }}">
+          <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px">
+            <li style="display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:baseline;color:#3A3632;line-height:1.5"><span aria-hidden="true" style="color:#3D7A4F">✔</span><span>강의 구성 — 알고 계신 개념을 확인하는 중<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap">, 끝난 단계</span></span></li>
+            <li style="display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:baseline;color:#1F1D1A;font-weight:600;line-height:1.5"><span aria-hidden="true" style="color:#2F4B7C">●</span><span style="display:flex;gap:8px;align-items:baseline">본문 작성<span style="font-size:14px;font-weight:600;color:#2F4B7C">지금</span></span></li>
+            <li style="display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:baseline;color:#6B655C;line-height:1.5"><span aria-hidden="true" style="color:#A39D93">○</span><span>플래시카드 만들기<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap">, 남은 단계</span></span></li>
+          </ol>
+        </sc-if>
+        <sc-if value="{{ isSlow }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:0;font-size:14px;color:#94601A">평소보다 조금 더 걸리고 있어요.</p>
+        </sc-if>
+        <div style="display:flex;flex-direction:column;gap:4px;border-top:1px solid #E4DFD5;padding-top:12px">
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#6B655C;text-wrap:pretty">보통 1~2분 걸려요. 이 화면을 떠나도 계속 만들어요.</p>
+          <a href="#" style="align-self:flex-start;font-size:16px;color:#2F4B7C;min-height:44px;display:flex;align-items:center;margin-bottom:-8px">기다리는 동안 복습하기 (23장)</a>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isFailRetry }}" hint-placeholder-val="{{ false }}">
+      <section data-layer="U4-2 기다리는 영역 · 실패 — 이어서 다시 시도" aria-live="polite" style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <p style="margin:0;font-size:16px;line-height:1.6;color:#B4443A;text-wrap:pretty">지금은 만들 수 없어요. 잠시 후 다시 시도해 주세요.</p>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+          <button style="height:44px;padding:0 16px;border-radius:6px;border:none;background:#2F4B7C;color:#FFFFFF;font:inherit;font-weight:600;cursor:pointer;transition:background 100ms" style-hover="background:#253D66">이어서 다시 시도</button>
+          <p style="margin:0;font-size:14px;color:#6B655C">이미 끝난 단계는 다시 하지 않아요.</p>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isFailRestart }}" hint-placeholder-val="{{ false }}">
+      <section data-layer="U4-2 기다리는 영역 · 실패 — 처음부터 다시 만들기" aria-live="polite" style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <p style="margin:0;font-size:16px;line-height:1.6;color:#B4443A;text-wrap:pretty">여러 번 시도했지만 완성하지 못했어요.</p>
+          <p style="margin:0;font-size:16px;line-height:1.6;color:#3A3632;text-wrap:pretty">처음부터 다시 만들 수 있어요. 앞서 만든 부분은 버리고 새로 만들어요.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+          <button style="height:44px;padding:0 16px;border-radius:6px;border:none;background:#2F4B7C;color:#FFFFFF;font:inherit;font-weight:600;cursor:pointer;transition:background 100ms" style-hover="background:#253D66">처음부터 다시 만들기</button>
+          <p style="margin:0;font-size:14px;color:#6B655C">앞서 만든 부분은 버리고 새로 만들어요.</p>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isBlocked }}" hint-placeholder-val="{{ false }}">
+      <section data-layer="U4-2 기다리는 영역 · 막힘 — 오늘 마감" aria-live="polite" style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:12px">
+        <p style="margin:0;font-size:16px;line-height:1.6;color:#B4443A;text-wrap:pretty">오늘은 새로 만들기가 마감됐어요. 0시에 다시 열려요. 이미 만든 강의와 복습은 계속할 수 있어요.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:4px 24px;margin-bottom:-8px">
+          <a href="#" style="font-size:16px;color:#2F4B7C;min-height:44px;display:flex;align-items:center">복습하기 (23장)</a>
+          <a href="#" style="font-size:16px;color:#2F4B7C;min-height:44px;display:flex;align-items:center">커리큘럼으로</a>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ showBody }}" hint-placeholder-val="{{ false }}">
+      <nav data-layer="U4-3 목차" style="border-top:1px solid #E4DFD5;border-bottom:1px solid #E4DFD5;padding:4px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:16px">
+        <a href="#" style="font-size:14px;color:#2F4B7C;min-height:44px;display:flex;align-items:center">오늘 배울 것</a>
+        <a href="#" style="font-size:14px;color:#2F4B7C;min-height:44px;display:flex;align-items:center">개념 설명</a>
+        <a href="#" style="font-size:14px;color:#2F4B7C;min-height:44px;display:flex;align-items:center">예시</a>
+        <a href="#" style="font-size:14px;color:#2F4B7C;min-height:44px;display:flex;align-items:center">정리</a>
+        <a href="#" style="font-size:14px;color:#2F4B7C;min-height:44px;display:flex;align-items:center">확인 질문</a>
+        <a href="#" style="font-size:14px;color:#2F4B7C;min-height:44px;display:flex;align-items:center">다음 시간에는</a>
+      </nav>
+      <article data-layer="U4-3 강의 본문" style="font-size:17px;line-height:1.75;color:#3A3632;text-wrap:pretty;margin-top:-8px">
+        <h2 style="margin:0 0 12px;font-size:20px;line-height:1.4;font-weight:600;color:#1F1D1A">오늘 배울 것</h2>
+        <p style="margin:0 0 12px">뉴스에서 ‘한국은행이 기준금리를 올렸다’는 기사를 자주 봅니다. 이 강의에서는 기준금리가 무엇인지, 그리고 기준금리를 움직이면 왜 물가가 달라지는지를 차례로 따라가 봅니다.</p>
+        <ul style="margin:0;padding-left:22px">
+          <li>기준금리의 뜻</li>
+          <li>금리가 물가로 전해지는 경로</li>
+          <li>명목금리와 실질금리의 차이</li>
+        </ul>
+
+        <h2 ref="{{ conceptRef }}" style="margin:40px 0 12px;font-size:20px;line-height:1.4;font-weight:600;color:#1F1D1A">개념 설명</h2>
+        <p style="margin:0 0 12px">기준금리는 한국은행이 금융기관과 돈을 주고받을 때 기준으로 삼는 금리입니다. 은행의 예금 · 대출 금리가 이 금리를 따라 움직이기 때문에, 기준금리는 경제 전체의 돈값을 정하는 출발점이 됩니다.</p>
+        <p style="margin:0 0 12px">기준금리를 올리면 영향은 다음 순서로 퍼집니다.</p>
+        <div ref="{{ flowRef }}" data-layer="그림 · 흐름도" style="margin:0 0 16px;overflow-x:auto;display:flex;justify-content:center;min-height:120px"></div>
+        <p style="margin:0 0 12px">대출 이자가 늘면 집이나 설비를 사려던 계획을 미루고, 예금 이자가 오르면 쓰기보다 모으려는 사람이 늘어납니다. 물건을 사려는 수요가 줄면 가격을 올리기 어려워집니다.</p>
+        <p style="margin:0 0 4px">금리를 볼 때는 물가도 함께 봐야 합니다. 물가가 오르는 만큼 돈의 가치가 줄기 때문입니다.</p>
+        <div ref="{{ mathRef }}" data-layer="수식" style="overflow-x:auto;overflow-y:hidden;min-height:56px"></div>
+        <p style="margin:0">그래서 명목금리가 같아도 기대 인플레이션율이 높으면 실질금리는 낮아집니다.</p>
+
+        <h2 ref="{{ exampleRef }}" style="margin:40px 0 12px;font-size:20px;line-height:1.4;font-weight:600;color:#1F1D1A">예시</h2>
+        <p style="margin:0 0 16px">2021년 하반기부터 물가가 빠르게 오르자 한국은행은 기준금리를 잇달아 올렸습니다. 아래 표에서 금리가 오른 뒤 한두 해에 걸쳐 물가 상승률이 낮아지는 흐름을 볼 수 있습니다.</p>
+        <div data-layer="표" style="overflow-x:auto;margin:0 0 6px">
+          <table style="border-collapse:collapse;width:100%;font-size:16px;line-height:1.5;font-variant-numeric:tabular-nums;white-space:nowrap">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:8px 12px 8px 0;border-bottom:1px solid #E4DFD5;font-weight:600;color:#1F1D1A">연도</th>
+                <th style="text-align:right;padding:8px 12px;border-bottom:1px solid #E4DFD5;font-weight:600;color:#1F1D1A">기준금리(연말)</th>
+                <th style="text-align:right;padding:8px 0 8px 12px;border-bottom:1px solid #E4DFD5;font-weight:600;color:#1F1D1A">물가 상승률</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #E4DFD5">2020</td><td style="text-align:right;padding:8px 12px;border-bottom:1px solid #E4DFD5">0.50%</td><td style="text-align:right;padding:8px 0 8px 12px;border-bottom:1px solid #E4DFD5">0.5%</td></tr>
+              <tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #E4DFD5">2021</td><td style="text-align:right;padding:8px 12px;border-bottom:1px solid #E4DFD5">1.00%</td><td style="text-align:right;padding:8px 0 8px 12px;border-bottom:1px solid #E4DFD5">2.5%</td></tr>
+              <tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #E4DFD5">2022</td><td style="text-align:right;padding:8px 12px;border-bottom:1px solid #E4DFD5">3.25%</td><td style="text-align:right;padding:8px 0 8px 12px;border-bottom:1px solid #E4DFD5">5.1%</td></tr>
+              <tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #E4DFD5">2023</td><td style="text-align:right;padding:8px 12px;border-bottom:1px solid #E4DFD5">3.50%</td><td style="text-align:right;padding:8px 0 8px 12px;border-bottom:1px solid #E4DFD5">3.6%</td></tr>
+              <tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #E4DFD5">2024</td><td style="text-align:right;padding:8px 12px;border-bottom:1px solid #E4DFD5">3.00%</td><td style="text-align:right;padding:8px 0 8px 12px;border-bottom:1px solid #E4DFD5">2.3%</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#6B655C">자료: 한국은행 기준금리, 통계청 소비자물가지수(연간)</p>
+        <div data-layer="그림 실패 상자" style="border-radius:6px;background:#F1EEE7;color:#6B655C;padding:24px;font-size:15px;line-height:1.5;margin:0 0 16px">그림을 표시하지 못했어요.</div>
+        <p style="margin:0">금리 효과가 바로 나타나지 않는 이유는, 대출 금리가 바뀌고 사람들이 소비 계획을 고치기까지 시간이 걸리기 때문입니다.</p>
+
+        <h2 style="margin:40px 0 12px;font-size:20px;line-height:1.4;font-weight:600;color:#1F1D1A">정리</h2>
+        <ul style="margin:0;padding-left:22px">
+          <li>기준금리는 한국은행이 정하는 정책 금리이고, 시중 금리의 기준이 됩니다.</li>
+          <li>기준금리를 올리면 대출 · 소비 · 투자가 줄어 물가 상승 압력이 낮아집니다.</li>
+          <li>실질금리는 명목금리에서 기대 인플레이션율을 뺀 값입니다.</li>
+        </ul>
+
+        <h2 style="margin:40px 0 12px;font-size:20px;line-height:1.4;font-weight:600;color:#1F1D1A">확인 질문</h2>
+        <ol style="margin:0;padding-left:22px">
+          <li>기준금리를 올리면 물가 상승률이 낮아지는 경로를 두 단계로 설명해 보세요.</li>
+          <li>명목금리가 3%이고 기대 인플레이션율이 4%라면 실질금리는 대략 얼마일까요?</li>
+        </ol>
+
+        <h2 style="margin:40px 0 12px;font-size:20px;line-height:1.4;font-weight:600;color:#1F1D1A">다음 시간에는</h2>
+        <p style="margin:0">7강 ‘환율은 어떻게 정해지나’에서는 나라 사이의 금리 차이가 환율을 어떻게 움직이는지 살펴봅니다.</p>
+      </article>
+
+      <section ref="{{ endRef }}" data-layer="U4-4 학습 완료" aria-live="polite" style="border-top:1px solid #E4DFD5;padding-top:28px;display:flex;flex-direction:column;gap:16px">
+        <sc-if value="{{ isBody }}" hint-placeholder-val="{{ true }}">
+          <p style="margin:0;font-size:16px;line-height:1.6;color:#3A3632;text-wrap:pretty">다 읽었으면 학습 완료를 눌러 주세요. 이 강의의 플래시카드가 오늘의 복습에 들어가요.</p>
+          <button style="align-self:flex-start;height:44px;padding:0 16px;border-radius:6px;border:none;background:#2F4B7C;color:#FFFFFF;font:inherit;font-weight:600;cursor:pointer;transition:background 100ms" style-hover="background:#253D66">학습 완료</button>
+        </sc-if>
+        <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+          <p tabindex="-1" style="margin:0;font-size:16px;line-height:1.6;color:#1F1D1A;text-wrap:pretty">6강을 마쳤어요. 방금 배운 플래시카드 8장을 바로 복습해 볼까요?</p>
+          <div style="display:flex;flex-wrap:wrap;gap:12px">
+            <button style="height:44px;padding:0 16px;border-radius:6px;border:none;background:#2F4B7C;color:#FFFFFF;font:inherit;font-weight:600;cursor:pointer;transition:background 100ms" style-hover="background:#253D66">바로 복습하기</button>
+            <button style="height:44px;padding:0 16px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;transition:background 100ms" style-hover="background:#F1EEE7">나중에</button>
+          </div>
+          <p style="margin:-4px 0 0;font-size:14px;color:#6B655C">플래시카드는 오늘의 복습에 들어가 있어요.</p>
+        </sc-if>
+      </section>
+    </sc-if>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;queued&quot;,&quot;running&quot;,&quot;slow&quot;,&quot;failRetry&quot;,&quot;failRestart&quot;,&quot;blocked&quot;,&quot;body&quot;,&quot;done&quot;],&quot;default&quot;:&quot;running&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;scrollTo&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;top&quot;,&quot;concept&quot;,&quot;example&quot;,&quot;end&quot;],&quot;default&quot;:&quot;top&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    ['rootRef','flowRef','mathRef','conceptRef','exampleRef','endRef'].forEach(k => this[k] = React.createRef());
+  }
+  componentDidMount() { this.paint(); }
+  componentDidUpdate(prev) {
+    if (prev.state !== this.props.state || prev.scrollTo !== this.props.scrollTo) this.paint();
+  }
+  async waitFor(fn) {
+    for (let i = 0; i < 200 && !fn(); i++) await new Promise(r => setTimeout(r, 50));
+    return fn();
+  }
+  async paint() {
+    const st = this.props.state ?? 'body';
+    if (st === 'body' || st === 'done') {
+      if (await this.waitFor(() => window.katex && this.mathRef.current)) {
+        window.katex.render('\\text{실질금리} \\approx \\text{명목금리} - \\text{기대 인플레이션율}', this.mathRef.current, { displayMode: true, throwOnError: false });
+      }
+      if (await this.waitFor(() => window.mermaid && this.flowRef.current)) {
+        const m = window.mermaid;
+        if (!window.__mgInit) {
+          m.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'base',
+            themeVariables: { primaryColor: '#E8EDF5', primaryBorderColor: '#2F4B7C', primaryTextColor: '#1F1D1A', mainBkg: '#E8EDF5', nodeBorder: '#2F4B7C', textColor: '#1F1D1A', lineColor: '#6B655C', secondaryColor: '#F1EEE7', tertiaryColor: '#FFFFFF', edgeLabelBackground: '#FAF8F3', clusterBkg: '#F1EEE7', clusterBorder: '#E4DFD5', background: '#FAF8F3', fontFamily: "'Pretendard Variable', Pretendard, sans-serif", fontSize: '15px' } });
+          window.__mgInit = true;
+        }
+        const code = 'flowchart TD\n  A[기준금리 인상] --> B[시중 금리 상승]\n  B --> C[소비 · 투자 감소]\n  C --> D[물가 상승 압력 완화]';
+        window.__mgQ = (window.__mgQ || Promise.resolve()).then(async () => {
+          const { svg } = await m.render('mg' + Math.random().toString(36).slice(2), code);
+          if (this.flowRef.current) this.flowRef.current.innerHTML = svg;
+        }).catch(() => {});
+        await window.__mgQ;
+      }
+    }
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    requestAnimationFrame(() => this.applyScroll());
+  }
+  applyScroll() {
+    const root = this.rootRef.current; if (!root) return;
+    const t = this.props.scrollTo ?? 'top';
+    if (t === 'top') { root.scrollTop = 0; return; }
+    if (t === 'end') { root.scrollTop = root.scrollHeight; return; }
+    let el = (t === 'concept' ? this.conceptRef : this.exampleRef).current, y = 0;
+    while (el && el !== root) { y += el.offsetTop; el = el.offsetParent; }
+    root.scrollTop = Math.max(0, y - 16);
+  }
+  renderVals() {
+    const st = this.props.state ?? 'body';
+    return {
+      rootRef: this.rootRef, flowRef: this.flowRef, mathRef: this.mathRef,
+      conceptRef: this.conceptRef, exampleRef: this.exampleRef, endRef: this.endRef,
+      showWait: ['queued','running','slow'].includes(st),
+      isQueue: st === 'queued',
+      isRunning: st === 'running' || st === 'slow',
+      isSlow: st === 'slow',
+      isFailRetry: st === 'failRetry',
+      isFailRestart: st === 'failRestart',
+      isBlocked: st === 'blocked',
+      showBody: st === 'body' || st === 'done',
+      isBody: st === 'body',
+      isDone: st === 'done',
+      navReview: st === 'done' ? '복습 (31)' : '복습 (23)',
+    };
+  }
+}
+</script>
+</body>
+</html>

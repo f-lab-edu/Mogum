@@ -8,6 +8,7 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 |---|---|
 | `docs/PRD.md` · `docs/ARCHITECTURE.md` · `docs/ADR.md` | 처음 볼 때 — 범위 · 구조 · 결정 요약 |
 | `docs/UI_GUIDE.md` | 화면 코드를 쓸 때 — 색 · 글꼴 · 컴포넌트 · 금지 패턴 |
+| `docs/design/` | 화면 코드를 쓸 때 — 그린 시안(Claude Design). 참고 자료이며 06 · UI_GUIDE 와 다르면 문서가 맞다 |
 | `docs/01-overview.md` | 범위 · 안 만드는 것과 그 트리거 · 성공 기준 · 용어 |
 | `docs/02-domain-data.md` | 테이블 · 숙련도 · 개념 동일성 · 핵심 쿼리 |
 | `docs/03-generation.md` | 생성 파이프라인 · 프롬프트 규칙 · LLM 호출 규약 |

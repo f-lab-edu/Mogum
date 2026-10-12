@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;align-items:flex-start;font-family:'Pretendard Variable',Pretendard,sans-serif">
+  <sc-if value="{{ hasArrow }}" hint-placeholder-val="{{ true }}">
+    <div data-layer="화살표" style="width:150px;flex:none;padding:0 10px;box-sizing:border-box;margin-top:{{ arrowTop }};display:flex;flex-direction:column;gap:6px">
+      <div style="min-height:34px;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;text-align:center">
+        <sc-for list="{{ lines }}" as="l" hint-placeholder-count="1">
+          <sc-if value="{{ l.normal }}" hint-placeholder-val="{{ true }}"><span style="font-size:12px;line-height:1.4;color:#1F1D1A;text-wrap:balance">{{ l.t }}</span></sc-if>
+          <sc-if value="{{ l.soft }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;line-height:1.4;color:#6B655C;text-wrap:balance">{{ l.t }}</span></sc-if>
+          <sc-if value="{{ l.danger }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;line-height:1.4;color:#B4443A;text-wrap:balance">{{ l.t }}</span></sc-if>
+        </sc-for>
+      </div>
+      <sc-if value="{{ solid }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;align-items:center"><div style="flex:1;border-top:2px solid #2F4B7C"></div><span style="width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-left:9px solid #2F4B7C"></span></div>
+      </sc-if>
+      <sc-if value="{{ autoDash }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center"><div style="flex:1;border-top:2px dashed #2F4B7C"></div><span style="width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-left:9px solid #2F4B7C"></span></div>
+      </sc-if>
+      <sc-if value="{{ softDash }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center"><div style="flex:1;border-top:2px dashed #6B655C"></div><span style="width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-left:9px solid #6B655C"></span></div>
+      </sc-if>
+    </div>
+  </sc-if>
+  <div data-layer="단계" style="width:125px;flex:none;display:flex;flex-direction:column;gap:8px">
+    <sc-if value="{{ isShot }}" hint-placeholder-val="{{ true }}">
+      <div style="width:125px;height:270px;overflow:hidden;border:1px solid #E4DFD5;background:#FAF8F3;box-sizing:border-box;pointer-events:none">
+        <div style="width:390px;height:844px;transform:scale(0.318);transform-origin:0 0">
+          <sc-if value="{{ c.U1 }}" hint-placeholder-val="{{ false }}"><dc-import name="Entry Screens" screen="{{ p.screen }}" checked="{{ p.checked }}" hint-size="100%,100%" style="width:100%;height:100%"></dc-import></sc-if>
+          <sc-if value="{{ c.U2 }}" hint-placeholder-val="{{ false }}"><dc-import name="U2 Screen" state="{{ p.state }}" scroll-to="{{ p.scroll }}" hint-size="100%,100%" style="width:100%;height:100%"></dc-import></sc-if>
+          <sc-if value="{{ c.U3 }}" hint-placeholder-val="{{ false }}"><dc-import name="U3 Screen" state="{{ p.state }}" scroll-to="{{ p.scroll }}" hint-size="100%,100%" style="width:100%;height:100%"></dc-import></sc-if>
+          <sc-if value="{{ c.U4 }}" hint-placeholder-val="{{ false }}"><dc-import name="U4 Screen" state="{{ p.state }}" scroll-to="{{ p.scroll }}" hint-size="100%,100%" style="width:100%;height:100%"></dc-import></sc-if>
+          <sc-if value="{{ c.U5 }}" hint-placeholder-val="{{ false }}"><dc-import name="U5 Screen" state="{{ p.state }}" hint-size="100%,100%" style="width:100%;height:100%"></dc-import></sc-if>
+          <sc-if value="{{ c.U9 }}" hint-placeholder-val="{{ false }}"><dc-import name="Settings Screens" screen="{{ p.screen }}" hint-size="100%,100%" style="width:100%;height:100%"></dc-import></sc-if>
+          <sc-if value="{{ c.U10 }}" hint-placeholder-val="{{ false }}"><dc-import name="U10 Screen" state="{{ p.state }}" hint-size="100%,100%" style="width:100%;height:100%"></dc-import></sc-if>
+          <sc-if value="{{ c.U11 }}" hint-placeholder-val="{{ false }}"><dc-import name="U11 Screen" state="{{ p.state }}" scroll-to="{{ p.scroll }}" hint-size="100%,100%" style="width:100%;height:100%"></dc-import></sc-if>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ isCard }}" hint-placeholder-val="{{ false }}">
+      <div data-layer="아직 안 그린 화면" style="width:125px;height:270px;box-sizing:border-box;border:1px dashed #A39D93;border-radius:6px;background:#FFFFFF;padding:14px 12px;display:flex;flex-direction:column;gap:6px">
+        <span style="font-size:20px;font-weight:600;color:#1F1D1A">{{ no }}</span>
+        <span style="font-size:13px;color:#3A3632">{{ name }}</span>
+        <span style="font-size:13px;line-height:1.5;color:#1F1D1A;font-weight:600;text-wrap:pretty">{{ st }}</span>
+        <sc-if value="{{ hasNote }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;line-height:1.5;color:{{ noteColor }};text-wrap:pretty">{{ note }}</span></sc-if>
+        <span style="margin-top:auto;font-size:11px;color:#6B655C">아직 그리지 않은 상태</span>
+      </div>
+    </sc-if>
+    <span style="font-size:13px;line-height:1.4;color:#1F1D1A;text-wrap:balance">{{ label }}</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:300,&quot;height&quot;:320},&quot;step&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.props.step || {};
+    const a = s.arrow;
+    const kind = a ? (a.kind || 'solid') : null;
+    const lines = (a && a.lines ? a.lines : []).map(l => {
+      const o = typeof l === 'string' ? { t: l } : l;
+      return { t: o.t, danger: !!o.danger, soft: !o.danger && (kind === 'soft' || !!o.soft), normal: !o.danger && kind !== 'soft' && !o.soft };
+    });
+    const comp = s.comp || '';
+    const c = { U1: comp === 'Entry', U2: comp === 'U2', U3: comp === 'U3', U4: comp === 'U4', U5: comp === 'U5', U9: comp === 'Settings', U10: comp === 'U10', U11: comp === 'U11' };
+    return {
+      hasArrow: !!a, lines, solid: kind === 'solid', autoDash: kind === 'auto', softDash: kind === 'soft',
+      arrowTop: '100px',
+      isShot: !!comp, isCard: !comp, c, p: { state: undefined, scroll: 'top', screen: undefined, checked: false, ...(s.p || {}) },
+      no: s.no, name: s.name, st: s.st, note: s.note, hasNote: !!s.note, noteColor: s.noteDanger ? '#B4443A' : '#6B655C',
+      label: s.label || `${s.no} · ${s.st}`,
+    };
+  }
+}
+</script>
+</body>
+</html>
