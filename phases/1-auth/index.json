@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "frontend-auth",
-      "status": "pending"
+      "status": "completed",
+      "summary": "frontend/src/api/client.ts fetch 래퍼·googleLoginUrl(VITE_API_BASE_URL·credentials·CSRF), api/useMe.ts·api/queryClient.ts 공통 401 처리, components/RequireAuth.tsx 로그인 확인·재시도 잠금, lib/authNavigation.ts 주소 복귀 검증, pages/LoginPage.tsx U1 최소판·lib/messages.ts 문구 표 구현; Vite proxy Host 동작 문서 정정; frontend test 59개·lint·build 통과",
+      "started_at": "2026-10-12T13:04:48+0900",
+      "completed_at": "2026-10-12T13:25:07+0900"
     }
   ],
   "created_at": "2026-10-12T12:07:06+0900"
