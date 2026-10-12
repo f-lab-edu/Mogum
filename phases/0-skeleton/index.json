@@ -1,0 +1,80 @@
+{
+  "project": "Mogum",
+  "phase": "0-skeleton",
+  "steps": [
+    {
+      "step": 0,
+      "name": "gradle-archunit",
+      "status": "completed",
+      "summary": "Gradle 9.1.0 wrapper·Java 21 toolchain·Spring Boot 4.1.1 최소 앱·패키지 경계와 ArchUnit 5개 규칙 및 위반 검증 테스트 구성",
+      "started_at": "2026-10-12T06:48:31+0900",
+      "completed_at": "2026-10-12T06:54:29+0900"
+    },
+    {
+      "step": 1,
+      "name": "database",
+      "status": "completed",
+      "summary": "Boot 관리 JUnit 6·JPA·Flyway·PostgreSQL 의존성, pgvector V1·로컬 Compose·JPA 설정 및 JVM 공유 Testcontainers DB와 통합 테스트 구성(./gradlew test 19개 통과)",
+      "started_at": "2026-10-12T06:55:15+0900",
+      "completed_at": "2026-10-12T06:59:07+0900"
+    },
+    {
+      "step": 2,
+      "name": "transaction-runner",
+      "status": "completed",
+      "summary": "TransactionRunner 포트·기본 REQUIRED TransactionTemplate 빈 구현 및 Postgres 커밋·롤백·동일 예외 전파·트랜잭션/리소스 해제 통합 테스트 구성(./gradlew test 24개 통과)",
+      "started_at": "2026-10-12T06:59:07+0900",
+      "completed_at": "2026-10-12T07:01:19+0900"
+    },
+    {
+      "step": 3,
+      "name": "seoul-clock",
+      "status": "completed",
+      "summary": "Asia/Seoul 기준 SeoulClock·루트 Clock/SeoulClock 빈 등록 및 한국/UTC 자정 경계·JVM 시간대 독립성·고정 Clock 주입 테스트 구성(./gradlew test 33개 통과)",
+      "started_at": "2026-10-12T07:01:20+0900",
+      "completed_at": "2026-10-12T07:03:36+0900"
+    },
+    {
+      "step": 4,
+      "name": "fsrs-check",
+      "status": "completed",
+      "summary": "FSRS 1.0.0 채택·학습/재학습 단계 비활성화 및 최소 1일 간격·정수 경과일 R 일치/소수 절삭 학습 테스트(FACTOR=0.6935087808430285, DECAY=-0.2)·문서 확정·Card 복원 필드 누락 없음(NEW→LEARNING/step=0 및 cardId int 매핑 필요; user_id/review_count/version은 앱 전용)",
+      "started_at": "2026-10-12T07:03:36+0900",
+      "completed_at": "2026-10-12T07:11:31+0900"
+    },
+    {
+      "step": 5,
+      "name": "frontend-skeleton",
+      "status": "completed",
+      "summary": "Vite·React·TypeScript strict 화면 뼈대, QueryClientProvider·루트 라우트, Tailwind 4 색/글꼴 토큰·자체 호스팅 Pretendard·API/OAuth 프록시 및 Vitest 2개·lint·build·기존 백엔드 테스트 통과",
+      "started_at": "2026-10-12T07:11:31+0900",
+      "completed_at": "2026-10-12T07:15:39+0900"
+    },
+    {
+      "step": 6,
+      "name": "jar-bundle",
+      "status": "completed",
+      "summary": "시스템 npm ci·Vite 빌드를 Gradle 입력/출력으로 연결해 static/ 포함 jar 생성·GET / 통합 테스트·check의 jar 검증 및 재빌드 UP-TO-DATE 확인(백엔드 52개·프론트 2개·lint 통과)",
+      "started_at": "2026-10-12T07:15:39+0900",
+      "completed_at": "2026-10-12T07:18:24+0900"
+    },
+    {
+      "step": 7,
+      "name": "archunit-fixtures",
+      "status": "completed",
+      "summary": "규칙 5의 JPA·@Transactional·Spring Data 위반 예시 추가 및 Web 포함 매개변수화 검사·운영 검사에서 예시 제외 확인(./gradlew test 55개 통과)",
+      "started_at": "2026-10-12T07:27:31+0900",
+      "completed_at": "2026-10-12T07:29:15+0900"
+    },
+    {
+      "step": 8,
+      "name": "unbundle-frontend",
+      "status": "completed",
+      "summary": "Gradle npm·프론트 빌드·static 복사·번들 검증 연결과 FrontendBundleIT 제거, jar static 없음·백엔드 54개·화면 build/test 2개/lint 및 AC 전체 통과",
+      "started_at": "2026-10-12T09:52:22+0900",
+      "completed_at": "2026-10-12T09:54:12+0900"
+    }
+  ],
+  "created_at": "2026-10-12T06:48:31+0900",
+  "completed_at": "2026-10-12T09:54:12+0900"
+}

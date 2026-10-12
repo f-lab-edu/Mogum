@@ -7,7 +7,7 @@
 
 ```
 /
-├── build.gradle                 # 단일 Gradle 모듈 — frontend 빌드 결과를 static/ 으로 복사
+├── build.gradle                 # 단일 Gradle 모듈 — 백엔드만. 화면은 jar 에 넣지 않는다(ADR-060)
 ├── src/main/java/…/mogum/
 │   ├── MogumApplication.java    # 루트 — 설정 배선 · app.role 별 빈 등록만
 │   ├── core/                    # 공통 포트(JobStore · UsageLedger · TransactionRunner …)
@@ -20,13 +20,13 @@
 ├── src/main/resources/
 │   ├── db/migration/            # Flyway 버전드 SQL(세션 테이블 포함)
 │   ├── prompts/v6/              # 운영 프롬프트 — 개발하며 새로 만든다. 명세는 03 §2~§6. 바꾸면 v7 로(금지 목록 18)
-│   └── static/                  # frontend 빌드 결과(커밋하지 않는다)
+│   └── (static/ 없음)           # 화면은 Vercel 에 따로 배포한다
 ├── src/test/java/…              # ArchUnit · Testcontainers · 장애 주입 · LLM 스텁
-├── frontend/                    # React + TypeScript · Vite
+├── frontend/                    # React + TypeScript · Vite — Vercel 에 정적 파일로 배포
 │   └── src/
 │       ├── pages/               # U1~U9 · P1 · P2 — 화면 하나에 파일 하나
 │       ├── components/          # 상단 바 · 카드 · 막힘 문구 · 마크다운 렌더러(KaTeX · mermaid)
-│       ├── api/                 # fetch 래퍼(XSRF-TOKEN 헤더) · 05 응답 타입 · TanStack Query 훅
+│       ├── api/                 # fetch 래퍼(API 주소 · credentials · XSRF-TOKEN 헤더) · 05 응답 타입 · TanStack Query 훅
 │       └── lib/                 # 문구 표(06 §15) · 유틸
 ├── phases/                      # 하네스 step 파일(Claude 가 쓰고 Codex 가 구현) · index.json. 실행 산출물(*-output.json · *-review.json)은 커밋하지 않는다
 ├── scripts/                     # 하네스 — execute.py(step 실행 · 리뷰 · 커밋) · tdd_guard.py(TDD 가드 훅) · 그 테스트
@@ -95,4 +95,4 @@ worker 실행기(빈손일 때만 1개 수령)
 
 성공/실패 전환과 이벤트 저장은 같은 트랜잭션이다. 리스 만료 RUNNING 수령도 회수 이벤트와 함께 커밋한다. U6의 최근 24시간 실패율/회수는 `job_events`, 호출 재시도 등록/429/비용은 `llm_calls`, 현재 대기/실행 상태는 `jobs`에서 읽는다. 작업 삭제/탈퇴 시 이벤트의 잡 연결만 해제하며 사용자/콘텐츠 원문 없는 운영 이력은 보존한다([02 §6.9](./02-domain-data.md)).
 
-EC2 한 대 · JVM 하나(`app.role=all` — API + 화면 정적 파일 + 워커 실행기 `N` 개) · PostgreSQL + pgvector(🅿️ 위치는 용량 측정 전에) · OpenAI. 운영 관측은 관리자 화면 U6(DB 만 읽는다) + 슬랙 알림 + 외부 헬스체크. ([04 §3](./04-jobs-and-cost.md#3-배포))
+화면은 Vercel(`{도메인}` — 정적 파일) · API 는 EC2 한 대(`api.{도메인}`) · JVM 하나(`app.role=all` — API + 워커 실행기 `N` 개) · PostgreSQL + pgvector(🅿️ 위치는 용량 측정 전에) · OpenAI. 운영 관측은 관리자 화면 U6(DB 만 읽는다) + 슬랙 알림 + 외부 헬스체크. ([04 §3](./04-jobs-and-cost.md#3-배포))

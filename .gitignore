@@ -1,31 +1,65 @@
-# Gradle · Java
+# Gradle · Java — wrapper(gradlew · gradle/wrapper/)는 추적한다
 .gradle/
 build/
 out/
 *.class
 *.log
+logs/
+# JVM 진단 산출물 — 힙 덤프 · JFR 기록에는 실제 데이터가 남는다
+*.hprof
+*.jfr
+
+# 화면 — 빌드 결과는 jar 빌드 때 build/ 안에서 다시 만든다
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+*.tsbuildinfo
+.eslintcache
+
+# 비밀 — .env · API 키 · 인증서는 커밋하지 않는다. 형식 안내용 .env.example 만 예외
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+# 구글 OAuth 콘솔에서 내려받는 클라이언트 비밀 JSON
+client_secret*.json
+# 로컬 전용 Spring 설정(비밀 포함 가능) — 공유할 기본값은 application.yml 에 둔다
+application-local.*
+
+# DB 백업 · 덤프 — 사용자 데이터다(*.sql 은 Flyway 마이그레이션이라 무시하지 않는다)
+*.dump
+*.sql.gz
+
+# Docker — 개인 compose 덮어쓰기
+compose.override.y*ml
+docker-compose.override.y*ml
 
 # IDE · OS
 .idea/
 *.iml
+*.ipr
+*.iws
 .vscode/
+.project
+.classpath
+.settings/
+.factorypath
+/bin/
 .DS_Store
-
-# 비밀 — .env · API 키는 커밋하지 않는다
-.env
-.env.*
-
-# 화면 — 빌드 결과는 jar 빌드 때 다시 만든다
-frontend/node_modules/
-frontend/dist/
-src/main/resources/static/
+Thumbs.db
 
 # 하네스 — .claude/ · .codex/ · scripts/ · phases/ 는 추적한다. 실행 산출물과 개인 설정만 뺀다
 phases/**/step*-output.json
 phases/**/step*-review.json
 .claude/settings.local.json
+CLAUDE.local.md
 __pycache__/
 .pytest_cache/
+.venv/
 
 # 로컬 실험 — 저장소에 올리지 않는다
 # 앞의 / 로 루트 폴더만 무시한다. 없으면 src/main/resources/prompts/(운영 프롬프트)까지 무시된다

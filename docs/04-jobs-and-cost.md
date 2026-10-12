@@ -10,17 +10,17 @@
 | 영역 | 선택 | 비교한 것 | 이 선택이 틀리는 때 |
 |---|---|---|---|
 | 언어 · 런타임 | **Java 21**(LTS) | Java 17 · Kotlin | — (1단계 하네스 · SDK 를 21 에서 검증했다) |
-| 프레임워크 | **Spring Boot 3 · Spring MVC** · 플랫폼 스레드 | WebFlux · 가상 스레드 | 초당 수만 건의 가벼운 요청 · 오래 기다리는 연결 수백 개 |
+| 프레임워크 | **Spring Boot 4 · Spring MVC** · 플랫폼 스레드 | WebFlux · 가상 스레드 | 초당 수만 건의 가벼운 요청 · 오래 기다리는 연결 수백 개 |
 | LLM | **OpenAI 공식 SDK + 자체 포트** | Spring AI · Anthropic | 프로바이더를 상시 여럿 지원해야 할 때 |
 | 저장소 | **PostgreSQL 하나 + pgvector** | MySQL + 벡터 DB · Redis | 개념 수십만 · 큐 초당 수백 건 |
 | 큐 | **`jobs` 테이블 + `FOR UPDATE SKIP LOCKED`** | Redis ZSET · Kafka | 초당 수백 건(hot row · VACUUM) |
 | DB 접근 | **Spring Data JPA 하나** — 도메인 테이블은 엔티티(`infra` 안), Postgres 고유 기능(`SKIP LOCKED` · advisory lock · `ON CONFLICT` · `RETURNING` · 벡터 거리)과 `jobs` · `job_events` · `llm_calls` 쓰기는 `EntityManager` 네이티브 쿼리 | MyBatis · `JdbcClient` · jOOQ · QueryDSL | 동적 SQL(조건이 이리저리 붙는 검색)이 많아질 때 |
 | 마이그레이션 | Flyway | Liquibase | — |
-| 화면 | **React SPA**(TypeScript · Vite · React Router · TanStack Query · Tailwind) — 빌드 결과를 Spring Boot `static/` 에 넣어 **jar 하나** | Next.js(Node 서버 별도) · Thymeleaf | 검색 노출(SSR)이 필요해진다 · 화면을 다른 도메인에서 띄운다 |
+| 화면 | **React SPA**(TypeScript · Vite · React Router · TanStack Query · Tailwind) — 빌드 결과를 **Vercel** 에 정적 파일로. API 는 `api.` 서브도메인의 EC2 — 같은 사이트 · 다른 출처(ADR-060) | Spring Boot `static/` 에 넣어 jar 하나(ADR-007 — 대체) · Vercel rewrites 프록시 · Next.js(Node 서버 별도) · Thymeleaf | 검색 노출(SSR)이 필요해진다 · 화면과 API 를 같은 등록 도메인에 둘 수 없다 |
 | 경계 강제 | **단일 Gradle 모듈 + ArchUnit** | 멀티모듈 | 규칙이 버거워지거나 배포 단위가 갈릴 때 |
 | 관측 | Micrometer · Prometheus · Grafana(**로컬**) · 운영은 관리자 화면 U6 | OpenTelemetry 트레이싱 | 메트릭 + 로그로 *"왜 오래 걸렸나"* 에 답하지 못할 때 |
 | 부하 · 장애 테스트 | k6 + LLM 스텁 서버 · Testcontainers(Postgres) | 실제 API 부하 | — |
-| 배포 | AWS EC2 한 대 · 앱 프로세스 하나 | 2대 · 쿠버네티스 | 예산이 늘거나 워커가 API 를 방해할 때 |
+| 배포 | AWS EC2 한 대 · 앱 프로세스 하나 · 화면은 Vercel · 무중단 배포는 공개 후(ADR-061) | 2대 · 쿠버네티스 | 예산이 늘거나 워커가 API 를 방해할 때 |
 
 > **가상 스레드를 쓰지 않는다.** 가상 스레드는 CPU 일을 늘리지 않고 *동시에 기다릴 수 있는 수* 를 늘린다.
 > 이 구조에서 오래(약 1분) 기다리는 작업은 **워커 실행기 `N` 개**로 묶여 있고, API 요청은 수 ms~수십 ms 라 플랫폼 스레드로 충분하다.
@@ -86,14 +86,15 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    U["사용자 · 정원 U_max"] --> APP["EC2 한 대 · 앱 JVM 하나<br/>API + 워커 실행기 N개"]
+    U["사용자 · 정원 U_max"] --> WEB["Vercel<br/>화면 정적 파일"]
+    U --> APP["EC2 한 대 · api. 서브도메인<br/>앱 JVM 하나 · API + 워커 실행기 N개"]
     APP <--> PG[("PostgreSQL + pgvector<br/>도메인 · jobs · 개념 임베딩")]
     APP --> AI["OpenAI<br/>채팅 · 임베딩"]
 ```
 
 | | 로컬(Docker Compose) | 운영(AWS) |
 |---|---|---|
-| 구성 | 앱 · Postgres · LLM 스텁 · Prometheus · Grafana | 앱 · Postgres |
+| 구성 | 앱 · Postgres · LLM 스텁 · Prometheus · Grafana | 앱 · Postgres · 화면은 Vercel |
 | 관측 | Grafana | **관리자 화면 U6**(DB 만 읽는다) — 1GB 에 관측 스택을 올리면 앱이 죽는다 |
 | LLM | 스텁(테스트) · 실제 API(실사용 전 확인) | 실제 API |
 
@@ -106,7 +107,7 @@ flowchart LR
   | ② RDS(db.t4g.micro) | 앱만 1GB | RDS 자동 백업 | 약 2만 원 |
   | ③ 같은 EC2 · 1GB 그대로 | 앱 + Postgres 합쳐 1GB — 매우 빠듯하다 | `pg_dump` → S3 cron | 0원 |
 
-- 공개 운영에 더하는 것 — 도메인 · HTTPS(구글 콜백 · `Secure` 쿠키) · DB 백업 · 슬랙 알림 · 외부 헬스체크(§9.1).
+- 공개 운영에 더하는 것 — 도메인(화면 → Vercel · `api.` → EC2) · HTTPS(구글 콜백 · `Secure` 쿠키) · Vercel 프로젝트(API 주소 환경 변수 · 화면 주소 새로고침을 `index.html` 로 · 요금제 약관 확인) · DB 백업 · 슬랙 알림 · 외부 헬스체크(§9.1).
 
 ### 3.1 역할 전환 — 비상용 배선
 
@@ -309,7 +310,7 @@ DB 처리 최대 지연에는 원장 등록 · 결과 기록 · 리스 갱신의
 | `server.shutdown` | `graceful` | 진행 중 API 요청이 끊긴다(새 요청은 받지 않는다) |
 | 프로세스 관리자의 강제 종료 대기 | 150초 이상 — systemd `TimeoutStopSec` · Docker `stop_grace_period` | **Docker 기본 10초 · systemd 기본 90초 뒤 SIGKILL** — 기다리는 도중 강제로 죽어 `kill -9` 경로(리스 만료 회수)가 된다 |
 
-**대가** — 서버가 한 대라 배포 중 중단 시간이 하던 호출의 남은 시간만큼(최대 약 2분) 늘어난다. 사람이 적은 시간에 배포한다. 백오프 대기 중이던 실행기는 기다리지 않고 바로 반납한다.
+**대가** — 서버가 한 대라 배포 중 중단 시간이 하던 호출의 남은 시간만큼(최대 약 2분) 늘어난다. 사람이 적은 시간에 배포한다. 백오프 대기 중이던 실행기는 기다리지 않고 바로 반납한다. 무중단 배포는 공개 후에 넣는다(ADR-061).
 
 ### 4.6 단계 산출물 · 재시도 · 완료
 

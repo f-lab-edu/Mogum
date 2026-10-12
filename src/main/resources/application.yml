@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: mogum
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/mogum}
+    username: ${DB_USERNAME:mogum_local}
+    password: ${DB_PASSWORD:mogum_local}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
