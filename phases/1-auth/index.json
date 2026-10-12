@@ -61,7 +61,10 @@
     {
       "step": 7,
       "name": "wrap-and-focus",
-      "status": "pending"
+      "status": "completed",
+      "summary": "frontend/src/index.css 기본 스타일에 한국어 어절 줄바꿈·이동 포커스 테두리 제거 구현, frontend/src/pages/LoginPage.test.tsx를 먼저 수정하고 LoginPage.tsx의 h1·알림 포커스 클래스 제거; 포커스 이동·접근성 속성·구글 로그인 링크 및 RequireAuth 다시 시도 버튼 포커스 링 유지, 새 의존성·문서 변경 없음; 빌드 CSS(frontend/dist/assets/index-yvMAL0DA.css)에서 word-break:keep-all·overflow-wrap:break-word·[tabindex=\"-1\"]:focus{outline:none} 확인; npm --prefix frontend run test 61개·lint·build 통과, 아키텍처 체크 완료(실제 Chrome 390px 화면은 후속 수동 확인)",
+      "started_at": "2026-10-12T21:58:09+0900",
+      "completed_at": "2026-10-12T22:00:40+0900"
     }
   ],
   "created_at": "2026-10-12T12:07:06+0900",
