@@ -26,8 +26,11 @@
   "role": "USER", "quota": { "usedRatio": 0.6, "resetsAt": "2026-12-15T00:00:00+09:00" } }   // 쿼터는 비율로만
 ```
 
-- **세션은 Postgres 에 둔다**(Spring Security `oauth2Login` + **Spring Session JDBC**). 쿠키에는 세션 번호만 있다 — `HttpOnly` · `Secure` · `SameSite=Lax`. 로그인 때 세션 번호를 새로 발급한다(세션 고정 방어 — 프레임워크 기본).
+`1-auth` 응답 범위는 `email` · `status` · `role` · `termsAgreed` · `waitlistPosition` 이다 — `quota` 는 `9-cost-control` 부터, `waitlistPosition` 은 `12-account-public` 전까지 `null` 이다.
+
+- **세션은 Postgres 에 둔다**(Spring Security `oauth2Login` + **Spring Session JDBC**). 쿠키에는 세션 번호만 있다 — `HttpOnly` · `Secure` · `SameSite=Lax`. `1-auth` 는 `DefaultCookieSerializerCustomizer` 로 발급 · 만료 쿠키의 세 속성을 강제한다(`Secure` 는 요청의 HTTPS 여부와 무관하게 켠다). 로그인 때 세션 번호를 새로 발급한다(세션 고정 방어 — 프레임워크 기본).
 - **비활동 7일이면 만료.** 세션에는 **사용자 id 만** 둔다 — 상태(`ACTIVE` · `WAITLISTED` · `PENDING`) · 역할은 **요청마다 `users` 에서 읽는다.** 승인 · 약관 변경이 바로 반영되게.
+    - 저장 형식은 `FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME`(`org.springframework.session.FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME`) 속성 하나에 `String` 타입의 `users.id` 다. `SecurityContext` 는 저장하지 않는다. `SessionUserFilter` 가 매 요청의 트랜잭션 안에서 사용자 스냅샷을 읽어 인증을 만들고, 컨트롤러는 `@AuthenticationPrincipal User` 로 현재 사용자를 받는다.
 - **CSRF** — `SameSite=Lax` 에 더해 Spring Security 기본 CSRF 보호를 켠다(화면은 `XSRF-TOKEN` 쿠키를 읽어 헤더로 보낸다).
 - **화면과 API 의 출처** — 화면은 `{도메인}`(Vercel), API 는 `api.{도메인}`(EC2)이다. 같은 등록 도메인이라 **같은 사이트 · 다른 출처**다(ADR-060).
     - 세션 쿠키는 API 호스트에만 둔다(`Domain` 없음). 같은 사이트라 `SameSite=Lax` 그대로 화면의 요청에 실린다. 화면의 fetch 는 `credentials: 'include'` 로 보낸다.
@@ -51,6 +54,7 @@
 ```
 
 포맷보다 **`code` 가 고정돼 있는 것**이 중요하다. RFC 9457 은 쓰지 않는다(`type` URI 를 운영할 클라이언트가 하나뿐이다).
+MVC 표준 예외와 서블릿 컨테이너의 ERROR 디스패치도 원래 HTTP 상태를 유지하며 위 JSON 형식으로 응답한다. 오류 디스패치에 인증을 다시 요구하지 않는다. 예외 메시지 · 스택 · 요청 원문은 응답에 싣지 않는다.
 
 | `code` | HTTP | 언제 |
 |---|---|---|
@@ -60,6 +64,9 @@
 | `CSRF_INVALID` | 403 | 상태를 바꾸는 요청에 `X-XSRF-TOKEN` 헤더가 없거나 `XSRF-TOKEN` 쿠키와 다르다. 화면은 같은 요청을 자동으로 다시 보내지 않는다 |
 | `RATE_LIMITED` | 429 | 우리 API 레이트리밋 · `Retry-After` |
 | `NOT_FOUND` | 404 | 없거나 **남의 것**(§1.3) |
+| `METHOD_NOT_ALLOWED` | 405 | 해당 경로가 지원하지 않는 HTTP 메서드. `Allow` 헤더 유지 |
+| `INVALID_REQUEST` | 4xx(404 · 405 제외) | MVC/컨테이너의 요청 오류 — 잘못된 JSON · 필수 매개변수 누락(400) · 응답 형식 불일치(406) · 지원하지 않는 본문 형식(415) 등. 인증 · CSRF · 도메인 오류는 각 전용 code 사용 |
+| `INTERNAL_ERROR` | 5xx | 처리되지 않은 예외(500) 등 MVC/컨테이너 서버 오류. 도메인 오류는 각 전용 code 사용 |
 | `STRUCTURAL_LIMIT` | 400 | 입력 길이(주제 100 · 목적 200 · 피드백 500자) 위반. 생성 목록의 총 1~40강 위반은 수정 요청 후에도 잘못되면 잡 `LLM_OUTPUT_INVALID`([03 §2](./03-generation.md)) |
 | `USER_QUOTA_EXCEEDED` | 429 | 일일 생성 비용 한도 · `Retry-After` = 한국 시간 자정까지 |
 | `ACTIVE_JOB_LIMIT` | 429 | 진행 중 생성이 이미 2개. 하나 끝나면 풀린다 |

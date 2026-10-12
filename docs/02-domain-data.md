@@ -288,7 +288,7 @@ COMMIT;
 | `terms_agreed_at` · `terms_version` | `timestamptz` · `text` | 약관 버전이 바뀌면 다시 동의 |
 | `created_at` | `timestamptz` **NOT NULL** | 대기 명단 순서 |
 
-**세션 테이블** — `spring_session` · `spring_session_attributes`(Spring Session JDBC 의 스키마). 프레임워크가 쓰는 테이블이지만 **Flyway 마이그레이션에 넣는다**(자동 생성은 끈다). 로그인 성공 때 인증 주체 이름(`principal_name`)을 `users.id` 로 둔다 — 탈퇴 때 그 사용자의 세션을 한 번에 지우려고.
+**세션 테이블** — `spring_session` · `spring_session_attributes`(Spring Session JDBC 의 스키마). 프레임워크가 쓰는 테이블이지만 **Flyway 마이그레이션에 넣는다**(자동 생성은 끈다). `V3__create_spring_session.sql` 은 관리 버전 Spring Session JDBC 4.1.1 jar 의 `org/springframework/session/jdbc/schema-postgresql.sql` 을 그대로 사용한다. 로그인 성공 때 인증 주체 이름(`principal_name`)을 `users.id` 로 둔다 — 탈퇴 때 그 사용자의 세션을 한 번에 지우려고.
 만료 세션은 라이브러리의 정리 작업이 지운다([04 §3.2](./04-jobs-and-cost.md)).
 
 ### 6.2 `curriculums` · `lessons`

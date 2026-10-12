@@ -9,6 +9,18 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  session:
+    timeout: 7d
+    jdbc:
+      initialize-schema: never
+
+server:
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: true
+        same-site: lax
 
 app:
   auth:
