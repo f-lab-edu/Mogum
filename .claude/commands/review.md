@@ -17,7 +17,7 @@
 2. **기술 스택 준수**: `docs/ADR.md` 기술 선택과 `docs/01-overview.md §6` 제외 항목(금지 목록 5)을 벗어나지 않았는가?
 3. **테스트 존재**: 새 기능에 테스트가 먼저 작성되어 있는가(TDD)? 실제 LLM 호출 테스트가 기본 실행에 섞이지 않았는가?
 4. **금지 목록**: `AGENTS.md` 금지 목록 1~27 중 이 변경이 건드리는 항목을 위반하지 않았는가? 해당 항목 번호를 적는다.
-5. **문서 일치 · 최신화**: 설계와 다르게 간 곳에서 `docs/` 를 먼저 고쳤는가? step 사이에 어긋난 곳은 없는가? 이 변경으로 바뀐 사실이 문서에 반영됐는가 — 버전 · 경로 · 명령어(`AGENTS.md`) · 디렉터리 구조(`docs/ARCHITECTURE.md`) · 🅿️ 값(`docs/PRD.md`) · "구현 · 검증은 아직" 표기(ADR · 01~07) · 진행(SCHEDULE §6 · `docs/01-overview.md` §10)?
+5. **문서 일치 · 최신화**: 설계와 다르게 간 곳에서 `docs/` 를 먼저 고쳤는가? step 사이에 어긋난 곳은 없는가? 이 변경으로 바뀐 사실이 문서에 반영됐는가 — 버전 · 경로 · 명령어(`AGENTS.md`) · 디렉터리 구조(`docs/ARCHITECTURE.md`) · 🅿️ 값(`docs/PRD.md`) · "구현 · 검증은 아직" 표기(ADR · 01~07) · 진행(SCHEDULE §6 · `docs/01-overview.md` §10)? 화면이 바뀌었으면 — step 에 적힌 시안과 영역 · 문구 · 가장 강조가 맞는가(`docs/design/README.md` 「어디까지 맞추나」), 시안과 일부러 다르게 간 곳이 그 README 「문서와 다른 곳」 에 있는가?
 6. **빌드 가능**: `./gradlew build` · `npm --prefix frontend run lint` · `npm --prefix frontend run test` 가 통과하는가? (해당하는 것만)
 
 ## 출력 형식
