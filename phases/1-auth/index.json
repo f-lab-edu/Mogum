@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "google-login",
-      "status": "pending"
+      "status": "completed",
+      "summary": "GET /auth/google·/auth/google/callback 연결; email 범위·10분 JSON state 쿠키·ID 전용 JDBC 세션 및 세션 번호 변경·Google 토큰 저장 제거·실패 error=not_allowed/login_failed 구현; GOOGLE_CLIENT_ID·GOOGLE_CLIENT_SECRET(없으면 기동 실패)·APP_AUTH_ADMIN_EMAILS·GOOGLE_REDIRECT_URI 및 로컬 콜백 http://localhost:5173/auth/google/callback 문서 반영; 가짜 Google HTTP 서버 포함 ./gradlew test 156개 통과(ArchUnit 18개)",
+      "started_at": "2026-10-12T12:46:58+0900",
+      "completed_at": "2026-10-12T13:04:48+0900"
     },
     {
       "step": 4,
