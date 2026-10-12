@@ -152,6 +152,8 @@ focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc
 ```
 키보드 사용자에게 언제나 보인다. 영역이 바뀌면 포커스를 옮긴다(06 §2.11).
 
+**포커스를 옮겨 받기만 하는 제목 · 문구**(`tabIndex={-1}` — 06 §2.11 의 이동 대상)에는 테두리를 그리지 않는다. 누르는 것이 아니고, Chrome 은 코드가 옮긴 포커스에도 `:focus-visible` 테두리를 그려 화면을 열 때마다 제목에 상자가 보인다. 기본 스타일(`index.css`)의 `[tabindex="-1"]:focus { outline: none }` 한 곳에서 지우고, 이 요소에는 위 포커스 클래스를 붙이지 않는다. 화면 읽기 프로그램은 그대로 읽는다.
+
 ## 레이아웃
 
 - **U4 강의 · U5 복습** — 모바일(390) 우선. 본문 폭 `max-w-prose`(한 줄 약 36자) · 좌우 여백 `px-4`. 데스크톱은 같은 틀을 가운데에.
@@ -163,6 +165,8 @@ focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc
 ## 타이포그래피
 
 글꼴은 **Pretendard 하나**(가변 폰트 · `font-sans`). 코드만 **JetBrains Mono**(`font-mono`, 없으면 시스템 고정폭).
+
+**한국어는 어절 단위로 줄을 바꾼다** — 기본 스타일(`index.css` 의 `body`)에 `word-break: keep-all` · `overflow-wrap: break-word`. 기본값이면 「복습/이」 처럼 낱말 중간에서 끊긴다. 칸보다 긴 한 덩어리(긴 영어 낱말 · 주소)만 끊는다. 코드 블록은 줄을 바꾸지 않고 그 안에서 가로로 스크롤한다(06 §2.10).
 
 | 용도 | 스타일 |
 |------|--------|
