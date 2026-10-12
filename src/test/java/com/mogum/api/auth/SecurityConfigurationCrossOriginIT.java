@@ -95,6 +95,12 @@ class SecurityConfigurationCrossOriginIT extends PostgresTestConfiguration {
     }
 
     @Test
+    void 백엔드는_화면의_login에_기본_로그인_페이지를_만들지_않는다() throws Exception {
+        mvc.perform(get("/login")).andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
     void CORS는_API_경로에만_적용한다() throws Exception {
         mvc.perform(options("/auth/google").secure(true).header("Origin", ORIGIN)
                         .header("Access-Control-Request-Method", "GET"))

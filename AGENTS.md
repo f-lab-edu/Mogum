@@ -93,7 +93,7 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 
 ```
 docker compose up -d        # 로컬 Postgres(pgvector) — bootRun 전에
-./gradlew bootRun            # 개발 서버 (API + 워커, app.role=all)
+./gradlew bootRun            # 개발 서버 (API + 워커, app.role=all) — 실제 로그인: GOOGLE_CLIENT_ID · GOOGLE_CLIENT_SECRET · APP_AUTH_ADMIN_EMAILS
 ./gradlew test               # 백엔드 테스트 (Testcontainers — Docker 필요)
 ./gradlew build              # 백엔드 jar 생성 — 화면은 넣지 않는다
 cd frontend && npm run dev   # 화면 개발 서버 (Vite — API 는 proxy 로 같은 출처처럼)

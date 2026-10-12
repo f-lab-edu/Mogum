@@ -13,6 +13,15 @@ spring:
     timeout: 7d
     jdbc:
       initialize-schema: never
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            scope: email
+            redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:5173/auth/google/callback}
 
 server:
   servlet:

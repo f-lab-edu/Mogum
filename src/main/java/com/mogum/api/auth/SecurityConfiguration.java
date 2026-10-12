@@ -3,6 +3,7 @@ package com.mogum.api.auth;
 import com.mogum.WebProperties;
 import com.mogum.api.ApiError;
 import com.mogum.core.TransactionRunner;
+import com.mogum.core.account.GoogleLogin;
 import com.mogum.core.account.UserRepository;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
@@ -17,6 +18,10 @@ import org.springframework.security.authentication.InsufficientAuthenticationExc
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.NullSecurityContextRepository;
@@ -28,14 +33,24 @@ import org.springframework.security.web.savedrequest.NullRequestCache;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.util.Assert;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.util.List;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(WebProperties.class)
 public class SecurityConfiguration {
+    @Bean
+    public DiscardingOAuth2AuthorizedClients discardedGoogleTokens(ClientRegistrationRepository registrations) {
+        var google = registrations.findByRegistrationId("google");
+        Assert.hasText(google.getClientId(), "GOOGLE_CLIENT_ID must be set");
+        Assert.hasText(google.getClientSecret(), "GOOGLE_CLIENT_SECRET must be set");
+        return new DiscardingOAuth2AuthorizedClients();
+    }
+
     @Bean
     public DefaultCookieSerializerCustomizer sessionCookieSecurity() {
         // ServletContext의 기본 쿠키 설정과 무관하게 발급/만료 쿠키에 같은 정책을 적용한다.
@@ -49,7 +64,9 @@ public class SecurityConfiguration {
     @Bean
     public SecurityFilterChain apiSecurity(HttpSecurity http, UserRepository users,
                                            TransactionRunner transactions, ObjectMapper mapper,
-                                           WebProperties web) throws Exception {
+                                           WebProperties web, GoogleLogin login, Clock clock,
+                                           ClientRegistrationRepository registrations,
+                                           DiscardingOAuth2AuthorizedClients clients) throws Exception {
         AuthenticationEntryPoint unauthorized = (request, response, exception) ->
                 writeError(response, mapper, 401, "UNAUTHORIZED", "로그인이 필요합니다");
         var tokens = CookieCsrfTokenRepository.withHttpOnlyFalse();
@@ -68,6 +85,20 @@ public class SecurityConfiguration {
         cors.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN"));
         var corsSource = new UrlBasedCorsConfigurationSource();
         corsSource.registerCorsConfiguration("/api/**", cors);
+        var oauthRequests = new CookieAuthorizationRequestRepository(registrations, mapper, clock);
+        var loginHandler = new GoogleLoginHandler(login, web.origin(), oauthRequests);
+        var resolver = new DefaultOAuth2AuthorizationRequestResolver(registrations, "/auth");
+        var getOnlyResolver = new OAuth2AuthorizationRequestResolver() {
+            @Override
+            public OAuth2AuthorizationRequest resolve(jakarta.servlet.http.HttpServletRequest request) {
+                return "GET".equals(request.getMethod()) ? resolver.resolve(request) : null;
+            }
+
+            @Override
+            public OAuth2AuthorizationRequest resolve(jakarta.servlet.http.HttpServletRequest request, String registrationId) {
+                return "GET".equals(request.getMethod()) ? resolver.resolve(request, registrationId) : null;
+            }
+        };
 
         http.cors(configuration -> configuration.configurationSource(corsSource))
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -76,6 +107,12 @@ public class SecurityConfiguration {
                 .securityContext(context -> context.securityContextRepository(new NullSecurityContextRepository()))
                 // 기존 세션을 읽는 요청마다 새 로그인으로 판단해 ID/CSRF를 바꾸지 않는다.
                 .sessionManagement(session -> session.requireExplicitAuthenticationStrategy(true))
+                .oauth2Login(oauth -> oauth.loginPage("/auth/google")
+                        .authorizedClientRepository(clients).authorizedClientService(clients)
+                        .authorizationEndpoint(endpoint -> endpoint.authorizationRequestResolver(getOnlyResolver)
+                                .authorizationRequestRepository(oauthRequests))
+                        .redirectionEndpoint(endpoint -> endpoint.baseUri("/auth/google/callback"))
+                        .successHandler(loginHandler).failureHandler(loginHandler))
                 .addFilterBefore(new SessionUserFilter(users, transactions, unauthorized), CsrfFilter.class)
                 .csrf(csrf -> csrf.csrfTokenRepository(tokens).csrfTokenRequestHandler(tokenHandler))
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(unauthorized)
@@ -92,6 +129,7 @@ public class SecurityConfiguration {
                             }
                         }))
                 .authorizeHttpRequests(requests -> requests.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/auth/google", "/auth/google/callback").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())
                 .logout(logout -> logout.logoutRequestMatcher(logoutRequest)

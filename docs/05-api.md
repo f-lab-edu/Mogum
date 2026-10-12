@@ -13,8 +13,8 @@
 
 | 엔드포인트 | 동작 |
 |---|---|
-| `GET /auth/google` | `state` 를 짧은 수명 쿠키에 담고 구글 동의 화면으로 |
-| `GET /auth/google/callback` | `state` 를 쿠키와 대조(CSRF) → 처음 온 사람이면 `PENDING` 사용자 생성 → **세션 생성 · 세션 쿠키** → 약관 전이면 U7 · 대기 명단이면 U8 · 아니면 U2 |
+| `GET /auth/google` | 세션 없이 `state` 를 10분 쿠키에 담고 구글 동의 화면으로 `302` |
+| `GET /auth/google/callback` | `state` 를 쿠키와 대조(CSRF) → 공개 전 관리자 계정 판정 → **ID만 담은 세션 · 새 세션 번호** → 화면의 `/` 로 `302`. 실패는 화면의 `/login?error=…`. `PENDING` 생성 · U7 · U8 분기는 `12` 범위 |
 | `GET /me` | 현재 사용자 — 화면이 어디로 갈지 이걸로 정한다 |
 | `POST /me/terms` | `{ "termsVersion": "…" }` → 동의 기록 → **처음이면 여기서 정원 검사** → `{ "status": "ACTIVE" \| "WAITLISTED" }` |
 | `POST /auth/logout` | **이 기기의 세션만** 무효화 · 쿠키 삭제(`HttpOnly` 라 스크립트는 못 지운다). 다른 기기는 로그인이 유지된다 |
@@ -28,7 +28,7 @@
 
 `1-auth` 응답 범위는 `email` · `status` · `role` · `termsAgreed` · `waitlistPosition` 이다 — `quota` 는 `9-cost-control` 부터, `waitlistPosition` 은 `12-account-public` 전까지 `null` 이다.
 
-- **세션은 Postgres 에 둔다**(Spring Security `oauth2Login` + **Spring Session JDBC**). 쿠키에는 세션 번호만 있다 — `HttpOnly` · `Secure` · `SameSite=Lax`. `1-auth` 는 `DefaultCookieSerializerCustomizer` 로 발급 · 만료 쿠키의 세 속성을 강제한다(`Secure` 는 요청의 HTTPS 여부와 무관하게 켠다). 로그인 때 세션 번호를 새로 발급한다(세션 고정 방어 — 프레임워크 기본).
+- **세션은 Postgres 에 둔다**(Spring Security `oauth2Login` + **Spring Session JDBC**). 쿠키에는 세션 번호만 있다 — `HttpOnly` · `Secure` · `SameSite=Lax`. `1-auth` 는 `DefaultCookieSerializerCustomizer` 로 발급 · 만료 쿠키의 세 속성을 강제한다(`Secure` 는 요청의 HTTPS 여부와 무관하게 켠다). 로그인 때 세션 번호를 새로 발급한다(세션 고정 방어 — 프레임워크 기본과 성공 handler의 번호 변경). 기존 세션 속성은 비우고 사용자 ID 하나만 남긴다. JDBC 번호 변경은 저장 시 반영되므로 번호를 바꾼 직후 세션을 무효화하지 않는다.
 - **비활동 7일이면 만료.** 세션에는 **사용자 id 만** 둔다 — 상태(`ACTIVE` · `WAITLISTED` · `PENDING`) · 역할은 **요청마다 `users` 에서 읽는다.** 승인 · 약관 변경이 바로 반영되게.
     - 저장 형식은 `FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME`(`org.springframework.session.FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME`) 속성 하나에 `String` 타입의 `users.id` 다. `SecurityContext` 는 저장하지 않는다. `SessionUserFilter` 가 매 요청의 트랜잭션 안에서 사용자 스냅샷을 읽어 인증을 만들고, 컨트롤러는 `@AuthenticationPrincipal User` 로 현재 사용자를 받는다.
 - **CSRF** — `SameSite=Lax` 에 더해 Spring Security 기본 CSRF 보호를 켠다(화면은 `XSRF-TOKEN` 쿠키를 읽어 헤더로 보낸다).
@@ -36,11 +36,17 @@
     - 세션 쿠키는 API 호스트에만 둔다(`Domain` 없음). 같은 사이트라 `SameSite=Lax` 그대로 화면의 요청에 실린다. 화면의 fetch 는 `credentials: 'include'` 로 보낸다.
     - CORS — 허용 출처는 `app.web.origin` 하나(환경 변수 `APP_WEB_ORIGIN`, 로컬 기본값 `http://localhost:5173`)이고 credentials 를 허용한다. 스킴 · 호스트 · 선택적 포트만 지정하며 끝 `/` 는 없다. `*` · 패턴 · 여러 출처를 허용하지 않으며, 잘못된 출처 설정은 기동을 거부한다. `SecurityConfiguration` 이 루트 `WebProperties` 에 바인딩한 값을 사용해 `/api/**` 의 preflight 를 인증 · CSRF보다 먼저 처리한다. 허용 메서드는 `GET` · `POST` · `PUT` · `PATCH` · `DELETE`, 요청 헤더는 `Content-Type` · `X-XSRF-TOKEN` 이다.
     - `XSRF-TOKEN` 쿠키는 화면 스크립트가 읽을 수 있게 `Domain` 을 등록 도메인으로 둔다(`app.web.cookie-domain`, 환경 변수 `APP_WEB_COOKIE_DOMAIN`). 로컬 기본값은 비어 있으며, 비어 있으면 `Domain` 을 두지 않는다. 세션 쿠키의 `Domain` 에는 적용하지 않는다. `HttpOnly` 아님 · `Secure` · `SameSite=Lax` 는 유지한다.
-    - 로그인 시작 · 콜백은 API 호스트의 `/auth/*` 에서 하고, 끝나면 화면 주소(`app.web.origin`)의 U7 · U8 · U2 로 보낸다(로그인 연결은 `1-auth` step 3 에서 구현).
+    - 로그인 시작 · 콜백은 API 호스트의 `/auth/*` 에서 하고, 끝나면 화면 주소(`app.web.origin`)로 보낸다. `1-auth` step 3 은 성공 시 U2(`/`), 실패 시 U1(`/login?error=…`)로 보낸다. U7 · U8 분기는 `12` 범위다.
     - 개발은 Vite proxy 로 같은 출처다 — 출처가 다른 운영 조건(CORS · 쿠키 도메인)은 테스트로 확인한다.
     - PR 미리보기(`*.vercel.app`)는 다른 사이트라 세션 쿠키가 실리지 않는다 — 미리보기에서 로그인을 확인하지 않는다.
 - 요청마다 **세션 조회 + 사용자 조회**, 그리고 마지막 접근 시각 갱신(세션 행 UPDATE)이 붙는다 — 용량 측정에 포함한다.
 - **공개 전 임시 — 관리자 이메일만 로그인**(ADR-062). `12-account-public` 전까지 콜백은 관리자 이메일 목록(`app.auth.admin-emails`)에 없는 계정을 거절하고 `users` 행 · 세션을 만들지 않는다. 목록의 계정은 처음 로그인할 때 `ACTIVE` · `ADMIN` 으로 만든다. 위 표의 `PENDING` 생성 · U7 · U8 분기와 `POST /me/terms` · `DELETE /me` 는 `12` 에서 만든다 — 그전까지 콜백 성공은 언제나 화면 주소의 `/`(U2)로 보낸다.
+- **Google 등록 · 환경 변수** — 등록 이름은 `google` 이다. 클라이언트 ID는 `GOOGLE_CLIENT_ID`, 비밀은 `GOOGLE_CLIENT_SECRET` 환경 변수로 받으며 저장소에 실제 값/대체 자격 정보는 두지 않는다. 둘 중 하나라도 없거나 공백이면 기동을 거부한다. 관리자 목록을 덮어쓰는 환경 변수는 `APP_AUTH_ADMIN_EMAILS`(쉼표로 구분)이며 기본값은 빈 목록이다 — 빈 목록이면 모든 계정을 `not_allowed`로 거절한다. 테스트 JVM은 Gradle의 `test` 작업에서 가짜 클라이언트 ID/비밀만 공통으로 주입하며 main 설정을 그대로 읽는다.
+    - 범위는 **`email` 하나**다. OAuth2 authorization code 교환 뒤 Google 사용자 정보 엔드포인트에서 `sub` · `email` · `email_verified`를 읽어 `GoogleLogin`에 넘긴다. `profile` · `openid` 범위와 ID 토큰은 요청하지 않는다.
+    - 로컬 콜백 주소는 정확히 **`http://localhost:5173/auth/google/callback`** 이다. 등록의 `redirect-uri`는 이 값으로 고정되어 요청 Host/돌아갈 주소 매개변수에서 유도하지 않는다. Vite가 `/auth`를 백엔드로 넘기고 Host를 유지하는 설정은 `1-auth` step 4에서 연결한다.
+    - 운영은 **`GOOGLE_REDIRECT_URI=https://api.{도메인}/auth/google/callback`** 을 설정하고 Google 콘솔에도 동일한 승인된 리디렉션 URI를 등록한다(`5-deploy`에서 실제 값 설정). `APP_WEB_ORIGIN`은 별도로 화면의 `https://{도메인}`에 맞춘다. `GOOGLE_REDIRECT_URI`가 없으면 로컬 콜백 주소를 사용한다.
+- **로그인 전 요청 쿠키** — `MOGUM_OAUTH_REQUEST`에 `state`와 발급 시각만 JSON → Base64URL로 담는다. `HttpOnly` · `Secure` · `SameSite=Lax` · `Max-Age=600` · `Path=/auth/google` · `Domain` 없음. Java 역직렬화는 하지 않으며 나머지 OAuth 요청 필드는 서버의 등록 설정으로 복원한다. `GET /auth/google`은 세션을 만들지 않는다. 콜백은 쿠키 없음/손상/만료/`state` 불일치를 토큰 교환 전에 거절하고 성공/실패 모두 요청 쿠키를 만료시킨다.
+- **Google 정보 보관** — Google 접근/ID 토큰과 OAuth 인증 주체는 세션 · DB · 로그인 뒤 메모리에 보관하지 않는다. `DiscardingOAuth2AuthorizedClients`가 웹 저장소와 서비스의 기본 저장을 모두 대체한다. `NullSecurityContextRepository`로 OAuth `SecurityContext`를 저장하지 않고 성공 handler는 기존의 ID 세션 형식으로 바꾼 뒤 요청의 인증 문맥을 비운다. 로그인 뒤에는 기존 `SessionUserFilter`가 `users`를 다시 읽는다. 백엔드 기본 `/login` 페이지는 만들지 않는다 — `/login`은 화면의 U1 주소다.
 - **콜백 실패는 화면의 U1 로** — `{화면 주소}/login?error=…` 로 보낸다. `error=not_allowed` 는 위 임시 거절, `error=login_failed` 는 그 밖의 실패(구글에서 취소 · `state` 불일치 · 이메일 미인증 · 토큰 교환 실패)다. 화면 문구는 [06 §3](./06-screens.md). 백엔드는 설정한 화면 주소로만 보낸다 — 요청 매개변수로 돌아갈 주소를 받지 않는다(열린 리다이렉트 방지). 로그인 전에 열려던 주소는 화면이 기억한다([06 §2.3](./06-screens.md)).
 - **부하 테스트 세션** — `POST /dev/session { "userKey": "vu-17" }` 가 사용자(`ACTIVE` · 약관 동의)와 세션을 만들고 세션 쿠키를 준다. **`loadtest` 프로필에만 빈이 있다.** `loadtest` 와 `aws` 프로필이 함께 켜지면 **기동을 거부**한다. 제품 API 수에 세지 않는다.
 
