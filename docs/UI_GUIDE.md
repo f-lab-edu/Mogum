@@ -174,7 +174,7 @@ focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc
 | 큰 숫자(「오늘의 복습 23장」 · 「대기 3번째」) | `text-3xl font-semibold text-ink tabular-nums` |
 | 서비스 이름 「머금」 | 상단 바 `text-lg font-bold text-ink` · U1 `text-[28px] font-bold text-ink` |
 
-**예외 — U1 구글 로그인 버튼**은 구글 브랜드 가이드의 표준 모양을 그대로 쓴다: Roboto 500 · 14px · 흰 바탕 · 테두리 `#747775` · 글자 `#1F1F1F` · `rounded`(4px) · 구글 로고 18px. 이 버튼에만 Roboto 와 구글 색을 쓴다.
+**예외 — U1 구글 로그인 버튼**은 구글 브랜드 가이드의 표준 모양을 그대로 쓴다: Roboto 500 · 14px · 흰 바탕 · 테두리 `#747775` · 글자 `#1F1F1F` · `rounded`(4px) · 구글 로고 18px. 이 버튼에만 Roboto 와 구글 색을 쓴다. `@fontsource/roboto` 의 500 굵기만 화면 빌드에 함께 넣으며, 외부 글꼴 서버를 부르지 않는다.
 
 ## 애니메이션
 
