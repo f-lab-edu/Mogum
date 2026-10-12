@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "cross-origin",
-      "status": "pending"
+      "status": "completed",
+      "summary": "app.web.origin·app.web.cookie-domain(APP_WEB_ORIGIN·APP_WEB_COOKIE_DOMAIN)을 루트 com.mogum.WebProperties에 바인딩하고 api.auth.SecurityConfiguration에서 /api/** 단일 출처 credentials CORS와 XSRF-TOKEN Domain 적용(빈 값은 Domain 없음); 세션 호스트 전용·쿠키 보안 속성 유지, 출처 설정 검증·교차 출처 테스트·05 §1.1 문서 반영; ./gradlew test 133개 통과(ArchUnit 18개 포함)",
+      "started_at": "2026-10-12T12:40:15+0900",
+      "completed_at": "2026-10-12T12:46:57+0900"
     },
     {
       "step": 3,
