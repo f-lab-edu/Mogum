@@ -53,7 +53,10 @@
     {
       "step": 6,
       "name": "login-design",
-      "status": "pending"
+      "status": "completed",
+      "summary": "frontend/src/pages/LoginPage.tsx·LoginPage.test.tsx를 TDD로 수정해 U1 소개·구글 로그인 링크·조건부 알림 카드를 u1/u1relogin 시안에 맞추고 기존 로그인 동작·접근성 유지; frontend/package.json·package-lock.json에 @fontsource/roboto ^5.3.0(설치 5.3.0)만 추가·500 굵기 로컬 배포 및 docs/UI_GUIDE.md 반영; npm --prefix frontend run test 61개·lint·build 통과, 구조·범위·시안 체크 완료",
+      "started_at": "2026-10-12T21:45:30+0900",
+      "completed_at": "2026-10-12T21:49:39+0900"
     }
   ],
   "created_at": "2026-10-12T12:07:06+0900",
