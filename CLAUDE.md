@@ -9,6 +9,15 @@
 - **기획** — MVP 범위와 큰 사용자 흐름을 중심으로 논의한다. DB/API/경합/수치 등 구현 세부는 각 TASK에서 Codex가 설계하도록 맡기고, step 파일은 목표·확정 제약·검증 기준 중심으로 쓴다. `/harness` 로 설계를 논의하고 `phases/` 에 step 파일을 쓴다. Codex 는 이 대화를 보지 못하므로 step 파일만 읽고 실행할 수 있게 쓴다.
 - **일정** — TASK 순서 · 주차 · 마일스톤은 `docs/SCHEDULE.md`. 다음 TASK 를 `/harness` 로 설계하기 전에 보고, 매주 일요일 점검 때 §6 진행 기록과 남은 배치를 갱신한다.
 - **리뷰** — step 마다 `execute.py` 가 Claude 를 읽기 전용 리뷰어(`claude -p`)로 부른다. phase 가 끝나면 `/review` 로 브랜치 전체를 리뷰하고, 고칠 것은 수정 step 으로 만들어 Codex 에 넘긴다.
+- **문서 최신화** — 설계 문서(`docs/`) · `AGENTS.md` · `CLAUDE.md` · 하네스 안내(`.claude/commands/`)는 개발과 함께 바뀐다. 문서가 낡으면 다음 작업자(Codex · Claude)가 틀린 문서를 기준으로 설계한다.
+    - step 을 쓸 때 — 그 step 이 정하거나 바꾸는 사실(버전 · 경로 · 명령어 · 디렉터리 구조 · 🅿️ 값 · "구현 · 검증은 아직" 표기)이 문서에 있으면 갱신할 문서와 절을 step 작업에 넣는다.
+    - phase 가 끝날 때(`/review`) — 코드와 어긋난 문서를 찾는다. 문서는 Claude 가 직접 고치고, 제품 코드는 수정 step 으로 넘긴다. 결정이 바뀌었으면 ADR 을 추가하거나 대체 표기를 남긴다.
+    - 진행 상태 — SCHEDULE §6(주간 점검) · PRD 🅿️ · `docs/01-overview.md` §10 공개 필수 목록 · ADR 의 "아직 수행하지 않았다" 문구를 실제 진행에 맞춘다.
+    - `docs/PORTFOLIO.md` 는 예외 — 아래 포트폴리오 규칙대로 사용자 확인 뒤에만 고친다.
+- **하네스 개선** — phase 를 실행 · 감시할 때와 `/review` 끝에서 하네스(`scripts/` · `.claude/` · `.codex/`)와 step 설계의 비효율을 찾는다 — 재시도 · 반려 · blocked 의 원인, 사람이 끼어든 지점, 시간 · 비용.
+    - 찾은 것은 근거(phase · step · 수치 · 로그 위치)와 함께 `phases/HARNESS-BACKLOG.md` 에 바로 적는다. 반복되는 step 작성 교훈은 `/harness` C 의 설계 원칙으로 올린다.
+    - 고치는 것은 사용자 확인 뒤, `main` 에서 딴 별도 브랜치에서 테스트부터 쓴다. 실행 중인 phase 브랜치에서 하네스를 고치지 않는다. 실행 중에 step 파일을 고쳐야 하면 `harness-stop` 으로 멈춘 뒤 고친다(`/harness` E).
+    - step 리뷰어(`claude -p`)는 이 일을 하지 않는다 — step 판정에 하네스 의견을 섞지 않는다.
 - `src/` · `frontend/` 의 제품 코드는 직접 고치지 않는다 — 사용자가 직접 요청한 경우만 예외. `docs/` · `phases/` · 하네스(`scripts/` · `.claude/` · `.codex/`)는 고친다.
 
 ## 포트폴리오 · 이력서 기록

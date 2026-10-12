@@ -8,7 +8,7 @@
 
 ### A. 탐색
 
-`docs/` 하위 문서(PRD, ARCHITECTURE, ADR 등)를 읽고 프로젝트의 기획·아키텍처·설계 의도를 파악한다. 필요시 Explore 에이전트를 병렬로 사용한다.
+`docs/` 하위 문서(PRD, ARCHITECTURE, ADR 등)를 읽고 프로젝트의 기획·아키텍처·설계 의도를 파악한다. 필요시 Explore 에이전트를 병렬로 사용한다. 이전 phase 에서 나온 step 작성 교훈과 하네스 문제는 `phases/HARNESS-BACKLOG.md` 에 있다 — step 을 쓰기 전에 본다.
 
 ### B. 논의
 
@@ -29,6 +29,8 @@
    - 화면: `npm --prefix frontend run test` · `npm --prefix frontend run lint` (`cd frontend && ...` 형태는 리뷰어가 실행하지 못한다)
 6. **주의사항은 구체적으로** — "조심해라" 대신 "X를 하지 마라. 이유: Y" 형식으로 적는다.
 7. **네이밍** — step name은 kebab-case slug로, 해당 step의 핵심 모듈/작업을 한두 단어로 표현한다 (예: `project-setup`, `api-layer`, `auth-flow`).
+8. **문서 갱신을 작업에 넣는다** — 이 step 이 정하거나 바꾸는 사실(버전 · 경로 · 명령어 · 디렉터리 구조 · 🅿️ 값 · "구현 · 검증은 아직" 표기)이 문서에 있으면, 갱신할 문서와 절을 작업 목록에 적는다. 적지 않으면 Codex 는 범위 밖이라 보고 건드리지 않는다.
+9. **버전 · 이름을 느슨하게 쓰지 않는다** — Codex 는 적힌 말을 문자 그대로 강제한다(0-skeleton: "JUnit 5" → Boot 관리 JUnit 6 을 5 로 낮춤). 프레임워크가 관리하는 버전을 따르게 하려면 그렇게 쓰고, 고정이 필요하면 정확한 값과 이유를 적는다.
 
 ### D. 파일 생성
 
@@ -149,20 +151,36 @@ step 하나의 흐름:
 2. **Claude 리뷰** — Codex 가 `completed` 로 끝내면 `claude -p --permission-mode dontAsk` 가 읽기 전용으로 리뷰한다. 볼 수 있는 것은 이 step 시작 커밋 이후의 diff 와 untracked 파일이다. AC 를 다시 돌리고 `approve` / `request_changes` 를 JSON 으로 판정한다. 결과는 `phases/{task}/step{N}-review.json` 에 남는다.
 3. **승인** → 코드(`feat`)와 메타데이터(`chore`)를 나눠 커밋한다.
    **반려** → 지적 사항(findings)을 다음 Codex 시도의 프롬프트에 넣는다. 이전 시도의 변경은 작업 트리에 남긴 채로 고치게 한다. Codex 실패와 리뷰 반려를 합쳐 최대 3회 시도한다.
+   **판정 없음**(리뷰 출력 파싱 실패 · 시간 초과) → Codex 를 다시 돌리지 않고 리뷰만 한 번 더 한다. 그래도 없으면 `error`.
 
 execute.py가 자동으로 처리하는 것:
 
 - `feat-{task-name}` 브랜치 생성/checkout
 - 컨텍스트 누적 — 완료된 step의 summary를 다음 step 프롬프트에 전달
 - 자가 교정 — Codex 에러 메시지나 Claude 리뷰 지적을 다음 시도에 피드백
+- 시간 초과 — Codex · 리뷰 각각 1800초. 넘으면 하네스가 죽지 않고 실패한 시도로 처리한다(Codex 는 다음 시도에 "시간 초과" 를 알린다)
+- 리뷰 전 중단 복구 — `completed` 인데 `completed_at`(리뷰 승인 기록)이 없는 step 은 건너뛰지 않고 다음 실행에서 리뷰부터 다시 한다
 - 타임스탬프 — started_at, completed_at, failed_at, blocked_at 자동 기록
+
+실행을 감시할 때 — 재시도 · 반려 · blocked 와 그 원인, 사람이 끼어든 지점, 유난히 오래 걸린 step 을 메모해 둔다. F 의 하네스 회고에 쓴다.
+
+중간에 멈추기 — 프로세스를 죽이지 않는다. 아래 파일을 만들면 **지금 step 이 리뷰 · 커밋까지 끝난 뒤** 다음 step 앞에서 멈추고 파일을 지운다(`.git` 안이라 커밋되지 않는다). 다시 실행하면 이어 한다. step 파일을 실행 중에 고쳐야 할 때 쓴다.
+
+```bash
+touch "$(git rev-parse --git-path harness-stop)"
+```
 
 에러 복구:
 
-- **error 발생 시** — 실패한 step 의 변경은 **커밋하지 않고** 작업 트리에 남는다. `step{N}-review.json` · `step{N}-output.json` 으로 원인을 본다. 그다음 `phases/{task-name}/index.json` 에서 해당 step의 `status`를 `"pending"`으로 바꾸고 `error_message`를 지운 뒤 재실행한다. 남은 변경을 그대로 두면 다음 시도의 리뷰 범위에 포함된다. 버리려면 사용자가 직접 정리한다.
-- **blocked 발생 시**: `blocked_reason`에 적힌 사유를 해결한 뒤, `status`를 `"pending"`으로 바꾸고 `blocked_reason`을 삭제한 뒤 재실행한다.
+- **error 발생 시** — 실패한 step 의 변경은 **커밋하지 않고** 작업 트리에 남는다. `step{N}-review.json` · `step{N}-output.json` 으로 원인을 본다. 그다음 `phases/{task-name}/index.json` 에서 해당 step의 `status` 만 `"pending"` 으로 바꾸고 재실행한다. **`error_message` 는 지우지 않는다** — execute.py 가 재개한 첫 시도의 프롬프트에 넣고 지운다. 남은 변경을 그대로 두면 다음 시도의 리뷰 범위에 포함된다. 버리려면 사용자가 직접 정리한다.
+- **blocked 발생 시** — `blocked_reason` 에 적힌 사유를 해결한 뒤(결정은 step 파일 · 문서에 반영한다), `status` 만 `"pending"` 으로 바꾸고 재실행한다. **`blocked_reason` 은 지우지 않는다** — 위와 같이 전달된다.
 - 리뷰 지적이 step 설계 자체의 문제라면(지시가 모호함 · 문서와 충돌) Codex 를 다시 돌리지 말고 step 파일부터 고친다.
 
 ### F. 최종 리뷰
 
 phase 가 끝나면 `/review {task-name}` 으로 브랜치 전체(`main...HEAD`)를 리뷰한다. step 단위 리뷰가 놓치는 것을 본다. 예를 들어 step 사이의 일관성, 문서와 코드의 어긋남, 탈퇴/삭제 범위 누락이 있다. 고칠 것이 있으면 사용자 승인 후 같은 phase 에 수정 step(`step{N}.md` + index 항목 `pending`)을 추가하고 E 를 다시 실행한다.
+
+`/review` 는 두 가지를 더 한다(`.claude/commands/review.md`):
+
+- **문서 최신화** — 이 phase 로 바뀐 사실이 문서에 반영됐는지 본다. 문서만의 어긋남은 Claude 가 직접 고친다.
+- **하네스 회고** — step 별 시도 · 반려 · blocked 원인 · 사람 개입 · 시간 · 비용을 정리하고, 하네스나 step 설계로 막을 수 있었던 것을 `phases/HARNESS-BACKLOG.md` 에 적는다. 하네스 수정은 사용자 확인 뒤 `main` 에서 딴 별도 브랜치에서 한다.
