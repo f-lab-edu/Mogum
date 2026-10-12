@@ -17,6 +17,7 @@ import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.util.UriComponentsBuilder;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -25,11 +26,14 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -40,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.*;
 })
 class GoogleLoginHandlerIT extends PostgresTestConfiguration {
     private static final AtomicInteger TOKEN_CALLS = new AtomicInteger();
+    private static final AtomicReference<String> CODE_CHALLENGE = new AtomicReference<>();
     private static final HttpServer GOOGLE = fakeGoogle();
     private static final String GOOGLE_ORIGIN = "http://127.0.0.1:" + GOOGLE.getAddress().getPort();
     private static String sub;
@@ -65,6 +70,7 @@ class GoogleLoginHandlerIT extends PostgresTestConfiguration {
         email = "admin@example.com";
         verified = true;
         TOKEN_CALLS.set(0);
+        CODE_CHALLENGE.set(null);
         usersBefore = count("users");
         sessionsBefore = count("spring_session");
     }
@@ -89,6 +95,9 @@ class GoogleLoginHandlerIT extends PostgresTestConfiguration {
         assertEquals("test-google-client", query.getFirst("client_id"));
         assertEquals("http://localhost:5173/auth/google/callback", java.net.URLDecoder.decode(query.getFirst("redirect_uri"), StandardCharsets.UTF_8));
         assertEquals("email", query.getFirst("scope"));
+        assertEquals("S256", query.getFirst("code_challenge_method"));
+        assertNotNull(query.getFirst("code_challenge"));
+        assertTrue(query.getFirst("code_challenge").matches("[A-Za-z0-9_-]{43}"));
         assertFalse(start.state().isBlank());
         var header = cookieHeader(start.response(), "MOGUM_OAUTH_REQUEST");
         assertCookieSecurity(header);
@@ -173,11 +182,55 @@ class GoogleLoginHandlerIT extends PostgresTestConfiguration {
     }
 
     @Test
+    void 형식이_유효해도_바뀐_verifier는_가짜_Google이_거절한다() throws Exception {
+        var start = start(null);
+        assertFailure(callback(withVerifier(start, "a".repeat(64)), "ok", null), "login_failed");
+        assertEquals(1, TOKEN_CALLS.get());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"missing", "short", "long", "invalid-character"})
+    void 없거나_형식이_틀린_verifier는_토큰_교환_전에_실패한다(String condition) throws Exception {
+        var start = start(null);
+        String verifier = switch (condition) {
+            case "missing" -> null;
+            case "short" -> "a".repeat(42);
+            case "long" -> "a".repeat(129);
+            default -> "a".repeat(43) + "!";
+        };
+        assertFailure(callback(withVerifier(start, verifier), "ok", null), "login_failed");
+        assertEquals(0, TOKEN_CALLS.get());
+    }
+
+    @Test
+    void 가짜_Google도_verifier가_없는_토큰_요청을_거절한다() throws Exception {
+        start(null);
+        var request = HttpRequest.newBuilder(URI.create(GOOGLE_ORIGIN + "/token"))
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString("code=ok&grant_type=authorization_code")).build();
+        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertEquals(400, response.statusCode());
+        assertEquals("invalid_grant", new ObjectMapper().readTree(response.body()).get("error").asText());
+        assertEquals(usersBefore, count("users"));
+        assertEquals(sessionsBefore, count("spring_session"));
+    }
+
+    private Start withVerifier(Start start, String verifier) {
+        var mapper = new ObjectMapper();
+        var saved = (tools.jackson.databind.node.ObjectNode) mapper.readTree(
+                Base64.getUrlDecoder().decode(start.cookie().substring("MOGUM_OAUTH_REQUEST=".length())));
+        if (verifier == null) saved.remove("code_verifier");
+        else saved.put("code_verifier", verifier);
+        String cookie = "MOGUM_OAUTH_REQUEST=" + Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(mapper.writeValueAsBytes(saved));
+        return new Start(start.state(), cookie, start.response());
+    }
+
+    @Test
     void 요청의_돌아갈_주소와_Host는_리다이렉트_대상을_바꾸지_않는다() throws Exception {
         var response = get("/auth/google?redirect_uri=https://evil.example&returnTo=https://evil.example", null);
         assertTrue(response.headers().firstValue("Location").orElseThrow().contains("redirect_uri=http://localhost:5173/auth/google/callback"));
-        var query = UriComponentsBuilder.fromUriString(response.headers().firstValue("Location").orElseThrow()).build().getQueryParams();
-        var start = new Start(query.getFirst("state"), cookiePair(cookieHeader(response, "MOGUM_OAUTH_REQUEST")), response);
+        var start = rememberAuthorization(response);
         assertRedirect(callback(start, "ok", null), "https://mogum.example/");
         assertEquals(401, get("/login", null).statusCode());
     }
@@ -199,9 +252,14 @@ class GoogleLoginHandlerIT extends PostgresTestConfiguration {
     private Start start(String existingCookie) throws Exception {
         var response = get("/auth/google", existingCookie);
         assertEquals(302, response.statusCode());
-        String location = response.headers().firstValue("Location").orElseThrow();
-        String state = UriComponentsBuilder.fromUriString(location).build().getQueryParams().getFirst("state");
-        return new Start(state, cookiePair(cookieHeader(response, "MOGUM_OAUTH_REQUEST")), response);
+        return rememberAuthorization(response);
+    }
+
+    private Start rememberAuthorization(HttpResponse<String> response) {
+        var query = UriComponentsBuilder.fromUriString(response.headers().firstValue("Location").orElseThrow())
+                .build().getQueryParams();
+        CODE_CHALLENGE.set(query.getFirst("code_challenge"));
+        return new Start(query.getFirst("state"), cookiePair(cookieHeader(response, "MOGUM_OAUTH_REQUEST")), response);
     }
 
     private HttpResponse<String> callback(Start start, String code, String existingCookie) throws Exception {
@@ -259,7 +317,11 @@ class GoogleLoginHandlerIT extends PostgresTestConfiguration {
             server.createContext("/token", exchange -> {
                 TOKEN_CALLS.incrementAndGet();
                 String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-                boolean bad = body.contains("code=bad-token");
+                var form = UriComponentsBuilder.fromUriString("http://localhost/?" + body).build().getQueryParams();
+                String verifier = form.getFirst("code_verifier");
+                if (verifier != null) verifier = java.net.URLDecoder.decode(verifier, StandardCharsets.UTF_8);
+                boolean bad = "bad-token".equals(form.getFirst("code")) || verifier == null
+                        || CODE_CHALLENGE.get() == null || !CODE_CHALLENGE.get().equals(challenge(verifier));
                 String response = bad ? "{\"error\":\"invalid_grant\"}" : "{\"access_token\":\"fake-access-token\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"id_token\":\"fake-id-token\"}";
                 byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -279,6 +341,15 @@ class GoogleLoginHandlerIT extends PostgresTestConfiguration {
             return server;
         } catch (IOException exception) {
             throw new ExceptionInInitializerError(exception);
+        }
+    }
+
+    private static String challenge(String verifier) {
+        try {
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(
+                    MessageDigest.getInstance("SHA-256").digest(verifier.getBytes(StandardCharsets.US_ASCII)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new AssertionError(exception);
         }
     }
 

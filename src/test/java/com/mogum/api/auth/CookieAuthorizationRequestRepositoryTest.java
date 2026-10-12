@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class CookieAuthorizationRequestRepositoryTest {
     private static final Instant NOW = Instant.parse("2026-10-12T00:00:00Z");
     private static final String STATE = "random-state-known-only-to-browser";
+    private static final String VERIFIER = "aB09-._~".repeat(8);
     private final ClientRegistration registration = ClientRegistration.withRegistrationId("google")
             .clientId("test-client").clientSecret("test-secret")
             .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE).scope("email")
@@ -31,7 +32,7 @@ class CookieAuthorizationRequestRepositoryTest {
             .redirectUri("http://localhost:5173/auth/google/callback").build();
 
     @Test
-    void JSON은_state와_발급시각만_담고_설정에서_요청을_복원한다() {
+    void JSON은_state와_발급시각과_PKCE_verifier만_담고_설정에서_요청을_복원한다() {
         var repository = repository(NOW);
         var response = new MockHttpServletResponse();
         var request = new MockHttpServletRequest();
@@ -41,6 +42,9 @@ class CookieAuthorizationRequestRepositoryTest {
         assertNotNull(cookie);
         String json = new String(Base64.getUrlDecoder().decode(cookie.getValue()), StandardCharsets.UTF_8);
         assertTrue(json.contains(STATE));
+        var saved = new ObjectMapper().readTree(json);
+        assertEquals(3, saved.size());
+        assertEquals(VERIFIER, saved.get("code_verifier").asText());
         assertFalse(json.contains("redirect"));
         assertFalse(json.contains("secret"));
         var callback = callback(cookie, STATE);
@@ -49,10 +53,52 @@ class CookieAuthorizationRequestRepositoryTest {
         assertEquals(registration.getRedirectUri(), restored.getRedirectUri());
         assertEquals(registration.getClientId(), restored.getClientId());
         assertEquals("google", restored.getAttribute("registration_id"));
+        assertEquals(VERIFIER, restored.getAttribute("code_verifier"));
         var removed = new MockHttpServletResponse();
         assertNotNull(repository.removeAuthorizationRequest(callback, removed));
         assertEquals(0, removed.getCookie("MOGUM_OAUTH_REQUEST").getMaxAge());
         assertNull(callback.getSession(false));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {43, 128})
+    void RFC7636_verifier의_최소와_최대_길이를_복원한다(int length) {
+        var cookie = savedCookie("a".repeat(length));
+        var restored = repository(NOW).loadAuthorizationRequest(callback(cookie, STATE));
+        assertNotNull(restored);
+        assertEquals("a".repeat(length), restored.getAttribute("code_verifier"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"missing", "empty", "short", "long", "space", "padding", "unicode"})
+    void 없거나_RFC7636_형식이_아닌_verifier는_복원하지_않는다(String condition) {
+        String verifier = switch (condition) {
+            case "missing" -> null;
+            case "empty" -> "";
+            case "short" -> "a".repeat(42);
+            case "long" -> "a".repeat(129);
+            case "space" -> "a".repeat(43) + " ";
+            case "padding" -> "a".repeat(43) + "=";
+            default -> "a".repeat(43) + "가";
+        };
+        assertNull(repository(NOW).loadAuthorizationRequest(callback(savedCookie(verifier), STATE)));
+    }
+
+    @Test
+    void 길이_상한을_넘거나_중복된_쿠키는_복원하지_않는다() {
+        assertNull(repository(NOW).loadAuthorizationRequest(
+                callback(new Cookie("MOGUM_OAUTH_REQUEST", "a".repeat(2049)), STATE)));
+        var cookie = savedCookie(VERIFIER);
+        var request = callback(cookie, STATE);
+        request.setCookies(cookie, cookie);
+        assertNull(repository(NOW).loadAuthorizationRequest(request));
+    }
+
+    private Cookie savedCookie(String verifier) {
+        var saved = new ObjectMapper().createObjectNode().put("state", STATE).put("issuedAt", NOW.getEpochSecond());
+        if (verifier != null) saved.put("code_verifier", verifier);
+        return new Cookie("MOGUM_OAUTH_REQUEST", Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(saved.toString().getBytes(StandardCharsets.UTF_8)));
     }
 
     @ParameterizedTest
@@ -80,7 +126,10 @@ class CookieAuthorizationRequestRepositoryTest {
     private OAuth2AuthorizationRequest authorization() {
         return OAuth2AuthorizationRequest.authorizationCode().authorizationUri(registration.getProviderDetails().getAuthorizationUri())
                 .clientId(registration.getClientId()).redirectUri(registration.getRedirectUri()).scopes(registration.getScopes())
-                .state(STATE).attributes(attributes -> attributes.put("registration_id", "google")).build();
+                .state(STATE).attributes(attributes -> {
+                    attributes.put("registration_id", "google");
+                    attributes.put("code_verifier", VERIFIER);
+                }).build();
     }
 
     private MockHttpServletRequest callback(Cookie cookie, String state) {

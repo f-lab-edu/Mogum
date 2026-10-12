@@ -1,6 +1,11 @@
 package com.mogum.api.auth;
 
 import com.mogum.api.account.MeController;
+import com.mogum.api.ApiErrorController;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.mogum.core.TransactionRunner;
 import com.mogum.core.account.User;
 import com.mogum.core.account.UserRepository;
@@ -36,6 +41,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import org.slf4j.LoggerFactory;
 import tools.jackson.databind.ObjectMapper;
 
 import java.net.URI;
@@ -50,6 +56,9 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.ArgumentMatchers.any;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -67,6 +76,7 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
     @Autowired private Flyway flyway;
     @Autowired private ObjectMapper mapper;
     @MockitoSpyBean private MeController meController;
+    @MockitoSpyBean private ApiErrorController errorController;
     @Value("${local.server.port}") private int port;
     private MockMvc mvc;
     private TestSessions testSessions;
@@ -176,6 +186,15 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
     }
 
     @Test
+    void 삭제된_사용자의_세션으로_등록된_로그인을_시작해도_실제_HTTP는_JSON_401이다() throws Exception {
+        var cookie = session();
+        jdbc.update("DELETE FROM users WHERE id = ?", user.id());
+
+        assertError(http("GET", "/auth/google", cookie, null), 401, "UNAUTHORIZED");
+        assertNull(sessions.findById(testSessions.id(cookie)));
+    }
+
+    @Test
     void 로그인한_사용자의_없는_API는_JSON_404다() throws Exception {
         mvc.perform(get("/api/does-not-exist").cookie(session())).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"))
@@ -206,6 +225,28 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
         assertError(http("GET", "/api/does-not-exist", cookie, null), 404, "NOT_FOUND");
         assertError(http("GET", "/api/me", null, null), 401, "UNAUTHORIZED");
         assertEquals(200, http("GET", "/api/me", cookie, null).statusCode());
+    }
+
+    @Test
+    void 미등록_인증_경로는_실제_ERROR_디스패치로_JSON_404를_주고_에러_로그가_없다() throws Exception {
+        doAnswer(invocation -> {
+            HttpServletRequest request = invocation.getArgument(0);
+            assertEquals(DispatcherType.ERROR, request.getDispatcherType());
+            return invocation.callRealMethod();
+        }).when(errorController).error(any(HttpServletRequest.class));
+        var logger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+        var logs = new ListAppender<ILoggingEvent>();
+        logs.start();
+        logger.addAppender(logs);
+        try {
+            assertError(http("GET", "/auth/foo", null, null), 404, "NOT_FOUND");
+            assertError(http("GET", "/auth/foo", session(), null), 404, "NOT_FOUND");
+            verify(errorController, times(2)).error(any(HttpServletRequest.class));
+            assertTrue(logs.list.stream().noneMatch(event -> event.getLevel().isGreaterOrEqual(Level.ERROR)));
+        } finally {
+            logger.detachAppender(logs);
+            logs.stop();
+        }
     }
 
     @Test

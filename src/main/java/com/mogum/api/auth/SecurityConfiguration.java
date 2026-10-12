@@ -67,8 +67,15 @@ public class SecurityConfiguration {
                                            WebProperties web, GoogleLogin login, Clock clock,
                                            ClientRegistrationRepository registrations,
                                            DiscardingOAuth2AuthorizedClients clients) throws Exception {
-        AuthenticationEntryPoint unauthorized = (request, response, exception) ->
+        var authorizationStart = PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET, "/auth/{registrationId}");
+        AuthenticationEntryPoint unauthorized = (request, response, exception) -> {
+            var match = authorizationStart.matcher(request);
+            if (match.isMatch() && registrations.findByRegistrationId(match.getVariables().get("registrationId")) == null) {
+                response.sendError(HttpServletResponse.SC_NOT_FOUND);
+            } else {
                 writeError(response, mapper, 401, "UNAUTHORIZED", "로그인이 필요합니다");
+            }
+        };
         var tokens = CookieCsrfTokenRepository.withHttpOnlyFalse();
         tokens.setCookieCustomizer(cookie -> {
             cookie.secure(true).sameSite("Lax").path("/");
@@ -91,12 +98,17 @@ public class SecurityConfiguration {
         var getOnlyResolver = new OAuth2AuthorizationRequestResolver() {
             @Override
             public OAuth2AuthorizationRequest resolve(jakarta.servlet.http.HttpServletRequest request) {
-                return "GET".equals(request.getMethod()) ? resolver.resolve(request) : null;
+                if (!"GET".equals(request.getMethod())) return null;
+                var match = authorizationStart.matcher(request);
+                // 미등록 ID는 해석기의 예외/로그 대신 공통 404 ERROR 디스패치로 보낸다.
+                if (match.isMatch() && registrations.findByRegistrationId(match.getVariables().get("registrationId")) == null) return null;
+                return resolver.resolve(request);
             }
 
             @Override
             public OAuth2AuthorizationRequest resolve(jakarta.servlet.http.HttpServletRequest request, String registrationId) {
-                return "GET".equals(request.getMethod()) ? resolver.resolve(request, registrationId) : null;
+                return "GET".equals(request.getMethod()) && registrations.findByRegistrationId(registrationId) != null
+                        ? resolver.resolve(request, registrationId) : null;
             }
         };
 
@@ -117,6 +129,11 @@ public class SecurityConfiguration {
                 .csrf(csrf -> csrf.csrfTokenRepository(tokens).csrfTokenRequestHandler(tokenHandler))
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(unauthorized)
                         .accessDeniedHandler((request, response, exception) -> {
+                            var match = authorizationStart.matcher(request);
+                            if (match.isMatch() && registrations.findByRegistrationId(match.getVariables().get("registrationId")) == null) {
+                                response.sendError(HttpServletResponse.SC_NOT_FOUND);
+                                return;
+                            }
                             var authentication = SecurityContextHolder.getContext().getAuthentication();
                             boolean anonymous = authentication == null || authentication instanceof AnonymousAuthenticationToken;
                             if (anonymous && !logoutRequest.matches(request)) {
