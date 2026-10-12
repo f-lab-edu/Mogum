@@ -2,6 +2,7 @@
 
 > **시각 디자인의 단일 출처다.** 화면 구조 · 상태 · 문구는 [06 화면](./06-screens.md)이 정한다 — 이 문서는 *어떻게 보이나* 만 정한다.
 > 화면 코드는 `frontend/` · React + Tailwind CSS. 아래 값은 `frontend/src/index.css` 의 `@theme` 테마 토큰으로 둔다(Tailwind CSS 4).
+> 그린 시안은 [docs/design/](./design/README.md) — 참고 자료다. 시안과 이 문서가 다르면 이 문서가 맞다.
 
 ## 디자인 원칙
 
@@ -60,7 +61,7 @@
 
 | 용도 | 토큰 | 값 | 쓰는 곳 |
 |------|------|------|------|
-| 성공 · 완료 | `ok` | `#3D7A4F` | 「완료」 표시 · 단계 목록 ✔ |
+| 성공 · 완료 | `ok` | `#3D7A4F` | 「완료」 표시 · 단계 목록 ✔ · U5 기다리는 동안 준비 알림(`font-semibold` — 실패 알림은 `danger`) |
 | 주의 | `warn` | `#94601A` | 「평소보다 조금 더 걸리고 있어요」 · 예정일 지난 카드 |
 | 오류 · 막힘 | `danger` | `#B4443A` | 06 §15 막힘 · 실패 문구 · 탈퇴 버튼 |
 
@@ -81,9 +82,14 @@ rounded-md bg-surface border border-line p-5
 Primary(화면당 하나): rounded-md bg-accent text-white px-4 h-11 hover:bg-accent-strong
 Secondary:            rounded-md border border-line bg-surface text-ink px-4 h-11 hover:bg-muted
 Text · 링크:          text-accent underline-offset-4 hover:underline
+약한 링크:            text-sm text-ink-soft underline underline-offset-4
 Danger(탈퇴만):       rounded-md border border-danger text-danger px-4 h-11
+전체 폭:              w-full h-12 — Primary 와 같은 색. 모바일 화면 아래 행동 자리 · 한 단짜리 결정
 잠김:                 opacity-50 cursor-not-allowed — 이유를 버튼 아래 작은 글씨로(06 문구)
 ```
+- **약한 링크** — 덜 권하는 동작에 쓴다: 「이 커리큘럼 삭제」 · 「이 묶음 삭제」 · 「지우고 다시 쓰기」(U11) · 「동의하지 않고 나가기」 · 「대기 취소하고 정보 지우기」. 바닥글 약관 링크 · 「건너뛰기」 는 같은 색 · 크기에 밑줄 없이.
+- **전체 폭** — U5 「답 보기」(평가 버튼과 같은 높이) · U7 「동의하고 시작하기」 · 소개 「다음」 「첫 커리큘럼 만들기」.
+- 누르는 자리는 버튼 · 링크 모두 **44px 이상**(`min-h-11`). 글자만 있는 링크도 줄 높이를 늘려 맞춘다.
 
 ### 복습 평가 버튼 — 4개 모두 같다
 
@@ -91,6 +97,14 @@ Danger(탈퇴만):       rounded-md border border-danger text-danger px-4 h-11
 rounded-md border border-line bg-surface text-ink h-12 min-w-[44px] hover:bg-muted
 안에 작은 글씨로 키보드 숫자: <span class="text-ink-faint text-xs">1</span>
 배치: 데스크톱 가로 한 줄 gap-3 · 모바일 2×2 gap-3
+```
+
+### 체크박스 · 점
+
+```
+체크박스: w-5 h-5 rounded border-[1.5px] border-ink-faint bg-surface → 체크하면 bg-accent border-accent + 흰 ✓
+          글자까지 누르는 자리(min-h-11). U7 동의 항목 · U9 탈퇴 확인
+소개 점:  w-2 h-2 rounded-full gap-2 — 지금 장 bg-ink · 나머지 bg-line (U7 소개 3장)
 ```
 
 ### 입력 필드
@@ -109,7 +123,7 @@ focus:outline-none focus:ring-2 focus:ring-accent
 키워드 · 개념 글자표: rounded-sm bg-muted text-ink-soft text-xs px-2 py-0.5
 ```
 
-### 막대(진도 · 오늘 생성량 · 복습 장수만)
+### 막대(진도 · 오늘 생성량 · 복습 장수 · U6 전역 한도만)
 
 ```
 h-1.5 rounded-full bg-muted → 채움 bg-accent
@@ -122,6 +136,8 @@ h-1.5 rounded-full bg-muted → 채움 bg-accent
 제목(##): text-xl font-semibold text-ink mt-10 mb-3
 코드 블록: rounded-md bg-muted font-mono text-sm p-4 overflow-x-auto
 수식($$) · 그림(mermaid) · 표: 블록 안에서만 overflow-x-auto — 본문 전체가 옆으로 밀리지 않는다
+표: border-collapse w-full · 머리 행 font-semibold text-ink · 행마다 border-b border-line · 숫자 열 오른쪽 정렬 tabular-nums
+    출처는 표 아래 text-sm text-ink-soft (U6 표도 같은 모양 · 글자 text-sm)
 그림 실패: rounded-md bg-muted text-ink-soft p-6 「그림을 표시하지 못했어요.」
 ```
 
@@ -142,7 +158,7 @@ focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc
 - **그 밖의 사용자 화면** — 한 단 `max-w-3xl mx-auto`. 모바일(390) 기준으로 설계하고 데스크톱은 같은 단을 가운데에 둔다(06 §2.10). **U6 관리자만 데스크톱(1280) 기준.**
 - 정렬: **좌측 정렬 기본.** 가운데 정렬은 U1 소개 · U5 카드 · U8 큰 숫자에만.
 - 간격: 요소 사이 `gap-3`~`gap-4`, 영역 사이 `space-y-8`. U3 [U3-5] 결정 바와 모바일 U5 [U5-3] 답 보기 · 평가 버튼은 화면 아래에 붙는다(`sticky bottom-0`).
-- 상단 바: `h-14 bg-surface border-b border-line` · **텍스트 링크**(아이콘 아님) · 현재 화면 링크는 `text-accent font-semibold`.
+- 상단 바: `h-14 bg-surface border-b border-line` · **텍스트 링크**(아이콘 아님) · 현재 화면 링크는 `text-accent font-semibold`. 안쪽 폭은 **모든 사용자 화면에서** `max-w-3xl px-4` 다 — U4 · U5 도 본문만 `max-w-prose` 이고 상단 바는 같다. 링크 사이 `gap-5`, 「설정」 은 `ml-auto` 로 오른쪽 끝. U6 은 상단 바 · 본문 모두 `max-w-7xl px-8`.
 
 ## 타이포그래피
 
@@ -156,6 +172,9 @@ focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc
 | UI 본문 · 버튼 | `text-base text-ink-body` |
 | 작은 글씨 · 출처 · 안내 | `text-sm text-ink-soft` |
 | 큰 숫자(「오늘의 복습 23장」 · 「대기 3번째」) | `text-3xl font-semibold text-ink tabular-nums` |
+| 서비스 이름 「머금」 | 상단 바 `text-lg font-bold text-ink` · U1 `text-[28px] font-bold text-ink` |
+
+**예외 — U1 구글 로그인 버튼**은 구글 브랜드 가이드의 표준 모양을 그대로 쓴다: Roboto 500 · 14px · 흰 바탕 · 테두리 `#747775` · 글자 `#1F1F1F` · `rounded`(4px) · 구글 로고 18px. 이 버튼에만 Roboto 와 구글 색을 쓴다.
 
 ## 애니메이션
 

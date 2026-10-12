@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+body{margin:0;background:#F1EEE7}
+a{color:#2F4B7C;text-decoration:none}
+a:hover{text-decoration:underline}
+</style>
+</helmet>
+<section id="u6" data-screen-label="U6 시스템 상태" style="padding:64px;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#1F1D1A">
+  <h2 style="margin:0 0 6px;font-size:28px;font-weight:600">U6 시스템 상태 — 관리자 전용 · 06 §14</h2>
+  <p style="margin:0 0 40px;font-size:15px;color:#6B655C">데스크톱 1280 · 페이지 전체 길이 · 이 화면만 시스템 용어 그대로 · 버튼은 새로고침 하나</p>
+  <div style="display:flex;flex-wrap:wrap;gap:56px 48px;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <p style="margin:0;font-size:15px;font-weight:600">U6 · D① 평소</p>
+      <div style="display:flex;gap:16px;align-items:flex-start">
+        <div style="width:1280px;border:1px solid #E4DFD5;flex:none"><dc-import name="U6 Screen" empty="{{ false }}" hint-size="1280px,1500px" style="width:100%"></dc-import></div>
+        <div style="width:200px;font-size:12px;line-height:1.7;color:#6B655C;font-family:ui-monospace,monospace">상단 바: 시스템 상태 — 관리자에게만<br>[U6-1] 머리 · 새로고침<br>[U6-2] 지금 도는 작업<br>[U6-3] 비용 · 전역 한도 막대<br>[U6-4] 신뢰성<br>[U6-5] 가입<br>[U6-6] 개념 매칭 — 표 2개<br><br>표의 개념 · 정의 · 유사도는 임시값</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <p style="margin:0;font-size:15px;font-weight:600">U6 · D② 데이터 없음</p>
+      <div style="display:flex;gap:16px;align-items:flex-start">
+        <div style="width:1280px;border:1px solid #E4DFD5;flex:none"><dc-import name="U6 Screen" empty="{{ true }}" hint-size="1280px,1200px" style="width:100%"></dc-import></div>
+        <div style="width:200px;font-size:12px;line-height:1.7;color:#6B655C;font-family:ui-monospace,monospace">종결 표본 없음 문구<br>비율 NULL → 표본 없음(0% 아님)<br>표마다 아직 기록이 없어요.<br><br>가입 1 · 활동 1명 = 관리자 본인(가정)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="settings" data-screen-label="U9 설정 · P1 이용약관" style="border-top:1px solid #E4DFD5;padding:64px;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#1F1D1A">
+  <h2 style="margin:0 0 6px;font-size:28px;font-weight:600">U9 설정 · P1 이용약관 · 06 §12 · §13</h2>
+  <p style="margin:0 0 40px;font-size:15px;color:#6B655C">탈퇴는 그 자리에서 펼쳐지고, 체크해야 버튼이 눌림 · P1 은 상단 바 없음</p>
+  <div style="display:flex;flex-wrap:wrap;gap:56px 48px;align-items:flex-start">
+    <sc-for list="{{ settings }}" as="f" hint-placeholder-count="3">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <p style="margin:0;font-size:15px;font-weight:600">{{ f.name }}</p>
+        <div style="display:flex;gap:16px">
+          <div style="width:390px;height:844px;overflow:hidden;border:1px solid #E4DFD5;flex:none"><dc-import name="Settings Screens" screen="{{ f.screen }}" hint-size="390px,844px" style="width:100%;height:100%"></dc-import></div>
+          <div style="width:200px;font-size:12px;line-height:1.7;color:#6B655C;font-family:ui-monospace,monospace;white-space:pre-line">{{ f.note }}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section id="entry" data-screen-label="U7 · U8 · U1" style="border-top:1px solid #E4DFD5;padding:64px;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#1F1D1A">
+  <h2 style="margin:0 0 6px;font-size:28px;font-weight:600">U7 가입 · U8 대기 명단 · U1 로그인 · 06 §4 · §5 · §3</h2>
+  <p style="margin:0 0 40px;font-size:15px;color:#6B655C">셋 다 상단 바 없음 · 데스크톱은 같은 한 단을 가운데</p>
+  <div style="display:flex;flex-direction:column;gap:72px">
+    <sc-for list="{{ entry }}" as="g" hint-placeholder-count="3">
+      <div style="display:flex;flex-direction:column;gap:24px">
+        <p style="margin:0;font-size:20px;font-weight:600">{{ g.title }}</p>
+        <div style="display:flex;flex-wrap:wrap;gap:56px 48px;align-items:flex-start">
+          <sc-for list="{{ g.frames }}" as="f" hint-placeholder-count="2">
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <p style="margin:0;font-size:15px;font-weight:600">{{ f.name }}</p>
+              <div style="display:flex;gap:16px">
+                <div style="width:{{ f.w }};height:{{ f.h }};overflow:hidden;border:1px solid #E4DFD5;flex:none"><dc-import name="Entry Screens" screen="{{ f.screen }}" checked="{{ f.checked }}" hint-size="100%,100%" style="width:100%;height:100%"></dc-import></div>
+                <div style="width:200px;font-size:12px;line-height:1.7;color:#6B655C;font-family:ui-monospace,monospace;white-space:pre-line">{{ f.note }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section id="u11" data-screen-label="U11 커리큘럼 묶음" style="border-top:1px solid #E4DFD5;padding:64px;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#1F1D1A">
+  <h2 style="margin:0 0 6px;font-size:28px;font-weight:600">U11 커리큘럼 묶음 · 06 §9</h2>
+  <p style="margin:0 0 40px;font-size:15px;color:#6B655C">모두 「Spring 백엔드 실무」 · 3단계 · 가장 강조는 현재 단계의 버튼 하나</p>
+  <div style="display:flex;flex-wrap:wrap;gap:56px 48px;align-items:flex-start">
+    <sc-for list="{{ u11 }}" as="f" hint-placeholder-count="5">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <p style="margin:0;font-size:15px;font-weight:600">{{ f.name }}</p>
+        <div style="display:flex;gap:16px">
+          <div style="width:390px;height:844px;overflow:hidden;border:1px solid #E4DFD5;flex:none"><dc-import name="U11 Screen" state="{{ f.state }}" scroll-to="{{ f.scroll }}" hint-size="390px,844px" style="width:100%;height:100%"></dc-import></div>
+          <div style="width:200px;font-size:12px;line-height:1.7;color:#6B655C;font-family:ui-monospace,monospace;white-space:pre-line">{{ f.note }}</div>
+        </div>
+      </div>
+    </sc-for>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <p style="margin:0;font-size:15px;font-weight:600">U11 · D⑥ 2단계 만들 차례</p>
+      <div style="display:flex;gap:16px">
+        <div style="width:1280px;height:800px;overflow:hidden;border:1px solid #E4DFD5;flex:none"><dc-import name="U11 Screen" state="nextTurn" scroll-to="top" hint-size="1280px,800px" style="width:100%;height:100%"></dc-import></div>
+        <div style="width:200px;font-size:12px;line-height:1.7;color:#6B655C;font-family:ui-monospace,monospace">[U11-1] · [U11-2] · [U11-3] · [U11-4]<br>한 단 max-w-3xl 가운데<br>가장 강조: 2단계 커리큘럼 만들기</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="u3" data-screen-label="U3 커리큘럼" style="border-top:1px solid #E4DFD5;padding:64px;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#1F1D1A">
+  <h2 style="margin:0 0 6px;font-size:28px;font-weight:600">U3 커리큘럼 · 06 §8</h2>
+  <p style="margin:0 0 40px;font-size:15px;color:#6B655C">검토 대기 · 학습 중 · 완료는 같은 화면의 세 상태 · [U3-5] 결정 바 아래 고정 · 삭제는 맨 아래 [U3-6]</p>
+  <div style="display:flex;flex-wrap:wrap;gap:56px 48px;align-items:flex-start">
+    <sc-for list="{{ u3 }}" as="f" hint-placeholder-count="8">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <p style="margin:0;font-size:15px;font-weight:600">{{ f.name }}</p>
+        <div style="display:flex;gap:16px">
+          <div style="width:390px;height:844px;overflow:hidden;border:1px solid #E4DFD5;flex:none"><dc-import name="U3 Screen" state="{{ f.state }}" scroll-to="{{ f.scroll }}" hint-size="390px,844px" style="width:100%;height:100%"></dc-import></div>
+          <div style="width:200px;font-size:12px;line-height:1.7;color:#6B655C;font-family:ui-monospace,monospace;white-space:pre-line">{{ f.note }}</div>
+        </div>
+      </div>
+    </sc-for>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <p style="margin:0;font-size:15px;font-weight:600">U3 · D⑨ 검토 대기</p>
+      <div style="display:flex;gap:16px">
+        <div style="width:1280px;height:800px;overflow:hidden;border:1px solid #E4DFD5;flex:none"><dc-import name="U3 Screen" state="review" scroll-to="top" hint-size="1280px,800px" style="width:100%;height:100%"></dc-import></div>
+        <div style="width:200px;font-size:12px;line-height:1.7;color:#6B655C;font-family:ui-monospace,monospace">[U3-1] · [U3-3] · [U3-4] · [U3-5]<br>결정 바 아래 고정 · 안쪽 max-w-3xl<br>가장 강조: 이대로 시작하기</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="u10" data-screen-label="U10 커리큘럼 만드는 중" style="border-top:1px solid #E4DFD5;padding:64px;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#1F1D1A">
+  <h2 style="margin:0 0 6px;font-size:28px;font-weight:600">U10 커리큘럼 만드는 중 · 06 §7</h2>
+  <p style="margin:0 0 40px;font-size:15px;color:#6B655C">기다림 · 실패만 있는 화면 — 단계 목록 없이 제목 한 줄과 회색 줄</p>
+  <div style="display:flex;flex-wrap:wrap;gap:56px 48px;align-items:flex-start">
+    <sc-for list="{{ u10 }}" as="f" hint-placeholder-count="3">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <p style="margin:0;font-size:15px;font-weight:600">{{ f.name }}</p>
+        <div style="display:flex;gap:16px">
+          <div style="width:390px;height:844px;overflow:hidden;border:1px solid #E4DFD5;flex:none"><dc-import name="U10 Screen" state="{{ f.state }}" hint-size="390px,844px" style="width:100%;height:100%"></dc-import></div>
+          <div style="width:200px;font-size:12px;line-height:1.7;color:#6B655C;font-family:ui-monospace,monospace;white-space:pre-line">{{ f.note }}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section id="u2" data-screen-label="U2 홈" style="border-top:1px solid #E4DFD5;padding:64px;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#1F1D1A">
+  <h2 style="margin:0 0 6px;font-size:28px;font-weight:600">U2 홈 · 06 §6</h2>
+  <p style="margin:0 0 40px;font-size:15px;color:#6B655C">모바일 390×844 · 데스크톱 1280×800 · max-w-3xl · M④ 는 같은 화면의 스크롤 위치 2곳</p>
+  <div style="display:flex;flex-wrap:wrap;gap:56px 48px;align-items:flex-start">
+    <sc-for list="{{ u2 }}" as="f" hint-placeholder-count="5">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <p style="margin:0;font-size:15px;font-weight:600">{{ f.name }}</p>
+        <div style="display:flex;gap:16px">
+          <div style="width:390px;height:844px;overflow:hidden;border:1px solid #E4DFD5;flex:none"><dc-import name="U2 Screen" state="{{ f.state }}" scroll-to="{{ f.scroll }}" hint-size="390px,844px" style="width:100%;height:100%"></dc-import></div>
+          <div style="width:200px;font-size:12px;line-height:1.7;color:#6B655C;font-family:ui-monospace,monospace;white-space:pre-line">{{ f.note }}</div>
+        </div>
+      </div>
+    </sc-for>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <p style="margin:0;font-size:15px;font-weight:600">U2 · D⑤ 평소</p>
+      <div style="display:flex;gap:16px">
+        <div style="width:1280px;height:800px;overflow:hidden;border:1px solid #E4DFD5;flex:none"><dc-import name="U2 Screen" state="normal" scroll-to="top" hint-size="1280px,800px" style="width:100%;height:100%"></dc-import></div>
+        <div style="width:200px;font-size:12px;line-height:1.7;color:#6B655C;font-family:ui-monospace,monospace">[U2-1] · [U2-2] · [U2-3] 접힘<br>한 단 max-w-3xl 가운데<br>가장 강조: 복습 시작</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="u5" data-screen-label="U5 복습" style="border-top:1px solid #E4DFD5;padding:64px;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#1F1D1A">
+  <h2 style="margin:0 0 6px;font-size:28px;font-weight:600">U5 복습 · 06 §11</h2>
+  <p style="margin:0 0 40px;font-size:15px;color:#6B655C">모바일 390×844 · 데스크톱 1280×800 · U4 상단 바 · 글자 크기 · 간격 그대로</p>
+  <div style="display:flex;flex-wrap:wrap;gap:56px 48px;align-items:flex-start">
+    <sc-for list="{{ u5 }}" as="f" hint-placeholder-count="6">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <p style="margin:0;font-size:15px;font-weight:600">{{ f.name }}</p>
+        <div style="display:flex;gap:16px">
+          <div style="width:390px;height:844px;overflow:hidden;border:1px solid #E4DFD5;flex:none"><dc-import name="U5 Screen" state="{{ f.state }}" hint-size="390px,844px" style="width:100%;height:100%"></dc-import></div>
+          <div style="width:200px;font-size:12px;line-height:1.7;color:#6B655C;font-family:ui-monospace,monospace;white-space:pre-line">{{ f.note }}</div>
+        </div>
+      </div>
+    </sc-for>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <p style="margin:0;font-size:15px;font-weight:600">U5 · D⑦ 답 + 평가</p>
+      <div style="display:flex;gap:16px">
+        <div style="width:1280px;height:800px;overflow:hidden;border:1px solid #E4DFD5;flex:none"><dc-import name="U5 Screen" state="todayAnswer" desktop="{{ true }}" hint-size="1280px,800px" style="width:100%;height:100%"></dc-import></div>
+        <div style="width:200px;font-size:12px;line-height:1.7;color:#6B655C;font-family:ui-monospace,monospace">[U5-1] · [U5-2] · [U5-3]<br>평가 버튼 가로 한 줄 · 고정하지 않음<br>가장 강조: 없음</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="u4" data-screen-label="U4 강의" style="padding:64px;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#1F1D1A;border-top:1px solid #E4DFD5">
+  <h2 style="margin:0 0 6px;font-size:28px;font-weight:600">U4 강의 · 06 §10</h2>
+  <p style="margin:0 0 40px;font-size:15px;color:#6B655C">모두 「경제 기초」 6강 · M⑦ 은 같은 화면의 스크롤 위치 3곳</p>
+  <div style="display:flex;flex-wrap:wrap;gap:56px 48px;align-items:flex-start">
+    <sc-for list="{{ u4 }}" as="f" hint-placeholder-count="10">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <p style="margin:0;font-size:15px;font-weight:600">{{ f.name }}</p>
+        <div style="display:flex;gap:16px">
+          <div style="width:390px;height:844px;overflow:hidden;border:1px solid #E4DFD5;flex:none"><dc-import name="U4 Screen" state="{{ f.state }}" scroll-to="{{ f.scroll }}" hint-size="390px,844px" style="width:100%;height:100%"></dc-import></div>
+          <div style="width:200px;font-size:12px;line-height:1.7;color:#6B655C;font-family:ui-monospace,monospace;white-space:pre-line">{{ f.note }}</div>
+        </div>
+      </div>
+    </sc-for>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <p style="margin:0;font-size:15px;font-weight:600">U4 · D⑨ 본문</p>
+      <div style="display:flex;gap:16px">
+        <div style="width:1280px;height:800px;overflow:hidden;border:1px solid #E4DFD5;flex:none"><dc-import name="U4 Screen" state="body" scroll-to="top" hint-size="1280px,800px" style="width:100%;height:100%"></dc-import></div>
+        <div style="width:200px;font-size:12px;line-height:1.7;color:#6B655C;font-family:ui-monospace,monospace">[U4-1] · [U4-3]<br>상단 바 max-w-3xl(전 화면 공통) · 본문 max-w-prose 가운데</div>
+      </div>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    // 상단 바 안쪽 폭: 사용자 화면 모두 max-w-3xl, 본문 폭은 화면별(U4 · U5 는 max-w-prose)
+    const M = { w: '390px', h: '844px' }, D = { w: '1280px', h: '800px' };
+    return {
+      settings: [
+        { name: 'U9 · M① 기본', screen: 'u9', note: '[U9-1] 계정 · 로그아웃\n[U9-2] 오늘 생성량 60%\n[U9-3] 약관 링크\n[U9-4] 탈퇴하기(Danger) — 맨 아래\n\n가장 강조: 없음' },
+        { name: 'U9 · M② 탈퇴 펼침', screen: 'u9withdraw', note: '[U9-4] 버튼 자리가 펼침(§2.7)\n  포커스: 안내 문구\n체크 전 → 탈퇴하기 잠김 + 이유\n취소 → 접히고 원래 버튼으로\n\n가장 강조: 없음' },
+        { name: 'P1 · M① 이용약관', screen: 'p1', note: '제목 · 시행일 · 본문\n맨 아래 돌아가기(화면 밖)\nP2 는 같은 틀\n본문 · 시행일은 임시 문안' },
+      ],
+      entry: [
+        { title: 'U7 가입 — 4장', frames: [
+          { ...M, name: 'U7 · M① 약관 동의', screen: 'u7terms', checked: false, note: '[U7-1] 머리\n[U7-2] 동의 항목 — 체크 전\n[U7-3] 버튼 잠김 + 이유\n\n가장 강조: 동의하고 시작하기\n(필수 둘 다 체크해야 눌림)' },
+          { ...M, name: 'U7 · M② 소개 1장', screen: 'u7intro1', note: '건너뛰기 → U2\n장면 조각: 주제 · 목적 입력 칸\n  (U2-3, 회색조)\n점 3개 — 1번째\n\n가장 강조: 다음' },
+          { ...M, name: 'U7 · M③ 소개 3장', screen: 'u7intro3', note: '장면 조각: 이렇게 짰어요 한 줄\n  (U3-3, 회색조)\n점 3개 — 3번째\n\n가장 강조: 첫 커리큘럼 만들기' },
+          { ...D, name: 'U7 · D④ 약관 동의', screen: 'u7terms', checked: true, note: '필수 둘 다 체크한 상태\n→ 버튼이 눌림\n\n가장 강조: 동의하고 시작하기' },
+        ] },
+        { title: 'U8 대기 명단 — 2장', frames: [
+          { ...M, name: 'U8 · M① 대기 3번째', screen: 'u8', note: '[U8-1] 안내 · 큰 숫자 가운데\n[U8-2] 로그아웃 · 대기 취소\n\n가장 강조: 없음' },
+          { ...D, name: 'U8 · D② 같은 화면', screen: 'u8', note: '[U8-1] · [U8-2]\n가장 강조: 없음' },
+        ] },
+        { title: 'U1 로그인 — 3장', frames: [
+          { ...M, name: 'U1 · M① 기본', screen: 'u1', note: '[U1-1] 소개 — 가운데\n[U1-2] Google 표준 버튼\n  (Light · 사각 · Roboto 500)\n[U1-3] 비어 있음\n[U1-4] 바닥글\n\n가장 강조: Google 계정으로 계속하기' },
+          { ...M, name: 'U1 · M② 다시 로그인해 주세요', screen: 'u1relogin', note: '[U1-3] 다시 로그인해 주세요.' },
+          { ...D, name: 'U1 · D③ 기본', screen: 'u1', note: '[U1-1] ~ [U1-4]\n한 단 가운데' },
+        ] },
+      ],
+      u11: [
+        { name: 'U11 · M① 단계 검토', state: 'plan', scroll: 'top', note: '분할안을 막 받은 시점\n[U11-1] 1단계 만들 차례\n[U11-2] 3단계로 나눴어요 안내\n[U11-3] 1단계 ● 만들 수 있어요\n  2 · 3단계 ○ 앞 단계 마치면\n[U11-4] 지우고 다시 쓰기\n\n가장 강조: 1단계 커리큘럼 만들기' },
+        { name: 'U11 · M② 1단계 학습 중', state: 'learning', scroll: 'top', note: '[U11-1] 1단계 학습 중\n[U11-2] 없음\n[U11-3] 1단계 ● 진도 7 / 12강\n[U11-4] 이 묶음 삭제\n\n가장 강조: 이어서 · 8강' },
+        { name: 'U11 · M③ 2단계 만들 차례', state: 'nextTurn', scroll: 'top', note: '[U11-1] 2단계 만들 차례\n[U11-2] 1단계를 마쳤어요\n[U11-3] 1 ✔ · 2 ● · 3 ○\n\n가장 강조: 2단계 커리큘럼 만들기' },
+        { name: 'U11 · M④ 모두 완료', state: 'allDone', scroll: 'top', note: '[U11-1] 완료\n[U11-2] 마침 + 새 커리큘럼 링크\n[U11-3] 모두 ✔ — 누르면 U3 다시 읽기\n\n가장 강조: 없음\n2단계 11강 · 3단계 10강(임시)' },
+        { name: 'U11 · M⑤ 묶음 삭제 확인 펼침', state: 'deleteOpen', scroll: 'bottom', note: 'M③ 시점(만든 단계 1개)\n[U11-4] 링크 자리가 펼침(§2.7)\n  포커스: 안내 문구\n삭제하기 · 취소 — Secondary' },
+      ],
+      u10: [
+        { name: 'U10 · M① 짜는 중 — 앞에 2명', state: 'queued', note: '[U10-1] 머리 — 통계학 입문\n[U10-2] 대기 블록(커리큘럼형)\n  단계 목록 없음\n[U10-3] 회색 줄 5개\n\n가장 강조: 없음' },
+        { name: 'U10 · M② 실패 — 다시 시도 가능', state: 'failRetry', note: '[U10-1]\n[U10-4] LLM_UNAVAILABLE\n\n가장 강조: 다시 시도' },
+        { name: 'U10 · M③ 실패 — 주제 거절', state: 'failRejected', note: '[U10-1] 영어 회화(U2 M③ 요청)\n  목적 없음 → 줄 없음\n[U10-4] TOPIC_REJECTED + 연습형 안내\n\n가장 강조: 지우고 다시 쓰기' },
+      ],
+      u3: [
+        { name: 'U3 · M① 검토 대기', state: 'review', scroll: 'top', note: '[U3-1] 금융 시장 입문 · 검토 대기\n[U3-3] 이렇게 짰어요 — 3줄\n[U3-4] 검토 목록(누르지 못함)\n[U3-5] 결정 바 — 아래 고정\n[U3-6] 삭제 — 맨 아래(화면 밖)\n\n가장 강조: 이대로 시작하기' },
+        { name: 'U3 · M② 다시 짜기 펼침', state: 'regenOpen', scroll: 'regen', note: '[U3-5] 결정 바 사라짐\n[U3-5a] 목록 아래 펼침\n  포커스: 입력 칸\n\n가장 강조: 이 내용으로 다시 짜기' },
+        { name: 'U3 · M③ 다시 짜는 중', state: 'regenerating', scroll: 'top', note: '[U3-1] 짜는 중\n[U3-2] 대기 블록\n[U3-3] · [U3-4] 이전 안 흐리게\n[U3-5] 두 버튼 잠김 + 이유\n\n가장 강조: 없음(잠김)' },
+        { name: 'U3 · M④ 다시 짜기 실패 — 이전 안 있음', state: 'regenFailed', scroll: 'top', note: '[U3-2] LLM_UNAVAILABLE\n  + 이전 안으로 시작할 수 있어요\n  다시 시도: Secondary\n[U3-5] 열림 · 2 / 3회\n\n가장 강조: 이대로 시작하기' },
+        { name: 'U3 · M⑤ 학습 중', state: 'active', scroll: 'top', note: '[U3-1] 경제 기초 · 학습 중\n[U3-7] 진도 5 / 16\n[U3-4] 학습 목록 — 6강 옅은 바탕\n\n가장 강조: 다음 강의' },
+        { name: 'U3 · M⑥ 삭제 확인 펼침', state: 'deleteOpen', scroll: 'bottom', note: '[U3-6] 링크 자리가 펼침(§2.7)\n  포커스: 안내 문구\n삭제하기 · 취소 — 둘 다 Secondary' },
+        { name: 'U3 · M⑦ 완료 — 하나짜리', state: 'doneSingle', scroll: 'top', note: '[U3-1] 한국사 근현대 · 완료\n[U3-8] 마침 + 새 커리큘럼 링크\n[U3-4] 8강 모두 완료 — 다시 읽기\n\n가장 강조: 없음' },
+        { name: 'U3 · M⑧ 완료 — 묶음 1단계', state: 'doneStep', scroll: 'top', note: '[U3-0] 묶음 경로 1 / 3단계\n[U3-1] Spring 핵심 원리 · 완료\n[U3-8] 다음 단계 카드\n[U3-4] 12강 모두 완료\n\n가장 강조: 2단계 커리큘럼 만들기' },
+        { name: 'U3 · M⑩ 짜는 중 — 2단계 첫 짜기', state: 'firstGen', scroll: 'top', note: '[U3-0] 묶음 경로 2 / 3단계\n[U3-1] 웹 MVC와 데이터 접근 · 짜는 중\n[U3-2] 대기 블록(커리큘럼형)\n[U3-3] · [U3-4] 회색 줄\n[U3-5] 두 버튼 잠김 + 이유\n[U3-6] 삭제 열림(화면 밖)\n\n가장 강조: 없음(잠김)' },
+      ],
+      u2: [
+        { name: 'U2 · M① 처음 온 사용자', state: 'first', scroll: 'top', note: '[U2-1] 빈 상태 — 버튼 없음\n[U2-2] 없음\n[U2-3] 펼침 — 화면의 중심\n\n가장 강조: 커리큘럼 만들기\n(주제가 비어 잠김)\n생성량 0% — 가입 직후 가정' },
+        { name: 'U2 · M② 평소', state: 'normal', scroll: 'top', note: '[U2-1] 오늘의 복습 23장\n[U2-2] 검토 대기 · 학습 중 · 묶음\n  끝난 학습 접힘\n[U2-3] 버튼 하나로 접힘\n\n가장 강조: 복습 시작' },
+        { name: 'U2 · M③ 짜는 중 · 짜기 실패 요청', state: 'requests', scroll: 'top', note: '[U2-2] 맨 위 요청 항목 2개\n  통계학 입문 — 짜는 중\n  주제 거절 — 지우기(묻지 않음)\n  지우기는 오른쪽 끝에 떼어 둔 자리\n\n가장 강조: 복습 시작' },
+        { name: 'U2 · M④ 오늘 복습 끝 + 막힘 — 1/2', state: 'doneBlocked', scroll: 'top', note: '[U2-1] 오늘 복습은 끝났어요\n[U2-2] 통계학 입문 짜는 중 + …\n\n가장 강조: 맨 위에서 버튼이 있는\n첫 항목 — 검토하기' },
+        { name: 'U2 · M④ 오늘 복습 끝 + 막힘 — 2/2', state: 'doneBlocked', scroll: 'form', note: '[U2-3] 펼침\n[U2-3a] ACTIVE_JOB_LIMIT(세 부분 문구)\n  오늘 복습 0장 → 복습하기 링크 없음\n오늘 생성량 60%' },
+      ],
+      u5: [
+        { name: 'U5 · M① 오늘의 복습 — 앞면', state: 'todayFront', note: '[U5-1] 세션 머리\n[U5-2] 플래시카드 — 앞면\n[U5-3] 답 보기 — 아래 고정\n\n가장 강조: 답 보기\n상단 바 21 = 23 − 평가한 2장' },
+        { name: 'U5 · M② 답 + 평가', state: 'todayAnswer', note: '[U5-1] · [U5-2] 답\n[U5-3] 평가 4개 2×2 — 같은 모양\n\n가장 강조: 없음' },
+        { name: 'U5 · M③ 첫 복습 — 앞면', state: 'firstFront', note: '[U5-1] 머리 + 안내 한 줄\n[U5-2] 6강 1번째\n[U5-3] 답 보기\n\n가장 강조: 답 보기\n상단 바 31 = 23 + 6강 8장' },
+        { name: 'U5 · M④ 저장 실패', state: 'saveFail', note: '[U5-4] 저장 알림 자리 — [U5-3] 바로 위\n다시 시도: Secondary\n\n가장 강조: 없음' },
+        { name: 'U5 · M⑤ 끝 — 첫 복습', state: 'endFirst', note: '[U5-5] 끝 화면\n\n가장 강조: 다음 강의 · 7강\n요약 숫자(1·2·4·1)는 임시값\n상단 바 23 = 31 − 평가한 8장' },
+        { name: 'U5 · M⑥ 끝 — 오늘의 복습', state: 'endToday', note: '[U5-5] 끝 화면\n상단 바 0장 → 숫자 없음\n\n가장 강조: 홈으로' },
+        { name: 'U5 · M⑧ 기다리는 동안 — 6강 준비됨 알림', state: 'waitReady', note: '[U5-1] 오늘의 복습 · 5 / 23\n  그만하기 자리 → 6강으로 돌아가기\n  준비 알림 한 줄(aria-live polite)\n  플래시카드를 가리지 않음\n[U5-2] 5번째 — 카드 내용 임시\n\n가장 강조: 답 보기\n상단 바 19 = 23 − 평가한 4장' },
+        { name: 'U5 · M⑨ 끝 — 그만했을 때', state: 'endStopped', note: '[U5-5] 여기까지 저장했어요\n  남은 12장 · 요약 11장\n  요약 숫자(1·3·5·2)는 임시값\n상단 바 12 = 남은 장수\n\n가장 강조: 홈으로' },
+      ],
+      u4: [
+        { name: 'U4 · M① 줄서기', state: 'queued', scroll: 'top', note: '[U4-1] 강의 머리\n[U4-2] 대기 블록 — 단계 전부 ○\n\n가장 강조: 없음' },
+        { name: 'U4 · M② 만드는 중', state: 'running', scroll: 'top', note: '[U4-1]\n[U4-2] 「본문 작성」 지금\n\n가장 강조: 없음' },
+        { name: 'U4 · M③ 평소보다 오래 걸림', state: 'slow', scroll: 'top', note: '[U4-1]\n[U4-2] + warn 한 줄\n\n가장 강조: 없음' },
+        { name: 'U4 · M④ 실패 — 이어서 다시 시도', state: 'failRetry', scroll: 'top', note: '[U4-1]\n[U4-2] LLM_UNAVAILABLE\n\n가장 강조: 이어서 다시 시도' },
+        { name: 'U4 · M⑤ 실패 — 처음부터 다시 만들기', state: 'failRestart', scroll: 'top', note: '[U4-1]\n[U4-2] JOB_CALL_LIMIT_EXCEEDED\n\n가장 강조: 처음부터 다시 만들기' },
+        { name: 'U4 · M⑥ 막힘 — 오늘 마감', state: 'blocked', scroll: 'top', note: '[U4-1]\n[U4-2] GLOBAL_BUDGET_EXHAUSTED\n  + 복습하기 (23장) · 커리큘럼으로\n단계 목록 없음\n\n가장 강조: 없음' },
+        { name: 'U4 · M⑦ 본문 — 1/3 목차', state: 'body', scroll: 'top', note: '[U4-1]\n[U4-3] 목차 · 오늘 배울 것\n\n가장 강조: 학습 완료(본문 맨 아래)' },
+        { name: 'U4 · M⑦ 본문 — 2/3 그림 · 수식', state: 'body', scroll: 'concept', note: '[U4-3] 개념 설명\n흐름도(mermaid) · 수식(KaTeX)' },
+        { name: 'U4 · M⑦ 본문 — 3/3 표 · 그림 실패', state: 'body', scroll: 'example', note: '[U4-3] 예시\n표 — 한국은행 · 통계청 공개값\n두 번째 그림 자리 = 실패 상자' },
+        { name: 'U4 · M⑧ 학습 완료 후', state: 'done', scroll: 'end', note: '[U4-4] 자리가 바뀜\n상단 바 31 = 23 + 6강 8장\n\n가장 강조: 바로 복습하기' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

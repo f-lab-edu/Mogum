@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+body{margin:0;background:#FAF8F3}
+a{color:#2F4B7C;text-decoration:none;text-underline-offset:4px}
+a:hover{text-decoration:underline}
+</style>
+</helmet>
+<div style="background:#FAF8F3;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#3A3632;font-size:16px;-webkit-font-smoothing:antialiased">
+  <header data-layer="상단 바 — 관리자" style="height:56px;background:#FFFFFF;border-bottom:1px solid #E4DFD5;box-sizing:border-box">
+    <nav style="max-width:80rem;margin:0 auto;height:100%;padding:0 32px;box-sizing:border-box;display:flex;align-items:center;gap:20px">
+      <a href="#" style="font-size:18px;font-weight:700;color:#1F1D1A;min-height:44px;display:flex;align-items:center">머금</a>
+      <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center">홈</a>
+      <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center;font-variant-numeric:tabular-nums">복습 (23)</a>
+      <a href="#" aria-current="page" style="color:#2F4B7C;font-weight:600;min-height:44px;display:flex;align-items:center">시스템 상태</a>
+      <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center;margin-left:auto">설정</a>
+    </nav>
+  </header>
+  <main style="max-width:80rem;margin:0 auto;padding:28px 32px 64px;box-sizing:border-box;display:flex;flex-direction:column;gap:32px;font-variant-numeric:tabular-nums">
+
+    <div data-layer="U6-1 머리" style="display:flex;align-items:center;gap:16px">
+      <h1 style="margin:0;font-size:24px;line-height:1.35;font-weight:600;color:#1F1D1A">시스템 상태</h1>
+      <span style="font-size:14px;color:#6B655C">14:32:05 기준</span>
+      <button style="margin-left:auto;height:44px;padding:0 16px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;transition:background 100ms" style-hover="background:#F1EEE7">새로고침</button>
+    </div>
+
+    <section data-layer="U6-2 지금 도는 작업" style="display:flex;flex-direction:column;gap:12px">
+      <h2 style="margin:0;font-size:18px;font-weight:600;color:#1F1D1A">지금 도는 작업</h2>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px">
+        <div style="padding:20px;display:flex;flex-direction:column;gap:4px;border-right:1px solid #E4DFD5">
+          <span style="font-size:14px;color:#6B655C">대기</span>
+          <span style="font-size:30px;font-weight:600;color:#1F1D1A">{{ d.queued }}</span>
+          <span style="font-size:14px;color:#6B655C">{{ d.oldest }}</span>
+        </div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:4px;border-right:1px solid #E4DFD5">
+          <span style="font-size:14px;color:#6B655C">실행 중</span>
+          <span style="font-size:30px;font-weight:600;color:#1F1D1A">{{ d.running }}<span style="font-size:16px;font-weight:400;color:#6B655C"> / 실행기 4</span></span>
+        </div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:4px">
+          <span style="font-size:14px;color:#6B655C">최근 24시간 작업 시도 실패율</span>
+          <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+            <span style="font-size:30px;font-weight:600;color:#1F1D1A">1%</span>
+          </sc-if>
+          <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+            <span style="font-size:16px;line-height:1.6;color:#3A3632;padding-top:8px">최근 24시간 종결된 작업이 없어요.</span>
+          </sc-if>
+        </div>
+      </div>
+    </section>
+
+    <section data-layer="U6-3 비용" style="display:flex;flex-direction:column;gap:12px">
+      <h2 style="margin:0;font-size:18px;font-weight:600;color:#1F1D1A">비용</h2>
+      <div style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px">
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-bottom:1px solid #E4DFD5">
+          <div style="padding:20px;display:flex;flex-direction:column;gap:4px;border-right:1px solid #E4DFD5">
+            <span style="font-size:14px;color:#6B655C">오늘 토큰</span>
+            <span style="font-size:30px;font-weight:600;color:#1F1D1A">{{ d.tokens }}</span>
+          </div>
+          <div style="padding:20px;display:flex;flex-direction:column;gap:4px;border-right:1px solid #E4DFD5">
+            <span style="font-size:14px;color:#6B655C">오늘 환산 비용</span>
+            <span style="font-size:30px;font-weight:600;color:#1F1D1A">{{ d.cost }}</span>
+          </div>
+          <div style="padding:20px;display:flex;flex-direction:column;gap:4px">
+            <span style="font-size:14px;color:#6B655C">비용 미확인 호출</span>
+            <span style="font-size:30px;font-weight:600;color:#1F1D1A">{{ d.unknown }}</span>
+            <span style="font-size:14px;line-height:1.5;color:#6B655C">사용량을 확인하지 못한 호출은 비용 합계에 포함되지 않아요</span>
+          </div>
+        </div>
+        <div data-layer="전역 한도 막대" style="padding:20px;display:flex;flex-direction:column;gap:8px">
+          <div role="progressbar" style="height:6px;border-radius:9999px;background:#F1EEE7;overflow:hidden"><div style="height:100%;border-radius:9999px;background:#2F4B7C;width:{{ d.capPct }}"></div></div>
+          <span style="font-size:14px;color:#6B655C">{{ d.capLeft }}</span>
+        </div>
+      </div>
+    </section>
+
+    <section data-layer="U6-4 신뢰성" style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <h2 style="margin:0;font-size:18px;font-weight:600;color:#1F1D1A">신뢰성</h2>
+        <span style="font-size:14px;color:#6B655C">최근 24시간</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px">
+        <sc-for list="{{ d.rel }}" as="r" hint-placeholder-count="7">
+          <div style="padding:16px;display:flex;flex-direction:column;gap:4px;border-right:1px solid #E4DFD5">
+            <span style="font-size:13px;line-height:1.4;color:#6B655C">{{ r.k }}</span>
+            <span style="font-size:22px;font-weight:600;color:#1F1D1A">{{ r.v }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <p style="margin:0;font-size:14px;line-height:1.6;color:#6B655C">실패 후 재시도가 성공하면 실패와 성공을 각각 셉니다. 429 비율은 응답 코드가 확인된 호출 기준이에요.</p>
+    </section>
+
+    <section data-layer="U6-5 가입" style="display:flex;flex-direction:column;gap:12px">
+      <h2 style="margin:0;font-size:18px;font-weight:600;color:#1F1D1A">가입</h2>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px">
+        <div style="padding:20px;display:flex;flex-direction:column;gap:4px;border-right:1px solid #E4DFD5">
+          <span style="font-size:14px;color:#6B655C">가입 / 정원</span>
+          <span style="font-size:30px;font-weight:600;color:#1F1D1A">{{ d.members }}<span style="font-size:16px;font-weight:400;color:#6B655C"> / 25</span></span>
+        </div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:4px;border-right:1px solid #E4DFD5">
+          <span style="font-size:14px;color:#6B655C">대기 명단</span>
+          <span style="font-size:30px;font-weight:600;color:#1F1D1A">{{ d.waitlist }}</span>
+        </div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:4px">
+          <span style="font-size:14px;color:#6B655C">오늘 활동</span>
+          <span style="font-size:30px;font-weight:600;color:#1F1D1A">{{ d.active }}</span>
+        </div>
+      </div>
+    </section>
+
+    <section data-layer="U6-6 개념 매칭" style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap">
+        <h2 style="margin:0;font-size:18px;font-weight:600;color:#1F1D1A">개념 매칭</h2>
+        <span style="font-size:14px;color:#3A3632">{{ d.match }}</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <h3 style="margin:0;font-size:16px;font-weight:600;color:#1F1D1A">경계 근처 판정</h3>
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#6B655C">임계값을 아슬아슬하게 넘어 합친 판정이에요. 다른 개념을 잘못 합치지 않았는지 정의를 비교해 보세요.</p>
+        <div style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:14px;line-height:1.5">
+            <thead><tr style="text-align:left;color:#1F1D1A">
+              <th style="padding:10px 14px;border-bottom:1px solid #E4DFD5;font-weight:600">사용자</th>
+              <th style="padding:10px 14px;border-bottom:1px solid #E4DFD5;font-weight:600">판정 번호</th>
+              <th style="padding:10px 14px;border-bottom:1px solid #E4DFD5;font-weight:600">들어온 이름</th>
+              <th style="padding:10px 14px;border-bottom:1px solid #E4DFD5;font-weight:600">들어온 정의</th>
+              <th style="padding:10px 14px;border-bottom:1px solid #E4DFD5;font-weight:600">연결된 개념</th>
+              <th style="padding:10px 14px;border-bottom:1px solid #E4DFD5;font-weight:600">그 개념의 정의</th>
+              <th style="padding:10px 14px;border-bottom:1px solid #E4DFD5;font-weight:600;text-align:right">유사도</th>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{ d.near }}" as="r" hint-placeholder-count="3">
+                <tr style="vertical-align:top">
+                  <td style="padding:10px 14px;border-bottom:1px solid #E4DFD5;white-space:nowrap">{{ r.u }}</td>
+                  <td style="padding:10px 14px;border-bottom:1px solid #E4DFD5;white-space:nowrap">{{ r.id }}</td>
+                  <td style="padding:10px 14px;border-bottom:1px solid #E4DFD5;color:#1F1D1A;white-space:nowrap">{{ r.n }}</td>
+                  <td style="padding:10px 14px;border-bottom:1px solid #E4DFD5">{{ r.nd }}</td>
+                  <td style="padding:10px 14px;border-bottom:1px solid #E4DFD5;color:#1F1D1A;white-space:nowrap">{{ r.c }}</td>
+                  <td style="padding:10px 14px;border-bottom:1px solid #E4DFD5">{{ r.cd }}</td>
+                  <td style="padding:10px 14px;border-bottom:1px solid #E4DFD5;text-align:right">{{ r.s }}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+          <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+            <p style="margin:0;padding:20px 14px;font-size:14px;color:#6B655C">아직 기록이 없어요.</p>
+          </sc-if>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <h3 style="margin:0;font-size:16px;font-weight:600;color:#1F1D1A">병합 후보</h3>
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#6B655C">임계값을 아깝게 넘지 못한 쌍이에요. 임계값을 낮출지, 이 쌍만 합칠지 판단하는 자리예요.</p>
+        <div style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:14px;line-height:1.5">
+            <thead><tr style="text-align:left;color:#1F1D1A">
+              <th style="padding:10px 14px;border-bottom:1px solid #E4DFD5;font-weight:600">사용자</th>
+              <th style="padding:10px 14px;border-bottom:1px solid #E4DFD5;font-weight:600">개념 A</th>
+              <th style="padding:10px 14px;border-bottom:1px solid #E4DFD5;font-weight:600">개념 B</th>
+              <th style="padding:10px 14px;border-bottom:1px solid #E4DFD5;font-weight:600;text-align:right">유사도</th>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{ d.cand }}" as="r" hint-placeholder-count="2">
+                <tr style="vertical-align:top">
+                  <td style="padding:10px 14px;border-bottom:1px solid #E4DFD5;white-space:nowrap">{{ r.u }}</td>
+                  <td style="padding:10px 14px;border-bottom:1px solid #E4DFD5"><span style="color:#6B655C">{{ r.aId }}</span> <strong style="font-weight:600;color:#1F1D1A">{{ r.a }}</strong><br>{{ r.ad }}</td>
+                  <td style="padding:10px 14px;border-bottom:1px solid #E4DFD5"><span style="color:#6B655C">{{ r.bId }}</span> <strong style="font-weight:600;color:#1F1D1A">{{ r.b }}</strong><br>{{ r.bd }}</td>
+                  <td style="padding:10px 14px;border-bottom:1px solid #E4DFD5;text-align:right">{{ r.s }}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+          <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+            <p style="margin:0;padding:20px 14px;font-size:14px;color:#6B655C">아직 기록이 없어요.</p>
+          </sc-if>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:1400},&quot;empty&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const U = 'someone@gmail.com';
+const FULL = {
+  queued: '3', oldest: '가장 오래 40초', running: '2',
+  tokens: '84,000', cost: '620원', unknown: '2건', capPct: '6.2%', capLeft: '킬스위치까지 9,380원 남음',
+  rel: [{ k: '429 비율', v: '2%' }, { k: '호출 재시도 등록', v: '5회' }, { k: '작업 시도 실패율', v: '1%' }, { k: '회수', v: '0건' }, { k: '성공', v: '99회' }, { k: '실패', v: '1회' }, { k: '실패한 채 남은 강의', v: '0개' }],
+  members: '14', waitlist: '3', active: '6명',
+  match: '합침 41 · 갈라놓음 3 · 새로 만듦 128',
+  near: [
+    { u: U, id: '#1042', n: '금리', nd: '돈을 빌린 대가로 내는 이자의 비율', c: '이자율', cd: '원금에 대한 이자의 비율', s: '0.912' },
+    { u: U, id: '#1038', n: '공급 감소', nd: '공급 곡선이 왼쪽으로 이동하는 것', c: '공급 변화', cd: '가격 외 요인으로 공급 곡선이 이동하는 것', s: '0.905' },
+    { u: U, id: '#1031', n: '빈 스코프', nd: '빈이 존재할 수 있는 범위', c: '빈 생명주기', cd: '빈이 생성되고 소멸하기까지의 과정', s: '0.901' },
+  ],
+  cand: [
+    { u: U, aId: '#312', a: '인플레이션', ad: '물가가 지속적으로 오르는 현상', bId: '#355', b: '물가 상승', bd: '상품과 서비스의 가격이 전반적으로 오르는 것', s: '0.893' },
+    { u: U, aId: '#207', a: '의존성 주입', ad: '객체가 필요한 의존 객체를 외부에서 받는 방식', bId: '#219', b: 'DI', bd: '의존 관계를 외부에서 넣어 주는 설계', s: '0.887' },
+  ],
+};
+const EMPTY = {
+  queued: '0', oldest: '', running: '0',
+  tokens: '0', cost: '0원', unknown: '0건', capPct: '0%', capLeft: '킬스위치까지 10,000원 남음',
+  rel: [{ k: '429 비율', v: '표본 없음' }, { k: '호출 재시도 등록', v: '0회' }, { k: '작업 시도 실패율', v: '표본 없음' }, { k: '회수', v: '0건' }, { k: '성공', v: '0회' }, { k: '실패', v: '0회' }, { k: '실패한 채 남은 강의', v: '0개' }],
+  members: '1', waitlist: '0', active: '1명',
+  match: '합침 0 · 갈라놓음 0 · 새로 만듦 0',
+  near: [], cand: [],
+};
+class Component extends DCLogic {
+  renderVals() {
+    const e = !!this.props.empty;
+    return { d: e ? EMPTY : FULL, empty: e, full: !e };
+  }
+}
+</script>
+</body>
+</html>

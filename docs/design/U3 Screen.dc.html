@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+body{margin:0;background:#FAF8F3}
+a{color:#2F4B7C;text-decoration:none;text-underline-offset:4px}
+a:hover{text-decoration:underline}
+textarea::placeholder{color:#A39D93}
+</style>
+</helmet>
+<div style="height:100%;display:flex;flex-direction:column;background:#FAF8F3;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#3A3632;font-size:16px;-webkit-font-smoothing:antialiased">
+  <div ref="{{ rootRef }}" style="position:relative;flex:1;min-height:0;overflow:hidden">
+    <header data-layer="상단 바" style="height:56px;background:#FFFFFF;border-bottom:1px solid #E4DFD5;box-sizing:border-box">
+      <nav style="max-width:calc(48rem + 32px);margin:0 auto;height:100%;padding:0 16px;box-sizing:border-box;display:flex;align-items:center;gap:20px">
+        <a href="#" style="font-size:18px;font-weight:700;color:#1F1D1A;min-height:44px;display:flex;align-items:center">머금</a>
+        <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center">홈</a>
+        <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center;font-variant-numeric:tabular-nums">복습 (23)</a>
+        <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center;margin-left:auto">설정</a>
+      </nav>
+    </header>
+    <main style="max-width:calc(48rem + 32px);margin:0 auto;padding:20px 16px 48px;box-sizing:border-box;display:flex;flex-direction:column;gap:32px">
+
+      <div data-layer="U3-0 · U3-1 제목 줄" style="display:flex;flex-direction:column;gap:6px">
+        <sc-if value="{{ isStep }}" hint-placeholder-val="{{ false }}">
+          <a href="#" data-layer="U3-0 묶음 경로" style="align-self:flex-start;font-size:14px;color:#2F4B7C;min-height:44px;display:flex;align-items:center;margin:-6px 0 -8px;font-variant-numeric:tabular-nums">{{ pathText }}</a>
+        </sc-if>
+        <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px">
+          <h1 style="margin:0;font-size:24px;line-height:1.35;font-weight:600;color:#1F1D1A">{{ c.title }}</h1>
+          <span style="font-size:14px;color:{{ statusColor }}">{{ status }}</span>
+        </div>
+        <p style="margin:0;font-size:16px;line-height:1.6;color:#3A3632;text-wrap:pretty">{{ c.line }}</p>
+        <p style="margin:0;font-size:14px;color:#6B655C">원하는 속도로, 원하는 순서로 학습하세요.</p>
+      </div>
+
+      <sc-if value="{{ isGenerating }}" hint-placeholder-val="{{ false }}">
+        <section data-layer="U3-2 알림 자리 · 대기 블록" aria-live="polite" style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:12px">
+          <h2 style="margin:0;font-size:18px;font-weight:600;color:#1F1D1A">커리큘럼을 짜고 있어요</h2>
+          <div style="display:flex;flex-direction:column;gap:4px;border-top:1px solid #E4DFD5;padding-top:12px">
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#6B655C">수십 초 걸려요. 이 화면을 떠나도 계속 짜요.</p>
+            <a href="#" style="align-self:flex-start;font-size:16px;color:#2F4B7C;min-height:44px;display:flex;align-items:center;margin-bottom:-8px">기다리는 동안 복습하기 (23장)</a>
+          </div>
+        </section>
+      </sc-if>
+      <sc-if value="{{ isRegenFailed }}" hint-placeholder-val="{{ false }}">
+        <section data-layer="U3-2 알림 자리 · 다시 짜기 실패" aria-live="polite" style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <p style="margin:0;font-size:16px;line-height:1.6;color:#B4443A">지금은 만들 수 없어요. 잠시 후 다시 시도해 주세요.</p>
+            <p style="margin:0;font-size:16px;line-height:1.6;color:#3A3632">이전 안으로 시작할 수 있어요.</p>
+          </div>
+          <button style="align-self:flex-start;height:44px;padding:0 16px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;transition:background 100ms" style-hover="background:#F1EEE7">다시 시도</button>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ isReviewish }}" hint-placeholder-val="{{ true }}">
+        <sc-if value="{{ isRegenerating }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:0 0 -16px;font-size:14px;color:#6B655C">새 안이 나오면 바뀌어요.</p>
+        </sc-if>
+        <section data-layer="U3-3 이렇게 짰어요" style="display:flex;flex-direction:column;gap:12px;opacity:{{ dim }}">
+          <h2 style="margin:0;font-size:18px;font-weight:600;color:#1F1D1A">이렇게 짰어요</h2>
+          <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:16px;line-height:1.6;color:#3A3632;text-wrap:pretty">
+            <li style="padding-bottom:8px;border-bottom:1px solid #E4DFD5"><strong style="font-weight:600;color:#1F1D1A">기회비용</strong>은 이미 잘 알고 계셔서 별도 강의로 만들지 않았어요.</li>
+            <li style="padding-bottom:8px;border-bottom:1px solid #E4DFD5"><strong style="font-weight:600;color:#1F1D1A">수요와 공급</strong>은 어느 정도 아셔서 짧게 다뤄요.</li>
+            <li><strong style="font-weight:600;color:#1F1D1A">가격 탄력성</strong>은 아직 헷갈리실 수 있어서 더 자세히 다뤄요.</li>
+          </ul>
+        </section>
+        <section data-layer="U3-4 강의 목록 — 검토(누르지 못함)" style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;opacity:{{ dim }}">
+          <sc-for list="{{ c.lessons }}" as="l" hint-placeholder-count="10">
+            <div style="padding:16px 20px;border-bottom:1px solid #E4DFD5;display:grid;grid-template-columns:24px 1fr;gap:4px 8px;cursor:default">
+              <span style="font-size:16px;line-height:1.5;color:#6B655C;font-variant-numeric:tabular-nums">{{ l.n }}</span>
+              <span style="font-size:16px;line-height:1.5;font-weight:600;color:#1F1D1A">{{ l.t }}</span>
+              <p style="grid-column:2;margin:0;font-size:14px;line-height:1.6;color:#6B655C;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ l.o }}</p>
+              <div style="grid-column:2;display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+                <sc-for list="{{ l.k }}" as="kw" hint-placeholder-count="1">
+                  <span style="border-radius:2px;background:#F1EEE7;color:#6B655C;font-size:12px;line-height:1.5;padding:2px 8px">{{ kw }}</span>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ isFirstGen }}" hint-placeholder-val="{{ false }}">
+        <div data-layer="U3-3 · U3-4 회색 줄" aria-hidden="true" style="display:flex;flex-direction:column;gap:12px">
+          <div style="height:18px;width:30%;border-radius:2px;background:#F1EEE7"></div>
+          <div style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px">
+            <sc-for list="{{ skel }}" as="k" hint-placeholder-count="5">
+              <div style="padding:16px 20px;border-bottom:1px solid #E4DFD5;display:flex;gap:12px;align-items:flex-start">
+                <div style="width:20px;height:14px;border-radius:2px;background:#F1EEE7;flex:none"></div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+                  <div style="height:14px;border-radius:2px;background:#F1EEE7;width:{{ k.a }}"></div>
+                  <div style="height:10px;border-radius:2px;background:#F1EEE7;width:{{ k.b }}"></div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isRegenOpen }}" hint-placeholder-val="{{ false }}">
+        <section ref="{{ regenRef }}" data-layer="U3-5a 다시 짜기 펼침" style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:16px">
+          <label style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:16px;color:#1F1D1A">무엇을 바꿀까요? (선택)</span>
+            <textarea rows="4" placeholder="예: 실무 예제를 더 넣어 주세요. 기초 설명을 더 자세히 해 주세요." style="padding:10px 12px;border-radius:6px;border:1px solid #2F4B7C;box-shadow:0 0 0 1px #2F4B7C;background:#FFFFFF;color:#1F1D1A;font:inherit;line-height:1.6;resize:vertical;box-sizing:border-box;width:100%;outline:none"></textarea>
+            <span style="align-self:flex-end;font-size:12px;color:#6B655C;font-variant-numeric:tabular-nums">0 / 500</span>
+          </label>
+          <p style="margin:-8px 0 0;font-size:14px;line-height:1.6;color:#6B655C;text-wrap:pretty">강의 내용 · 범위 · 깊이 · 순서를 바꿀 수 있어요. 학습 일정은 정하지 않아요. 오늘 2번 더 다시 짤 수 있어요.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:12px">
+            <button style="height:44px;padding:0 16px;border-radius:6px;border:none;background:#2F4B7C;color:#FFFFFF;font:inherit;font-weight:600;cursor:pointer;transition:background 100ms" style-hover="background:#253D66">이 내용으로 다시 짜기</button>
+            <button style="height:44px;padding:0 16px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;transition:background 100ms" style-hover="background:#F1EEE7">취소</button>
+          </div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ isActive }}" hint-placeholder-val="{{ false }}">
+        <section data-layer="U3-7 진도" style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div role="progressbar" style="flex:1;height:6px;border-radius:9999px;background:#F1EEE7;overflow:hidden"><div style="width:31.25%;height:100%;border-radius:9999px;background:#2F4B7C"></div></div>
+            <span style="font-size:14px;color:#6B655C;font-variant-numeric:tabular-nums">5 / 16강 완료</span>
+          </div>
+          <button style="align-self:flex-start;max-width:100%;height:44px;padding:0 16px;border-radius:6px;border:none;background:#2F4B7C;color:#FFFFFF;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background 100ms" style-hover="background:#253D66">다음 강의 · 6강 기준금리와 인플레이션</button>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ isDoneSingle }}" hint-placeholder-val="{{ false }}">
+        <section data-layer="U3-8 마침 — 하나짜리" style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:8px">
+          <p style="margin:0;font-size:18px;font-weight:600;color:#1F1D1A">모든 강의를 마쳤어요.</p>
+          <p style="margin:0;font-size:16px;line-height:1.6;color:#3A3632">다음 커리큘럼은 이미 아는 내용을 줄여서 짜요.</p>
+          <a href="#" style="align-self:flex-start;font-size:16px;color:#2F4B7C;min-height:44px;display:flex;align-items:center;margin-bottom:-8px">새 커리큘럼 만들기</a>
+        </section>
+      </sc-if>
+      <sc-if value="{{ isDoneStep }}" hint-placeholder-val="{{ false }}">
+        <section data-layer="U3-8 마침 — 다음 단계 카드" style="display:flex;flex-direction:column;gap:12px">
+          <p style="margin:0;font-size:18px;font-weight:600;color:#1F1D1A">모든 강의를 마쳤어요.</p>
+          <div style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:8px">
+            <p style="margin:0;font-size:16px;line-height:1.6;font-weight:600;color:#1F1D1A">다음은 2단계 ‘웹 MVC와 데이터 접근’이에요.</p>
+            <p style="margin:0;font-size:16px;line-height:1.6;color:#3A3632">요청 처리 흐름 · REST API 설계 · JPA와 영속성 관리</p>
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#6B655C">지금까지의 복습 기록을 반영해 짜요. 수십 초 걸려요.</p>
+            <button style="align-self:flex-start;margin-top:8px;height:44px;padding:0 16px;border-radius:6px;border:none;background:#2F4B7C;color:#FFFFFF;font:inherit;font-weight:600;cursor:pointer;transition:background 100ms" style-hover="background:#253D66">2단계 커리큘럼 만들기</button>
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#6B655C;text-wrap:pretty">나중에 만들어도 돼요. 홈과 묶음 화면에서도 만들 수 있어요.</p>
+          </div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ isLearnList }}" hint-placeholder-val="{{ false }}">
+        <section data-layer="U3-4 강의 목록 — 학습 중 · 완료(모두 누를 수 있음)" style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;overflow:hidden">
+          <sc-for list="{{ c.lessons }}" as="l" hint-placeholder-count="8">
+            <div style="min-height:52px;padding:12px 20px;box-sizing:border-box;border-bottom:1px solid #E4DFD5;display:grid;grid-template-columns:24px 1fr auto;gap:8px;align-items:baseline;cursor:pointer;background:{{ l.bg }}" style-hover="background:#F1EEE7">
+              <span style="font-size:16px;line-height:1.5;color:#6B655C;font-variant-numeric:tabular-nums">{{ l.n }}</span>
+              <span style="font-size:16px;line-height:1.5;color:#1F1D1A">{{ l.t }}</span>
+              <span style="font-size:14px;color:{{ l.sc }}">{{ l.s }}</span>
+            </div>
+          </sc-for>
+        </section>
+      </sc-if>
+
+      <div ref="{{ endRef }}" data-layer="U3-6 관리" style="border-top:1px solid #E4DFD5;padding-top:16px">
+        <sc-if value="{{ deleteClosed }}" hint-placeholder-val="{{ true }}">
+          <a href="#" style="font-size:14px;color:#6B655C;min-height:44px;display:inline-flex;align-items:center;text-decoration:underline;text-underline-offset:4px">이 커리큘럼 삭제</a>
+        </sc-if>
+        <sc-if value="{{ isDeleteOpen }}" hint-placeholder-val="{{ false }}">
+          <div data-layer="확인 펼침 §2.7" style="display:flex;flex-direction:column;gap:16px;padding-top:4px">
+            <p tabindex="-1" style="margin:0;font-size:16px;line-height:1.6;color:#3A3632;text-wrap:pretty">이 커리큘럼과 강의 자료, 학습 기록, 관련 플래시카드가 모두 삭제돼요. 삭제한 플래시카드의 학습 기록은 앞으로의 맞춤 학습에 반영되지 않아요. 삭제하면 되돌릴 수 없어요.</p>
+            <div style="display:flex;flex-wrap:wrap;gap:12px">
+              <button style="height:44px;padding:0 16px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;transition:background 100ms" style-hover="background:#F1EEE7">삭제하기</button>
+              <button style="height:44px;padding:0 16px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;transition:background 100ms" style-hover="background:#F1EEE7">취소</button>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </main>
+  </div>
+
+  <sc-if value="{{ showBar }}" hint-placeholder-val="{{ true }}">
+    <div data-layer="U3-5 결정 바 (화면 아래 고정)" style="flex:none;background:#FFFFFF;border-top:1px solid #E4DFD5;padding:12px 16px 20px">
+      <div style="max-width:48rem;margin:0 auto;display:flex;flex-direction:column;gap:8px">
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;opacity:{{ barOpacity }}">
+          <div style="display:flex;flex-direction:column;gap:4px;align-items:center">
+            <button disabled="{{ barLocked }}" style="height:44px;padding:0 16px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;transition:background 100ms" style-hover="background:#F1EEE7">다시 짜기</button>
+            <span style="font-size:12px;color:#6B655C;font-variant-numeric:tabular-nums;white-space:nowrap">{{ regenText }}</span>
+          </div>
+          <button disabled="{{ barLocked }}" style="height:44px;padding:0 16px;border-radius:6px;border:none;background:#2F4B7C;color:#FFFFFF;font:inherit;font-weight:600;cursor:pointer;transition:background 100ms" style-hover="background:#253D66">이대로 시작하기</button>
+        </div>
+        <sc-if value="{{ isGenerating }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:0;font-size:14px;color:#6B655C">짜는 중에는 시작할 수 없어요.</p>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;review&quot;,&quot;regenOpen&quot;,&quot;regenerating&quot;,&quot;regenFailed&quot;,&quot;active&quot;,&quot;deleteOpen&quot;,&quot;doneSingle&quot;,&quot;doneStep&quot;,&quot;firstGen&quot;],&quot;default&quot;:&quot;review&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;scrollTo&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;top&quot;,&quot;regen&quot;,&quot;bottom&quot;],&quot;default&quot;:&quot;top&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const L = (n, t, o, k) => ({ n, t, o, k });
+const FIN = {
+  title: '금융 시장 입문', line: '금융 시장 입문 · 금리 · 환율 기사를 이해하고 싶어요 · 강의 10개',
+  lessons: [
+    L(1, '금융 시장은 무엇을 하나', '돈이 모이고 흘러가는 길을 설명할 수 있다', ['금융 시장', '자금 중개']),
+    L(2, '수요와 공급으로 보는 가격', '금리 · 환율도 수요와 공급으로 정해진다는 것을 설명할 수 있다', ['수요와 공급']),
+    L(3, '가격 탄력성', '가격 변화에 수요가 얼마나 반응하는지 계산하고 해석할 수 있다', ['가격 탄력성']),
+    L(4, '가격 탄력성과 금융 상품', '금리 변화에 예금 · 대출 수요가 다르게 반응하는 이유를 설명할 수 있다', ['가격 탄력성', '금리']),
+    L(5, '금리의 종류', '기준금리 · 시장금리 · 대출금리의 관계를 구분할 수 있다', ['기준금리', '시장금리']),
+    L(6, '채권과 금리', '채권 가격과 금리가 반대로 움직이는 이유를 설명할 수 있다', ['채권', '수익률']),
+    L(7, '외환 시장과 환율', '환율이 오르고 내린다는 말의 뜻을 설명할 수 있다', ['환율', '외환 시장']),
+    L(8, '금리와 환율의 연결', '두 나라의 금리 차이가 환율에 주는 영향을 설명할 수 있다', ['금리 차', '자본 이동']),
+    L(9, '주식 시장과 금리', '금리 변화가 주가에 영향을 주는 경로를 설명할 수 있다', ['주식', '할인율']),
+    L(10, '금융 기사 읽기', '금리 · 환율 기사의 핵심 숫자를 찾아 해석할 수 있다', ['기사 읽기']),
+  ],
+};
+const WEB = { title: '웹 MVC와 데이터 접근', line: 'Spring 백엔드 · 신입 백엔드 개발자로 실무에 투입될 수준까지', lessons: [] };
+const DONE = { s: '완료', sc: '#3D7A4F', bg: 'transparent' };
+const NONE = { s: '', sc: '#6B655C', bg: 'transparent' };
+const list = (titles, doneCount, nextIdx) => titles.map((t, i) => ({ n: i + 1, t, ...(i < doneCount ? DONE : NONE), ...(i === nextIdx ? { bg: '#E8EDF5' } : {}) }));
+const ECO = {
+  title: '경제 기초', line: '경제 기초 · 뉴스의 경제 기사를 이해하고 싶어요 · 강의 16개',
+  lessons: list(['경제학이 묻는 질문', '기회비용과 선택', '수요와 공급', '시장 균형과 가격 변화', '국내총생산(GDP)', '기준금리와 인플레이션', '환율은 어떻게 정해지나', '무역과 경상수지', '재정 정책', '실업과 고용 지표', '경기 순환', '주식과 채권', '부동산과 금리', '세계 경제와 한국', '경제 지표 읽는 법', '경제 기사 종합 읽기'], 5, 5),
+};
+const KOR = {
+  title: '한국사 근현대', line: '한국사 근현대 · 강의 8개',
+  lessons: list(['개항과 근대화의 시작', '대한제국과 국권 침탈', '일제 강점기의 통치', '독립운동의 흐름', '광복과 분단', '6·25 전쟁', '산업화와 경제 성장', '민주화와 오늘의 한국'], 8, -1),
+};
+const SPR = {
+  title: 'Spring 핵심 원리', line: 'Spring 백엔드 · 신입 백엔드 개발자로 실무에 투입될 수준까지 · 강의 12개',
+  lessons: list(['스프링이 해결하는 문제', '객체 지향 설계와 스프링', '의존성 주입', '스프링 컨테이너와 빈', '컴포넌트 스캔', '빈 생명주기 콜백', '빈 스코프', '프록시와 AOP 개념', '스프링 AOP 적용', '트랜잭션의 동작 원리', '트랜잭션 전파', '정리와 실전 점검'], 12, -1),
+};
+class Component extends DCLogic {
+  constructor(p) { super(p); this.rootRef = React.createRef(); this.regenRef = React.createRef(); this.endRef = React.createRef(); }
+  componentDidMount() { this.paint(); }
+  componentDidUpdate(prev) { if (prev.state !== this.props.state || prev.scrollTo !== this.props.scrollTo) this.paint(); }
+  async paint() {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    requestAnimationFrame(() => {
+      const root = this.rootRef.current; if (!root) return;
+      const t = this.props.scrollTo ?? 'top';
+      if (t === 'top') { root.scrollTop = 0; return; }
+      if (t === 'bottom') { root.scrollTop = root.scrollHeight; return; }
+      let el = this.regenRef.current, y = 0;
+      while (el && el !== root) { y += el.offsetTop; el = el.offsetParent; }
+      root.scrollTop = Math.max(0, y - 120);
+    });
+  }
+  renderVals() {
+    const st = this.props.state ?? 'review';
+    const firstGen = st === 'firstGen';
+    const reviewish = ['review', 'regenOpen', 'regenerating', 'regenFailed'].includes(st);
+    const c = firstGen ? WEB : reviewish ? FIN : st === 'doneSingle' ? KOR : st === 'doneStep' ? SPR : ECO;
+    const status = (st === 'regenerating' || firstGen) ? '짜는 중' : reviewish ? '검토 대기' : (st === 'doneSingle' || st === 'doneStep') ? '완료' : '학습 중';
+    return {
+      rootRef: this.rootRef, regenRef: this.regenRef, endRef: this.endRef,
+      c, status, statusColor: status === '완료' ? '#3D7A4F' : '#6B655C',
+      isStep: st === 'doneStep' || firstGen,
+      pathText: firstGen ? '‹ Spring 백엔드 실무 · 2 / 3단계' : '‹ Spring 백엔드 실무 · 1 / 3단계',
+      isFirstGen: firstGen, isGenerating: st === 'regenerating' || firstGen,
+      skel: [{ a: '58%', b: '86%' }, { a: '44%', b: '72%' }, { a: '63%', b: '80%' }, { a: '50%', b: '90%' }, { a: '40%', b: '68%' }],
+      isReviewish: reviewish, isRegenerating: st === 'regenerating', isRegenFailed: st === 'regenFailed', isRegenOpen: st === 'regenOpen',
+      dim: st === 'regenerating' ? 0.45 : 1,
+      isActive: st === 'active' || st === 'deleteOpen',
+      isDoneSingle: st === 'doneSingle', isDoneStep: st === 'doneStep',
+      isLearnList: !reviewish && !firstGen,
+      isDeleteOpen: st === 'deleteOpen', deleteClosed: st !== 'deleteOpen',
+      showBar: ['review', 'regenerating', 'regenFailed', 'firstGen'].includes(st),
+      barLocked: st === 'regenerating' || firstGen, barOpacity: (st === 'regenerating' || firstGen) ? 0.5 : 1,
+      regenText: firstGen ? '오늘 0 / 3회 사용' : st === 'review' ? '오늘 1 / 3회 사용' : '오늘 2 / 3회 사용',
+    };
+  }
+}
+</script>
+</body>
+</html>

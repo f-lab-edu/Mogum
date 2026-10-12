@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<style>
+body{margin:0;background:#F1EEE7}
+a{color:#2F4B7C;text-decoration:none}
+a:hover{text-decoration:underline}
+</style>
+</helmet>
+<section id="map" data-screen-label="흐름 — 전체 지도" style="padding:64px;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#1F1D1A">
+  <div style="display:flex;gap:48px;align-items:flex-start">
+    <div style="background:#FAF8F3;border:1px solid #E4DFD5;border-radius:6px;padding:40px;display:flex;flex-direction:column;gap:24px;min-width:900px">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <h2 style="margin:0;font-size:28px;font-weight:600">흐름 — 전체 지도</h2>
+        <p style="margin:0;font-size:15px;color:#6B655C">06 §2.4 — 주요 이동만 그린 지도 · 나머지 이동은 각 화면 절과 장면 보드가 보여 줌</p>
+      </div>
+      <div style="display:flex;gap:24px;font-size:13px;color:#3A3632;align-items:center">
+        <span style="display:flex;align-items:center;gap:8px"><span style="width:32px;border-top:2px solid #2F4B7C"></span>주요 이동</span>
+        <span style="display:flex;align-items:center;gap:8px"><span style="width:32px;border-top:2px dashed #6B655C"></span>상단 바 · 약관 링크</span>
+      </div>
+      <div ref="{{ mapRef }}" data-layer="화면 지도" style="min-height:600px;display:flex;justify-content:center"></div>
+    </div>
+  </div>
+</section>
+
+<sc-for list="{{ boards }}" as="b" hint-placeholder-count="5">
+  <section id="{{ b.id }}" data-screen-label="{{ b.title }}" style="padding:64px;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#1F1D1A;border-top:1px solid #E4DFD5">
+    <div style="display:flex;gap:48px;align-items:flex-start">
+      <div style="background:#FAF8F3;border:1px solid #E4DFD5;border-radius:6px;padding:40px;display:flex;flex-direction:column;gap:32px">
+        <header data-layer="보드 머리" style="display:flex;flex-direction:column;gap:8px">
+          <h2 style="margin:0;font-size:28px;font-weight:600">{{ b.title }}</h2>
+          <p style="margin:0;font-size:15px;color:#6B655C">{{ b.meta }}</p>
+          <p style="margin:0;font-size:16px;line-height:1.6;color:#1F1D1A">화면이 지킬 것 — {{ b.keep }}</p>
+        </header>
+
+        <sc-for list="{{ b.lanes }}" as="lane" hint-placeholder-count="1">
+          <div data-layer="정상 경로" style="display:flex;flex-direction:column;gap:12px">
+            <sc-if value="{{ lane.title }}" hint-placeholder-val="{{ false }}">
+              <p style="margin:0;font-size:14px;font-weight:600;color:#3A3632">{{ lane.title }}</p>
+            </sc-if>
+            <div style="display:flex;align-items:flex-start">
+              <sc-for list="{{ lane.steps }}" as="s" hint-placeholder-count="6">
+                <dc-import name="Flow Step" step="{{ s }}" hint-size="125px,300px"></dc-import>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+
+        <sc-if value="{{ b.hasBranches }}" hint-placeholder-val="{{ true }}">
+          <div data-layer="갈림길" style="display:flex;flex-direction:column;gap:16px;border-top:1px dashed #A39D93;padding-top:24px">
+            <p style="margin:0;font-size:14px;font-weight:600;color:#6B655C">갈림길 — 실패 · 막힘 · 빠지는 길</p>
+            <div style="display:flex;flex-wrap:wrap;gap:32px 56px;align-items:flex-start">
+              <sc-for list="{{ b.branches }}" as="br" hint-placeholder-count="2">
+                <div style="display:flex;align-items:flex-start">
+                  <div style="width:110px;flex:none;padding-top:112px;font-size:12px;line-height:1.5;color:#6B655C;text-wrap:balance">{{ br.from }}</div>
+                  <sc-for list="{{ br.steps }}" as="s" hint-placeholder-count="1">
+                    <dc-import name="Flow Step" step="{{ s }}" hint-size="275px,300px"></dc-import>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ b.isS6 }}" hint-placeholder-val="{{ false }}">
+          <div data-layer="시작점 → 막힘 → 할 수 있는 것" style="display:grid;grid-template-columns:300px 80px 380px 80px 300px;align-items:start">
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:#3A3632">시작점</p>
+              <sc-for list="{{ s6.starts }}" as="x" hint-placeholder-count="3">
+                <div style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:4px">
+                  <span style="font-size:13px;color:#6B655C">{{ x.where }}</span>
+                  <span style="font-size:15px;color:#1F1D1A">{{ x.btn }}</span>
+                  <sc-if value="{{ x.note }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;line-height:1.5;color:#6B655C">{{ x.note }}</span></sc-if>
+                </div>
+              </sc-for>
+            </div>
+            <div style="padding-top:120px;display:flex;align-items:center;padding-left:10px;padding-right:10px"><div style="flex:1;border-top:2px solid #2F4B7C"></div><span style="width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-left:9px solid #2F4B7C"></span></div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:#3A3632">막힘 문구 · 06 §15.1</p>
+              <sc-for list="{{ s6.blocks }}" as="x" hint-placeholder-count="4">
+                <div style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:4px">
+                  <span style="font-size:13px;font-weight:600;color:#B4443A">{{ x.name }}</span>
+                  <span style="font-size:14px;line-height:1.6;color:#3A3632;text-wrap:pretty">{{ x.text }}</span>
+                  <span style="font-size:12px;color:#6B655C">{{ x.where }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="padding-top:120px;display:flex;align-items:center;padding-left:10px;padding-right:10px"><div style="flex:1;border-top:2px solid #2F4B7C"></div><span style="width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-left:9px solid #2F4B7C"></span></div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:#3A3632">지금 할 수 있는 것</p>
+              <sc-for list="{{ s6.cando }}" as="x" hint-placeholder-count="3">
+                <div style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:4px">
+                  <span style="font-size:13px;color:#6B655C">{{ x.where }}</span>
+                  <span style="font-size:15px;line-height:1.5;color:#1F1D1A;text-wrap:pretty">{{ x.what }}</span>
+                  <sc-if value="{{ x.gap }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;line-height:1.5;color:#B4443A">{{ x.gap }}</span></sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div data-layer="실제 프레임" style="display:flex;flex-direction:column;gap:12px;border-top:1px dashed #A39D93;padding-top:24px">
+            <p style="margin:0;font-size:14px;font-weight:600;color:#6B655C">그린 막힘 프레임</p>
+            <div style="display:flex;gap:40px">
+              <sc-for list="{{ s6.frames }}" as="s" hint-placeholder-count="2">
+                <dc-import name="Flow Step" step="{{ s }}" hint-size="125px,300px"></dc-import>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <footer data-layer="누르는 횟수" style="border-top:1px solid #E4DFD5;padding-top:16px;display:flex;flex-direction:column;gap:6px">
+          <p style="margin:0;font-size:14px;font-weight:600;color:#3A3632">목표까지 누르는 횟수</p>
+          <sc-for list="{{ b.taps }}" as="t" hint-placeholder-count="2">
+            <p style="margin:0;font-size:15px;line-height:1.6;color:#1F1D1A;font-variant-numeric:tabular-nums">{{ t }}</p>
+          </sc-for>
+        </footer>
+      </div>
+      <aside data-layer="흐름이 끊기는 곳" style="width:300px;flex:none;display:flex;flex-direction:column;gap:10px">
+        <p style="margin:0;font-size:15px;font-weight:600">흐름이 끊기는 곳 · 확인할 것</p>
+        <sc-for list="{{ b.gaps }}" as="g" hint-placeholder-count="2">
+          <p style="margin:0;font-size:13px;line-height:1.6;color:#3A3632;padding-top:10px;border-top:1px solid #E4DFD5;text-wrap:pretty">{{ g }}</p>
+        </sc-for>
+      </aside>
+    </div>
+  </section>
+</sc-for>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const A = (lines, kind) => ({ lines: [].concat(lines), kind: kind || 'solid' });
+const sh = (comp, p, label, arrow) => ({ comp, p, label, arrow });
+const cd = (no, name, st, arrow, note, noteDanger) => ({ no, name, st, arrow, note, noteDanger, label: `${no} · ${st}` });
+const D = t => ({ t, danger: true });
+const S = t => ({ t, soft: true });
+
+const S1 = {
+  id: 's1', title: '흐름 — S1 처음 온 사람', meta: '링크를 받은 휴대폰 · 5분',
+  keep: '설명을 더 끼우지 않는다. 누를 곳이 늘 하나로 보인다',
+  lanes: [{ steps: [
+    sh('Entry', { screen: 'u1' }, 'U1 · 기본'),
+    sh('Entry', { screen: 'u7terms', checked: true }, 'U7 · 약관 동의', A(['「Google 계정으로 계속하기」'])),
+    sh('Entry', { screen: 'u7intro1' }, 'U7 · 소개 1장', A(['「모두 동의」', '「동의하고 시작하기」'])),
+    sh('Entry', { screen: 'u7intro3' }, 'U7 · 소개 3장', A(['「다음」 × 2'])),
+    sh('U2', { state: 'first' }, 'U2 · 처음 온 사용자', A(['「첫 커리큘럼 만들기」'])),
+    sh('U10', { state: 'queued' }, 'U10 · 짜는 중', A([S('주제 입력'), '「커리큘럼 만들기」'])),
+    sh('U3', { state: 'review' }, 'U3 · 검토 대기', A(['자동', '수십 초'], 'auto')),
+    sh('U4', { state: 'running' }, 'U4 · 만드는 중', A(['「이대로 시작하기」'])),
+    sh('U4', { state: 'body' }, 'U4 · 본문', A(['자동', '1~2분'], 'auto')),
+    sh('U4', { state: 'done', scroll: 'end' }, 'U4 · 학습 완료 후', A(['「학습 완료」'])),
+    sh('U5', { state: 'firstFront' }, 'U5 · 첫 복습', A(['「바로 복습하기」'])),
+    sh('U5', { state: 'endFirst' }, 'U5 · 끝 — 첫 복습', A(['「답 보기」 · 평가', '× 플래시카드 장수'])),
+    cd('U4', '강의', '2강 · 만드는 중', A(['「다음 강의 · ⟨2⟩강 …」'])),
+  ] }],
+  branches: [
+    { from: 'U7 · 약관 동의에서', steps: [sh('Entry', { screen: 'u8' }, 'U8 · 대기 3번째', A(['「동의하고 시작하기」', D('정원 초과')], 'soft'))] },
+    { from: 'U7 · 소개 1~3장에서', steps: [cd('U2', '홈', '처음 온 사용자', A(['「건너뛰기」'], 'soft'))] },
+    { from: 'U10 · 짜는 중에서', steps: [sh('U11', { state: 'plan' }, 'U11 · 단계 검토 → S5', A(['자동 · 수십 초', '단계로 나눴을 때'], 'soft'))] },
+  ],
+  taps: ['첫 강의(1강)까지 8번 + 주제 입력 — Google 1 · 모두 동의 1 · 동의하고 시작하기 1 · 다음 2 · 첫 커리큘럼 만들기 1 · 커리큘럼 만들기 1 · 이대로 시작하기 1', '2강까지 27번 — 위 8 + 학습 완료 1 + 바로 복습하기 1 + 첫 복습 8장 × 2 + 다음 강의 1'],
+  gaps: [
+    '소개 1 → 2 → 3장 사이의 「다음」 두 번이 받은 경로에 빠져 있어 06 §4.2 대로 넣었어요.',
+    '정원 초과 → U8 은 누르는 버튼이 아니라 「동의하고 시작하기」의 응답으로 갈려요(06 §4 나가는 곳).',
+    '06 §2.1 의 S1 흐름은 「U4 1강」에서 끝나요. 그 뒤(첫 복습 → 2강)는 받은 경로를 따랐어요.',
+    '「다음 강의 · ⟨2⟩강 …」 — 06 예시 값은 7강뿐이라 2강 제목이 없어요.',
+    '처음 온 사람의 첫 강의는 금융 시장 입문이 아니지만, 축소본은 그려 둔 U3 검토 대기 프레임을 썼어요.',
+  ],
+};
+
+const S2 = {
+  id: 's2', title: '흐름 — S2 매일 복습', meta: '휴대폰 · 자투리 3~5분',
+  keep: '홈 맨 위가 복습. 엄지 하나로 끝까지. 중간에 나가도 저장된다',
+  lanes: [{ steps: [
+    sh('U2', { state: 'normal' }, 'U2 · 평소'),
+    sh('U5', { state: 'todayFront' }, 'U5 · 앞면', A(['「복습 시작」'])),
+    sh('U5', { state: 'todayAnswer' }, 'U5 · 답 + 평가', A(['「답 보기」'])),
+    cd('U5', '복습', '다음 장 — 23장까지 반복', A(['평가 넷 중 하나', S('「기억 안 났어요」 … 「바로 떠올렸어요」')])),
+    sh('U5', { state: 'endToday' }, 'U5 · 끝 — 오늘의 복습', A(['마지막 장 평가'])),
+    sh('U2', { state: 'doneBlocked' }, 'U2 · 오늘 복습 끝', A(['「홈으로」'])),
+  ] }],
+  branches: [
+    { from: 'U5 · 앞면 · 답에서', steps: [sh('U5', { state: 'endStopped' }, 'U5 · 끝 — 그만했을 때', A(['「그만하기」'], 'soft')), sh('U2', { state: 'normal' }, 'U2 · 평소 — 남은 12장', A(['「홈으로」'], 'soft'))] },
+    { from: 'U5 · 평가를 누른 뒤', steps: [sh('U5', { state: 'saveFail' }, 'U5 · 저장 실패', A([D('저장 실패')], 'soft')), cd('U5', '복습', '같은 장 — 다시 보냄', A(['「다시 시도」'], 'soft'))] },
+  ],
+  taps: ['48번 — 복습 시작 1 + 23장 × 2(답 보기 · 평가) + 홈으로 1'],
+  gaps: [
+    'U2 · 오늘 복습 끝 축소본은 그려 둔 M④(오늘 복습 끝 + 막힘)를 썼어요 — 막힘 문구는 폼 쪽이라 위쪽 장면은 같아요.',
+  ],
+};
+
+const S3 = {
+  id: 's3', title: '흐름 — S3 강의 하나 학습', meta: '휴대폰 · 이동 중 10~20분',
+  keep: '대기를 복습 시간으로 바꾼다. 다 읽으면 첫 복습으로, 첫 복습 뒤엔 다음 강의로 이끈다',
+  lanes: [{ steps: [
+    sh('U2', { state: 'normal' }, 'U2 · 평소'),
+    sh('U4', { state: 'running' }, 'U4 · 만드는 중', A(['「이어서 · 6강 기준금리와 인플레이션」'])),
+    sh('U5', { state: 'waitReady' }, 'U5 · 기다리는 동안 — 6강 준비됨', A(['「기다리는 동안 복습하기 (23장)」', S('다 되면 머리에 한 줄')])),
+    sh('U4', { state: 'body' }, 'U4 · 본문', A(['「6강으로 돌아가기」'])),
+    sh('U4', { state: 'done', scroll: 'end' }, 'U4 · 학습 완료 후', A(['「학습 완료」'])),
+    sh('U5', { state: 'firstFront' }, 'U5 · 첫 복습', A(['「바로 복습하기」'])),
+    sh('U5', { state: 'endFirst' }, 'U5 · 끝 — 첫 복습', A(['「답 보기」 · 평가', '× 8장'])),
+    cd('U4', '강의', '7강', A(['「다음 강의 · 7강 환율은 어떻게 정해지나」'])),
+  ] }],
+  branches: [
+    { from: 'U4 · 학습 완료 후에서', steps: [sh('U3', { state: 'active' }, 'U3 · 학습 중', A(['「나중에」'], 'soft'))] },
+    { from: 'U4 · 만드는 중에서', steps: [sh('U4', { state: 'failRetry' }, 'U4 · 실패', A([D('실패')], 'soft')), cd('U4', '강의', '만드는 중 — 이어서', A(['「이어서 다시 시도」'], 'soft'))] },
+    { from: 'U5 · 기다리는 동안에서', steps: [cd('U5', '복습', '기다리는 동안 — 만들지 못함', A([D('만들기 실패')], 'soft'), '머리에 「6강을 만들지 못했어요. 돌아가서 확인해 주세요.」 · 화면은 옮기지 않음'), cd('U4', '강의', '실패 상태', A(['「6강으로 돌아가기」'], 'soft'))] },
+    { from: 'U5 · 기다리는 동안 끝까지', steps: [cd('U5', '복습', '끝 — 기다리는 동안', A(['마지막 장 평가'], 'soft'), '「6강으로 돌아가기」 버튼 → U4')] },
+    { from: 'U5 · 끝 — 첫 복습에서', steps: [sh('U3', { state: 'active' }, 'U3 · 학습 중', A(['「커리큘럼으로」'], 'soft'))] },
+  ],
+  taps: ['22번 + 기다리는 동안 복습한 장수 × 2 — 이어서 1 · 기다리는 동안 복습하기 1 · 6강으로 돌아가기 1 · 학습 완료 1 · 바로 복습하기 1 · 첫 복습 8장 × 2 · 다음 강의 1'],
+  gaps: [
+    '해결 — 기다리는 동안 모드는 작업을 계속 확인하다가 끝나면 [U5-1] 머리에 한 줄로 알려요. 화면은 옮기지 않고, 돌아갈지는 사용자가 정해요(06 §11.1).',
+    '준비 알림 줄은 성공색(#3D7A4F) 굵은 글씨로 했어요 — 06 에 색이 없어 확인이 필요해요.',
+    '「커리큘럼으로」(U5 끝 → U3)는 받은 경로에 없지만 06 §11.3 에 있어 갈림길로 넣었어요.',
+  ],
+};
+
+const S4 = {
+  id: 's4', title: '흐름 — S4 새 주제 시작', meta: '아무 기기',
+  keep: '내 복습 기록 때문에 무엇이 줄고 늘었는지 보인다',
+  lanes: [{ steps: [
+    sh('U2', { state: 'normal' }, 'U2 · 평소'),
+    cd('U2', '홈', '만들기 폼 펼침', A(['「새 커리큘럼 만들기」'])),
+    sh('U10', { state: 'queued' }, 'U10 · 짜는 중', A([S('주제 · 목적 입력'), '「커리큘럼 만들기」'])),
+    sh('U3', { state: 'review' }, 'U3 · 검토 대기', A(['자동', '수십 초'], 'auto')),
+    sh('U3', { state: 'regenOpen', scroll: 'regen' }, 'U3 · 다시 짜기 펼침', A(['「다시 짜기」'])),
+    sh('U3', { state: 'regenerating' }, 'U3 · 다시 짜는 중', A([S('바꿀 내용 입력(선택)'), '「이 내용으로 다시 짜기」'])),
+    sh('U3', { state: 'review' }, 'U3 · 검토 대기(새 안)', A(['자동', '수십 초'], 'auto')),
+    cd('U4', '강의', '1강 · 만드는 중', A(['「이대로 시작하기」'])),
+  ] }],
+  branches: [
+    { from: 'U10 · 짜는 중에서', steps: [sh('U10', { state: 'failRejected' }, 'U10 · 실패 — 주제 거절', A([D('주제 거절')], 'soft')), cd('U2', '홈', '폼 펼침 · 주제 · 목적 채움', A(['「지우고 다시 쓰기」'], 'soft'))] },
+    { from: 'U3 · 검토 대기에서', steps: [cd('U3', '커리큘럼', '「다시 짜기」 잠김', A([D('하루 3번 소진')], 'soft'), '「다시 짜기는 하루 3번까지예요. 0시에 다시 할 수 있어요. 지금 안으로 시작할 수도 있어요.」 · 「이대로 시작하기」 열림')] },
+    { from: 'U3 · 다시 짜기 펼침에서', steps: [sh('U3', { state: 'review' }, 'U3 · 검토 대기', A(['「취소」'], 'soft'))] },
+  ],
+  taps: ['다시 짜기까지 5번 + 입력 — 새 커리큘럼 만들기 1 · 커리큘럼 만들기 1 · 다시 짜기 1 · 이 내용으로 다시 짜기 1 · 이대로 시작하기 1', '다시 짜지 않으면 3번 + 입력'],
+  gaps: [
+    '하루 3번을 다 쓴 결정 바(「다시 짜기」 잠김)는 아직 그리지 않았어요.',
+    '1강 축소본은 6강 프레임밖에 없어 카드로 두었어요.',
+  ],
+};
+
+const S5 = {
+  id: 's5', title: '흐름 — S5 넓은 주제', meta: '아무 기기 · 몇 주에 걸쳐',
+  keep: '지금 몇 단계인지, 다음에 무엇을 누르는지 한눈에. 다음 단계는 내가 누를 때만 만든다',
+  lanes: [{ steps: [
+    sh('U2', { state: 'normal' }, 'U2 · 평소'),
+    sh('U10', { state: 'queued' }, 'U10 · 짜는 중', A(['「새 커리큘럼 만들기」', '「커리큘럼 만들기」'])),
+    sh('U11', { state: 'plan' }, 'U11 · 단계 검토', A(['자동 · 수십 초', '단계로 나눴을 때'], 'auto')),
+    cd('U3', '커리큘럼', '1단계 · 짜는 중', A(['「1단계 커리큘럼 만들기」'])),
+    cd('U3', '커리큘럼', '1단계 · 검토 대기', A(['자동', '수십 초'], 'auto')),
+    cd('U4', '강의', '1단계 강의 반복(S3)', A(['「이대로 시작하기」'])),
+    sh('U3', { state: 'doneStep' }, 'U3 · 완료 — 다음 단계 카드', A(['마지막 강의 첫 복습 끝', '「커리큘럼으로」'])),
+    sh('U3', { state: 'firstGen' }, 'U3 · 2단계 첫 짜기', A(['「2단계 커리큘럼 만들기」'])),
+    cd('U3', '커리큘럼', '3단계 · 완료', A(['… 2 · 3단계 반복'], 'auto')),
+    sh('U11', { state: 'allDone' }, 'U11 · 모두 완료', A(['「묶음 보기」'])),
+  ] }],
+  branches: [
+    { from: 'U2 묶음 항목에서', steps: [sh('U3', { state: 'firstGen' }, 'U3 · 2단계 첫 짜기', A(['「2단계 커리큘럼 만들기」'], 'soft'))] },
+    { from: 'U3 단계 커리큘럼에서', steps: [sh('U11', { state: 'nextTurn' }, 'U11 · 2단계 만들 차례', A(['「‹ Spring 백엔드 실무 · 1 / 3단계」'], 'soft')), sh('U3', { state: 'firstGen' }, 'U3 · 2단계 첫 짜기', A(['「2단계 커리큘럼 만들기」'], 'soft'))] },
+    { from: 'U11 · 단계 검토에서', steps: [cd('U2', '홈', '폼 펼침 · 주제 · 목적 채움', A(['「지우고 다시 쓰기」', S('확인 펼침 「지우고 다시 쓰기」')], 'soft'))] },
+  ],
+  taps: ['1단계 1강까지 4번 + 입력 — 새 커리큘럼 만들기 1 · 커리큘럼 만들기 1 · 1단계 커리큘럼 만들기 1 · 이대로 시작하기 1', '다음 단계마다 3번 — 커리큘럼으로 1 · ⟨n⟩단계 커리큘럼 만들기 1 · 이대로 시작하기 1'],
+  gaps: [
+    '받은 경로의 「U4 학습 반복 → U3 완료」 사이 버튼은 06 §11.3 의 「커리큘럼으로」(마지막 강의일 때 가장 강조)예요.',
+    '「묶음 보기」는 마지막 단계의 U3 완료에만 있어요(06 §8.4). 3단계 완료 프레임은 아직 그리지 않았어요.',
+    '단계 커리큘럼 첫 짜기는 U3 M⑩ 으로 그렸어요. 1단계 짜는 중 · 검토 대기는 같은 모양이라 카드로 두었어요.',
+  ],
+};
+
+const S6 = {
+  id: 's6', title: '흐름 — S6 막혔을 때', meta: '기기 · 시간 — 06 §2.1 에 없음',
+  keep: '이유 · 언제 풀리나 · 지금 할 수 있는 것. 학습 · 복습은 계속된다',
+  lanes: [], branches: [], isS6: true,
+  taps: ['막힌 자리에서 0번 — 문구가 그 자리에 바로 나와요', '할 수 있는 것까지 1번 — U4 「복습하기 (23장)」 · 「커리큘럼으로」, U2 · U11 은 상단 바 「복습」'],
+  gaps: [
+    '해결 — 막힘 문구 아래에 지금 할 수 있는 것 링크를 붙여요. U2 · U11 · U4 같은 규칙(06 §15.1).',
+    '해결 — 「이미 2개를 …」 · 다시 짜기 소진 문구에 지금 할 수 있는 것을 더했어요.',
+    'U2 M④ 는 오늘 복습이 끝난 시점(0장)이라 규칙대로 복습 링크가 없어요.',
+    '「오늘 횟수 소진」은 받은 시작점 셋이 아니라 U3 「다시 짜기」 · U4 「처음부터 다시 만들기」에서 생겨요. 06 대로 시작점에 함께 적었어요.',
+    'U11 단계 아래 막힘 문구 프레임은 아직 그리지 않았어요.',
+  ],
+};
+const S6data = {
+  starts: [
+    { where: 'U2 · 만들기 폼', btn: '「커리큘럼 만들기」', note: '[U2-3a] 에 문구 · 폼과 입력은 그대로' },
+    { where: 'U4 · 강의 열기', btn: '강의를 열 때 자동으로 만들기 시작', note: '[U4-2] 에 문구 · 단계 목록 없음' },
+    { where: 'U11 · 단계 목록', btn: '「⟨n⟩단계 커리큘럼 만들기」', note: '그 단계 아래에 문구 · 버튼은 그대로' },
+    { where: 'U3 · 결정 바 / U4 · 실패', btn: '「다시 짜기」 · 「처음부터 다시 만들기」', note: '오늘 횟수 소진만 — 06 에 있는 시작점' },
+  ],
+  blocks: [
+    { name: '오늘 생성량 소진', text: '「오늘 생성량을 다 썼어요. 0시에 다시 채워져요. 이미 만든 강의와 복습은 계속할 수 있어요.」', where: 'U2 · U4 · U11' },
+    { name: '오늘 마감', text: '「오늘은 새로 만들기가 마감됐어요. 0시에 다시 열려요. 이미 만든 강의와 복습은 계속할 수 있어요.」', where: 'U2 · U4 · U11' },
+    { name: '이미 2개 만드는 중', text: '「이미 2개를 만들고 있어요. 하나가 끝나면 시작할 수 있어요. 그동안 복습하거나 이미 만든 강의를 들을 수 있어요.」', where: 'U2 · U4 · U11' },
+    { name: '오늘 횟수 소진', text: '「다시 짜기는 하루 3번까지예요. 0시에 다시 할 수 있어요. 지금 안으로 시작할 수도 있어요.」 · 「오늘은 이 강의를 더 다시 만들 수 없어요. 0시에 다시 만들 수 있어요. 다른 강의를 먼저 들어 보세요.」', where: 'U3 결정 바 · U4 버튼 자리' },
+  ],
+  cando: [
+    { where: 'U2 · U11 · U4 공통 — 06 §15.1', what: '문구 아래 링크 — 오늘 복습이 있으면 「복습하기 (23장)」', gap: '' },
+    { where: 'U4 만', what: '「커리큘럼으로」 도 함께', gap: '' },
+    { where: '오늘 복습 0장일 때', what: '복습 링크 없음 — U4 는 「커리큘럼으로」 만', gap: '' },
+    { where: 'U3 다시 짜기 소진', what: '「이대로 시작하기」 가 열려 있음', gap: '' },
+  ],
+  frames: [
+    sh('U2', { state: 'doneBlocked', scroll: 'form' }, 'U2 · 막힘 — 이미 2개 만드는 중'),
+    cd('U11', '커리큘럼 묶음', '단계 아래 막힘', null, '§15.1 문구 + 「복습하기 (23장)」'),
+    sh('U4', { state: 'blocked' }, 'U4 · 막힘 — 오늘 마감'),
+  ],
+};
+
+const S7 = {
+  id: 's7', title: '흐름 — S7 정리', meta: '기기 · 시간 — 06 §2.1 에 없음',
+  keep: '무엇이 지워지는지 먼저 말하고 그 자리에서 한 번 더 묻는다',
+  lanes: [
+    { title: '커리큘럼 삭제', steps: [
+      sh('U3', { state: 'active' }, 'U3 · 학습 중'),
+      sh('U3', { state: 'deleteOpen', scroll: 'bottom' }, 'U3 · 확인 펼침', A(['「이 커리큘럼 삭제」'])),
+      cd('U2', '홈', '삭제 직후', A(['「삭제하기」'])),
+    ] },
+    { title: '묶음 삭제', steps: [
+      sh('U11', { state: 'nextTurn' }, 'U11 · 2단계 만들 차례'),
+      sh('U11', { state: 'deleteOpen', scroll: 'bottom' }, 'U11 · 확인 펼침', A(['「이 묶음 삭제」'])),
+      cd('U2', '홈', '삭제 직후', A(['「삭제하기」'])),
+    ] },
+    { title: '실패한 요청 지우기 — 확인 없음', steps: [
+      sh('U2', { state: 'requests' }, 'U2 · 짜기 실패 요청'),
+      cd('U2', '홈', '요청 항목이 사라짐', A(['「지우기」', S('묻지 않고 바로')])),
+    ] },
+    { title: '탈퇴', steps: [
+      sh('Settings', { screen: 'u9' }, 'U9 · 기본'),
+      sh('Settings', { screen: 'u9withdraw' }, 'U9 · 탈퇴 펼침', A(['「탈퇴하기」'])),
+      cd('U1', '로그인', '탈퇴 직후', A(['체크 「모든 학습 기록이 지워지는 것을 확인했어요」', '「탈퇴하기」']), '「탈퇴가 끝났어요. 학습 기록을 모두 지웠어요.」'),
+    ] },
+  ],
+  branches: [
+    { from: 'U3 · 확인 펼침에서(단계 커리큘럼)', steps: [cd('U11', '커리큘럼 묶음', '삭제 직후 — 그 단계는 「아직 만들지 않음」', A(['「삭제하기」'], 'soft'))] },
+    { from: '확인 펼침에서', steps: [cd('U3 · U11 · U9', '같은 화면', '접힘 — 원래 링크 · 버튼', A(['「취소」'], 'soft'))] },
+  ],
+  taps: ['커리큘럼 삭제 2번 — 이 커리큘럼 삭제 1 · 삭제하기 1', '묶음 삭제 2번 · 실패한 요청 지우기 1번', '탈퇴 4번 — 상단 바 설정 1 · 탈퇴하기 1 · 체크 1 · 탈퇴하기 1'],
+  gaps: [
+    '삭제 직후 U2 · U11 · U1 탈퇴 직후 프레임은 아직 그리지 않았어요.',
+    '해결 — U2 「지우기」는 확인 없이 두되, 항목 오른쪽 끝에 세로 선으로 떼어 둔 44px 자리로 옮겼어요. 항목을 누르는 자리(→ U10)와 겹치지 않아요(06 §6).',
+  ],
+};
+
+const MAP = `flowchart TD
+    U1["U1 로그인"] -->|"처음 온 사람"| U7["U7 약관 동의 → 소개 3장"]
+    U1 -->|"가입한 사람"| U2["U2 홈"]
+    U7 -->|"정원 초과"| U8["U8 대기 명단"]
+    U7 -->|"정원 안"| U2
+    U2 -->|"커리큘럼 만들기 · 요청 항목"| U10["U10 커리큘럼 만드는 중"]
+    U10 -->|"하나로 짰을 때"| U3["U3 커리큘럼"]
+    U10 -->|"단계로 나눴을 때"| U11["U11 커리큘럼 묶음"]
+    U2 -->|"커리큘럼 항목"| U3
+    U2 -->|"묶음 항목"| U11
+    U11 -->|"n단계 만들기 · 단계 항목"| U3
+    U3 -->|"‹ 묶음 경로"| U11
+    U2 -->|"이어서"| U4["U4 강의"]
+    U3 -->|"이대로 시작하기 → 1강 · 강의 항목"| U4
+    U4 -->|"학습 완료 → 바로 복습하기"| U5["U5 복습"]
+    U4 -->|"기다리는 동안 복습하기"| U5
+    U2 -->|"복습 시작"| U5
+    U5 -->|"첫 복습 끝 → 다음 강의"| U4
+    U5 -->|"오늘의 복습 끝"| U2
+    NAV["상단 바"] -.-> U2
+    NAV -.-> U5
+    NAV -.-> U9["U9 설정"]
+    NAV -.->|"관리자만"| U6["U6 시스템 상태"]
+    U9 -->|"로그아웃 · 탈퇴"| U1
+    U1 -.->|"이용약관 · 개인정보처리방침"| P["P1 · P2 약관"]
+    U7 -.-> P
+    U9 -.-> P
+    linkStyle default stroke:#2F4B7C,stroke-width:2px
+    linkStyle 18,19,20,21,23,24,25 stroke:#6B655C,stroke-width:2px,stroke-dasharray:6 4`;
+
+const MAP_GAPS = [
+  '06 §2.4 지도에 없지만 본문에 있는 이동이 있어요. U4 「나중에」 → U3, U5 「커리큘럼으로」 → U3, U3 완료 「묶음 보기」 → U11, U10 「지우고 다시 쓰기」 · U11 「지우고 다시 쓰기」 → U2, U7 「동의하지 않고 나가기」 → U1, U8 「로그아웃」 · 「대기 취소하고 정보 지우기」 → U1, 삭제 직후 → U2 · U11. 지도는 06 그대로 두었어요.',
+  'U8 에서 나가는 화살표가 지도에 없어요(본문에는 로그아웃 · 대기 취소 → U1).',
+  'U6 · P1 · P2 에서 돌아가는 이동은 지도에 없어요. P1 · P2 는 06 §13 「돌아가기」(온 곳으로 — U1 · U7 · U9)를 점선으로 넣었어요.',
+];
+
+class Component extends DCLogic {
+  constructor(p) { super(p); this.mapRef = React.createRef(); }
+  async componentDidMount() {
+    for (let i = 0; i < 200 && !(window.mermaid && this.mapRef.current); i++) await new Promise(r => setTimeout(r, 50));
+    const m = window.mermaid; if (!m) return;
+    if (!window.__mgInit) {
+      m.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'base',
+        themeVariables: { primaryColor: '#E8EDF5', primaryBorderColor: '#2F4B7C', primaryTextColor: '#1F1D1A', mainBkg: '#E8EDF5', nodeBorder: '#2F4B7C', textColor: '#1F1D1A', lineColor: '#6B655C', secondaryColor: '#F1EEE7', tertiaryColor: '#FFFFFF', edgeLabelBackground: '#FAF8F3', clusterBkg: '#F1EEE7', clusterBorder: '#E4DFD5', background: '#FAF8F3', fontFamily: "'Pretendard Variable', Pretendard, sans-serif", fontSize: '15px' } });
+      window.__mgInit = true;
+    }
+    window.__mgQ = (window.__mgQ || Promise.resolve()).then(async () => {
+      const { svg } = await m.render('mgmap' + Math.random().toString(36).slice(2), MAP);
+      if (this.mapRef.current) this.mapRef.current.innerHTML = svg;
+    }).catch(e => console.warn(e));
+  }
+  renderVals() {
+    const boards = [S1, S2, S3, S4, S5, S6, S7].map(b => ({ ...b, hasBranches: (b.branches || []).length > 0, isS6: !!b.isS6 }));
+    return { mapRef: this.mapRef, boards, s6: S6data, mapGaps: MAP_GAPS };
+  }
+}
+</script>
+</body>
+</html>
