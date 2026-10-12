@@ -9,3 +9,31 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  session:
+    timeout: 7d
+    jdbc:
+      initialize-schema: never
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            scope: email
+            redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:5173/auth/google/callback}
+
+server:
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: true
+        same-site: lax
+
+app:
+  web:
+    origin: ${APP_WEB_ORIGIN:http://localhost:5173}
+    cookie-domain: ${APP_WEB_COOKIE_DOMAIN:}
+  auth:
+    admin-emails: ${APP_AUTH_ADMIN_EMAILS:}

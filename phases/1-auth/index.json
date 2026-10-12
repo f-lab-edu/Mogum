@@ -1,0 +1,72 @@
+{
+  "project": "Mogum",
+  "phase": "1-auth",
+  "steps": [
+    {
+      "step": 0,
+      "name": "users-account",
+      "status": "completed",
+      "summary": "V2__create_users.sql·User 계정 도메인·GoogleLogin.login/roleFor·LoginResult.Success(userId)/Rejected(EMAIL_NOT_VERIFIED·NOT_ALLOWED)·UserRepository.findById/findByGoogleSub/create/updateLogin·UserEntity/JpaUserRepository·루트 AuthProperties/AuthConfiguration(app.auth.admin-emails, APP_AUTH_ADMIN_EMAILS) 구현 및 users NOT NULL/CHECK 문서 반영; ./gradlew test 82개 통과; 명시적 flush 없이 네이티브 조회해도 Hibernate 자동 flush로 변경값 auto-flush@example.com 관찰",
+      "started_at": "2026-10-12T12:07:06+0900",
+      "completed_at": "2026-10-12T12:14:23+0900"
+    },
+    {
+      "step": 1,
+      "name": "session-api",
+      "status": "completed",
+      "summary": "V3 Spring Session JDBC 스키마·7일 쿠키 세션·요청별 사용자 조회·CSRF·GET /api/me·POST /api/auth/logout·공통 JSON 에러 구현; 세션은 FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME 속성 하나에 String users.id만 저장(SecurityContext 미저장), 현재 사용자는 @AuthenticationPrincipal User, 테스트 세션 지원은 src/test/java/com/mogum/support/TestSessions.java, 공통 예외는 com.mogum.core.NotFoundException; ERROR 디스패치 허용 및 ApiExceptionHandler/ApiErrorController로 400·405·500 상태와 JSON 형식 보존, 05 §1.2 코드 표 반영; ./gradlew test 105개 통과(실제 HTTP 회귀 테스트·ArchUnit 18개 포함)",
+      "started_at": "2026-10-12T12:14:23+0900",
+      "completed_at": "2026-10-12T12:40:15+0900"
+    },
+    {
+      "step": 2,
+      "name": "cross-origin",
+      "status": "completed",
+      "summary": "app.web.origin·app.web.cookie-domain(APP_WEB_ORIGIN·APP_WEB_COOKIE_DOMAIN)을 루트 com.mogum.WebProperties에 바인딩하고 api.auth.SecurityConfiguration에서 /api/** 단일 출처 credentials CORS와 XSRF-TOKEN Domain 적용(빈 값은 Domain 없음); 세션 호스트 전용·쿠키 보안 속성 유지, 출처 설정 검증·교차 출처 테스트·05 §1.1 문서 반영; ./gradlew test 133개 통과(ArchUnit 18개 포함)",
+      "started_at": "2026-10-12T12:40:15+0900",
+      "completed_at": "2026-10-12T12:46:57+0900"
+    },
+    {
+      "step": 3,
+      "name": "google-login",
+      "status": "completed",
+      "summary": "GET /auth/google·/auth/google/callback 연결; email 범위·10분 JSON state 쿠키·ID 전용 JDBC 세션 및 세션 번호 변경·Google 토큰 저장 제거·실패 error=not_allowed/login_failed 구현; GOOGLE_CLIENT_ID·GOOGLE_CLIENT_SECRET(없으면 기동 실패)·APP_AUTH_ADMIN_EMAILS·GOOGLE_REDIRECT_URI 및 로컬 콜백 http://localhost:5173/auth/google/callback 문서 반영; 가짜 Google HTTP 서버 포함 ./gradlew test 156개 통과(ArchUnit 18개)",
+      "started_at": "2026-10-12T12:46:58+0900",
+      "completed_at": "2026-10-12T13:04:48+0900"
+    },
+    {
+      "step": 4,
+      "name": "frontend-auth",
+      "status": "completed",
+      "summary": "frontend/src/api/client.ts fetch 래퍼·googleLoginUrl(VITE_API_BASE_URL·credentials·CSRF), api/useMe.ts·api/queryClient.ts 공통 401 처리, components/RequireAuth.tsx 로그인 확인·재시도 잠금, lib/authNavigation.ts 주소 복귀 검증, pages/LoginPage.tsx U1 최소판·lib/messages.ts 문구 표 구현; Vite proxy Host 동작 문서 정정; frontend test 59개·lint·build 통과",
+      "started_at": "2026-10-12T13:04:48+0900",
+      "completed_at": "2026-10-12T13:25:07+0900"
+    },
+    {
+      "step": 5,
+      "name": "pkce-cookie",
+      "status": "completed",
+      "summary": "PKCE(S256)를 유지하고 OAuth JSON 쿠키의 code_verifier 저장·복원·RFC 7636 검증 및 가짜 Google PKCE 검사를 구현; 미등록 GET /auth/{id}만 ERROR 디스패치로 404 NOT_FOUND 처리하고 삭제된 사용자 세션의 /auth/google은 기존 401 UNAUTHORIZED 유지; 실제 HTTP 회귀 테스트·05 §1.1 문서 반영; ./gradlew test 174개 통과(ArchUnit 18개 포함)",
+      "started_at": "2026-10-12T13:35:37+0900",
+      "completed_at": "2026-10-12T13:46:55+0900"
+    },
+    {
+      "step": 6,
+      "name": "login-design",
+      "status": "completed",
+      "summary": "frontend/src/pages/LoginPage.tsx·LoginPage.test.tsx를 TDD로 수정해 U1 소개·구글 로그인 링크·조건부 알림 카드를 u1/u1relogin 시안에 맞추고 기존 로그인 동작·접근성 유지; frontend/package.json·package-lock.json에 @fontsource/roboto ^5.3.0(설치 5.3.0)만 추가·500 굵기 로컬 배포 및 docs/UI_GUIDE.md 반영; npm --prefix frontend run test 61개·lint·build 통과, 구조·범위·시안 체크 완료",
+      "started_at": "2026-10-12T21:45:30+0900",
+      "completed_at": "2026-10-12T21:49:39+0900"
+    },
+    {
+      "step": 7,
+      "name": "wrap-and-focus",
+      "status": "completed",
+      "summary": "frontend/src/index.css 기본 스타일에 한국어 어절 줄바꿈·이동 포커스 테두리 제거 구현, frontend/src/pages/LoginPage.test.tsx를 먼저 수정하고 LoginPage.tsx의 h1·알림 포커스 클래스 제거; 포커스 이동·접근성 속성·구글 로그인 링크 및 RequireAuth 다시 시도 버튼 포커스 링 유지, 새 의존성·문서 변경 없음; 빌드 CSS(frontend/dist/assets/index-yvMAL0DA.css)에서 word-break:keep-all·overflow-wrap:break-word·[tabindex=\"-1\"]:focus{outline:none} 확인; npm --prefix frontend run test 61개·lint·build 통과, 아키텍처 체크 완료(실제 Chrome 390px 화면은 후속 수동 확인)",
+      "started_at": "2026-10-12T21:58:09+0900",
+      "completed_at": "2026-10-12T22:00:40+0900"
+    }
+  ],
+  "created_at": "2026-10-12T12:07:06+0900",
+  "completed_at": "2026-10-12T22:00:40+0900"
+}

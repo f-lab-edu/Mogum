@@ -32,7 +32,7 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 1. **`core.generation`(생성 유스케이스 · `LlmClient` · `EmbeddingClient` 등 유료 호출 포트)을 참조하는 것은 `worker` · `infra` · 루트 설정뿐이다.** `api` 는 물론 `core.job` 등 다른 core 패키지도 참조하지 않는다. 유료 포트는 이 패키지에 둔다. → 요청 경로에서 생성이나 유료 호출을 부르면 1분짜리 요청이 조용히 되살아난다 — `api → core.job → 임베딩` 같은 우회도 같다. ArchUnit 이 빌드를 깬다 — 규칙을 무르지 말고 코드를 고친다.
 2. **`core` 에 Spring Web · Spring Data · JPA(`jakarta.persistence`) · `@Transactional` · LLM SDK 를 들이지 않는다.** → 경계가 무너지고 프로바이더를 바꿀 때 도메인이 같이 바뀐다.
 3. **트랜잭션은 `TransactionRunner` 로 드러낸다. LLM 호출 중에는 DB 커넥션을 쥐지 않는다.** → 1분짜리 호출이 커넥션을 쥐면 풀이 마르고 복습 조회까지 멈춘다. `spring.jpa.open-in-view=false`.
-4. **JPA 엔티티는 `infra` 안에만 둔다. 리포지토리 포트는 트랜잭션 안에서 완전히 채운 record 를 돌려준다. 같은 트랜잭션에서 JPA 로 바꾼 행을 네이티브 쿼리로 읽기 전에 `flush()` 한다.** → 트랜잭션 밖 detached 엔티티는 바꿔도 저장되지 않고(예외도 없다) 지연 로딩에서 `LazyInitializationException` 이 난다. flush 를 빼면 네이티브 쿼리가 옛 값을 읽는다.
+4. **JPA 엔티티는 `infra` 안에만 둔다. 리포지토리 포트는 트랜잭션 안에서 완전히 채운 record 를 돌려준다. 같은 트랜잭션에서 JPA 로 바꾼 행을 네이티브 쿼리로 읽기 전에 `flush()` 한다.** → 트랜잭션 밖 detached 엔티티는 바꿔도 저장되지 않고(예외도 없다) 지연 로딩에서 `LazyInitializationException` 이 난다. flush 를 빼면 플러시 모드에 따라 네이티브 쿼리가 옛 값을 읽는다 — 지금 설정은 Hibernate 가 네이티브 쿼리 전에 스스로 flush 하는 것을 관찰했지만(`1-auth` step 0) 그 동작에 기대지 않는다.
 5. **`docs/01-overview.md §6` 의 제외 항목을 트리거 없이 넣지 않는다**(Redis · 레이트리미터 · 가상 스레드 · 선행 생성 · 학습 플랜 · 다크 모드 …). → 측정 근거 없이 복잡도만 는다. 필요해 보이면 트리거부터 확인하고 문서를 먼저 고친다.
     MVP 커리큘럼은 주제 · 목적을 받아 내용과 권장 순서만 만든다. 기간/주당 학습량 입력 · 예상 완료 기간 · 주차별 일정/조정은 후속 학습 플랜 기능이다. 강의는 총 1~40개이며 학습 속도와 순서는 사용자가 선택한다. FSRS 복습 일정은 유지한다.
     단일/그룹은 LLM이 목표의 일관성 · 독립적인 하위 목표 · 선행 관계로 판단하고 사용자가 결과를 검토한다. 초기 첫 생성 호출에서 유형과 단일 강의 목록/그룹 분할안을 함께 반환하며 정상 경로의 생성용 채팅은 1회다. 초기에는 `CURRICULUM_INITIAL` 잡에 주제/목적을 저장하고 성공할 때 단일 커리큘럼 또는 그룹을 생성/연결한다. 빈 단일/그룹을 미리 만들지 않는다. 접수는 `POST /curriculum-requests`, 복귀는 미완료 요청 조회와 잡 결과 유형/ID로 한다. 초기 요청은 요청 식별자로 중복 접수 시 기존 작업에 연결한다. 정확한 출력/예산과 중복 처리의 구현 세부는 해당 TASK에서 설계한다. 사용자는 **실패한** 초기 요청만 지울 수 있다 — 짜는 중인 요청은 지우지 않는다. 서버는 구조/상한/순서를 검증한다. 초기 대기는 U10, 그룹은 묶음 화면 U11 하나로 다루고 단계 커리큘럼은 기존 U3 를 쓴다([03 §2.1](docs/03-generation.md) · [06 §7 · §9](docs/06-screens.md)).
@@ -94,7 +94,7 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 
 ```
 docker compose up -d        # 로컬 Postgres(pgvector) — bootRun 전에
-./gradlew bootRun            # 개발 서버 (API + 워커, app.role=all)
+./gradlew bootRun            # 개발 서버 (API + 워커, app.role=all) — 기동에 GOOGLE_CLIENT_ID · GOOGLE_CLIENT_SECRET 필요(없으면 기동 거부) · 로그인 허용 계정은 APP_AUTH_ADMIN_EMAILS
 ./gradlew test               # 백엔드 테스트 (Testcontainers — Docker 필요)
 ./gradlew build              # 백엔드 jar 생성 — 화면은 넣지 않는다
 cd frontend && npm run dev   # 화면 개발 서버 (Vite — API 는 proxy 로 같은 출처처럼)

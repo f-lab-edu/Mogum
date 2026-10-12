@@ -107,7 +107,7 @@ flowchart LR
   | ② RDS(db.t4g.micro) | 앱만 1GB | RDS 자동 백업 | 약 2만 원 |
   | ③ 같은 EC2 · 1GB 그대로 | 앱 + Postgres 합쳐 1GB — 매우 빠듯하다 | `pg_dump` → S3 cron | 0원 |
 
-- 공개 운영에 더하는 것 — 도메인(화면 → Vercel · `api.` → EC2) · HTTPS(구글 콜백 · `Secure` 쿠키) · Vercel 프로젝트(API 주소 환경 변수 · 화면 주소 새로고침을 `index.html` 로 · 요금제 약관 확인) · DB 백업 · 슬랙 알림 · 외부 헬스체크(§9.1).
+- 공개 운영에 더하는 것 — 도메인(화면 → Vercel · `api.` → EC2) · HTTPS(구글 콜백 · `Secure` 쿠키) · Vercel 프로젝트(API 주소 환경 변수 `VITE_API_BASE_URL` · 화면 주소 새로고침을 `index.html` 로 · 요금제 약관 확인) · DB 백업 · 슬랙 알림 · 외부 헬스체크(§9.1).
 
 ### 3.1 역할 전환 — 비상용 배선
 

@@ -13,8 +13,8 @@
 
 | 엔드포인트 | 동작 |
 |---|---|
-| `GET /auth/google` | `state` 를 짧은 수명 쿠키에 담고 구글 동의 화면으로 |
-| `GET /auth/google/callback` | `state` 를 쿠키와 대조(CSRF) → 처음 온 사람이면 `PENDING` 사용자 생성 → **세션 생성 · 세션 쿠키** → 약관 전이면 U7 · 대기 명단이면 U8 · 아니면 U2 |
+| `GET /auth/google` | 세션 없이 `state` 를 10분 쿠키에 담고 구글 동의 화면으로 `302` |
+| `GET /auth/google/callback` | `state` 를 쿠키와 대조(CSRF) → 공개 전 관리자 계정 판정 → **ID만 담은 세션 · 새 세션 번호** → 화면의 `/` 로 `302`. 실패는 화면의 `/login?error=…`. `PENDING` 생성 · U7 · U8 분기는 `12` 범위 |
 | `GET /me` | 현재 사용자 — 화면이 어디로 갈지 이걸로 정한다 |
 | `POST /me/terms` | `{ "termsVersion": "…" }` → 동의 기록 → **처음이면 여기서 정원 검사** → `{ "status": "ACTIVE" \| "WAITLISTED" }` |
 | `POST /auth/logout` | **이 기기의 세션만** 무효화 · 쿠키 삭제(`HttpOnly` 라 스크립트는 못 지운다). 다른 기기는 로그인이 유지된다 |
@@ -26,17 +26,29 @@
   "role": "USER", "quota": { "usedRatio": 0.6, "resetsAt": "2026-12-15T00:00:00+09:00" } }   // 쿼터는 비율로만
 ```
 
-- **세션은 Postgres 에 둔다**(Spring Security `oauth2Login` + **Spring Session JDBC**). 쿠키에는 세션 번호만 있다 — `HttpOnly` · `Secure` · `SameSite=Lax`. 로그인 때 세션 번호를 새로 발급한다(세션 고정 방어 — 프레임워크 기본).
+`1-auth` 응답 범위는 `email` · `status` · `role` · `termsAgreed` · `waitlistPosition` 이다 — `quota` 는 `9-cost-control` 부터, `waitlistPosition` 은 `12-account-public` 전까지 `null` 이다.
+
+- **세션은 Postgres 에 둔다**(Spring Security `oauth2Login` + **Spring Session JDBC**). 쿠키에는 세션 번호만 있다 — `HttpOnly` · `Secure` · `SameSite=Lax`. `1-auth` 는 `DefaultCookieSerializerCustomizer` 로 발급 · 만료 쿠키의 세 속성을 강제한다(`Secure` 는 요청의 HTTPS 여부와 무관하게 켠다). 로그인 때 세션 번호를 새로 발급한다(세션 고정 방어 — 프레임워크 기본과 성공 handler의 번호 변경). 기존 세션 속성은 비우고 사용자 ID 하나만 남긴다. JDBC 번호 변경은 저장 시 반영되므로 번호를 바꾼 직후 세션을 무효화하지 않는다.
 - **비활동 7일이면 만료.** 세션에는 **사용자 id 만** 둔다 — 상태(`ACTIVE` · `WAITLISTED` · `PENDING`) · 역할은 **요청마다 `users` 에서 읽는다.** 승인 · 약관 변경이 바로 반영되게.
+    - 저장 형식은 `FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME`(`org.springframework.session.FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME`) 속성 하나에 `String` 타입의 `users.id` 다. `SecurityContext` 는 저장하지 않는다. `SessionUserFilter` 가 매 요청의 트랜잭션 안에서 사용자 스냅샷을 읽어 인증을 만들고, 컨트롤러는 `@AuthenticationPrincipal User` 로 현재 사용자를 받는다.
 - **CSRF** — `SameSite=Lax` 에 더해 Spring Security 기본 CSRF 보호를 켠다(화면은 `XSRF-TOKEN` 쿠키를 읽어 헤더로 보낸다).
 - **화면과 API 의 출처** — 화면은 `{도메인}`(Vercel), API 는 `api.{도메인}`(EC2)이다. 같은 등록 도메인이라 **같은 사이트 · 다른 출처**다(ADR-060).
+    - 화면의 API 출처는 빌드 환경 변수 `VITE_API_BASE_URL` 로 받는다(운영 예: `https://api.{도메인}`). 비어 있으면 상대 경로를 쓰며, 개발에서는 `frontend/vite.config.ts` 의 Vite proxy 가 `/api` · `/auth` 를 백엔드(`http://localhost:8080`)로 넘긴다. JSON 호출은 `{API 출처}/api{경로}`, 로그인 시작 링크는 `{API 출처}/auth/google` 이다. 실제 Vercel 변수 설정은 `5-deploy` 에서 한다.
     - 세션 쿠키는 API 호스트에만 둔다(`Domain` 없음). 같은 사이트라 `SameSite=Lax` 그대로 화면의 요청에 실린다. 화면의 fetch 는 `credentials: 'include'` 로 보낸다.
-    - CORS — 허용 출처는 화면 출처 하나(설정값)이고 credentials 를 허용한다. `*` · 패턴 허용을 쓰지 않는다.
-    - `XSRF-TOKEN` 쿠키는 화면 스크립트가 읽을 수 있게 `Domain` 을 등록 도메인으로 둔다.
-    - 로그인 시작 · 콜백은 API 호스트의 `/auth/*` 에서 하고, 끝나면 화면 주소(설정값)의 U7 · U8 · U2 로 보낸다.
+    - CORS — 허용 출처는 `app.web.origin` 하나(환경 변수 `APP_WEB_ORIGIN`, 로컬 기본값 `http://localhost:5173`)이고 credentials 를 허용한다. 스킴 · 호스트 · 선택적 포트만 지정하며 끝 `/` 는 없다. `*` · 패턴 · 여러 출처를 허용하지 않으며, 잘못된 출처 설정은 기동을 거부한다. `SecurityConfiguration` 이 루트 `WebProperties` 에 바인딩한 값을 사용해 `/api/**` 의 preflight 를 인증 · CSRF보다 먼저 처리한다. 허용 메서드는 `GET` · `POST` · `PUT` · `PATCH` · `DELETE`, 요청 헤더는 `Content-Type` · `X-XSRF-TOKEN` 이다.
+    - `XSRF-TOKEN` 쿠키는 화면 스크립트가 읽을 수 있게 `Domain` 을 등록 도메인으로 둔다(`app.web.cookie-domain`, 환경 변수 `APP_WEB_COOKIE_DOMAIN`). 로컬 기본값은 비어 있으며, 비어 있으면 `Domain` 을 두지 않는다. 세션 쿠키의 `Domain` 에는 적용하지 않는다. `HttpOnly` 아님 · `Secure` · `SameSite=Lax` 는 유지한다.
+    - 로그인 시작 · 콜백은 API 호스트의 `/auth/*` 에서 하고, 끝나면 화면 주소(`app.web.origin`)로 보낸다. `1-auth` step 3 은 성공 시 U2(`/`), 실패 시 U1(`/login?error=…`)로 보낸다. U7 · U8 분기는 `12` 범위다.
     - 개발은 Vite proxy 로 같은 출처다 — 출처가 다른 운영 조건(CORS · 쿠키 도메인)은 테스트로 확인한다.
     - PR 미리보기(`*.vercel.app`)는 다른 사이트라 세션 쿠키가 실리지 않는다 — 미리보기에서 로그인을 확인하지 않는다.
 - 요청마다 **세션 조회 + 사용자 조회**, 그리고 마지막 접근 시각 갱신(세션 행 UPDATE)이 붙는다 — 용량 측정에 포함한다.
+- **공개 전 임시 — 관리자 이메일만 로그인**(ADR-062). `12-account-public` 전까지 콜백은 관리자 이메일 목록(`app.auth.admin-emails`)에 없는 계정을 거절하고 `users` 행 · 세션을 만들지 않는다. 목록의 계정은 처음 로그인할 때 `ACTIVE` · `ADMIN` 으로 만든다. 위 표의 `PENDING` 생성 · U7 · U8 분기와 `POST /me/terms` · `DELETE /me` 는 `12` 에서 만든다 — 그전까지 콜백 성공은 언제나 화면 주소의 `/`(U2)로 보낸다.
+- **Google 등록 · 환경 변수** — 등록 이름은 `google` 이다. 클라이언트 ID는 `GOOGLE_CLIENT_ID`, 비밀은 `GOOGLE_CLIENT_SECRET` 환경 변수로 받으며 저장소에 실제 값/대체 자격 정보는 두지 않는다. 둘 중 하나라도 없거나 공백이면 기동을 거부한다. 관리자 목록을 덮어쓰는 환경 변수는 `APP_AUTH_ADMIN_EMAILS`(쉼표로 구분)이며 기본값은 빈 목록이다 — 빈 목록이면 모든 계정을 `not_allowed`로 거절한다. 테스트 JVM은 Gradle의 `test` 작업에서 가짜 클라이언트 ID/비밀만 공통으로 주입하며 main 설정을 그대로 읽는다.
+    - 범위는 **`email` 하나**다. OAuth2 authorization code 교환 뒤 Google 사용자 정보 엔드포인트에서 `sub` · `email` · `email_verified`를 읽어 `GoogleLogin`에 넘긴다. `profile` · `openid` 범위와 ID 토큰은 요청하지 않는다.
+    - 로컬 콜백 주소는 정확히 **`http://localhost:5173/auth/google/callback`** 이다. 등록의 `redirect-uri`는 이 값으로 고정되어 요청 Host/돌아갈 주소 매개변수에서 유도하지 않는다. `frontend/vite.config.ts` 의 Vite proxy 는 `/api` · `/auth` 에 문자열 축약형을 쓰므로 `changeOrigin: true` 로 변환되어 Host 가 백엔드 주소(`localhost:8080`)로 바뀐다. 백엔드는 설정으로 고정한 `redirect-uri` 를 쓰므로 Host 에 기대지 않는다(`GoogleLoginHandlerIT` 의 Host 테스트로 검증).
+    - 운영은 **`GOOGLE_REDIRECT_URI=https://api.{도메인}/auth/google/callback`** 을 설정하고 Google 콘솔에도 동일한 승인된 리디렉션 URI를 등록한다(`5-deploy`에서 실제 값 설정). `APP_WEB_ORIGIN`은 별도로 화면의 `https://{도메인}`에 맞춘다. `GOOGLE_REDIRECT_URI`가 없으면 로컬 콜백 주소를 사용한다.
+- **로그인 전 요청 쿠키** — PKCE(S256)는 켜 둔다. `MOGUM_OAUTH_REQUEST`에 `state` · 발급 시각 · PKCE `code_verifier`만 JSON → Base64URL로 담고 콜백에서 verifier를 복원해 토큰 교환에 보낸다. `HttpOnly` · `Secure` · `SameSite=Lax` · `Max-Age=600` · `Path=/auth/google` · `Domain` 없음. Java 역직렬화는 하지 않으며 나머지 OAuth 요청 필드는 서버의 등록 설정으로 복원한다. `GET /auth/google`은 세션을 만들지 않는다. 콜백은 쿠키 없음/손상/만료/`state` 불일치와 verifier 누락/형식 오류(RFC 7636: 43~128자 · `[A-Za-z0-9-._~]`)를 토큰 교환 전에 거절하고 성공/실패 모두 요청 쿠키를 만료시킨다. verifier는 로그 · 에러 응답에 남기지 않는다. 등록되지 않은 한 단계 `GET /auth/{id}`는 공통 `404 NOT_FOUND` JSON을 반환한다.
+- **Google 정보 보관** — Google 접근/ID 토큰과 OAuth 인증 주체는 세션 · DB · 로그인 뒤 메모리에 보관하지 않는다. `DiscardingOAuth2AuthorizedClients`가 웹 저장소와 서비스의 기본 저장을 모두 대체한다. `NullSecurityContextRepository`로 OAuth `SecurityContext`를 저장하지 않고 성공 handler는 기존의 ID 세션 형식으로 바꾼 뒤 요청의 인증 문맥을 비운다. 로그인 뒤에는 기존 `SessionUserFilter`가 `users`를 다시 읽는다. 백엔드 기본 `/login` 페이지는 만들지 않는다 — `/login`은 화면의 U1 주소다.
+- **콜백 실패는 화면의 U1 로** — `{화면 주소}/login?error=…` 로 보낸다. `error=not_allowed` 는 위 임시 거절, `error=login_failed` 는 그 밖의 실패(구글에서 취소 · `state` 불일치 · 이메일 미인증 · 토큰 교환 실패)다. 화면 문구는 [06 §3](./06-screens.md). 백엔드는 설정한 화면 주소로만 보낸다 — 요청 매개변수로 돌아갈 주소를 받지 않는다(열린 리다이렉트 방지). 로그인 전에 열려던 주소는 화면이 기억한다([06 §2.3](./06-screens.md)).
 - **부하 테스트 세션** — `POST /dev/session { "userKey": "vu-17" }` 가 사용자(`ACTIVE` · 약관 동의)와 세션을 만들고 세션 쿠키를 준다. **`loadtest` 프로필에만 빈이 있다.** `loadtest` 와 `aws` 프로필이 함께 켜지면 **기동을 거부**한다. 제품 API 수에 세지 않는다.
 
 > **왜 JWT 가 아닌가** — 로그아웃 · 탈퇴를 즉시 반영하고 대기 · 약관 같은 바뀌는 상태를 확인하려면 **어차피 요청마다 DB 를 본다.** 그러면 JWT 의 장점(DB 없이 검증)이 사라지고 발급 · 검증 필터 · 서명 키 관리만 남는다.
@@ -49,14 +61,19 @@
 ```
 
 포맷보다 **`code` 가 고정돼 있는 것**이 중요하다. RFC 9457 은 쓰지 않는다(`type` URI 를 운영할 클라이언트가 하나뿐이다).
+MVC 표준 예외와 서블릿 컨테이너의 ERROR 디스패치도 원래 HTTP 상태를 유지하며 위 JSON 형식으로 응답한다. 오류 디스패치에 인증을 다시 요구하지 않는다. 예외 메시지 · 스택 · 요청 원문은 응답에 싣지 않는다.
 
 | `code` | HTTP | 언제 |
 |---|---|---|
 | `UNAUTHORIZED` | 401 | 세션 없음 · 만료 · 로그아웃 · 탈퇴로 삭제됨 |
 | `TERMS_REQUIRED` | 403 | 약관 전 — `GET /me` · `POST /me/terms` · 로그아웃 · `DELETE /me` 만 된다 |
 | `ACCOUNT_WAITLISTED` | 403 | 대기 명단 — 위 네 개만 된다 |
+| `CSRF_INVALID` | 403 | 상태를 바꾸는 요청에 `X-XSRF-TOKEN` 헤더가 없거나 `XSRF-TOKEN` 쿠키와 다르다. 화면은 같은 요청을 자동으로 다시 보내지 않는다 |
 | `RATE_LIMITED` | 429 | 우리 API 레이트리밋 · `Retry-After` |
 | `NOT_FOUND` | 404 | 없거나 **남의 것**(§1.3) |
+| `METHOD_NOT_ALLOWED` | 405 | 해당 경로가 지원하지 않는 HTTP 메서드. `Allow` 헤더 유지 |
+| `INVALID_REQUEST` | 4xx(404 · 405 제외) | MVC/컨테이너의 요청 오류 — 잘못된 JSON · 필수 매개변수 누락(400) · 응답 형식 불일치(406) · 지원하지 않는 본문 형식(415) 등. 인증 · CSRF · 도메인 오류는 각 전용 code 사용 |
+| `INTERNAL_ERROR` | 5xx | 처리되지 않은 예외(500) 등 MVC/컨테이너 서버 오류. 도메인 오류는 각 전용 code 사용 |
 | `STRUCTURAL_LIMIT` | 400 | 입력 길이(주제 100 · 목적 200 · 피드백 500자) 위반. 생성 목록의 총 1~40강 위반은 수정 요청 후에도 잘못되면 잡 `LLM_OUTPUT_INVALID`([03 §2](./03-generation.md)) |
 | `USER_QUOTA_EXCEEDED` | 429 | 일일 생성 비용 한도 · `Retry-After` = 한국 시간 자정까지 |
 | `ACTIVE_JOB_LIMIT` | 429 | 진행 중 생성이 이미 2개. 하나 끝나면 풀린다 |
