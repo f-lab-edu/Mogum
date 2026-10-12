@@ -3,7 +3,7 @@
 - 출처 — Claude Design 프로젝트 「머금 강의 화면 설계」(https://claude.ai/design/p/c01ce1b4-dfd2-49d4-8ba2-eb90d90c92de). 2026-10-12 에 가져왔다.
 - **참고 자료다.** 화면 구조 · 상태 · 문구는 [06 화면](../06-screens.md), 색 · 글꼴 · 컴포넌트는 [UI_GUIDE](../UI_GUIDE.md) 가 정한다. 시안과 문서가 다르면 문서가 맞다.
 - **완성형이다.** 시안은 공개 시점의 모습을 다 그렸다. 언제 무엇을 만드는지는 [06 §16](../06-screens.md) 이 정한다 — step 에 적힌 상태만 만든다.
-- 여기서 직접 고치지 않는다. 시안을 고치면 Claude Design 에서 다시 가져와 폴더를 통째로 바꾼다. 시안 런타임(`support.js`)은 가져오지 않는다.
+- 여기서 직접 고치지 않는다. 시안을 고치면 Claude Design 에서 다시 가져와 폴더를 통째로 바꾼다. 시안 런타임(`support.js`)은 가져오지 않는다. 이 폴더는 SonarCloud 분석에서 뺀다(`sonar-project.properties`).
 
 ## 무엇을 볼 때 어느 파일을 여나
 
