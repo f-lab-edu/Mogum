@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+body{margin:0;background:#FAF8F3}
+a{color:#2F4B7C;text-decoration:none;text-underline-offset:4px}
+a:hover{text-decoration:underline}
+</style>
+</helmet>
+<div style="height:100%;overflow:hidden;background:#FAF8F3;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#3A3632;font-size:16px;-webkit-font-smoothing:antialiased">
+  <header data-layer="상단 바" style="height:56px;background:#FFFFFF;border-bottom:1px solid #E4DFD5;box-sizing:border-box">
+    <nav style="max-width:calc(48rem + 32px);margin:0 auto;height:100%;padding:0 16px;box-sizing:border-box;display:flex;align-items:center;gap:20px">
+      <a href="#" style="font-size:18px;font-weight:700;color:#1F1D1A;min-height:44px;display:flex;align-items:center">머금</a>
+      <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center">홈</a>
+      <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center;font-variant-numeric:tabular-nums">복습 (23)</a>
+      <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center;margin-left:auto">설정</a>
+    </nav>
+  </header>
+  <main style="max-width:calc(48rem + 32px);margin:0 auto;padding:20px 16px 56px;box-sizing:border-box;display:flex;flex-direction:column;gap:32px">
+    <div data-layer="U10-1 머리" style="display:flex;flex-direction:column;gap:6px">
+      <p style="margin:0;font-size:14px;color:#6B655C">새 커리큘럼</p>
+      <h1 style="margin:0;font-size:24px;line-height:1.35;font-weight:600;color:#1F1D1A">{{ topic }}</h1>
+      <sc-if value="{{ hasPurpose }}" hint-placeholder-val="{{ true }}">
+        <p style="margin:0;font-size:16px;line-height:1.6;color:#3A3632">데이터 분석 업무에 쓰려고요</p>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ isWait }}" hint-placeholder-val="{{ true }}">
+      <section data-layer="U10-2 대기 블록 · 커리큘럼형" aria-live="polite" style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:12px">
+        <h2 style="margin:0;font-size:18px;font-weight:600;color:#1F1D1A">커리큘럼을 짜고 있어요</h2>
+        <p style="margin:0;font-size:16px;color:#3A3632">앞에 2명이 기다리고 있어요.</p>
+        <div style="display:flex;flex-direction:column;gap:4px;border-top:1px solid #E4DFD5;padding-top:12px;margin-top:4px">
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#6B655C;text-wrap:pretty">수십 초 걸려요. 이 화면을 떠나도 계속 짜요. 홈에서 다시 열 수 있어요.</p>
+          <a href="#" style="align-self:flex-start;font-size:16px;color:#2F4B7C;min-height:44px;display:flex;align-items:center;margin-bottom:-8px">기다리는 동안 복습하기 (23장)</a>
+        </div>
+      </section>
+      <div data-layer="U10-3 미리 자리 · 회색 줄 5개" aria-hidden="true" style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px">
+        <sc-for list="{{ skel }}" as="s" hint-placeholder-count="5">
+          <div style="padding:16px 20px;border-bottom:1px solid #E4DFD5;display:flex;gap:12px;align-items:flex-start">
+            <div style="width:20px;height:14px;border-radius:2px;background:#F1EEE7;flex:none"></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+              <div style="height:14px;border-radius:2px;background:#F1EEE7;width:{{ s.a }}"></div>
+              <div style="height:10px;border-radius:2px;background:#F1EEE7;width:{{ s.b }}"></div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isFailRetry }}" hint-placeholder-val="{{ false }}">
+      <section data-layer="U10-4 실패 — 다시 시도 가능" aria-live="polite" style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <p style="margin:0;font-size:16px;line-height:1.6;color:#B4443A;text-wrap:pretty">지금은 만들 수 없어요. 잠시 후 다시 시도해 주세요.</p>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px">
+          <button style="height:44px;padding:0 16px;border-radius:6px;border:none;background:#2F4B7C;color:#FFFFFF;font:inherit;font-weight:600;cursor:pointer;transition:background 100ms" style-hover="background:#253D66">다시 시도</button>
+          <a href="#" style="font-size:16px;color:#2F4B7C;min-height:44px;display:flex;align-items:center">이 요청 지우기</a>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isRejected }}" hint-placeholder-val="{{ false }}">
+      <section data-layer="U10-4 실패 — 주제 거절" aria-live="polite" style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <p style="margin:0;font-size:16px;line-height:1.6;color:#B4443A;text-wrap:pretty">이 주제로는 강의를 만들 수 없어요. 다른 주제로 만들어 주세요.</p>
+          <p style="margin:0;font-size:16px;line-height:1.6;color:#3A3632;text-wrap:pretty">개념과 지식을 배우는 주제로 적어 주세요. 회화 · 실기처럼 연습이 중심인 주제는 만들 수 없어요.</p>
+        </div>
+        <button style="align-self:flex-start;height:44px;padding:0 16px;border-radius:6px;border:none;background:#2F4B7C;color:#FFFFFF;font:inherit;font-weight:600;cursor:pointer;transition:background 100ms" style-hover="background:#253D66">지우고 다시 쓰기</button>
+      </section>
+    </sc-if>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;queued&quot;,&quot;failRetry&quot;,&quot;failRejected&quot;],&quot;default&quot;:&quot;queued&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.props.state ?? 'queued';
+    return {
+      topic: st === 'failRejected' ? '영어 회화' : '통계학 입문',
+      hasPurpose: st !== 'failRejected',
+      isWait: st === 'queued', isFailRetry: st === 'failRetry', isRejected: st === 'failRejected',
+      skel: [{ a: '58%', b: '86%' }, { a: '44%', b: '72%' }, { a: '63%', b: '80%' }, { a: '50%', b: '90%' }, { a: '40%', b: '68%' }],
+    };
+  }
+}
+</script>
+</body>
+</html>

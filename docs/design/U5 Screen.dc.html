@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+body{margin:0;background:#FAF8F3}
+a{color:#2F4B7C;text-decoration:none;text-underline-offset:4px}
+a:hover{text-decoration:underline}
+</style>
+</helmet>
+<div style="height:100%;display:flex;flex-direction:column;background:#FAF8F3;font-family:'Pretendard Variable',Pretendard,sans-serif;color:#3A3632;font-size:16px;-webkit-font-smoothing:antialiased">
+  <div style="flex:1;min-height:0;overflow:hidden">
+    <header data-layer="상단 바" style="height:56px;background:#FFFFFF;border-bottom:1px solid #E4DFD5;box-sizing:border-box">
+      <nav style="max-width:calc(48rem + 32px);margin:0 auto;height:100%;padding:0 16px;box-sizing:border-box;display:flex;align-items:center;gap:20px">
+        <a href="#" style="font-size:18px;font-weight:700;color:#1F1D1A;min-height:44px;display:flex;align-items:center">머금</a>
+        <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center">홈</a>
+        <a href="#" aria-current="page" style="color:#2F4B7C;font-weight:600;min-height:44px;display:flex;align-items:center;font-variant-numeric:tabular-nums">{{ navReview }}</a>
+        <a href="#" style="color:#3A3632;min-height:44px;display:flex;align-items:center;margin-left:auto">설정</a>
+      </nav>
+    </header>
+    <main style="max-width:calc(65ch + 32px);margin:0 auto;padding:20px 16px 32px;box-sizing:border-box;display:flex;flex-direction:column;gap:32px">
+
+      <sc-if value="{{ inSession }}" hint-placeholder-val="{{ true }}">
+        <div data-layer="U5-1 세션 머리" style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+            <h1 style="margin:0;flex:1;font-size:24px;line-height:1.35;font-weight:600;color:#1F1D1A;text-wrap:pretty">{{ modeTitle }}</h1>
+            <a href="#" style="flex:none;font-size:14px;color:#2F4B7C;min-height:44px;display:flex;align-items:center;margin-top:-6px">{{ stopLabel }}</a>
+          </div>
+          <div aria-live="polite" data-layer="준비 알림 자리">
+            <sc-if value="{{ isReady }}" hint-placeholder-val="{{ false }}">
+              <p data-layer="준비 알림" style="margin:-4px 0 0;font-size:16px;line-height:1.6;font-weight:600;color:#3D7A4F">6강이 준비됐어요.</p>
+            </sc-if>
+          </div>
+          <sc-if value="{{ isFirst }}" hint-placeholder-val="{{ false }}">
+            <p style="margin:-4px 0 0;font-size:14px;line-height:1.6;color:#6B655C;text-wrap:pretty">방금 읽어서 쉽게 느껴질 수 있어요. 강의를 덮었다고 생각하고 떠올려 보세요.</p>
+          </sc-if>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div role="progressbar" style="flex:1;height:6px;border-radius:9999px;background:#F1EEE7;overflow:hidden">
+              <div style="height:100%;border-radius:9999px;background:#2F4B7C;width:{{ pct }}"></div>
+            </div>
+            <span style="font-size:14px;color:#6B655C;font-variant-numeric:tabular-nums">{{ progress }}</span>
+          </div>
+        </div>
+
+        <section data-layer="U5-2 플래시카드" style="background:#FFFFFF;border:1px solid #E4DFD5;border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:20px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center">
+            <div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px">
+              <span style="font-size:14px;color:#6B655C">{{ card.source }}</span>
+              <span style="border-radius:2px;background:#F1EEE7;color:#6B655C;font-size:12px;line-height:1.5;padding:2px 8px">{{ card.concept }}</span>
+            </div>
+            <p style="margin:0;font-size:20px;line-height:1.6;font-weight:600;color:#1F1D1A;text-wrap:pretty">{{ card.question }}</p>
+            <sc-if value="{{ isFront }}" hint-placeholder-val="{{ true }}">
+              <p style="margin:0;font-size:14px;color:#6B655C">먼저 답을 떠올려 보세요.</p>
+            </sc-if>
+          </div>
+          <sc-if value="{{ isAnswered }}" hint-placeholder-val="{{ false }}">
+            <div style="border-top:1px solid #E4DFD5;padding-top:20px;display:flex;flex-direction:column;gap:20px">
+              <div tabindex="-1" style="display:flex;flex-direction:column;gap:6px">
+                <p style="margin:0;font-size:14px;font-weight:600;color:#6B655C">모범 답안</p>
+                <p style="margin:0;font-size:17px;line-height:1.75;color:#3A3632;text-wrap:pretty">{{ card.answer }}</p>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <p style="margin:0;font-size:14px;font-weight:600;color:#6B655C">채점 포인트</p>
+                <p style="margin:0;font-size:14px;color:#6B655C">이 내용이 들어갔으면 떠올린 거예요.</p>
+                <ul style="list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:6px">
+                  <sc-for list="{{ card.points }}" as="pt" hint-placeholder-count="3">
+                    <li style="display:grid;grid-template-columns:20px 1fr;gap:8px;align-items:baseline;font-size:16px;line-height:1.6;color:#3A3632"><span aria-hidden="true" style="color:#6B655C">✓</span><span>{{ pt }}</span></li>
+                  </sc-for>
+                </ul>
+              </div>
+            </div>
+          </sc-if>
+        </section>
+
+        <sc-if value="{{ deskRate }}" hint-placeholder-val="{{ false }}">
+          <div data-layer="U5-3 행동 자리 · 데스크톱" style="display:flex;flex-direction:column;gap:12px;margin-top:-8px">
+            <p style="margin:0;font-size:16px;color:#1F1D1A">얼마나 잘 떠올렸나요?</p>
+            <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+              <button style="height:48px;min-width:44px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 100ms" style-hover="background:#F1EEE7"><span style="font-size:12px;color:#A39D93">1</span>기억 안 났어요</button>
+              <button style="height:48px;min-width:44px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 100ms" style-hover="background:#F1EEE7"><span style="font-size:12px;color:#A39D93">2</span>겨우 떠올렸어요</button>
+              <button style="height:48px;min-width:44px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 100ms" style-hover="background:#F1EEE7"><span style="font-size:12px;color:#A39D93">3</span>떠올렸어요</button>
+              <button style="height:48px;min-width:44px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 100ms" style-hover="background:#F1EEE7"><span style="font-size:12px;color:#A39D93">4</span>바로 떠올렸어요</button>
+            </div>
+          </div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ isEnd }}" hint-placeholder-val="{{ false }}">
+        <section data-layer="U5-5 끝 화면" style="display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <p style="margin:0;font-size:14px;color:#6B655C">{{ modeTitle }}</p>
+            <sc-if value="{{ isFinished }}" hint-placeholder-val="{{ true }}">
+              <h1 tabindex="-1" style="margin:0;font-size:24px;line-height:1.35;font-weight:600;color:#1F1D1A">복습을 마쳤어요.</h1>
+            </sc-if>
+            <sc-if value="{{ isStopped }}" hint-placeholder-val="{{ false }}">
+              <h1 tabindex="-1" style="margin:0;font-size:24px;line-height:1.35;font-weight:600;color:#1F1D1A">여기까지 저장했어요.</h1>
+            </sc-if>
+          </div>
+          <sc-if value="{{ isStopped }}" hint-placeholder-val="{{ false }}">
+            <p style="margin:0;font-size:16px;line-height:1.6;color:#3A3632;font-variant-numeric:tabular-nums">남은 12장은 오늘의 복습에 남아 있어요.</p>
+          </sc-if>
+          <p style="margin:0;font-size:16px;line-height:1.6;color:#3A3632;font-variant-numeric:tabular-nums;text-wrap:pretty">{{ summary }}</p>
+          <sc-if value="{{ isFirst }}" hint-placeholder-val="{{ false }}">
+            <p style="margin:0;font-size:16px;line-height:1.6;color:#3A3632">이 플래시카드는 잊을 때쯤 다시 나와요.</p>
+            <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-top:8px">
+              <button style="max-width:100%;height:44px;padding:0 16px;border-radius:6px;border:none;background:#2F4B7C;color:#FFFFFF;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background 100ms" style-hover="background:#253D66">다음 강의 · 7강 환율은 어떻게 정해지나</button>
+              <a href="#" style="font-size:16px;color:#2F4B7C;min-height:44px;display:flex;align-items:center">커리큘럼으로</a>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isToday }}" hint-placeholder-val="{{ false }}">
+            <button style="align-self:flex-start;margin-top:8px;height:44px;padding:0 16px;border-radius:6px;border:none;background:#2F4B7C;color:#FFFFFF;font:inherit;font-weight:600;cursor:pointer;transition:background 100ms" style-hover="background:#253D66">홈으로</button>
+          </sc-if>
+        </section>
+      </sc-if>
+    </main>
+  </div>
+
+  <sc-if value="{{ mobileBar }}" hint-placeholder-val="{{ true }}">
+    <div data-layer="U5-4 저장 알림 · U5-3 행동 자리 (화면 아래 고정)" style="flex:none;background:#FFFFFF;border-top:1px solid #E4DFD5;padding:12px 16px 24px">
+      <div style="max-width:65ch;margin:0 auto;display:flex;flex-direction:column;gap:12px">
+        <sc-if value="{{ isSaveFail }}" hint-placeholder-val="{{ false }}">
+          <div data-layer="U5-4 저장 알림 자리" aria-live="polite" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid #E4DFD5">
+            <p style="margin:0;font-size:16px;color:#B4443A">저장하지 못했어요.</p>
+            <button style="height:44px;padding:0 16px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;transition:background 100ms" style-hover="background:#F1EEE7">다시 시도</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isFront }}" hint-placeholder-val="{{ true }}">
+          <button style="width:100%;height:48px;border-radius:6px;border:none;background:#2F4B7C;color:#FFFFFF;font:inherit;font-weight:600;cursor:pointer;transition:background 100ms" style-hover="background:#253D66">답 보기</button>
+        </sc-if>
+        <sc-if value="{{ isAnswered }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:0;font-size:16px;color:#1F1D1A">얼마나 잘 떠올렸나요?</p>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+            <button style="height:48px;min-width:44px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 100ms" style-hover="background:#F1EEE7"><span style="font-size:12px;color:#A39D93">1</span>기억 안 났어요</button>
+            <button style="height:48px;min-width:44px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 100ms" style-hover="background:#F1EEE7"><span style="font-size:12px;color:#A39D93">2</span>겨우 떠올렸어요</button>
+            <button style="height:48px;min-width:44px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 100ms" style-hover="background:#F1EEE7"><span style="font-size:12px;color:#A39D93">3</span>떠올렸어요</button>
+            <button style="height:48px;min-width:44px;border-radius:6px;border:1px solid #E4DFD5;background:#FFFFFF;color:#1F1D1A;font:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 100ms" style-hover="background:#F1EEE7"><span style="font-size:12px;color:#A39D93">4</span>바로 떠올렸어요</button>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;todayFront&quot;,&quot;todayAnswer&quot;,&quot;firstFront&quot;,&quot;saveFail&quot;,&quot;endFirst&quot;,&quot;endToday&quot;,&quot;waitReady&quot;,&quot;endStopped&quot;],&quot;default&quot;:&quot;todayFront&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;desktop&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const CARDS = {
+  today: {
+    source: '경제 기초 › 4강', concept: '공급 변화',
+    question: '원자재 가격이 올라 공급이 줄었어요. 수요가 그대로라면 시장 가격과 거래량은 각각 어떻게 변하나요?',
+    answer: '공급 곡선이 왼쪽으로 이동해 균형 가격은 오르고 거래량은 줄어요.',
+    points: ['공급 곡선이 왼쪽으로 이동한다', '균형 가격이 오른다', '거래량이 줄어든다'],
+  },
+  first: {
+    source: '경제 기초 › 6강', concept: '기준금리',
+    question: '기준금리를 올리면 물가 상승률이 낮아지는 경로를 두 단계로 설명해 보세요.',
+    answer: '기준금리가 오르면 시중 금리가 따라 올라 대출 · 소비 · 투자가 줄고, 수요가 줄어 물가 상승 압력이 낮아져요.',
+    points: ['시중 금리가 오른다', '소비 · 투자가 줄어든다', '수요가 줄어 물가 압력이 낮아진다'],
+  },
+};
+CARDS.wait = {
+  source: 'Spring 핵심 원리 › 3강', concept: '의존성 주입',
+  question: '객체가 필요한 다른 객체를 직접 만들지 않고 밖에서 받으면 무엇이 좋아지나요?',
+  answer: '구현을 바꿀 때 사용하는 쪽 코드를 고치지 않아도 되고, 테스트할 때 가짜 객체를 넣기 쉬워져요.',
+  points: ['구현을 갈아 끼우기 쉽다', '사용하는 쪽 코드를 고치지 않는다', '테스트에 가짜 객체를 넣을 수 있다'],
+};
+const NAV = { todayFront: '복습 (21)', todayAnswer: '복습 (21)', saveFail: '복습 (21)', firstFront: '복습 (31)', endFirst: '복습 (23)', endToday: '복습', waitReady: '복습 (19)', endStopped: '복습 (12)' };
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.props.state ?? 'todayFront';
+    const desk = !!this.props.desktop;
+    const isFirst = st === 'firstFront' || st === 'endFirst';
+    const isEnd = st === 'endFirst' || st === 'endToday' || st === 'endStopped';
+    const isFront = st === 'todayFront' || st === 'firstFront' || st === 'waitReady';
+    const isWait = st === 'waitReady';
+    const isAnswered = st === 'todayAnswer' || st === 'saveFail';
+    return {
+      navReview: NAV[st] ?? '복습 (21)',
+      modeTitle: isFirst ? '첫 복습 · 6강 기준금리와 인플레이션' : '오늘의 복습',
+      card: isFirst ? CARDS.first : isWait ? CARDS.wait : CARDS.today,
+      progress: isFirst ? '1 / 8' : isWait ? '5 / 23' : '3 / 23',
+      pct: isFirst ? `${100 / 8}%` : isWait ? `${500 / 23}%` : `${300 / 23}%`,
+      summary: st === 'endFirst' ? '8장 · 기억 안 남 1 · 겨우 2 · 떠올림 4 · 바로 1' : st === 'endStopped' ? '11장 · 기억 안 남 1 · 겨우 3 · 떠올림 5 · 바로 2' : '23장 · 기억 안 남 3 · 겨우 5 · 떠올림 12 · 바로 3',
+      inSession: !isEnd, isEnd, isFirst, isToday: st === 'endToday' || st === 'endStopped',
+      isReady: isWait, stopLabel: isWait ? '6강으로 돌아가기' : '그만하기',
+      isStopped: st === 'endStopped', isFinished: st !== 'endStopped',
+      isFront, isAnswered, isSaveFail: st === 'saveFail',
+      mobileBar: !desk && !isEnd,
+      deskRate: desk && isAnswered,
+    };
+  }
+}
+</script>
+</body>
+</html>
