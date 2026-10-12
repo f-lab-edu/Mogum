@@ -34,9 +34,9 @@
 - **CSRF** — `SameSite=Lax` 에 더해 Spring Security 기본 CSRF 보호를 켠다(화면은 `XSRF-TOKEN` 쿠키를 읽어 헤더로 보낸다).
 - **화면과 API 의 출처** — 화면은 `{도메인}`(Vercel), API 는 `api.{도메인}`(EC2)이다. 같은 등록 도메인이라 **같은 사이트 · 다른 출처**다(ADR-060).
     - 세션 쿠키는 API 호스트에만 둔다(`Domain` 없음). 같은 사이트라 `SameSite=Lax` 그대로 화면의 요청에 실린다. 화면의 fetch 는 `credentials: 'include'` 로 보낸다.
-    - CORS — 허용 출처는 화면 출처 하나(설정값)이고 credentials 를 허용한다. `*` · 패턴 허용을 쓰지 않는다.
-    - `XSRF-TOKEN` 쿠키는 화면 스크립트가 읽을 수 있게 `Domain` 을 등록 도메인으로 둔다.
-    - 로그인 시작 · 콜백은 API 호스트의 `/auth/*` 에서 하고, 끝나면 화면 주소(설정값)의 U7 · U8 · U2 로 보낸다.
+    - CORS — 허용 출처는 `app.web.origin` 하나(환경 변수 `APP_WEB_ORIGIN`, 로컬 기본값 `http://localhost:5173`)이고 credentials 를 허용한다. 스킴 · 호스트 · 선택적 포트만 지정하며 끝 `/` 는 없다. `*` · 패턴 · 여러 출처를 허용하지 않으며, 잘못된 출처 설정은 기동을 거부한다. `SecurityConfiguration` 이 루트 `WebProperties` 에 바인딩한 값을 사용해 `/api/**` 의 preflight 를 인증 · CSRF보다 먼저 처리한다. 허용 메서드는 `GET` · `POST` · `PUT` · `PATCH` · `DELETE`, 요청 헤더는 `Content-Type` · `X-XSRF-TOKEN` 이다.
+    - `XSRF-TOKEN` 쿠키는 화면 스크립트가 읽을 수 있게 `Domain` 을 등록 도메인으로 둔다(`app.web.cookie-domain`, 환경 변수 `APP_WEB_COOKIE_DOMAIN`). 로컬 기본값은 비어 있으며, 비어 있으면 `Domain` 을 두지 않는다. 세션 쿠키의 `Domain` 에는 적용하지 않는다. `HttpOnly` 아님 · `Secure` · `SameSite=Lax` 는 유지한다.
+    - 로그인 시작 · 콜백은 API 호스트의 `/auth/*` 에서 하고, 끝나면 화면 주소(`app.web.origin`)의 U7 · U8 · U2 로 보낸다(로그인 연결은 `1-auth` step 3 에서 구현).
     - 개발은 Vite proxy 로 같은 출처다 — 출처가 다른 운영 조건(CORS · 쿠키 도메인)은 테스트로 확인한다.
     - PR 미리보기(`*.vercel.app`)는 다른 사이트라 세션 쿠키가 실리지 않는다 — 미리보기에서 로그인을 확인하지 않는다.
 - 요청마다 **세션 조회 + 사용자 조회**, 그리고 마지막 접근 시각 갱신(세션 행 UPDATE)이 붙는다 — 용량 측정에 포함한다.

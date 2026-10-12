@@ -23,5 +23,8 @@ server:
         same-site: lax
 
 app:
+  web:
+    origin: ${APP_WEB_ORIGIN:http://localhost:5173}
+    cookie-domain: ${APP_WEB_COOKIE_DOMAIN:}
   auth:
     admin-emails: ${APP_AUTH_ADMIN_EMAILS:}

@@ -28,6 +28,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
+import org.springframework.session.web.http.CookieSerializer;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MvcResult;
@@ -57,6 +60,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SecurityConfigurationIT extends PostgresTestConfiguration {
     @Autowired private WebApplicationContext context;
     @Autowired private JdbcIndexedSessionRepository sessions;
+    @Autowired private CookieSerializer cookieSerializer;
     @Autowired private UserRepository users;
     @Autowired private TransactionRunner transactions;
     @Autowired private JdbcTemplate jdbc;
@@ -83,6 +87,19 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
     void cleanUp() {
         cookies.forEach(cookie -> sessions.deleteById(testSessions.id(cookie)));
         jdbc.update("DELETE FROM users WHERE id = ?", user.id());
+    }
+
+    @Test
+    void 로컬_설정의_발급_세션_쿠키에도_Domain이_없다() {
+        var request = new MockHttpServletRequest();
+        var response = new MockHttpServletResponse();
+        cookieSerializer.writeCookieValue(new CookieSerializer.CookieValue(request, response, "test-session"));
+        var cookie = response.getCookie("SESSION");
+        assertNotNull(cookie);
+        assertNull(cookie.getDomain());
+        assertTrue(cookie.isHttpOnly());
+        assertTrue(cookie.getSecure());
+        assertEquals("Lax", cookie.getAttribute("SameSite"));
     }
 
     @Test
