@@ -1,4 +1,4 @@
-package com.mogum.infra;
+package com.mogum.infra.account;
 
 import com.mogum.core.account.User;
 import com.mogum.core.account.UserRole;
@@ -20,9 +20,6 @@ public class UserEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(name = "google_sub", nullable = false, unique = true, columnDefinition = "text")
-    private String googleSub;
 
     @Column(nullable = false, columnDefinition = "text")
     private String email;
@@ -47,20 +44,14 @@ public class UserEntity {
     protected UserEntity() {
     }
 
-    UserEntity(String googleSub, String email, UserStatus status, UserRole role, Instant createdAt) {
-        this.googleSub = googleSub;
+    UserEntity(String email, UserStatus status, UserRole role, Instant createdAt) {
         this.email = email;
         this.status = status;
         this.role = role;
         this.createdAt = createdAt;
     }
 
-    void updateLogin(String email, UserRole role) {
-        this.email = email;
-        this.role = role;
-    }
-
     User toUser() {
-        return new User(id, googleSub, email, status, role, termsAgreedAt, termsVersion, createdAt);
+        return new User(id, email, status, role, termsAgreedAt, termsVersion, createdAt);
     }
 }

@@ -14,7 +14,7 @@
 | LLM | **OpenAI 공식 SDK + 자체 포트** | Spring AI · Anthropic | 프로바이더를 상시 여럿 지원해야 할 때 |
 | 저장소 | **PostgreSQL 하나 + pgvector** | MySQL + 벡터 DB · Redis | 개념 수십만 · 큐 초당 수백 건 |
 | 큐 | **`jobs` 테이블 + `FOR UPDATE SKIP LOCKED`** | Redis ZSET · Kafka | 초당 수백 건(hot row · VACUUM) |
-| DB 접근 | **Spring Data JPA 하나** — 도메인 테이블은 엔티티(`infra` 안), Postgres 고유 기능(`SKIP LOCKED` · advisory lock · `ON CONFLICT` · `RETURNING` · 벡터 거리)과 `jobs` · `job_events` · `llm_calls` 쓰기는 `EntityManager` 네이티브 쿼리 | MyBatis · `JdbcClient` · jOOQ · QueryDSL | 동적 SQL(조건이 이리저리 붙는 검색)이 많아질 때 |
+| DB 접근 | **Spring Data JPA 하나** — 도메인 테이블은 엔티티(`infra` 안)와 Spring Data 리포지토리로 조회 · 저장한다. 일반 CRUD와 메서드 이름으로 표현할 수 있는 조회는 Spring Data JPA를 우선 사용한다. Postgres 고유 기능(`SKIP LOCKED` · advisory lock · `ON CONFLICT` · `RETURNING` · 벡터 거리)과 `jobs` · `job_events` · `llm_calls` 쓰기는 `EntityManager` 네이티브 쿼리 | MyBatis · `JdbcClient` · jOOQ · QueryDSL | 동적 SQL(조건이 이리저리 붙는 검색)이 많아질 때 |
 | 마이그레이션 | Flyway | Liquibase | — |
 | 화면 | **React SPA**(TypeScript · Vite · React Router · TanStack Query · Tailwind) — 빌드 결과를 **Vercel** 에 정적 파일로. API 는 `api.` 서브도메인의 EC2 — 같은 사이트 · 다른 출처(ADR-060) | Spring Boot `static/` 에 넣어 jar 하나(ADR-007 — 대체) · Vercel rewrites 프록시 · Next.js(Node 서버 별도) · Thymeleaf | 검색 노출(SSR)이 필요해진다 · 화면과 API 를 같은 등록 도메인에 둘 수 없다 |
 | 경계 강제 | **단일 Gradle 모듈 + ArchUnit** | 멀티모듈 | 규칙이 버거워지거나 배포 단위가 갈릴 때 |
@@ -29,6 +29,30 @@
 ---
 
 ## 2. 패키지 경계
+
+`infra`의 도메인 전용 구현은 `infra.<도메인>` 아래에 모은다. 계정의 `UserEntity` · `JpaUserRepository`는 `infra.account`에 두고, 여러 도메인이 공유하는 `SpringTransactionRunner`는 `infra` 최상위에 둔다. 테스트도 대응하는 구현과 같은 패키지에 둔다.
+
+계정의 `JpaUserRepository`는 `SpringDataUserRepository extends JpaRepository<UserEntity, Long>`에 조회 · 저장을 위임하고, 반환한 엔티티를 `User` record로 변환한다. Spring Data 인터페이스는 `infra.account` 내부에서만 사용한다. 호출자는 기존처럼 `TransactionRunner` 안에서 포트를 사용하며, Spring Data의 저장 · 조회는 호출자의 트랜잭션에 참여한다([Spring Data JPA 트랜잭션 규약](https://docs.spring.io/spring-data/jpa/reference/jpa/transactions.html)).
+
+**회원과 외부 인증의 경계 — 구현 완료(ADR-064).** 저장 모델과 불변조건은 [02 §6.1](./02-domain-data.md)에 둔다. 구글 응답 해석과 회원 로그인을 아래 구조로 분리했다.
+
+| 위치 | 책임 |
+|---|---|
+| `core.account.User` | 서비스 회원 스냅샷. 외부 제공자 식별자를 필드로 갖지 않는다 |
+| `core.account.ExternalIdentity` | `(provider, subject)` 값. 제공자 응답 필드명 · OAuth 토큰 · Spring Security 타입을 알지 않는다 |
+| `core.account.UserIdentity` | 내부 연결 ID · 사용자 ID · 외부 식별자 · 연결 시각의 스냅샷 |
+| `core.account.ExternalAccount` | 인증을 마친 외부 식별자와 이메일 · 이메일 검증 여부를 전달하는 공통 입력 |
+| `core.account.Login` | 기존 연결 조회 또는 회원과 연결의 원자적 생성. 이메일 인증 · 허용 목록 · 신규 초기 역할 정책을 적용한다 |
+| `core.account.UserRepository` | 사용자 ID로 조회 · 회원 생성. 제공자 식별자로 회원을 직접 조회하지 않는다 |
+| `core.account.UserIdentityRepository` | `findByIdentity(ExternalIdentity)`로 연결 스냅샷 조회 · 사용자와 식별자의 연결 생성. 회원 저장소와 같은 `TransactionRunner` 범위에서 사용한다 |
+| `api.auth` | `OAuthLoginHandler`가 검증된 인증 결과를 공통 입력으로 변환해 `Login`을 호출하고 사용자 ID로 세션을 만든다. `GoogleAccountMapper`가 구글의 `sub` · `email` · `email_verified`를 해석한다 |
+| `infra.account` | 회원과 로그인 연결의 JPA 엔티티 · Spring Data 리포지토리 · 포트 어댑터. 엔티티를 트랜잭션 안에서 record로 변환한다 |
+
+제공자 선택은 검증된 Spring Security 인증의 클라이언트 등록 ID를 사용한다. 현재는 구글 변환기 하나만 구성한다. 추가 제공자는 등록 설정 · 응답 변환기 · 해당 제공자의 이메일 신뢰 정책을 확인한 뒤 연결한다. 구글의 `email_verified` 필드를 다른 제공자에도 있다고 가정하거나, 값이 없을 때 검증된 것으로 취급하지 않는다. 범용 플러그인 탐색기나 동적 제공자 등록 기능은 만들지 않는다.
+
+현재 구글 경로(`/auth/google` · `/auth/google/callback`) · 요청 쿠키 · PKCE · 토큰 폐기 정책은 유지한다. 제공자별 프로토콜 처리는 `api.auth`에 남을 수 있으며, 회원과 학습 도메인이 해당 제공자에 종속되지 않는 것이 이 변경의 목적이다. 여러 제공자를 동시에 활성화하는 API/화면, 계정 연결/해제/병합 동작은 별도 기능으로 다룬다.
+
+역할 설명만 담은 `package-info.java`는 구현이 없는 패키지의 자리를 남기는 데 사용한다. 구현이 있는 `core` · `api` · `infra`에서는 제거하고, 아직 구현이 없는 `core.job` · `core.generation` · `worker`에서는 유지한다.
 
 ```mermaid
 flowchart TD

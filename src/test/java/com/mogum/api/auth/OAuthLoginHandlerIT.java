@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.*;
         "app.web.origin=https://mogum.example",
         "app.auth.admin-emails=admin@example.com,changed@example.com"
 })
-class GoogleLoginHandlerIT extends PostgresTestConfiguration {
+class OAuthLoginHandlerIT extends PostgresTestConfiguration {
     private static final AtomicInteger TOKEN_CALLS = new AtomicInteger();
     private static final AtomicReference<String> CODE_CHALLENGE = new AtomicReference<>();
     private static final HttpServer GOOGLE = fakeGoogle();
@@ -77,8 +77,8 @@ class GoogleLoginHandlerIT extends PostgresTestConfiguration {
 
     @AfterEach
     void clean() {
-        jdbc.update("DELETE FROM spring_session WHERE principal_name IN (SELECT id::text FROM users WHERE google_sub = ?)", sub);
-        jdbc.update("DELETE FROM users WHERE google_sub = ?", sub);
+        jdbc.update("DELETE FROM spring_session WHERE principal_name IN (SELECT user_id::text FROM user_identities WHERE provider = 'google' AND subject = ?)", sub);
+        jdbc.update("DELETE FROM users WHERE id IN (SELECT user_id FROM user_identities WHERE provider = 'google' AND subject = ?)", sub);
     }
 
     @AfterAll
@@ -118,7 +118,7 @@ class GoogleLoginHandlerIT extends PostgresTestConfiguration {
         assertCookieSecurity(sessionHeader);
         assertFalse(sessionHeader.contains("Domain="));
         String sessionCookie = cookiePair(sessionHeader);
-        var row = jdbc.queryForMap("SELECT id, status, role FROM users WHERE google_sub = ?", sub);
+        var row = jdbc.queryForMap("SELECT u.id, u.status, u.role FROM users u JOIN user_identities i ON i.user_id = u.id WHERE i.provider = 'google' AND i.subject = ?", sub);
         assertEquals("ACTIVE", row.get("status"));
         assertEquals("ADMIN", row.get("role"));
         assertIdOnly(sessionCookie, row.get("id").toString());
@@ -131,19 +131,25 @@ class GoogleLoginHandlerIT extends PostgresTestConfiguration {
     }
 
     @Test
-    void 재로그인은_기존_세션을_폐기하고_같은_sub의_이메일을_갱신한다() throws Exception {
+    void 재로그인은_세션_번호만_바꾸고_같은_sub의_저장된_이메일과_역할을_보존한다() throws Exception {
         var first = callback(start(null), "ok", null);
         var oldCookie = cookiePair(cookieHeader(first, "SESSION"));
-        long id = jdbc.queryForObject("SELECT id FROM users WHERE google_sub = ?", Long.class, sub);
+        long id = jdbc.queryForObject("SELECT user_id FROM user_identities WHERE provider = 'google' AND subject = ?", Long.class, sub);
+        jdbc.update("UPDATE users SET role = 'USER' WHERE id = ?", id);
         email = "changed@example.com";
         var second = callback(start(oldCookie), "ok", oldCookie);
         assertRedirect(second, "https://mogum.example/");
         var newCookie = cookiePair(cookieHeader(second, "SESSION"));
         assertNotEquals(oldCookie, newCookie);
         assertEquals(401, get("/api/me", oldCookie).statusCode());
-        assertEquals(200, get("/api/me", newCookie).statusCode());
-        assertEquals(id, jdbc.queryForObject("SELECT id FROM users WHERE google_sub = ?", Long.class, sub));
-        assertEquals("changed@example.com", jdbc.queryForObject("SELECT email FROM users WHERE id = ?", String.class, id));
+        var me = get("/api/me", newCookie);
+        assertEquals(200, me.statusCode());
+        var body = new tools.jackson.databind.ObjectMapper().readTree(me.body());
+        assertEquals("admin@example.com", body.get("email").asString());
+        assertEquals("USER", body.get("role").asString());
+        assertEquals(id, jdbc.queryForObject("SELECT user_id FROM user_identities WHERE provider = 'google' AND subject = ?", Long.class, sub));
+        assertEquals("admin@example.com", jdbc.queryForObject("SELECT email FROM users WHERE id = ?", String.class, id));
+        assertEquals("USER", jdbc.queryForObject("SELECT role FROM users WHERE id = ?", String.class, id));
         assertIdOnly(newCookie, Long.toString(id));
         assertEquals(sessionsBefore + 1, count("spring_session"));
     }

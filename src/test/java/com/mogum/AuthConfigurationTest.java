@@ -1,8 +1,9 @@
 package com.mogum;
 
 import com.mogum.core.TransactionRunner;
-import com.mogum.core.account.GoogleLogin;
+import com.mogum.core.account.Login;
 import com.mogum.core.account.UserRepository;
+import com.mogum.core.account.UserIdentityRepository;
 import com.mogum.core.account.UserRole;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -18,6 +19,7 @@ class AuthConfigurationTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(AuthConfiguration.class)
             .withBean(UserRepository.class, () -> mock(UserRepository.class))
+            .withBean(UserIdentityRepository.class, () -> mock(UserIdentityRepository.class))
             .withBean(TransactionRunner.class, () -> mock(TransactionRunner.class))
             .withBean(Clock.class, Clock::systemUTC);
 
@@ -26,7 +28,7 @@ class AuthConfigurationTest {
         runner.run(context -> {
             assertNull(context.getStartupFailure());
             assertTrue(context.getBean(AuthProperties.class).adminEmails().isEmpty());
-            assertEquals(UserRole.USER, context.getBean(GoogleLogin.class).roleFor("admin@example.com"));
+            assertEquals(UserRole.USER, context.getBean(Login.class).roleFor("admin@example.com"));
         });
     }
 
@@ -36,7 +38,7 @@ class AuthConfigurationTest {
                 .run(context -> {
                     assertNull(context.getStartupFailure());
                     assertEquals(2, context.getBean(AuthProperties.class).adminEmails().size());
-                    var login = context.getBean(GoogleLogin.class);
+                    var login = context.getBean(Login.class);
                     assertEquals(UserRole.ADMIN, login.roleFor("admin@example.com"));
                     assertEquals(UserRole.ADMIN, login.roleFor(" SECOND@example.com "));
                     assertEquals(UserRole.USER, login.roleFor("other@example.com"));
@@ -58,7 +60,7 @@ class AuthConfigurationTest {
                         "APP_AUTH_ADMIN_EMAILS", "env-admin@example.com,second@example.com"))))
                 .withPropertyValues("app.auth.admin-emails=").run(context -> {
                     assertNull(context.getStartupFailure());
-                    assertEquals(UserRole.ADMIN, context.getBean(GoogleLogin.class).roleFor("env-admin@example.com"));
+                    assertEquals(UserRole.ADMIN, context.getBean(Login.class).roleFor("env-admin@example.com"));
                     assertEquals(2, context.getBean(AuthProperties.class).adminEmails().size());
                 });
     }

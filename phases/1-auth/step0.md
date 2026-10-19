@@ -1,5 +1,7 @@
 # Step 0: users-account
 
+> 2026-10-19 후속 변경: 이 step의 구글 전용 계정 모델/클래스는 ADR-064로 대체했다. 현재 구현은 `Login` · `ExternalAccount` · `OAuthLoginHandler`와 `user_identities`이며, 기존 V2는 유지하고 V4로 이전한다. 최신 구조와 검증은 [02 §6.1](../../docs/02-domain-data.md) · [04 §2](../../docs/04-jobs-and-cost.md) · [07 §1.2](../../docs/07-testing.md)를 따른다.
+
 ## 읽어야 할 파일
 
 먼저 아래 파일들을 읽고 프로젝트의 아키텍처와 설계 의도를 파악하라:
@@ -40,7 +42,7 @@ public enum UserRole { USER, ADMIN }
 public interface UserRepository {          // 포트 — 구현은 infra
     Optional<User> findById(long id);
     Optional<User> findByGoogleSub(String googleSub);
-    // 로그인에 필요한 생성 · 갱신 메서드는 재량
+    // 신규 가입에 필요한 생성 메서드는 재량. 재로그인에서는 조회만 한다.
 }
 
 public record GoogleAccount(String sub, String email, boolean emailVerified) {}
@@ -55,24 +57,24 @@ public final class GoogleLogin {           // 로그인 판정 유스케이스
 1. `emailVerified` 가 거짓이면 거절(사유: 이메일 미인증). DB 에 아무것도 쓰지 않는다.
 2. **관리자 이메일 목록에 없는 이메일이면 거절**(사유: 허용되지 않은 계정 — ADR-062). DB 에 아무것도 쓰지 않는다 — 이미 행이 있는 사용자라도 갱신하지 않는다. 이메일 비교는 앞뒤 공백을 무시하고 대소문자를 구분하지 않는다. 목록이 비어 있으면 아무도 로그인하지 못한다.
 3. 통과하면 `google_sub` 로 찾는다. 이메일은 바뀔 수 있으므로 **식별자는 `google_sub` 다**(02 §6.1).
-   - 있으면 `email` 과 `role` 을 이번 로그인 값으로 갱신한다. `status` · 약관 컬럼 · `created_at` 은 건드리지 않는다.
+   - 있으면 기존 사용자를 그대로 사용한다. `email` · `role` · `status` · 약관 컬럼 · `created_at` 을 모두 보존한다. 로그인에서 이메일 · 역할을 갱신하지 않는다(사용자 결정, 2026-10-18).
    - 없으면 새로 만든다 — `status=ACTIVE`, `role` 은 아래 역할 계산, 약관 컬럼 NULL, `created_at` 은 주입받은 `Clock` 의 현재 시각.
-4. **역할 계산과 거절을 따로 둔다.** 역할은 "관리자 이메일 목록에 있으면 `ADMIN`, 아니면 `USER`" 로 계산하는 독립된 코드로 두고, 2번의 거절은 그와 별개의 분기로 둔다. 이유: `12-account-public` 에서 거절 분기만 지우고 역할 계산은 남긴다(ADR-062). 지금은 거절 때문에 결과가 늘 `ADMIN` 이지만, 역할 계산 테스트는 `USER` 경우도 확인한다.
-5. 찾기와 생성 · 갱신은 `TransactionRunner` 로 한 트랜잭션에 둔다(금지 목록 3 — `@Transactional` 을 `core` 에 쓰지 않는다).
+4. **신규 가입의 역할 계산과 거절을 따로 둔다.** 초기 역할은 "관리자 이메일 목록에 있으면 `ADMIN`, 아니면 `USER`" 로 계산하는 독립된 코드로 두고, 2번의 거절은 그와 별개의 분기로 둔다. 기존 사용자의 역할은 다시 계산하지 않는다. 이유: `12-account-public` 에서 거절 분기만 지우고 신규 가입의 역할 계산은 남긴다(ADR-062). 지금은 거절 때문에 신규 역할이 늘 `ADMIN` 이지만, 역할 계산 테스트는 `USER` 경우도 확인한다.
+5. 찾기와 신규 생성은 `TransactionRunner` 로 한 트랜잭션에 둔다(금지 목록 3 — `@Transactional` 을 `core` 에 쓰지 않는다).
 6. 같은 `google_sub` 의 동시 첫 로그인은 unique 제약으로 한 행만 남는 것으로 충분하다 — 진 쪽은 예외로 끝나도 된다(사용자가 다시 로그인하면 기존 행으로 들어온다). 재시도 · `ON CONFLICT` 장치를 따로 만들지 마라.
 
 관리자 이메일 목록은 설정 `app.auth.admin-emails`(쉼표 구분 목록 — 환경 변수로 덮어쓸 수 있게)에서 받는다. **바인딩과 빈 등록은 루트 패키지 `com.mogum` 에 바로 둔다** — `com.mogum.config` 같은 하위 패키지에 두지 않는다(ArchUnit 규칙 1 의 허용 목록이 루트 `..mogum` 만 허용한다). `core` 는 Spring 설정 바인딩을 모른다 — 목록은 생성자 인자 등 평범한 값으로 받는다. `application.yml` 의 기본값은 빈 목록이다(실제 이메일을 저장소에 적지 않는다).
 
-### 3. `infra` — JPA 엔티티 · 어댑터
+### 3. `infra.account` — 계정 JPA 엔티티 · 어댑터
 
-- `users` 를 매핑하는 JPA 엔티티는 `infra` 에만 둔다(금지 목록 4). `ddl-auto: validate` 를 통과해야 한다.
-- `UserRepository` 구현은 Spring Data 리포지토리를 써도 된다. **트랜잭션 안에서 완전히 채운 `User` record 를 돌려준다** — 엔티티를 `infra` 밖으로 내보내지 않는다.
+- `users` 를 매핑하는 `UserEntity`와 `JpaUserRepository`는 `infra.account`에 둔다(금지 목록 4). 대응하는 테스트도 같은 패키지에 둔다. `ddl-auto: validate` 를 통과해야 한다.
+- `JpaUserRepository`는 같은 패키지의 `SpringDataUserRepository extends JpaRepository<UserEntity, Long>`에 조회 · 저장을 위임한다. 일반 CRUD와 메서드 이름으로 표현할 수 있는 조회는 Spring Data JPA를 우선 사용한다. **호출자의 `TransactionRunner` 트랜잭션 안에서 완전히 채운 `User` record를 돌려준다** — 엔티티를 `infra` 밖으로 내보내지 않는다.
 
 ### 4. 테스트
 
 TDD 가드: 구현 파일마다 같은 패키지에 `{클래스명}*Test.java` 또는 `{클래스명}*IT.java` 가 먼저 있어야 쓰기가 허용된다. record · enum · interface · `@Entity` 는 검사하지 않는다.
 
-- **`GoogleLogin`** — 위 규칙 1~4 의 분기 전부: 미인증 거절 · 목록 밖 거절(기존 행이 있어도 갱신 없음) · 대소문자/공백 무시 · 빈 목록 · 첫 로그인 생성(`ACTIVE` · `ADMIN` · 약관 NULL · 주입한 시계의 시각) · 재로그인 시 같은 id 로 이메일 갱신 · 역할 계산(`USER` 경우 포함).
+- **`GoogleLogin`** — 위 규칙 1~4 의 분기 전부: 미인증 거절 · 목록 밖 거절(기존 행이 있어도 갱신 없음) · 대소문자/공백 무시 · 빈 목록 · 첫 로그인 생성(`ACTIVE` · `ADMIN` · 약관 NULL · 주입한 시계의 시각) · 재로그인 시 같은 id 와 이메일 · 역할을 포함한 전체 계정 정보 보존 · 신규 가입 역할 계산(`USER` 경우 포함).
   실제 Postgres 로 돌리든 가짜 포트로 돌리든 재량이다. 거절 때 "DB 에 쓰지 않았다" 는 실제 DB 로 확인한다.
 - **어댑터** — 실제 Postgres(`PostgresTestConfiguration` 상속)로 저장 · 조회 · `google_sub` unique 위반 · CHECK 위반.
 - **JPA · 네이티브 혼합 규칙 테스트**(07 §1.2) — 한 트랜잭션에서 `users` 엔티티를 JPA 로 바꾸고, `flush()` 한 뒤 같은 트랜잭션의 `EntityManager` 네이티브 쿼리로 읽으면 바뀐 값이 보인다. 그리고 포트가 돌려준 record 를 트랜잭션이 끝난 뒤 읽어도 예외가 없다.

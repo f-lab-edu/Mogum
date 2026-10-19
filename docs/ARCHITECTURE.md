@@ -17,6 +17,8 @@
 │   ├── api/                     # 컨트롤러 · 인증 · DTO · 레이트리밋
 │   ├── worker/                  # 수령 루프 · 실행기 N 개 · 단계 실행
 │   └── infra/                   # JPA 엔티티(여기에만) · Spring Data 리포지토리 · EntityManager 네이티브 쿼리(jobs · job_events · llm_calls · 락 · 벡터) · OpenAI 어댑터 · 슬랙 웹훅
+│       ├── account/             # UserEntity · JpaUserRepository · SpringDataUserRepository — 도메인별 구현
+│       └── SpringTransactionRunner.java # 여러 도메인이 공유하는 트랜잭션 구현
 ├── src/main/resources/
 │   ├── db/migration/            # Flyway 버전드 SQL(세션 테이블 포함)
 │   ├── prompts/v6/              # 운영 프롬프트 — 개발하며 새로 만든다. 명세는 03 §2~§6. 바꾸면 v7 로(금지 목록 18)
@@ -54,6 +56,19 @@
 | **역할 전환(비상용)** | 같은 jar 를 `app.role` = `all` · `api` · `worker` 로. 판단은 루트 설정의 빈 등록에서만 | [04 §3.1](./04-jobs-and-cost.md) |
 
 ## 데이터 흐름
+
+**로그인 — 회원/외부 식별자 분리(ADR-064)**
+
+```text
+구글 인증 완료 → api.auth: 검증된 클라이언트 등록과 구글 응답을 ExternalAccount로 변환
+              → core.account.Login: 이메일 검증 · 허용 목록 검사
+              → TransactionRunner 안에서 user_identities(provider, subject) 조회
+                  기존 연결: users 조회, 계정 정보 보존
+                  신규 연결: users와 user_identities를 같은 트랜잭션으로 생성
+              → api.auth: 기존 방식으로 사용자 ID만 세션에 저장 · 화면으로 이동
+```
+
+`User`와 학습 데이터의 기준은 서비스 사용자 ID다. 제공자 고유 식별자는 `UserIdentity` / `user_identities`로 분리한다([02 §6.1](./02-domain-data.md)). `GoogleAccountMapper`가 제공자 응답을 해석하고 `OAuthLoginHandler`가 공통 `Login`을 호출한다. V4 마이그레이션이 기존 회원 정보와 ID 세션을 보존하며 구글 식별자를 이전한다. 현재 활성 제공자는 구글 하나다.
 
 **생성 — 전부 비동기**
 

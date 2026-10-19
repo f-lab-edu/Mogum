@@ -32,7 +32,7 @@
 
 ### 3. 패키지
 
-각 패키지에 역할을 한 줄로 적은 `package-info.java` 를 둔다(역할은 04 §2 표).
+뼈대에서는 각 패키지에 역할을 한 줄로 적은 `package-info.java`를 둔다(역할은 04 §2 표). 구현이 추가된 패키지에서는 이 설명용 파일을 제거하고, 구현이 없는 패키지에서는 유지한다.
 
 - `com.mogum.core` · `com.mogum.core.job` · `com.mogum.core.generation`
 - `com.mogum.api` · `com.mogum.worker` · `com.mogum.infra`

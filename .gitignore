@@ -31,6 +31,7 @@ client_secret*.json
 application-local.*
 
 # DB 백업 · 덤프 — 사용자 데이터다(*.sql 은 Flyway 마이그레이션이라 무시하지 않는다)
+/backups/
 *.dump
 *.sql.gz
 
@@ -60,6 +61,9 @@ CLAUDE.local.md
 __pycache__/
 .pytest_cache/
 .venv/
+
+# 브라우저 확인 중 생성되는 콘솔 로그 · 스크린샷
+/.playwright-mcp/
 
 # 로컬 실험 — 저장소에 올리지 않는다
 # 앞의 / 로 루트 폴더만 무시한다. 없으면 src/main/resources/prompts/(운영 프롬프트)까지 무시된다

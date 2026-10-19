@@ -7,10 +7,5 @@ import java.util.Optional;
 public interface UserRepository {
     Optional<User> findById(long id);
 
-    Optional<User> findByGoogleSub(String googleSub);
-
-    User create(String googleSub, String email, UserStatus status, UserRole role, Instant createdAt);
-
-    /** 상태 · 약관 · 가입 시각은 보존한다. */
-    User updateLogin(long id, String email, UserRole role);
+    User create(String email, UserStatus status, UserRole role, Instant createdAt);
 }

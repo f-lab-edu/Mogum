@@ -1,27 +1,30 @@
 package com.mogum.api.auth;
 
-import com.mogum.core.account.GoogleAccount;
-import com.mogum.core.account.GoogleLogin;
+import com.mogum.core.account.ExternalAccount;
+import com.mogum.core.account.Login;
 import com.mogum.core.account.LoginResult;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.session.FindByIndexNameSessionRepository;
 
 import java.io.IOException;
 
-public final class GoogleLoginHandler implements AuthenticationSuccessHandler, AuthenticationFailureHandler {
-    private final GoogleLogin login;
+public final class OAuthLoginHandler implements AuthenticationSuccessHandler, AuthenticationFailureHandler {
+    private final Login login;
+    private final GoogleAccountMapper accounts;
     private final String origin;
     private final CookieAuthorizationRequestRepository requests;
 
-    public GoogleLoginHandler(GoogleLogin login, String origin, CookieAuthorizationRequestRepository requests) {
+    public OAuthLoginHandler(Login login, GoogleAccountMapper accounts, String origin,
+                              CookieAuthorizationRequestRepository requests) {
         this.login = login;
+        this.accounts = accounts;
         this.origin = origin;
         this.requests = requests;
     }
@@ -30,16 +33,14 @@ public final class GoogleLoginHandler implements AuthenticationSuccessHandler, A
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                         Authentication authentication) throws IOException {
         try {
-            var google = (OAuth2User) authentication.getPrincipal();
-            Object sub = google.getAttribute("sub");
-            Object email = google.getAttribute("email");
-            if (!(sub instanceof String subject) || subject.isBlank()
-                    || !(email instanceof String address) || address.isBlank()) {
+            ExternalAccount account;
+            try {
+                account = accounts.map(authentication);
+            } catch (OAuth2AuthenticationException invalid) {
                 fail(request, response, "login_failed");
                 return;
             }
-            var result = login.login(new GoogleAccount(subject, address,
-                    Boolean.TRUE.equals(google.getAttribute("email_verified"))));
+            var result = login.login(account);
             if (result instanceof LoginResult.Success success) {
                 // 번호 변경은 JDBC 저장 시 반영된다. 변경 직후 invalidate하면 이전 DB 행을 다시 읽을 수 있다.
                 var session = request.getSession(false);

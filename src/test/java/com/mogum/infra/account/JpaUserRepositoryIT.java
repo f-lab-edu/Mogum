@@ -1,4 +1,4 @@
-package com.mogum.infra;
+package com.mogum.infra.account;
 
 import com.mogum.core.TransactionRunner;
 import com.mogum.core.account.User;
@@ -14,6 +14,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.sql.SQLException;
@@ -27,46 +28,51 @@ class JpaUserRepositoryIT extends PostgresTestConfiguration {
     @Autowired private UserRepository repository;
     @Autowired private TransactionRunner transactions;
     @PersistenceContext private EntityManager entityManager;
-    private final String sub = "repository-" + UUID.randomUUID();
+    private final String email = "repository-" + UUID.randomUUID() + "@example.com";
+    private final java.util.List<Long> ids = new java.util.ArrayList<>();
     private final Instant now = Instant.parse("2026-10-12T03:00:00Z");
 
     @AfterEach
     void cleanUp() {
         transactions.inTransaction(() -> {
-            entityManager.createNativeQuery("DELETE FROM users WHERE google_sub = :sub")
-                    .setParameter("sub", sub).executeUpdate();
+            for (var id : ids) entityManager.createNativeQuery("DELETE FROM users WHERE id = :id")
+                    .setParameter("id", id).executeUpdate();
         });
     }
 
     @Test
-    void 저장하고_id와_sub로_완전히_채운_record를_조회한다() {
-        assertTrue(transactions.inTransaction(() -> repository.findByGoogleSub(sub)).isEmpty());
+    void 저장하고_id로_완전히_채운_record를_조회한다() {
         assertTrue(transactions.inTransaction(() -> repository.findById(-1)).isEmpty());
         var saved = create();
         assertTrue(saved.id() > 0);
         var byId = transactions.inTransaction(() -> repository.findById(saved.id()).orElseThrow());
-        var bySub = transactions.inTransaction(() -> repository.findByGoogleSub(sub).orElseThrow());
         assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
-        assertEquals(new User(saved.id(), sub, "before@example.com", UserStatus.ACTIVE,
+        assertEquals(new User(saved.id(), email, UserStatus.ACTIVE,
                 UserRole.ADMIN, null, null, now), byId);
-        assertEquals(byId, bySub);
     }
 
     @Test
-    void 이메일과_역할_갱신은_나머지_컬럼을_보존한다() {
-        var saved = create();
-        var updated = transactions.inTransaction(() -> repository.updateLogin(saved.id(), "after@example.com", UserRole.USER));
-        var expected = new User(saved.id(), sub, "after@example.com", saved.status(), UserRole.USER,
-                saved.termsAgreedAt(), saved.termsVersion(), saved.createdAt());
-        assertEquals(expected, updated);
-        assertEquals(expected, transactions.inTransaction(() -> repository.findById(saved.id()).orElseThrow()));
+    void 호출자의_트랜잭션이_롤백되면_사용자_저장도_롤백된다() {
+        var failure = new IllegalStateException("rollback user creation");
+
+        var actual = assertThrows(IllegalStateException.class, () -> transactions.inTransaction(() -> {
+            var saved = repository.create(email, UserStatus.ACTIVE, UserRole.ADMIN, now);
+            ids.add(saved.id());
+            assertTrue(saved.id() > 0);
+            throw failure;
+        }));
+
+        assertSame(failure, actual);
+        assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+        assertTrue(transactions.inTransaction(() -> repository.findById(ids.getFirst())).isEmpty());
     }
 
     @Test
-    void google_sub는_유일하다() {
-        var saved = create();
-        assertSqlState("23505", assertThrows(RuntimeException.class, this::create));
-        assertEquals(saved, transactions.inTransaction(() -> repository.findByGoogleSub(sub).orElseThrow()));
+    void 이메일은_외부_계정의_키가_아니므로_중복을_허용한다() {
+        var first = create();
+        var second = create();
+        assertNotEquals(first.id(), second.id());
+        assertEquals(first.email(), second.email());
     }
 
     @ParameterizedTest
@@ -82,7 +88,7 @@ class JpaUserRepositoryIT extends PostgresTestConfiguration {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"google_sub", "email", "status", "role", "created_at"})
+    @ValueSource(strings = {"email", "status", "role", "created_at"})
     void 필수_컬럼은_NULL을_거절한다(String column) {
         var saved = create();
         var failure = assertThrows(RuntimeException.class, () -> transactions.inTransaction(() -> {
@@ -98,13 +104,14 @@ class JpaUserRepositoryIT extends PostgresTestConfiguration {
         var saved = create();
         User snapshot = transactions.inTransaction(() -> {
             var entity = entityManager.find(UserEntity.class, saved.id());
-            entity.updateLogin("flushed@example.com", UserRole.USER);
+            // 로그인용 갱신 메서드 없이 JPA와 네이티브 쿼리 사이의 flush 동작만 검증한다.
+            ReflectionTestUtils.setField(entity, "email", "flushed@example.com");
             entityManager.flush();
             assertEquals("flushed@example.com", nativeEmail(saved.id()));
             return repository.findById(saved.id()).orElseThrow();
         });
         assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
-        assertEquals(new User(saved.id(), sub, "flushed@example.com", saved.status(), UserRole.USER,
+        assertEquals(new User(saved.id(), "flushed@example.com", saved.status(), saved.role(),
                 null, null, now), snapshot);
     }
 
@@ -112,14 +119,17 @@ class JpaUserRepositoryIT extends PostgresTestConfiguration {
     void 명시적_flush_없는_네이티브_조회_값을_관찰한다() {
         var saved = create();
         transactions.inTransaction(() -> {
-            entityManager.find(UserEntity.class, saved.id()).updateLogin("auto-flush@example.com", UserRole.USER);
+            ReflectionTestUtils.setField(entityManager.find(UserEntity.class, saved.id()),
+                    "email", "auto-flush@example.com");
             // 자동 flush 여부는 설정에 의존하므로 조회 결과는 관찰만 한다.
             System.out.println("users native email without explicit flush: " + nativeEmail(saved.id()));
         });
     }
 
     private User create() {
-        return transactions.inTransaction(() -> repository.create(sub, "before@example.com", UserStatus.ACTIVE, UserRole.ADMIN, now));
+        var user = transactions.inTransaction(() -> repository.create(email, UserStatus.ACTIVE, UserRole.ADMIN, now));
+        ids.add(user.id());
+        return user;
     }
 
     private String nativeEmail(long id) {

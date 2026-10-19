@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class MeControllerTest {
     @Test
     void 현재_사용자의_공개_필드와_약관_동의를_변환한다() {
-        var user = new User(1L, "google-sub", "me@example.com", UserStatus.ACTIVE,
+        var user = new User(1L, "me@example.com", UserStatus.ACTIVE,
                 UserRole.ADMIN, Instant.now(), "v1", Instant.now());
         var response = new MeController().me(user);
         assertEquals("me@example.com", response.email());

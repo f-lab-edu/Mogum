@@ -32,7 +32,7 @@ class SessionUserFilterTest {
 
     @Test
     void ID로_조회한_스냅샷을_요청_인증으로만_사용한다() throws Exception {
-        var user = new User(17, "sub", "me@example.com", UserStatus.ACTIVE,
+        var user = new User(17, "me@example.com", UserStatus.ACTIVE,
                 UserRole.ADMIN, null, null, Instant.now());
         when(users.findById(17)).thenReturn(Optional.of(user));
         when(transactions.inTransaction(any(Supplier.class))).thenAnswer(invocation ->

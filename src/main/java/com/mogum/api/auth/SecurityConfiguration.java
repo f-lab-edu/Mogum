@@ -3,7 +3,7 @@ package com.mogum.api.auth;
 import com.mogum.WebProperties;
 import com.mogum.api.ApiError;
 import com.mogum.core.TransactionRunner;
-import com.mogum.core.account.GoogleLogin;
+import com.mogum.core.account.Login;
 import com.mogum.core.account.UserRepository;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
@@ -64,7 +64,7 @@ public class SecurityConfiguration {
     @Bean
     public SecurityFilterChain apiSecurity(HttpSecurity http, UserRepository users,
                                            TransactionRunner transactions, ObjectMapper mapper,
-                                           WebProperties web, GoogleLogin login, Clock clock,
+                                           WebProperties web, Login login, Clock clock,
                                            ClientRegistrationRepository registrations,
                                            DiscardingOAuth2AuthorizedClients clients) throws Exception {
         var authorizationStart = PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET, "/auth/{registrationId}");
@@ -93,7 +93,7 @@ public class SecurityConfiguration {
         var corsSource = new UrlBasedCorsConfigurationSource();
         corsSource.registerCorsConfiguration("/api/**", cors);
         var oauthRequests = new CookieAuthorizationRequestRepository(registrations, mapper, clock);
-        var loginHandler = new GoogleLoginHandler(login, web.origin(), oauthRequests);
+        var loginHandler = new OAuthLoginHandler(login, new GoogleAccountMapper(), web.origin(), oauthRequests);
         var resolver = new DefaultOAuth2AuthorizationRequestResolver(registrations, "/auth");
         var getOnlyResolver = new OAuth2AuthorizationRequestResolver() {
             @Override

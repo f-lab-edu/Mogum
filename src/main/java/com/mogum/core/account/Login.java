@@ -8,22 +8,24 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public final class GoogleLogin {
+public final class Login {
     private final UserRepository repository;
+    private final UserIdentityRepository identities;
     private final TransactionRunner transactions;
     private final Clock clock;
     private final Set<String> adminEmails;
 
-    public GoogleLogin(UserRepository repository, TransactionRunner transactions, Clock clock,
-                       List<String> adminEmails) {
+    public Login(UserRepository repository, UserIdentityRepository identities, TransactionRunner transactions,
+                 Clock clock, List<String> adminEmails) {
         this.repository = repository;
+        this.identities = identities;
         this.transactions = transactions;
         this.clock = clock;
-        this.adminEmails = adminEmails.stream().map(GoogleLogin::normalizeEmail)
+        this.adminEmails = adminEmails.stream().map(Login::normalizeEmail)
                 .filter(email -> !email.isEmpty()).collect(Collectors.toUnmodifiableSet());
     }
 
-    public LoginResult login(GoogleAccount account) {
+    public LoginResult login(ExternalAccount account) {
         if (!account.emailVerified()) {
             return new LoginResult.Rejected(LoginResult.RejectionReason.EMAIL_NOT_VERIFIED);
         }
@@ -32,12 +34,16 @@ public final class GoogleLogin {
             return new LoginResult.Rejected(LoginResult.RejectionReason.NOT_ALLOWED);
         }
 
-        UserRole role = roleFor(account.email());
         return transactions.inTransaction(() -> {
-            User user = repository.findByGoogleSub(account.sub())
-                    .map(existing -> repository.updateLogin(existing.id(), account.email(), role))
-                    .orElseGet(() -> repository.create(account.sub(), account.email(), UserStatus.ACTIVE,
-                            role, clock.instant()));
+            var existing = identities.findByIdentity(account.identity());
+            if (existing.isPresent()) {
+                return repository.findById(existing.get().userId())
+                        .<LoginResult>map(user -> new LoginResult.Success(user.id()))
+                        .orElseGet(() -> new LoginResult.Rejected(LoginResult.RejectionReason.ACCOUNT_NOT_FOUND));
+            }
+            var now = clock.instant();
+            var user = repository.create(account.email(), UserStatus.ACTIVE, roleFor(account.email()), now);
+            identities.create(user.id(), account.identity(), now);
             return new LoginResult.Success(user.id());
         });
     }
