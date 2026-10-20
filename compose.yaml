@@ -1,14 +1,36 @@
+# 로컬 개발 — 저장소 루트에서
+#   docker compose up -d --build   DB + 서버 컨테이너
+#   docker compose up -d postgres  DB 만 — 서버를 IDE · bootRun 으로 띄울 때
 services:
   postgres:
-    image: pgvector/pgvector:pg17
+    image: pgvector/pgvector:pg17   # 테스트(Testcontainers)와 같은 태그
     environment:
       POSTGRES_DB: mogum
       POSTGRES_USER: mogum_local
       POSTGRES_PASSWORD: mogum_local
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"       # 이 컴퓨터에서만 — 같은 네트워크의 다른 기기는 접속하지 못한다
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mogum_local -d mogum"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  backend:
+    build: ./backend
+    env_file:
+      - path: .env                  # GOOGLE_CLIENT_ID · GOOGLE_CLIENT_SECRET 등 — .env.example 참고. 없으면 서버가 기동을 거부한다
+        required: false
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/mogum   # 컨테이너 안의 localhost 는 자기 자신이다
+    ports:
+      - "127.0.0.1:8080:8080"       # 화면 개발 서버(Vite)의 /api · /auth proxy 대상
+    depends_on:
+      postgres:
+        condition: service_healthy
+    stop_grace_period: 150s         # 04 §4.5 — Spring 종료 대기(130초)보다 길게. 기본 10초면 유예 중 SIGKILL 된다
 
 volumes:
   postgres_data:

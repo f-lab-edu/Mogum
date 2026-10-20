@@ -1,0 +1,6 @@
+# 이미지 빌드에 필요 없는 것 — 빌드 결과 · 캐시 · 테스트 코드(이미지 빌드는 bootJar 만 한다)
+build/
+.gradle/
+out/
+src/test/
+*.log
