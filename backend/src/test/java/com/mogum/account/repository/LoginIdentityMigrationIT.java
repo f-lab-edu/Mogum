@@ -1,7 +1,6 @@
 package com.mogum.account.repository;
 
 import com.mogum.MogumApplication;
-import com.mogum.account.domain.ExternalIdentity;
 import com.mogum.account.service.ExternalAccount;
 import com.mogum.account.service.LoginResult;
 import com.mogum.account.service.LoginService;
@@ -110,7 +109,7 @@ class LoginIdentityMigrationIT extends PostgresTestConfiguration {
                 assertTrue(me.body().contains("old@example.com"));
                 long id = ((Number) users.getFirst().get("id")).longValue();
                 assertEquals(new LoginResult.Success(id), app.getBean(LoginService.class).login(
-                        new ExternalAccount(new ExternalIdentity("google", "Original-Sub"), "new@example.com", true)));
+                        new ExternalAccount("google", "Original-Sub", "new@example.com", true)));
                 assertEquals(users, jdbc.queryForList("SELECT id, email, status, role, terms_agreed_at, terms_version, created_at FROM users ORDER BY id"));
                 assertEquals(java.util.List.of("Original-Sub", "other-sub"),
                         jdbc.queryForList("SELECT subject FROM users ORDER BY id", String.class));

@@ -9,10 +9,15 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
 @Entity
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "users", uniqueConstraints = @UniqueConstraint(
         name = "users_provider_subject_key", columnNames = {"provider", "subject"}))
 public class User {
@@ -46,43 +51,15 @@ public class User {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    protected User() {
-    }
-
-    public User(ExternalIdentity identity, String email, UserStatus status, UserRole role, Instant createdAt) {
-        this.provider = identity.provider();
-        this.subject = identity.subject();
-        this.email = email;
-        this.status = status;
-        this.role = role;
-        this.createdAt = createdAt;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public UserStatus getStatus() {
-        return status;
-    }
-
-    public UserRole getRole() {
-        return role;
-    }
-
-    public Instant getTermsAgreedAt() {
-        return termsAgreedAt;
-    }
-
-    public String getTermsVersion() {
-        return termsVersion;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
+    // 첫 로그인으로 가입한 회원 — ACTIVE 로 시작한다. 역할은 바깥 정보(관리자 목록)라 서비스가 정해 넘긴다
+    public static User join(String provider, String subject, String email, UserRole role, Instant joinedAt) {
+        var user = new User();
+        user.provider = provider;
+        user.subject = subject;
+        user.email = email;
+        user.status = UserStatus.ACTIVE;
+        user.role = role;
+        user.createdAt = joinedAt;
+        return user;
     }
 }

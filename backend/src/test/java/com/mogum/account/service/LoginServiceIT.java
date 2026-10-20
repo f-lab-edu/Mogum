@@ -1,6 +1,5 @@
 package com.mogum.account.service;
 
-import com.mogum.account.domain.ExternalIdentity;
 import com.mogum.account.domain.User;
 import com.mogum.account.domain.UserRole;
 import com.mogum.account.domain.UserStatus;
@@ -38,7 +37,7 @@ class LoginServiceIT extends PostgresTestConfiguration {
     @Autowired private UserRepository users;
     @Autowired private JdbcTemplate jdbc;
     private final String email = "login-" + UUID.randomUUID() + "@example.com";
-    private final ExternalIdentity identity = new ExternalIdentity("google", "Sub-" + UUID.randomUUID());
+    private final String subject = "Sub-" + UUID.randomUUID();
     private final Instant now = Instant.parse("2026-10-12T03:00:00Z");
 
     @AfterEach
@@ -49,13 +48,13 @@ class LoginServiceIT extends PostgresTestConfiguration {
     @Test
     void 미인증과_목록_밖과_빈_목록은_회원을_만들지_않는다() {
         assertEquals(new LoginResult.Rejected(LoginResult.RejectionReason.EMAIL_NOT_VERIFIED),
-                login(users).login(new ExternalAccount(identity, email, false)));
+                login(users).login(new ExternalAccount("google", subject, email, false)));
         assertEquals(new LoginResult.Rejected(LoginResult.RejectionReason.NOT_ALLOWED),
-                login(users).login(new ExternalAccount(identity, "outside@example.com", true)));
+                login(users).login(new ExternalAccount("google", subject, "outside@example.com", true)));
         assertEquals(new LoginResult.Rejected(LoginResult.RejectionReason.NOT_ALLOWED),
                 service(users, List.of()).login(account()));
         assertEquals(0, userCount());
-        assertTrue(find(identity).isEmpty());
+        assertTrue(find("google", subject).isEmpty());
     }
 
     @Test
@@ -68,9 +67,9 @@ class LoginServiceIT extends PostgresTestConfiguration {
         assertNull(user.getTermsAgreedAt());
         assertNull(user.getTermsVersion());
         assertEquals(now, user.getCreatedAt());
-        assertEquals(user.getId(), find(identity).orElseThrow().getId());
-        assertEquals(identity.subject(), jdbc.queryForObject("SELECT subject FROM users WHERE id = ?", String.class, user.getId()));
-        assertEquals(identity.provider(), jdbc.queryForObject("SELECT provider FROM users WHERE id = ?", String.class, user.getId()));
+        assertEquals(user.getId(), find("google", subject).orElseThrow().getId());
+        assertEquals(subject, jdbc.queryForObject("SELECT subject FROM users WHERE id = ?", String.class, user.getId()));
+        assertEquals("google", jdbc.queryForObject("SELECT provider FROM users WHERE id = ?", String.class, user.getId()));
         assertEquals(result, login(users).login(account()));
         assertEquals(1, userCount());
     }
@@ -78,12 +77,12 @@ class LoginServiceIT extends PostgresTestConfiguration {
     @ParameterizedTest
     @EnumSource(UserStatus.class)
     void 재로그인은_이메일_역할_상태_약관_가입시각과_외부_식별자를_보존한다(UserStatus status) {
-        var user = users.save(new User(identity, email, status, UserRole.USER, now.minusSeconds(200)));
-        jdbc.update("UPDATE users SET terms_agreed_at = ?, terms_version = 'v1' WHERE id = ?",
-                java.sql.Timestamp.from(now.minusSeconds(100)), user.getId());
+        var user = users.save(User.join("google", subject, email, UserRole.USER, now.minusSeconds(200)));
+        jdbc.update("UPDATE users SET status = ?, terms_agreed_at = ?, terms_version = 'v1' WHERE id = ?",
+                status.name(), java.sql.Timestamp.from(now.minusSeconds(100)), user.getId());
         var before = row(user.getId());
         var login = service(users, List.of("new@example.com"));
-        assertEquals(new LoginResult.Success(user.getId()), login.login(new ExternalAccount(identity, "new@example.com", true)));
+        assertEquals(new LoginResult.Success(user.getId()), login.login(new ExternalAccount("google", subject, "new@example.com", true)));
         assertEquals(before, row(user.getId()));
         assertEquals(new LoginResult.Rejected(LoginResult.RejectionReason.NOT_ALLOWED), login.login(account()));
         assertEquals(before, row(user.getId()));
@@ -93,7 +92,7 @@ class LoginServiceIT extends PostgresTestConfiguration {
     @Test
     void 이메일이_같아도_다른_제공자의_같은_subject은_자동_병합하지_않는다() {
         var first = login(users).login(account());
-        var second = login(users).login(new ExternalAccount(new ExternalIdentity("other-provider", identity.subject()), email, true));
+        var second = login(users).login(new ExternalAccount("other-provider", subject, email, true));
         assertNotEquals(first, second);
         assertEquals(2, userCount());
     }
@@ -126,14 +125,14 @@ class LoginServiceIT extends PostgresTestConfiguration {
             assertEquals(1, conflicts);
         }
         assertEquals(1, userCount());
-        var user = find(identity).orElseThrow();
+        var user = find("google", subject).orElseThrow();
         assertEquals(new LoginResult.Success(user.getId()), login(users).login(account()));
     }
 
     private int userCount() { return jdbc.queryForObject("SELECT count(*) FROM users WHERE email = ?", Integer.class, email); }
     private Map<String, Object> row(long id) { return jdbc.queryForMap("SELECT * FROM users WHERE id = ?", id); }
-    private Optional<User> find(ExternalIdentity key) { return users.findByProviderAndSubject(key.provider(), key.subject()); }
-    private ExternalAccount account() { return new ExternalAccount(identity, email, true); }
+    private Optional<User> find(String provider, String subject) { return users.findByProviderAndSubject(provider, subject); }
+    private ExternalAccount account() { return new ExternalAccount("google", subject, email, true); }
     private LoginService login(UserRepository repository) { return service(repository, List.of(email)); }
     private LoginService service(UserRepository repository, List<String> adminEmails) {
         return new LoginService(repository, Clock.fixed(now, ZoneOffset.UTC), new AuthProperties(adminEmails));

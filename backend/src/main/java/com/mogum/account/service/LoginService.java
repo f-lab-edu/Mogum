@@ -2,7 +2,6 @@ package com.mogum.account.service;
 
 import com.mogum.account.domain.User;
 import com.mogum.account.domain.UserRole;
-import com.mogum.account.domain.UserStatus;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.config.AuthProperties;
 import org.springframework.stereotype.Service;
@@ -36,12 +35,11 @@ public class LoginService {
             return new LoginResult.Rejected(LoginResult.RejectionReason.NOT_ALLOWED);
         }
 
-        var identity = account.identity();
-        var existing = users.findByProviderAndSubject(identity.provider(), identity.subject());
+        var existing = users.findByProviderAndSubject(account.provider(), account.subject());
         if (existing.isPresent()) {
             return new LoginResult.Success(existing.get().getId());
         }
-        var user = users.save(new User(identity, account.email(), UserStatus.ACTIVE,
+        var user = users.save(User.join(account.provider(), account.subject(), account.email(),
                 roleFor(account.email()), clock.instant()));
         return new LoginResult.Success(user.getId());
     }

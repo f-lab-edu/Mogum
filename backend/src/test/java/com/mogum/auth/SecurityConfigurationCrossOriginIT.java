@@ -1,9 +1,7 @@
 package com.mogum.auth;
 
-import com.mogum.account.domain.ExternalIdentity;
 import com.mogum.account.domain.User;
 import com.mogum.account.domain.UserRole;
-import com.mogum.account.domain.UserStatus;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.support.PostgresTestConfiguration;
 import com.mogum.support.TestSessions;
@@ -55,7 +53,7 @@ class SecurityConfigurationCrossOriginIT extends PostgresTestConfiguration {
                 .addFilters(context.getBean("springSessionRepositoryFilter", jakarta.servlet.Filter.class))
                 .apply(springSecurity()).build();
         testSessions = new TestSessions(sessions);
-        user = users.save(new User(new ExternalIdentity("google", "cors-" + UUID.randomUUID()), "cors@example.com", UserStatus.ACTIVE, UserRole.ADMIN, Instant.now()));
+        user = users.save(User.join("google", "cors-" + UUID.randomUUID(), "cors@example.com", UserRole.ADMIN, Instant.now()));
         session = testSessions.create(user.getId());
     }
 

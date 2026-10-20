@@ -1,9 +1,7 @@
 package com.mogum.auth;
 
-import com.mogum.account.domain.ExternalIdentity;
 import com.mogum.account.domain.User;
 import com.mogum.account.domain.UserRole;
-import com.mogum.account.domain.UserStatus;
 import com.mogum.account.repository.UserRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -30,8 +28,7 @@ class SessionUserFilterTest {
 
     @Test
     void ID로_조회한_회원을_요청_인증으로만_사용한다() throws Exception {
-        var user = new User(new ExternalIdentity("google", "sub"), "me@example.com", UserStatus.ACTIVE,
-                UserRole.ADMIN, Instant.now());
+        var user = User.join("google", "sub", "me@example.com", UserRole.ADMIN, Instant.now());
         when(users.findById(17L)).thenReturn(Optional.of(user));
         var request = new MockHttpServletRequest("GET", "/api/me");
         request.getSession().setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, "17");

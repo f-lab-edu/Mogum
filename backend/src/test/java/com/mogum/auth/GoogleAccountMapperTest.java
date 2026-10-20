@@ -1,6 +1,5 @@
 package com.mogum.auth;
 
-import com.mogum.account.domain.ExternalIdentity;
 import com.mogum.account.service.ExternalAccount;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -20,7 +19,7 @@ class GoogleAccountMapperTest {
 
     @Test
     void 서버_등록_ID와_구글_응답을_로그인_입력으로_변환하고_원문을_보존한다() {
-        assertEquals(new ExternalAccount(new ExternalIdentity("google", " Case-Sensitive-Sub "), "Admin@Example.com", true),
+        assertEquals(new ExternalAccount("google", " Case-Sensitive-Sub ", "Admin@Example.com", true),
                 mapper.map(authentication("google", attributes())));
     }
 

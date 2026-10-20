@@ -1,6 +1,5 @@
 package com.mogum.auth;
 
-import com.mogum.account.domain.ExternalIdentity;
 import com.mogum.account.service.ExternalAccount;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -20,7 +19,7 @@ public final class GoogleAccountMapper {
                 || !(email instanceof String address) || address.isBlank()) {
             throw invalidAccount();
         }
-        return new ExternalAccount(new ExternalIdentity("google", subject), address,
+        return new ExternalAccount("google", subject, address,
                 Boolean.TRUE.equals(principal.getAttribute("email_verified")));
     }
 

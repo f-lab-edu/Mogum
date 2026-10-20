@@ -6,11 +6,9 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.mogum.account.domain.ExternalIdentity;
 import com.mogum.account.domain.User;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.account.domain.UserRole;
-import com.mogum.account.domain.UserStatus;
 import com.mogum.support.PostgresTestConfiguration;
 import com.mogum.support.TestSessions;
 import jakarta.servlet.DispatcherType;
@@ -88,7 +86,7 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
                 .addFilters(context.getBean("springSessionRepositoryFilter", jakarta.servlet.Filter.class))
                 .apply(springSecurity()).build();
         testSessions = new TestSessions(sessions);
-        user = users.save(new User(new ExternalIdentity("google", "session-" + UUID.randomUUID()), "session@example.com", UserStatus.ACTIVE, UserRole.ADMIN, Instant.now()));
+        user = users.save(User.join("google", "session-" + UUID.randomUUID(), "session@example.com", UserRole.ADMIN, Instant.now()));
     }
 
     @AfterEach

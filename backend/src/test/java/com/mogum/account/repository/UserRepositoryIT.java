@@ -1,6 +1,5 @@
 package com.mogum.account.repository;
 
-import com.mogum.account.domain.ExternalIdentity;
 import com.mogum.account.domain.User;
 import com.mogum.account.domain.UserRole;
 import com.mogum.account.domain.UserStatus;
@@ -65,7 +64,7 @@ class UserRepositoryIT extends PostgresTestConfiguration {
         var failure = new IllegalStateException("rollback user creation");
 
         var actual = assertThrows(IllegalStateException.class, () -> transactions.executeWithoutResult(status -> {
-            var saved = repository.save(new User(new ExternalIdentity("google", "Sub-" + UUID.randomUUID()), email, UserStatus.ACTIVE, UserRole.ADMIN, now));
+            var saved = repository.save(User.join("google", "Sub-" + UUID.randomUUID(), email, UserRole.ADMIN, now));
             ids.add(saved.getId());
             assertTrue(saved.getId() > 0);
             throw failure;
@@ -87,40 +86,37 @@ class UserRepositoryIT extends PostgresTestConfiguration {
     @Test
     void 외부_식별자는_원문으로_조회하며_중복과_빈값을_거절한다() {
         String sub = " Sub-" + UUID.randomUUID() + " ";
-        var identity = new ExternalIdentity("google", sub);
-        assertTrue(find(identity).isEmpty());
-        var saved = save(identity, UserRole.ADMIN);
-        assertEquals(saved.getId(), find(identity).orElseThrow().getId());
-        assertTrue(find(new ExternalIdentity("google", sub.strip())).isEmpty());
-        assertTrue(find(new ExternalIdentity("google", sub.toLowerCase(java.util.Locale.ROOT))).isEmpty());
+        assertTrue(find("google", sub).isEmpty());
+        var saved = save("google", sub, UserRole.ADMIN);
+        assertEquals(saved.getId(), find("google", sub).orElseThrow().getId());
+        assertTrue(find("google", sub.strip()).isEmpty());
+        assertTrue(find("google", sub.toLowerCase(java.util.Locale.ROOT)).isEmpty());
         var duplicate = assertThrows(RuntimeException.class, () ->
-                repository.save(new User(identity, email, UserStatus.ACTIVE, UserRole.ADMIN, now)));
+                repository.save(User.join("google", sub, email, UserRole.ADMIN, now)));
         assertSqlState("23505", duplicate);
         for (String blank : java.util.List.of("", "  ", "\t\n")) {
             var invalid = assertThrows(RuntimeException.class, () ->
-                    repository.save(new User(new ExternalIdentity("google", blank), email, UserStatus.ACTIVE, UserRole.ADMIN, now)));
+                    repository.save(User.join("google", blank, email, UserRole.ADMIN, now)));
             assertSqlState("23514", invalid);
         }
         for (String blank : java.util.List.of("", "  ", "\t\n")) {
             var invalid = assertThrows(RuntimeException.class, () ->
-                    repository.save(new User(new ExternalIdentity(blank, sub), email, UserStatus.ACTIVE, UserRole.ADMIN, now)));
+                    repository.save(User.join(blank, sub, email, UserRole.ADMIN, now)));
             assertSqlState("23514", invalid);
         }
-        assertEquals(saved.getId(), find(identity).orElseThrow().getId());
+        assertEquals(saved.getId(), find("google", sub).orElseThrow().getId());
     }
 
     @Test
     void 제공자가_다르면_같은_subject도_별도_회원이다() {
         String subject = "shared-" + UUID.randomUUID();
-        var google = new ExternalIdentity("google", subject);
-        var other = new ExternalIdentity("other-provider", subject);
-        assertTrue(find(other).isEmpty());
-        var first = save(google, UserRole.USER);
-        assertTrue(find(other).isEmpty());
-        var second = save(other, UserRole.USER);
+        assertTrue(find("other-provider", subject).isEmpty());
+        var first = save("google", subject, UserRole.USER);
+        assertTrue(find("other-provider", subject).isEmpty());
+        var second = save("other-provider", subject, UserRole.USER);
         assertNotEquals(first.getId(), second.getId());
-        assertEquals(first.getId(), find(google).orElseThrow().getId());
-        assertEquals(second.getId(), find(other).orElseThrow().getId());
+        assertEquals(first.getId(), find("google", subject).orElseThrow().getId());
+        assertEquals(second.getId(), find("other-provider", subject).orElseThrow().getId());
     }
 
     @ParameterizedTest
@@ -172,17 +168,17 @@ class UserRepositoryIT extends PostgresTestConfiguration {
     }
 
     private User create() {
-        return save(new ExternalIdentity("google", "Sub-" + UUID.randomUUID()), UserRole.ADMIN);
+        return save("google", "Sub-" + UUID.randomUUID(), UserRole.ADMIN);
     }
 
-    private User save(ExternalIdentity identity, UserRole role) {
-        var user = repository.save(new User(identity, email, UserStatus.ACTIVE, role, now));
+    private User save(String provider, String subject, UserRole role) {
+        var user = repository.save(User.join(provider, subject, email, role, now));
         ids.add(user.getId());
         return user;
     }
 
-    private Optional<User> find(ExternalIdentity identity) {
-        return repository.findByProviderAndSubject(identity.provider(), identity.subject());
+    private Optional<User> find(String provider, String subject) {
+        return repository.findByProviderAndSubject(provider, subject);
     }
 
     private String nativeEmail(long id) {

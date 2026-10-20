@@ -1,6 +1,5 @@
 package com.mogum.account.service;
 
-import com.mogum.account.domain.ExternalIdentity;
 import com.mogum.account.domain.User;
 import com.mogum.account.domain.UserRole;
 import com.mogum.account.domain.UserStatus;
@@ -57,7 +56,7 @@ class LoginServiceTest {
     }
 
     @Test
-    void 첫_로그인은_ACTIVE_ADMIN과_주입한_시각으로_생성한다() {
+    void 첫_로그인은_외부_식별자와_ACTIVE_ADMIN과_주입한_시각으로_생성한다() {
         String email = "  Admin@EXAMPLE.COM  ";
         when(repository.findByProviderAndSubject("google", "new-sub")).thenReturn(Optional.empty());
         when(repository.save(any(User.class))).thenAnswer(invocation -> {
@@ -71,6 +70,8 @@ class LoginServiceTest {
         verify(repository).findByProviderAndSubject("google", "new-sub");
         verify(repository).save(saved.capture());
         verifyNoMoreInteractions(repository);
+        assertEquals("google", saved.getValue().getProvider());
+        assertEquals("new-sub", saved.getValue().getSubject());
         assertEquals(email, saved.getValue().getEmail());
         assertEquals(UserStatus.ACTIVE, saved.getValue().getStatus());
         assertEquals(UserRole.ADMIN, saved.getValue().getRole());
@@ -80,9 +81,9 @@ class LoginServiceTest {
     @ParameterizedTest
     @EnumSource(UserStatus.class)
     void 재로그인은_외부_식별자로_찾고_기존_사용자_ID로_로그인하며_계정을_쓰지_않는다(UserStatus status) {
-        var existing = new User(new ExternalIdentity("google", "stable-sub"), "old@example.com", status,
-                UserRole.USER, now.minusSeconds(200));
+        var existing = User.join("google", "stable-sub", "old@example.com", UserRole.USER, now.minusSeconds(200));
         ReflectionTestUtils.setField(existing, "id", 12L);
+        ReflectionTestUtils.setField(existing, "status", status);
         when(repository.findByProviderAndSubject("google", "stable-sub")).thenReturn(Optional.of(existing));
 
         assertEquals(new LoginResult.Success(12),
@@ -105,6 +106,6 @@ class LoginServiceTest {
     }
 
     private static ExternalAccount account(String subject, String email, boolean verified) {
-        return new ExternalAccount(new ExternalIdentity("google", subject), email, verified);
+        return new ExternalAccount("google", subject, email, verified);
     }
 }
