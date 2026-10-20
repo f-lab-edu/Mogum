@@ -51,8 +51,8 @@ def stop_payload(root, sid="s1", active=False):
     return {"session_id": sid, "cwd": str(root), "hook_event_name": "Stop", "stop_hook_active": active}
 
 
-FOO = "src/main/java/com/mogum/core/Foo.java"
-FOO_TEST = "src/test/java/com/mogum/core/FooTest.java"
+FOO = "backend/src/main/java/com/mogum/core/Foo.java"
+FOO_TEST = "backend/src/test/java/com/mogum/core/FooTest.java"
 CARD = "frontend/src/features/review/ReviewCard.tsx"
 
 
@@ -79,7 +79,7 @@ class TestClassify:
     @pytest.mark.parametrize("rel", [
         "docs/02-domain-data.md",
         "phases/0-mvp/step0.md",
-        "src/main/resources/db/migration/V1__init.sql",
+        "backend/src/main/resources/db/migration/V1__init.sql",
         "frontend/src/index.css",
         "frontend/src/test/setup.ts",
         "scripts/execute.py",
@@ -111,8 +111,8 @@ class TestExempt:
         assert not tg.is_exempt(repo, FOO, "public class Foo { int run() { return 1; } }")
 
     @pytest.mark.parametrize("rel", [
-        "src/main/java/com/mogum/core/package-info.java",
-        "src/main/java/com/mogum/MogumApplication.java",
+        "backend/src/main/java/com/mogum/core/package-info.java",
+        "backend/src/main/java/com/mogum/MogumApplication.java",
         "frontend/src/main.tsx",
         "frontend/src/vite-env.d.ts",
         "frontend/src/api/types.ts",
@@ -160,15 +160,15 @@ class TestPre:
 
     @pytest.mark.parametrize("test_rel", [
         FOO_TEST,
-        "src/test/java/com/mogum/core/FooConcurrencyTest.java",
-        "src/test/java/com/mogum/core/FooIT.java",
+        "backend/src/test/java/com/mogum/core/FooConcurrencyTest.java",
+        "backend/src/test/java/com/mogum/core/FooIT.java",
     ])
     def test_claude_write_with_existing_test_is_allowed(self, repo, test_rel):
         put(repo, test_rel)
         assert tg.pre(claude_write(repo, FOO), repo) is None
 
     def test_test_in_other_package_does_not_count(self, repo):
-        put(repo, "src/test/java/com/mogum/api/FooTest.java")
+        put(repo, "backend/src/test/java/com/mogum/api/FooTest.java")
         assert tg.pre(claude_write(repo, FOO), repo) is not None
 
     def test_claude_edit_existing_without_test_is_blocked(self, repo):

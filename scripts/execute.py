@@ -75,7 +75,7 @@ class StepExecutor:
     REVIEW_TOOLS = [
         "Read", "Grep", "Glob",
         "Bash(git diff:*)", "Bash(git status:*)", "Bash(git log:*)", "Bash(git show:*)",
-        "Bash(./gradlew:*)", "Bash(npm --prefix frontend run:*)",
+        "Bash(./backend/gradlew:*)", "Bash(npm --prefix frontend run:*)",
     ]
 
     def __init__(self, phase_dir_name: str, *, auto_push: bool = False):
@@ -306,7 +306,7 @@ class StepExecutor:
             f"- 지시: 아래 step 파일(phases/{self._phase_dir_name}/step{step_num}.md)\n\n"
             f"## 확인할 것\n\n"
             f"1. step 의 작업과 AC 를 충족하는가 — AC 커맨드를 직접 실행해 확인한다"
-            f"(`./gradlew ...` · `npm --prefix frontend run ...` · `git diff/status/log/show` 만 실행할 수 있다. "
+            f"(`./backend/gradlew -p backend ...` · `npm --prefix frontend run ...` · `git diff/status/log/show` 만 실행할 수 있다. "
             f"작업 디렉터리는 이미 저장소 루트다 — `cd` 나 `;` · `&&` 로 잇지 말고 한 번에 하나씩 실행한다. "
             f"실행하지 못한 AC 가 있으면 summary 에 적는다).\n"
             f"2. AGENTS.md 금지 목록과 작업 방식(새 기능은 테스트 먼저 — TDD)을 어기지 않았는가.\n"
