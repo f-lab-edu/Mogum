@@ -4,7 +4,7 @@ TDD 가드 — Claude Code · Codex 공통 훅. 두 도구 모두 exit 2 + stder
 
 Usage (stdin: 훅 입력 JSON):
     python3 scripts/tdd_guard.py pre    # PreToolUse — 짝 테스트 파일이 먼저 있어야 구현 파일을 쓴다
-    python3 scripts/tdd_guard.py stop   # Stop — 이번 세션이 구현 파일을 바꿨으면 테스트 변경도 있어야 끝낸다
+    python3 scripts/tdd_guard.py stop   # Stop — 이번 세션이 바꾸고 아직 커밋하지 않은 구현 파일이 있으면 테스트 변경도 있어야 끝낸다
 
 pre 가 허용한 파일은 세션별로 `.git/tdd-guard/{session_id}.json` 에 남긴다.
 stop 은 그 기록만 본다 — 작업 트리에 남은 다른 세션(예: 실패한 Codex step)의 변경으로 이 세션을 막지 않는다.
@@ -170,6 +170,11 @@ def _record(root: Path, session_id: Optional[str], paths: List[str]):
     f.write_text(json.dumps(sorted(set(_load(root, session_id)) | set(paths))), encoding="utf-8")
 
 
+def _clear(root: Path, session_id: Optional[str]):
+    if session_id:
+        _state_file(root, session_id).unlink(missing_ok=True)
+
+
 def _changed_in_worktree(root: Path) -> List[str]:
     out = subprocess.run(["git", "status", "--porcelain", "-uall", "-z"],
                          cwd=root, capture_output=True, text=True).stdout
@@ -209,14 +214,18 @@ def pre(payload: dict, root: Path) -> Optional[str]:
 
 
 def stop(payload: dict, root: Path) -> Optional[str]:
-    if payload.get("stop_hook_active"):  # 한 번 되돌린 뒤에는 막지 않는다 — 무한 반복 방지
+    session_id = payload.get("session_id")
+    # 한 번 되돌린 뒤에는 막지 않는다 — 무한 반복 방지. 기록도 비워 다음 턴에 같은 변경으로 다시 막지 않는다
+    if payload.get("stop_hook_active"):
+        _clear(root, session_id)
         return None
-    touched = _load(root, payload.get("session_id"))
+    touched = _load(root, session_id)
+    pending = set(_changed_in_worktree(root))  # 커밋한 변경은 다시 묻지 않는다
     changed = [rel for rel in touched
-               if is_production(rel) and (root / rel).exists() and not is_exempt(root, rel, None)]
+               if rel in pending and is_production(rel) and (root / rel).exists() and not is_exempt(root, rel, None)]
     if not changed:
         return None
-    if any(is_test(rel) for rel in touched) or any(is_test(rel) for rel in _changed_in_worktree(root)):
+    if any(is_test(rel) for rel in touched) or any(is_test(rel) for rel in pending):
         return None
     lines = "\n".join(f"- {rel}" for rel in changed)
     return (
