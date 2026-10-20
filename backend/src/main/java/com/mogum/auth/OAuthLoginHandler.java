@@ -40,23 +40,23 @@ public final class OAuthLoginHandler implements AuthenticationSuccessHandler, Au
                 fail(request, response, "login_failed");
                 return;
             }
-            var result = login.login(account);
-            if (result instanceof LoginResult.Success success) {
-                // 번호 변경은 JDBC 저장 시 반영된다. 변경 직후 invalidate하면 이전 DB 행을 다시 읽을 수 있다.
-                var session = request.getSession(false);
-                if (session != null) {
-                    request.changeSessionId();
-                    java.util.Collections.list(session.getAttributeNames()).forEach(session::removeAttribute);
-                } else {
-                    session = request.getSession(true);
+            switch (login.login(account)) {
+                case LoginResult.Success success -> {
+                    // 번호 변경은 JDBC 저장 시 반영된다. 변경 직후 invalidate하면 이전 DB 행을 다시 읽을 수 있다.
+                    var session = request.getSession(false);
+                    if (session != null) {
+                        request.changeSessionId();
+                        java.util.Collections.list(session.getAttributeNames()).forEach(session::removeAttribute);
+                    } else {
+                        session = request.getSession(true);
+                    }
+                    session.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME,
+                            Long.toString(success.userId()));
+                    response.sendRedirect(origin + "/");
                 }
-                session.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME,
-                        Long.toString(success.userId()));
-                response.sendRedirect(origin + "/");
-            } else {
-                var rejected = (LoginResult.Rejected) result;
-                fail(request, response, rejected.reason() == LoginResult.RejectionReason.NOT_ALLOWED
-                        ? "not_allowed" : "login_failed");
+                case LoginResult.Rejected rejected ->
+                        fail(request, response, rejected.reason() == LoginResult.RejectionReason.NOT_ALLOWED
+                                ? "not_allowed" : "login_failed");
             }
         } finally {
             SecurityContextHolder.clearContext();
