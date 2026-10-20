@@ -19,7 +19,7 @@
 │   │   │   ├── controller/          # MeController
 │   │   │   ├── service/             # LoginService · ExternalAccount(입력) · LoginResult(결과)
 │   │   │   ├── repository/          # UserRepository(Spring Data) · 네이티브 쿼리 클래스
-│   │   │   ├── domain/              # User(@Entity) · UserRole · UserStatus · ExternalIdentity · 도메인 규칙
+│   │   │   ├── domain/              # User(@Entity · Lombok @Getter · @NoArgsConstructor(PROTECTED) · 생성은 정적 팩토리 User.join) · UserRole · UserStatus · 도메인 규칙
 │   │   │   └── dto/                 # MeResponse — HTTP 요청 · 응답만
 │   │   ├── <도메인>/                 # curriculum · material · concept · review … — account 와 같은 다섯 하위 패키지. MasteryPolicy 등은 domain/
 │   │   ├── job/                     # 적재 · 재시도 · 잡 조회 API · jobs/job_events 네이티브 SQL(repository/) — 같은 다섯 하위 패키지 · generation 참조 금지
@@ -78,7 +78,7 @@
               → auth: 사용자 ID만 세션에 저장 · 화면으로 이동
 ```
 
-서비스 회원 ID는 세션과 학습 데이터의 기준이다. 로그인 식별자는 `ExternalIdentity(provider, subject)`로 표현하고 회원 테이블의 복합 unique 제약으로 보호한다. `GoogleAccountMapper`가 구글 응답을 해석하며 현재 활성 제공자는 구글 하나다. V6는 기존 `google_sub`를 `subject`로 바꾸고 provider를 `google`로 채우면서 회원 정보와 ID 세션을 보존한다([02 §6.1](./02-domain-data.md)). 별도 연결 테이블은 두지 않는다.
+서비스 회원 ID는 세션과 학습 데이터의 기준이다. 로그인 식별자는 회원 테이블의 `(provider, subject)` 두 컬럼이며 복합 unique 제약으로 보호한다. 로그인 입력은 `ExternalAccount(provider, subject, email, emailVerified)`다. `GoogleAccountMapper`가 구글 응답을 해석하며 현재 활성 제공자는 구글 하나다. V6는 기존 `google_sub`를 `subject`로 바꾸고 provider를 `google`로 채우면서 회원 정보와 ID 세션을 보존한다([02 §6.1](./02-domain-data.md)). 별도 연결 테이블은 두지 않는다.
 
 **생성 — 전부 비동기**
 

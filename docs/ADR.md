@@ -352,7 +352,7 @@
 **트레이드오프**: 구글 식별자를 회원 스키마와 저장소가 명시적으로 안다. 복수 로그인 수단이 실제 요구사항이 되면 마이그레이션과 연결 정책을 다시 설계한다.
 
 ### ADR-066: 회원당 로그인 수단 하나를 provider·subject로 표현한다
-**결정**: 사용자 결정(2026-10-20)에 따라 회원 테이블 하나는 유지하되 `users.google_sub`를 `provider`·`subject`로 일반화한다. 두 컬럼은 NOT NULL·빈 값 금지이며 복합 UNIQUE로 외부 계정 중복을 막는다. `ExternalIdentity`와 `ExternalAccount`를 로그인 입력·회원 생성에 사용하고(조회는 `UserRepository.findByProviderAndSubject` — ADR-067) `GoogleAccount`는 제거한다. 별도 로그인 연결 테이블·저장소는 만들지 않는다. 현재 활성 로그인은 구글 하나다.
+**결정**: 사용자 결정(2026-10-20)에 따라 회원 테이블 하나는 유지하되 `users.google_sub`를 `provider`·`subject`로 일반화한다. 두 컬럼은 NOT NULL·빈 값 금지이며 복합 UNIQUE로 외부 계정 중복을 막는다. 로그인 입력 `ExternalAccount(provider, subject, email, emailVerified)`로 회원을 조회 · 생성하고(조회는 `UserRepository.findByProviderAndSubject` — ADR-067) `GoogleAccount`는 제거한다. 처음에는 두 컬럼을 묶는 값 타입 `ExternalIdentity`를 두었으나, ADR-067 뒤에는 검증 · 동작 없이 두 문자열을 넘겨주기만 해서 사용자 결정(2026-10-20)으로 지우고 `ExternalAccount` · `User`에 펼쳤다. 별도 로그인 연결 테이블·저장소는 만들지 않는다. 현재 활성 로그인은 구글 하나다.
 **이유**: 회원당 로그인 수단 하나라는 제약과 로그인 제공자 종류의 확장 가능성은 별개다. 제공자 종류가 늘 때 회원 테이블 컬럼을 바꾸지 않으면서, 현재 필요 없는 1:N 연결 모델은 도입하지 않는다.
 **불변조건**: 제공자는 검증된 서버 등록으로 정한다. 서로 다른 제공자의 같은 subject는 다른 계정이며 이메일로 자동 병합하지 않는다. 이메일 검증·허용 목록·최초 역할·재로그인 정보 보존·사용자 ID 세션은 유지한다. 사용자 응답에는 외부 식별자를 추가하지 않는다.
 **이전과 검증**: V1~V5는 유지하고 V6에서 `google_sub`를 `subject`로 이름 변경해 원문을 보존하고 기존 provider를 `google`로 채운 뒤 기본값을 제거한다. 구글 전용 unique를 복합 unique로 교체한다. V3/V4/V5 회원과 기존 세션 이전·제공자 격리·복합키 중복·빈 값/NULL·동시 가입·HTTP 로그인을 검증한다. **2026-10-20 전체 서버 테스트 192개 통과.** V3/V4/V5에서 V6까지 회원 정보와 ID 세션을 보존하며, 기존 세션의 실제 `/api/me`와 재로그인이 동작하는 것을 검증했다. 로컬 개발 DB에도 V6를 적용하고 새 서버 기동·화면 200·미인증 API 401·구글 로그인 시작 302를 확인했다. 실제 운영 DB에는 적용하지 않았다.
@@ -376,6 +376,18 @@
 **이유**: 로컬 · 운영 · 용량 측정이 같은 실행 단위를 쓰게 한다 — 용량 측정은 앱 컨테이너를 운영과 같은 메모리로 묶어 재야 하고([07 §2](./07-testing.md)), 같은 EC2 에 Postgres 를 두면 운영도 같은 구성이 된다. 정상 종료 유예(ADR 의 SIGTERM 결정 · 04 §4.5)는 컨테이너에서 SIGTERM 이 java 에 바로 가고 종료 대기가 150초여야 지켜지므로, 실행 방식을 처음부터 이미지에 박아 둔다. 같은 네트워크의 다른 기기가 알려진 로컬 비밀번호로 DB 에 붙지 못하게 포트를 좁혔다.
 **트레이드오프**: 코드를 바꾸면 이미지를 다시 빌드해야 한다(Gradle 캐시 마운트로 줄인다). 이미지 빌드는 테스트를 돌리지 않는다 — Testcontainers 는 호스트에서 돈다. 8080 을 서버 컨테이너와 호스트 `bootRun` 이 함께 쓸 수 없다. 메모리 상한은 아직 두지 않았다 — 용량 측정(`16-capacity`)에서 정한다.
 **검증**: 2026-10-20 이미지를 빌드해 compose 의 DB 에 붙여 띄웠다 — 1.9초에 기동, Flyway 6개 검증, `/api/me` 401 JSON, `/auth/google` 302, 비루트 사용자 · java 가 PID 1. `docker stop` 에 1초 만에 exit 143(SIGTERM 정상 종료)으로 끝났고 종료 대기는 150초로 잡혔다. Postgres healthcheck 가 `healthy` 가 되고 포트가 `127.0.0.1` 에만 열린 것을 확인했다. 실행기가 아직 없어 유예 중 반납 동작은 `4-job-queue` 에서 확인한다. 기존 호스트 `bootRun` 이 8080 을 쓰고 있어 서버 컨테이너는 임시 포트(18080)로 확인했다.
+
+### ADR-070: Lombok 은 엔티티의 `@Getter` · `@NoArgsConstructor(access = PROTECTED)` 에만 쓴다
+**결정**: 사용자 결정(2026-10-20)에 따라 Lombok 을 들이고(`compileOnly` + `annotationProcessor`, 버전은 Spring Boot BOM) 엔티티의 getter 와 JPA 용 기본 생성자를 손으로 쓰지 않고 `@Getter` · `@NoArgsConstructor(access = AccessLevel.PROTECTED)` 로 만든다. 기본 생성자는 Hibernate 프록시가 쓰도록 `protected` 로 두고, 코드는 정적 팩토리 메서드로만 엔티티를 만든다(ADR-071). 다른 Lombok 기능은 필요해질 때 이 결정을 고쳐 넓힌다. **엔티티에 쓰지 않는 것** — `@Data`(아래를 한꺼번에 켠다) · `@Setter`(상태 변경의 의도와 검증이 사라진다 — 의도가 드러나는 메서드로 바꾼다) · `@EqualsAndHashCode`(저장 전후로 `id` 가 바뀌고 연관 필드가 지연 로딩된다) · `@ToString`(지연 로딩 · 양방향 연관의 무한 재귀 · 로그에 개인정보) · `@AllArgsConstructor` · `@Builder`(DB 가 정하는 `id` 까지 외부에서 넣게 열린다). 사용자 API 응답에 무엇을 싣는지는 엔티티 getter 가 아니라 응답 DTO(`dto`)가 정한다 — 예: `User` 의 `provider` · `subject` getter 가 있어도 `MeResponse` 에는 넣지 않는다(ADR-066). ([04 §2](./04-jobs-and-cost.md))
+**이유**: 엔티티를 도메인 모델로 직접 쓰면서(ADR-067) 필드마다 같은 모양의 getter 와 JPA 용 빈 생성자가 반복된다. 국내 Spring 프로젝트에서 흔한 조합이라 읽기 익숙하다. Lombok 자체가 아니라 엔티티에 붙이는 일부 애노테이션이 문제라서, 쓸 것과 쓰지 않을 것을 함께 적는다.
+**트레이드오프**: 애노테이션 프로세서와 IDE 지원이 필요하다(VS Code Java · IntelliJ 는 기본 지원). 생성 코드가 소스에 보이지 않는다. 클래스 단위 `@Getter` 는 모든 필드에 getter 를 열므로, 감출 필드가 생기면 필드에 `@Getter(AccessLevel.NONE)` 을 붙인다.
+**검증**: 2026-10-20 `User` 에 적용해 `javap` 로 getter 9개와 `protected User()` 생성을 확인했고 서버 테스트 179개가 통과했다. 함께 `ExternalIdentity` 를 지우고(ADR-066) `LoginServiceTest` 가 저장되는 회원의 `provider` · `subject` 를 getter 로 확인하게 했다 — `User` 를 만드는 연속된 문자열 인자의 순서가 바뀌면 잡힌다.
+
+### ADR-071: 엔티티는 생성 흐름마다 이름 있는 정적 팩토리 메서드로 만든다
+**결정**: 사용자 결정(2026-10-20)에 따라 엔티티에는 public 생성자 · `@Builder` 를 두지 않고, 생성 흐름마다 이름 있는 정적 팩토리 메서드를 둔다. JPA 용 기본 생성자만 `protected` 다(ADR-070). 처음 상태처럼 엔티티 스스로 정할 수 있는 규칙은 팩토리 안에 고정하고, 바깥 정보가 필요한 값은 서비스가 정해 인자로 넘긴다. 처음 상태 규칙이 없는 엔티티도 모양을 맞추려고 팩토리로 만든다. 첫 적용은 `User.join(provider, subject, email, role, joinedAt)` — 첫 로그인으로 가입한 회원은 `ACTIVE` 로 시작하고, 역할은 관리자 목록을 아는 `LoginService` 가 정한다. (AGENTS 금지 목록 28 · [04 §2](./04-jobs-and-cost.md))
+**이유**: 다음 엔티티 대부분에 처음 상태 규칙이 있다 — 커리큘럼은 `DRAFT` 로 시작하고, 카드 상태는 학습 완료 때 `NEW` · 오늘 날짜로 만든다([02 §3](./02-domain-data.md)). 서비스마다 채우면 TASK 마다 다르게 채울 수 있다. 팩토리는 이름으로 의도를 말하고, 필수 값이 빠지면 컴파일되지 않는다. 빌더는 선택 값이 많을 때 낫지만 이 프로젝트의 엔티티 필드는 대부분 NOT NULL 필수 값이고, 빠뜨려도 컴파일된 뒤 INSERT 에서야 터진다.
+**트레이드오프**: 위치 인자라 같은 타입 인자가 이어지면 순서 실수를 컴파일이 못 막는다 — 팩토리가 채운 값을 getter 로 확인하는 테스트로 막는다. 테스트에서 임의 상태의 엔티티를 만들기 번거롭다 — DB 테스트는 팩토리로 만든 뒤 SQL 로 바꾸고, DB 없는 단위 테스트는 `ReflectionTestUtils` 로 필드를 바꾼다. 처음 상태 규칙이 없는 엔티티의 팩토리는 이름만 바꾼 생성자가 된다. 흐름이 바뀌면 팩토리 이름도 바뀐다 — 공개 가입(`13-account-public`)에서 약관 동의 · 대기 명단이 붙으면 `join` 을 다시 본다.
+**검증**: 2026-10-20 `User` 의 public 생성자를 지우고 `join` 으로 바꿨다. `UserTest` 로 `ACTIVE` 시작 · 약관 없음 · ID 없음을 고정했고, 다른 상태가 필요한 재로그인 테스트는 `LoginServiceIT` 에서 SQL 로, `LoginServiceTest` 에서 리플렉션으로 상태를 바꿨다. 서버 테스트 180개 통과.
 
 ## 설계 묶음 정리 때 확정한 것 (Q220~Q231)
 

@@ -229,7 +229,7 @@ flowchart LR
 | 한국어 | 코드 | 정의 | 아닌 것 |
 |---|---|---|---|
 | 사용자 | `User` / `users` | 서비스 회원. 학습 데이터 · 쿼터 · 숙련도 · 권한의 주체 | 외부 로그인 제공자의 계정 자체가 아니다 |
-| 외부 로그인 식별자 | `ExternalIdentity` / `users(provider, subject)` | 제공자와 제공자 계정 식별자의 쌍. 회원 테이블에서 복합 UNIQUE · 각 NOT NULL로 저장한다 | 이메일 · 서비스 사용자 ID가 아니다 |
+| 외부 로그인 식별자 | `users(provider, subject)` | 제공자와 제공자 계정 식별자의 쌍. 회원 테이블에서 복합 UNIQUE · 각 NOT NULL로 저장한다 | 이메일 · 서비스 사용자 ID가 아니다 |
 | 외부 로그인 입력 | `ExternalAccount` | 인증을 마친 외부 식별자 · 이메일 · 이메일 검증 여부를 전달하는 값 | DB 엔티티 · OAuth 토큰이 아니다 |
 | 커리큘럼 묶음 | `CurriculumGroup` / `curriculum_groups` | 넓은 주제의 전체 목표와 단계별 분할안을 보관하는 사용자 소유 묶음 | 기간 · 일정을 배정하는 학습 플랜이 아니다 |
 | 커리큘럼 단계 | `CurriculumStep` / `curriculum_steps` | 묶음 안의 순서 · 제목 · 범위 · 생성용 주제/목적. 실제 커리큘럼은 필요할 때 연결된다 | 미생성 단계는 초안 커리큘럼이 아니다 |

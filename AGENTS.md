@@ -16,7 +16,7 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 | `docs/05-api.md` · `docs/06-screens.md` | API 계약 · 인증(쿠키 세션) · 화면 문구 |
 | `docs/07-testing.md` | 장애 주입 · 용량 측정 · LLM 스텁 |
 
-**스택** — Java 21 · Spring Boot 4(MVC, 플랫폼 스레드) · Spring Security(구글 OAuth) + Spring Session JDBC · PostgreSQL + pgvector · Spring Data JPA(엔티티 · 리포지토리는 각 도메인 패키지 · Postgres 고유 기능은 `EntityManager` 네이티브 쿼리) · Flyway · OpenAI SDK(`gpt-5.6-terra` · `gpt-5.6-luna` · `text-embedding-3-large`) · FSRS 라이브러리 · ArchUnit · Testcontainers · Micrometer.
+**스택** — Java 21 · Spring Boot 4(MVC, 플랫폼 스레드) · Spring Security(구글 OAuth) + Spring Session JDBC · PostgreSQL + pgvector · Spring Data JPA(엔티티 · 리포지토리는 각 도메인 패키지 · Postgres 고유 기능은 `EntityManager` 네이티브 쿼리) · Flyway · OpenAI SDK(`gpt-5.6-terra` · `gpt-5.6-luna` · `text-embedding-3-large`) · FSRS 라이브러리 · ArchUnit · Testcontainers · Micrometer · Lombok(엔티티의 `@Getter` · `@NoArgsConstructor(access = PROTECTED)` 만. `@Data` · `@Setter` · `@EqualsAndHashCode` · `@ToString` · `@Builder` 는 엔티티에 쓰지 않는다 — [ADR-070](docs/ADR.md)).
 **화면** — `frontend/` · React + TypeScript(strict) · Vite · React Router · TanStack Query · Tailwind CSS · react-markdown + KaTeX + mermaid · Vitest + Testing Library. 빌드 결과는 **Vercel** 에 정적 파일로 배포하고 jar 에는 넣지 않는다. 화면 `{도메인}` · API `api.{도메인}`(EC2) — 같은 사이트 · 다른 출처라 쿠키 세션은 그대로 쓰고 CORS · `XSRF-TOKEN` 쿠키 도메인을 맞춘다([05 §1.1](docs/05-api.md)).
 **패키지** — 도메인별 패키지(`account` · `curriculum` · `job` … — 각자 `controller` · `service` · `repository` · `domain` · `dto` 하위 패키지로 항상 나눈다) + `generation`(생성 · 유료 호출) · `worker`(수령 루프 · 실행기) · `config`(설정 · 역할별 빈 등록) · `common`(오류 응답 · 시계) · `auth`(로그인). 단일 Gradle 모듈([ADR-067](docs/ADR.md)).
 **운영** — EC2 한 대 · 프로세스 하나(`app.role=all` — API + 워커 실행기 `N` 개) · 화면은 Vercel. 필요하면 실행 인자만으로 `api` / `worker` 로 나눈다. 무중단 배포는 공개 후(ADR-061). 정원제 실사용자.
@@ -74,6 +74,7 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 25. **프로세스 메모리에 공유 상태(카운터 · 캐시 · 잠금)를 새로 두지 않는다 — DB 에 둔다.** 예외는 API 레이트리밋 버킷 하나. → 역할 전환(`app.role`)으로 프로세스를 나누는 순간 상태가 쪼개져 상한 · 중복 방지가 조용히 깨진다.
 26. **역할 판단(`app.role`)은 `config` 의 빈 등록에서만 한다.** 수령 루프 · 실행기 빈은 컴포넌트 스캔(`@Component` · `@Service`)으로 올리지 않고 `config` 에서 등록한다. 컨트롤러 · 서비스 · `worker` · `generation` 코드에 *"지금 내 역할이 뭐지"* 분기를 넣지 않는다. → 역할이 코드 곳곳에 퍼지면 나눠 띄울 때 무엇이 켜지는지 알 수 없다. 스캔으로 올린 실행기는 역할과 무관하게 항상 켜진다.
 27. **세션에는 사용자 id 만 둔다. 상태 · 역할은 요청마다 `users` 에서 읽는다.** → 세션에 상태를 넣으면 대기자를 승인하거나 약관이 바뀌어도 로그인 중인 사람에게 반영되지 않는다.
+28. **엔티티는 생성 흐름마다 이름 있는 정적 팩토리 메서드로만 만든다(예: `User.join`).** public 생성자 · `@Builder` 를 두지 않는다 — JPA 용 기본 생성자만 `protected`(ADR-070 · ADR-071). 처음 상태처럼 엔티티 스스로 정할 수 있는 규칙은 팩토리 안에 고정하고, 바깥 정보가 필요한 값(관리자 목록으로 정하는 역할 등)은 서비스가 정해 인자로 넘긴다. 같은 타입 인자가 이어지면 팩토리가 채운 값을 getter 로 확인하는 테스트를 둔다. → 서비스마다 처음 상태를 채우면 TASK 마다 다르게 채워 잘못된 상태의 행이 생기고, 빌더는 필수 값을 빠뜨려도 컴파일된 뒤 INSERT 에서야 NOT NULL 로 터진다.
 
 ## 작업 방식
 

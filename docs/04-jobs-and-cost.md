@@ -39,7 +39,7 @@
 | `controller` | `@RestController` |
 | `service` | `@Service` · 서비스 메서드의 입력 · 결과 타입(예: `ExternalAccount` · `LoginResult`) |
 | `repository` | Spring Data 리포지토리 · `EntityManager` 네이티브 쿼리 클래스 |
-| `domain` | `@Entity` · enum · 값 타입 · 도메인 규칙(`MasteryPolicy` 등) |
+| `domain` | `@Entity` · enum · 값 타입 · 도메인 규칙(`MasteryPolicy` 등). 엔티티는 생성 흐름마다 이름 있는 정적 팩토리로만 만든다 — public 생성자 · `@Builder` 없음, 처음 상태는 팩토리 안에 고정(ADR-071) |
 | `dto` | HTTP 요청 · 응답 타입만 |
 
 `generation` 은 계층이 아니라 용도로 나눈다(`generation.llm` · 잡 종류별 — 해당 TASK 에서 정한다). `auth` · `config` · `common` · `worker` 는 계층 구분이 맞지 않는 기술 코드라 평평하게 둔다. 하위 패키지끼리 참조하므로 클래스와 그 생성자 · 메서드는 `public` 이다.
@@ -103,9 +103,8 @@ flowchart TD
 
 | 위치 | 책임 |
 |---|---|
-| `account.domain.User` | 회원 엔티티(`users`). `provider` · `subject` 컬럼을 매핑하지만 getter 로 내놓지 않고 API 응답에도 넣지 않는다 |
-| `account.domain.ExternalIdentity` | `(provider, subject)` 값. 회원 테이블의 로그인 식별자를 표현한다 |
-| `account.service.ExternalAccount` | 인증을 마친 외부 식별자·이메일·이메일 검증 여부를 전달하는 로그인 입력 |
+| `account.domain.User` | 회원 엔티티(`users`) · Lombok `@Getter` · `@NoArgsConstructor(access = PROTECTED)`(ADR-070). 생성은 `User.join` 하나 — 첫 로그인 회원은 `ACTIVE` 로 시작(ADR-071). `provider` · `subject` 는 사용자 API 응답(`MeResponse`)에 넣지 않는다 |
+| `account.service.ExternalAccount` | 인증을 마친 `provider` · `subject` · 이메일 · 이메일 검증 여부를 전달하는 로그인 입력 |
 | `account.service.LoginService` | 이메일 검증·허용 목록 검사(DB 접근 전) 후 `findByProviderAndSubject` 로 조회하거나 신규 회원 저장. 재로그인 정보 보존 |
 | `account.repository.UserRepository` | `JpaRepository<User, Long>` · `findByProviderAndSubject` |
 | `account.controller.MeController` · `account.dto.MeResponse` | `GET /api/me` |
@@ -113,7 +112,7 @@ flowchart TD
 
 `LoginService` 는 메서드 전체에 `@Transactional` 을 붙이지 않는다 — 거절을 DB 접근 전에 하고([02 §6.1.1](./02-domain-data.md)), 조회와 저장은 Spring Data 리포지토리 메서드마다 짧은 트랜잭션이며, 동시 첫 로그인은 `(provider, subject)` unique 제약이 하나만 남긴다. 여러 행을 함께 바꾸는 서비스 메서드는 `@Transactional` 을 붙인다(§5).
 
-제공자 구분은 두 컬럼과 값 타입으로 표현한다. 별도 연결 모델·저장소·동적 제공자 탐색기는 만들지 않는다. 추가 제공자에는 인증 설정·응답 변환·이메일 신뢰 정책이 필요하며 복수 로그인 연결이 필요할 때 테이블 분리를 다시 검토한다. 현재 구글 경로·요청 쿠키·PKCE·토큰 폐기 정책은 유지한다.
+제공자 구분은 두 컬럼으로 표현한다 — 두 문자열을 묶는 값 타입(`ExternalIdentity`)은 동작 없이 넘겨주기만 해서 지웠다(ADR-066). 별도 연결 모델·저장소·동적 제공자 탐색기는 만들지 않는다. 추가 제공자에는 인증 설정·응답 변환·이메일 신뢰 정책이 필요하며 복수 로그인 연결이 필요할 때 테이블 분리를 다시 검토한다. 현재 구글 경로·요청 쿠키·PKCE·토큰 폐기 정책은 유지한다.
 
 ---
 

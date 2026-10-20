@@ -293,7 +293,7 @@ COMMIT;
 
 **`UNIQUE(provider, subject)`**로 외부 계정 하나당 회원 하나를 보장한다. 서로 다른 제공자의 같은 `subject`는 서로 다른 계정이다. 회원당 로그인 수단은 하나이며 별도 연결 테이블은 두지 않는다. 현재 활성 제공자는 구글 하나다. 추가 제공자의 인증 설정·응답 변환·이메일 신뢰 정책은 해당 기능에서 구현하며, 저장 모델의 제공자 구분 테스트가 실제 로그인을 활성화하는 것은 아니다. 복수 로그인 연결·해제·계정 병합은 범위 밖이다.
 
-`User`는 `users`를 매핑한 회원 엔티티다. `provider`·`subject` 컬럼을 매핑하지만 getter로 내놓지 않고 사용자 API 응답에도 넣지 않는다. `ExternalIdentity(provider, subject)`는 로그인 입력과 회원 생성에 사용하고, 조회는 `UserRepository.findByProviderAndSubject`로 한다. 세션과 학습 데이터의 기준은 계속 `users.id`다. 이메일은 로그인 키나 자동 병합 근거가 아니며 원본 프로필과 구글 접근/ID 토큰은 보관하지 않는다.
+`User`는 `users`를 매핑한 회원 엔티티다. `provider`·`subject`는 사용자 API 응답에 넣지 않는다. 로그인 입력 `ExternalAccount(provider, subject, email, emailVerified)`로 회원을 생성하고, 조회는 `UserRepository.findByProviderAndSubject`로 한다. 세션과 학습 데이터의 기준은 계속 `users.id`다. 이메일은 로그인 키나 자동 병합 근거가 아니며 원본 프로필과 구글 접근/ID 토큰은 보관하지 않는다.
 
 **재로그인은 계정 정보를 변경하지 않는다.** 같은 `(provider, subject)`의 회원이 있으면 기존 ID로 로그인하고 이메일·역할·상태·약관·가입 시각을 보존한다. 이번 인증 이메일과 관리자 목록은 로그인 허용 여부를 확인하는 데 사용하며 저장된 역할은 덮어쓰지 않는다. 이메일·역할 변경은 별도의 명시적 변경 절차에서 수행한다.
 
@@ -301,9 +301,9 @@ COMMIT;
 
 #### 6.1.1 로그인 · 가입 불변조건
 
-1. `auth.GoogleAccountMapper`가 검증된 Google 등록과 응답을 `ExternalAccount(ExternalIdentity(provider, subject), email, emailVerified)`로 변환한다. `provider`는 요청 매개변수·원본 프로필에서 믿지 않고 검증된 서버 등록으로 정한다. 현재 매퍼는 구글만 수락한다. `account`는 Spring Security 타입·OAuth 토큰·원본 응답을 알지 않는다.
+1. `auth.GoogleAccountMapper`가 검증된 Google 등록과 응답을 `ExternalAccount(provider, subject, email, emailVerified)`로 변환한다. `provider`는 요청 매개변수·원본 프로필에서 믿지 않고 검증된 서버 등록으로 정한다. 현재 매퍼는 구글만 수락한다. `account`는 Spring Security 타입·OAuth 토큰·원본 응답을 알지 않는다.
 2. 이메일 검증·관리자 허용 목록 검사는 DB 접근 전에 수행한다. 허용 여부는 이번 인증 이메일로 확인하며 기존 이메일을 바꾸지 않는다.
-3. `LoginService`가 `UserRepository.findByProviderAndSubject`로 조회한다. 있으면 기존 ID를 반환하고 회원을 쓰지 않는다. 없으면 식별자와 신규 이메일·초기 역할·상태·가입 시각을 한 행에 저장한다. 이메일이 같은 기존 회원을 자동 병합하지 않는다.
+3. `LoginService`가 `UserRepository.findByProviderAndSubject`로 조회한다. 있으면 기존 ID를 반환하고 회원을 쓰지 않는다. 없으면 `User.join`으로 식별자와 신규 이메일·초기 역할·가입 시각을 한 행에 저장한다(처음 상태 `ACTIVE`는 `join` 안에 고정 — ADR-071). 이메일이 같은 기존 회원을 자동 병합하지 않는다.
 4. 같은 외부 식별자의 동시 첫 로그인은 복합 unique 제약으로 회원 하나만 남긴다. 충돌 요청은 실패해도 되며 다음 로그인은 기존 회원을 찾는다. 추가 잠금·자동 재시도는 넣지 않는다.
 5. 세션에는 `users.id`만 저장하고 상태·역할은 요청마다 DB에서 읽는다. 외부 식별자는 사용자 API 응답에 추가하지 않는다. 탈퇴 시 식별자도 회원 행과 함께 삭제한다.
 
