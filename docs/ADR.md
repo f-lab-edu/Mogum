@@ -36,7 +36,7 @@
 **트레이드오프**: 오래 기다리는 연결이 수백 개 동시에 생기는 기능이 오면 다시 본다.
 
 ### ADR-005: 단일 Gradle 모듈 + ArchUnit
-**결정**: `core` ← `api` · `worker` · `infra` 경계를 패키지와 ArchUnit(첫 커밋)으로 강제한다. 생성 유스케이스와 유료 호출 포트(`LlmClient` · `EmbeddingClient` …)는 `core.generation` 에 모으고, 이 패키지를 참조할 수 있는 쪽을 `worker` · `infra` · 루트 설정으로 **허용 목록**으로 적는다 — api 금지만 두면 다른 core 패키지를 거친 우회를 못 막는다. 도메인 모델(record)은 `core.<도메인>` 에 둬 api 와 생성이 같이 쓴다 — JPA 엔티티는 `infra` 에만 둔다(ADR-042).
+**결정**: 패키지 경계를 ArchUnit(첫 커밋)으로 강제한다. 패키지는 도메인별이다(ADR-067). 생성 유스케이스와 유료 호출(`LlmClient` · `EmbeddingClient` …)은 `generation` 에 모으고, 이 패키지를 참조할 수 있는 쪽을 `worker` · `config` 로 **허용 목록**으로 적는다 — 컨트롤러 금지만 두면 다른 도메인 패키지(`job` 등)를 거친 우회를 못 막는다. `worker` 는 `config` 만 참조하고, `generation` · `worker` 의 `@Transactional` 과 `generation.llm` 밖의 OpenAI SDK 사용도 ArchUnit 이 막는다.
 **이유**: 멀티모듈을 부를 계기(배포 단위 · 팀 · 공개 라이브러리)가 없다. 강제 결과는 같다. ([04 §2](./04-jobs-and-cost.md))
 **트레이드오프**: 컴파일러가 아니라 테스트가 막는다 — 규칙을 무르면 경계가 사라진다.
 
@@ -66,13 +66,13 @@
 
 ## LLM
 
-### ADR-011: Spring AI 대신 OpenAI SDK + 자체 포트
+### ADR-011: Spring AI 대신 OpenAI SDK + 자체 인터페이스(`LlmClient`)
 **결정**: `LlmClient`(1턴) · `GuardedLlmClient`(재시도 · usage · 리스 갱신) · SDK `maxRetries(0)`.
 **이유**: 재시도 · 리스 갱신을 시도 단위로 쥐어야 리스 부등식(`300 > 60 + 100 + DB 처리 최대 지연`)이 선다. 프레임워크 안에 숨으면 확인할 수 없다. ([03 §8](./03-generation.md))
 **트레이드오프**: 프로바이더를 상시 여럿 지원하려면 어댑터를 직접 늘려야 한다.
 
 ### ADR-012: 채팅 OpenAI(`gpt-5.6-terra` · `gpt-5.6-luna`)
-**결정**: 중상위 terra(잡 A · ① · ②) · 하위 luna(③ 카드). 포트는 모델명이 아니라 `ModelTier` 를 받는다.
+**결정**: 중상위 terra(잡 A · ① · ②) · 하위 luna(③ 카드). `LlmClient` 는 모델명이 아니라 `ModelTier` 를 받는다.
 **이유**: 한국어를 토큰 절반 가까이로 써서 강의 1건 **82원 vs 162원**, 46~62초 vs 74~90초. 단가표로는 반대 결론이었다.
 **트레이드오프**: 품질은 블라인드 채점하지 않았다. 카드 품질(C1~C5)이 낮으면 ③을 중상위로 올린다.
 
@@ -224,10 +224,10 @@
 **이유**: 사용자가 해당 비교 검증을 우선 추가하지 않기로 결정했다.
 **트레이드오프**: 현재 검증 계획은 검색 관련성 · 콘텐츠 품질을 확인하며, 숙련도 반영 자체의 효과를 대조 결과로 측정하는 단계는 포함하지 않는다. 해당 실험을 수행하거나 효과가 입증됐다고 기록하지 않는다.
 
-### ADR-042: DB 접근은 Spring Data JPA 하나 · 엔티티는 `infra` · Postgres 고유 기능은 네이티브 쿼리
-**결정**: 도메인 테이블(`users` · `curriculums` · `lessons` · `materials` · `flashcards` · `reviews` …)은 JPA 엔티티로 다룬다. 엔티티는 `infra` 안에만 두고 리포지토리 포트는 트랜잭션 안에서 record 로 바꿔 돌려준다 — `core` 에는 `jakarta.persistence` 가 없다. `jobs` · `llm_calls` 쓰기와 Postgres 고유 기능(`SKIP LOCKED` · advisory lock · `ON CONFLICT` · `RETURNING` · 벡터 거리 · 숙련도 집계)은 `EntityManager` 네이티브 쿼리로 쓴다. 같은 트랜잭션에서 JPA 로 바꾼 행을 네이티브 쿼리로 읽기 전에 `flush()` 를 명시한다. ([04 §1 · §2 · §5](./04-jobs-and-cost.md))
+### ADR-042: DB 접근은 Spring Data JPA 하나 · Postgres 고유 기능은 네이티브 쿼리
+**결정**: 도메인 테이블(`users` · `curriculums` · `lessons` · `materials` · `flashcards` · `reviews` …)은 JPA 엔티티로 다룬다. 엔티티와 Spring Data 리포지토리는 각 도메인 패키지에 두고 서비스가 바로 쓴다(ADR-067 — 처음에는 엔티티를 `infra` 에만 두고 record 로 바꿔 돌려줬다). `jobs` · `llm_calls` 쓰기와 Postgres 고유 기능(`SKIP LOCKED` · advisory lock · `ON CONFLICT` · `RETURNING` · 벡터 거리 · 숙련도 집계)은 `EntityManager` 네이티브 쿼리로 쓴다. 같은 트랜잭션에서 JPA 로 바꾼 행을 네이티브 쿼리로 읽기 전에 `flush()` 를 명시한다. ([04 §1 · §2 · §5](./04-jobs-and-cost.md))
 **이유**: 기술 스택을 JPA 하나로 묶는다 — 국내 백엔드에서 주력으로 쓰는 방식이고, 네이티브로 남는 20개 안팎의 문장도 같은 `EntityManager` · 트랜잭션 안에서 돈다. MyBatis 는 강점인 동적 SQL · XML 분리 · 중첩 결과 매핑을 쓸 일이 없고(조건이 고정된 문장들) 프레임워크와 타입 핸들러(`vector` · `jsonb` · `text[]`)만 는다. `JdbcClient` 는 record 매핑이 간결하지만 접근 방식이 하나 더 생긴다. QueryDSL 은 JPA 위라 Postgres 고유 문법은 결국 네이티브로 빠진다.
-**트레이드오프**: 네이티브 쿼리 결과를 record 로 받는 매핑이 `JdbcClient` 보다 번거롭다(결과 매핑 설정 · 인터페이스 프로젝션). 펜싱 · 원장 · 락처럼 틀리면 돈이 나가는 문장이 JPA 코드 사이에 섞이므로 네이티브임이 드러나게 둔다. 엔티티 ↔ record 매핑 코드가 는다. 동적 SQL 이 많아지면 MyBatis · jOOQ 를 다시 본다.
+**트레이드오프**: 네이티브 쿼리 결과를 record 로 받는 매핑이 `JdbcClient` 보다 번거롭다(결과 매핑 설정 · 인터페이스 프로젝션). 펜싱 · 원장 · 락처럼 틀리면 돈이 나가는 문장이 JPA 코드 사이에 섞이므로 네이티브임이 드러나게 둔다. 동적 SQL 이 많아지면 MyBatis · jOOQ 를 다시 본다.
 
 ### ADR-043: MVP는 기간 없이 커리큘럼을 생성하고 학습 플랜은 후속 기능으로 둔다
 **결정**: 사용자 결정에 따라 초기 입력은 주제 · 학습 목적만 받는다. 기간 · 주당 학습 가능 시간/학습량 입력, 예상 완료 기간, 주차별 일정과 일정 재조정은 MVP에서 제외하고 후속 학습 플랜 기능으로 둔다. 커리큘럼은 내용과 권장 순서만 제안하며 학습 시점 · 속도 · 실제 순서는 사용자가 선택한다. `curriculums.weeks` · `lessons.week` 및 해당 API/생성 출력/화면을 제거한다. 주당 3~5강 규칙과 1~8주 제한도 제거하며, 기존 총 40강 상한은 유지한다(검증된 목록 1~40강). 다시 짜기는 내용 · 범위 · 깊이 · 권장 순서를 조정하고 일정은 생성하지 않는다. FSRS 복습 일정은 유지한다. ([01 §5 · §6](./01-overview.md) · [02 §6.2](./02-domain-data.md) · [03 §2](./03-generation.md) · [05 §2](./05-api.md) · [06 §6 · §8](./06-screens.md))
@@ -352,11 +352,30 @@
 **트레이드오프**: 구글 식별자를 회원 스키마와 저장소가 명시적으로 안다. 복수 로그인 수단이 실제 요구사항이 되면 마이그레이션과 연결 정책을 다시 설계한다.
 
 ### ADR-066: 회원당 로그인 수단 하나를 provider·subject로 표현한다
-**결정**: 사용자 결정(2026-10-20)에 따라 회원 테이블 하나는 유지하되 `users.google_sub`를 `provider`·`subject`로 일반화한다. 두 컬럼은 NOT NULL·빈 값 금지이며 복합 UNIQUE로 외부 계정 중복을 막는다. `ExternalIdentity`와 `ExternalAccount`를 로그인 입력·저장소 계약에 사용하고 `GoogleAccount`는 제거한다. 별도 로그인 연결 테이블·저장소는 만들지 않는다. 현재 활성 로그인은 구글 하나다.
+**결정**: 사용자 결정(2026-10-20)에 따라 회원 테이블 하나는 유지하되 `users.google_sub`를 `provider`·`subject`로 일반화한다. 두 컬럼은 NOT NULL·빈 값 금지이며 복합 UNIQUE로 외부 계정 중복을 막는다. `ExternalIdentity`와 `ExternalAccount`를 로그인 입력·회원 생성에 사용하고(조회는 `UserRepository.findByProviderAndSubject` — ADR-067) `GoogleAccount`는 제거한다. 별도 로그인 연결 테이블·저장소는 만들지 않는다. 현재 활성 로그인은 구글 하나다.
 **이유**: 회원당 로그인 수단 하나라는 제약과 로그인 제공자 종류의 확장 가능성은 별개다. 제공자 종류가 늘 때 회원 테이블 컬럼을 바꾸지 않으면서, 현재 필요 없는 1:N 연결 모델은 도입하지 않는다.
 **불변조건**: 제공자는 검증된 서버 등록으로 정한다. 서로 다른 제공자의 같은 subject는 다른 계정이며 이메일로 자동 병합하지 않는다. 이메일 검증·허용 목록·최초 역할·재로그인 정보 보존·사용자 ID 세션은 유지한다. 사용자 응답에는 외부 식별자를 추가하지 않는다.
 **이전과 검증**: V1~V5는 유지하고 V6에서 `google_sub`를 `subject`로 이름 변경해 원문을 보존하고 기존 provider를 `google`로 채운 뒤 기본값을 제거한다. 구글 전용 unique를 복합 unique로 교체한다. V3/V4/V5 회원과 기존 세션 이전·제공자 격리·복합키 중복·빈 값/NULL·동시 가입·HTTP 로그인을 검증한다. **2026-10-20 전체 서버 테스트 192개 통과.** V3/V4/V5에서 V6까지 회원 정보와 ID 세션을 보존하며, 기존 세션의 실제 `/api/me`와 재로그인이 동작하는 것을 검증했다. 로컬 개발 DB에도 V6를 적용하고 새 서버 기동·화면 200·미인증 API 401·구글 로그인 시작 302를 확인했다. 실제 운영 DB에는 적용하지 않았다.
 **트레이드오프**: 한 회원에 복수 로그인 수단 연결은 지원하지 않는다. 해당 요구가 생기면 연결 정책과 테이블 분리를 다시 설계한다. 새 제공자를 활성화하려면 인증 설정·응답 변환·이메일 신뢰 정책 구현이 여전히 필요하다.
+
+### ADR-067: 도메인별 패키지와 표준 Spring 계층으로 바꾼다 — 포트와 어댑터를 걷어낸다
+**결정**: 사용자 결정(2026-10-20)에 따라 `core` ← `api` · `worker` · `infra` 계층 우선 패키지와 리포지토리 포트 · 어댑터 · 엔티티 ↔ record 변환 · `TransactionRunner` 를 걷어낸다. 도메인별 패키지(`account` · `curriculum` · `job` …)에 Controller · Service · Entity · Repository 를 함께 두고, 엔티티를 도메인 모델로 직접 쓰며 서비스가 Spring Data 리포지토리를 바로 쓴다. 도메인 패키지 안은 `controller` · `service` · `repository` · `domain` · `dto` 하위 패키지로 항상 나눈다 — 작은 도메인도 같은 모양으로 둬 구현자가 위치를 판단할 여지를 없앤다. `generation` 은 용도로 나누고, `auth` · `config` · `common` · `worker` 는 평평하게 둔다. 컨트롤러가 부르는 일반 서비스는 `@Transactional` 을 쓰고, LLM 을 부르는 `generation` · `worker` 는 `TransactionTemplate` 으로 경계를 드러낸다. 설정 · 역할별 빈 등록은 `config`, 공통 오류 응답 · 시계는 `common` 에 둔다. ([04 §2 · §5](./04-jobs-and-cost.md) · [ARCHITECTURE](./ARCHITECTURE.md))
+**유지하는 것**: LLM 때문에 생긴 규칙은 구조와 무관하게 남긴다 — `generation` 은 `worker` · `config` 만 참조(허용 목록), `worker` 는 `config` 만 참조, `generation` · `worker` 의 `@Transactional` 금지, OpenAI SDK 는 `generation.llm` 에만(넷 다 ArchUnit). `jobs` · `llm_calls` 는 엔티티가 아니라 네이티브 SQL + 수령 회차, 역할 판단은 `config` 의 빈 등록에서만.
+**이유**: 기능 하나가 세 패키지로 흩어지고 리포지토리가 세 겹(포트 → 어댑터 → Spring Data)에 엔티티 ↔ record 변환까지 있어 코드를 따라가기 어려웠다. 이 구조가 막던 위험 중 중요한 것(요청 경로의 유료 호출 · LLM 호출 중 커넥션 점유)은 ArchUnit 규칙으로 따로 지킬 수 있다. DB 기술을 바꿀 때 도메인을 지키는 이점은 advisory lock · `SKIP LOCKED` · pgvector 같은 Postgres 고유 기능에 이미 묶여 있어 작았다. 구현된 도메인이 계정 하나뿐인 지금 바꾸는 비용이 가장 작다.
+**트레이드오프**: 워커 경로에서 detached 엔티티 위험이 돌아온다 — 트랜잭션 밖에서 바꾼 엔티티는 저장되지 않고(예외도 없다) 지연 로딩은 `LazyInitializationException` 이 난다. LLM 호출을 사이에 둘 때는 엔티티 대신 ID 나 값을 넘기고 다음 트랜잭션에서 다시 읽는 규칙으로 막는다(AGENTS 금지 목록 4). 도메인이 JPA 에 묶이고, 경계는 컴파일러가 아니라 ArchUnit 테스트가 막는다. 하위 패키지끼리 참조하므로 package-private 를 쓸 수 없고, 작은 도메인에는 파일 하나짜리 하위 패키지가 생긴다. `LoginService` 는 거절을 DB 접근 전에 하려고([02 §6.1.1](./02-domain-data.md)) 메서드 전체 트랜잭션 없이 리포지토리 호출마다 짧은 트랜잭션을 쓴다.
+**검증**: 2026-10-20 계정 · 인증 코드를 새 구조로 옮기고 ArchUnit 규칙과 위반 픽스처를 바꿨다. **전체 서버 테스트 179개 통과**(이전 192개 — `TransactionRunner` 테스트 5개 · 트랜잭션 래퍼 롤백 테스트 1개를 지웠고, ArchUnit 검사가 18개에서 11개가 됐다). 로그인 · 세션 · CSRF · 계정 이전 IT 는 그대로 통과했다. 같은 날 `account` 를 다섯 하위 패키지로 나눈 뒤에도 179개가 통과했다.
+
+### ADR-068: 서버 코드를 `backend/` 로 옮긴다
+**결정**: 사용자 결정(2026-10-20)에 따라 Gradle 프로젝트(`build.gradle` · `settings.gradle` · wrapper · `src/`)를 저장소 루트에서 `backend/` 로 옮겨 `frontend/` 와 나란히 둔다. `backend/` 는 자체 wrapper 를 가진 독립 Gradle 프로젝트다. 사람은 `cd backend && ./gradlew …`, step 의 AC 와 리뷰어는 저장소 루트에서 `./backend/gradlew -p backend …` 로 실행한다. `compose.yaml` · `.env.example` 은 로컬 개발 공용이라 루트에 둔다. ([ARCHITECTURE](./ARCHITECTURE.md) · `AGENTS.md` 명령어)
+**이유**: 백엔드가 루트에 있던 것은 화면을 jar 에 넣던 ADR-007 의 흔적이었다 — 화면이 Gradle 프로젝트 안의 하위 폴더였다. ADR-060 으로 화면을 Vercel 에 따로 배포하면서 배포 단위가 둘이 됐으니 폴더도 둘로 나눈다. 배포 스크립트 · CI 빌드가 경로를 박아 넣기 전(`2-deploy` 전)이라 지금 옮기는 비용이 가장 작다.
+**트레이드오프**: 저장소 루트에서 백엔드 명령이 길어진다(`-p backend`). TDD 가드(`scripts/tdd_guard.py`)의 짝 경로 · 리뷰어 허용 명령(`scripts/execute.py` 의 `REVIEW_TOOLS`) · Sonar 제외 경로가 `backend/` 에 묶인다. 완료된 phase 의 step 파일은 옮기기 전 경로를 그대로 둔다(이력). IDE 는 `backend/` 를 Gradle 프로젝트로 다시 가져와야 한다.
+**검증**: 2026-10-20 저장소 루트에서 `./backend/gradlew -p backend test` 로 서버 테스트 179개가 처음부터 다시 컴파일돼 통과했다. 하네스 테스트 133개 통과 — 가드 테스트의 Java 경로를 먼저 `backend/` 로 바꿔 실패를 확인한 뒤 가드를 고쳤고, 리뷰어가 `./backend/gradlew` 를 쓰는지 확인하는 테스트를 더했다.
+
+### ADR-069: 서버도 컨테이너 이미지로 만들고 로컬 compose 에 넣는다
+**결정**: 사용자 결정(2026-10-20)에 따라 `backend/Dockerfile`(JDK 로 `bootJar` 빌드 → JRE 로 실행, 비루트 사용자, exec 형식 `ENTRYPOINT`)을 두고 `compose.yaml` 에 `backend` 서비스를 더한다. `docker compose up -d --build` 는 DB 와 서버를 함께, `docker compose up -d postgres` 는 DB 만 띄운다 — 코드를 자주 바꾸는 개발은 이미지를 다시 빌드하지 않도록 호스트 `bootRun` 을 그대로 쓴다. 서버 컨테이너는 루트 `.env` 를 읽고 `DB_URL` 만 서비스 이름(`postgres:5432`)으로 덮어쓰며, Postgres healthcheck 가 통과한 뒤 뜬다. 두 서비스 모두 포트를 `127.0.0.1` 에만 연다. 운영의 앱 실행 방식(이 이미지 · jar + systemd)은 `2-deploy` 에서 정한다. ([04 §3 · §4.5](./04-jobs-and-cost.md))
+**이유**: 로컬 · 운영 · 용량 측정이 같은 실행 단위를 쓰게 한다 — 용량 측정은 앱 컨테이너를 운영과 같은 메모리로 묶어 재야 하고([07 §2](./07-testing.md)), 같은 EC2 에 Postgres 를 두면 운영도 같은 구성이 된다. 정상 종료 유예(ADR 의 SIGTERM 결정 · 04 §4.5)는 컨테이너에서 SIGTERM 이 java 에 바로 가고 종료 대기가 150초여야 지켜지므로, 실행 방식을 처음부터 이미지에 박아 둔다. 같은 네트워크의 다른 기기가 알려진 로컬 비밀번호로 DB 에 붙지 못하게 포트를 좁혔다.
+**트레이드오프**: 코드를 바꾸면 이미지를 다시 빌드해야 한다(Gradle 캐시 마운트로 줄인다). 이미지 빌드는 테스트를 돌리지 않는다 — Testcontainers 는 호스트에서 돈다. 8080 을 서버 컨테이너와 호스트 `bootRun` 이 함께 쓸 수 없다. 메모리 상한은 아직 두지 않았다 — 용량 측정(`16-capacity`)에서 정한다.
+**검증**: 2026-10-20 이미지를 빌드해 compose 의 DB 에 붙여 띄웠다 — 1.9초에 기동, Flyway 6개 검증, `/api/me` 401 JSON, `/auth/google` 302, 비루트 사용자 · java 가 PID 1. `docker stop` 에 1초 만에 exit 143(SIGTERM 정상 종료)으로 끝났고 종료 대기는 150초로 잡혔다. Postgres healthcheck 가 `healthy` 가 되고 포트가 `127.0.0.1` 에만 열린 것을 확인했다. 실행기가 아직 없어 유예 중 반납 동작은 `4-job-queue` 에서 확인한다. 기존 호스트 `bootRun` 이 8080 을 쓰고 있어 서버 컨테이너는 임시 포트(18080)로 확인했다.
 
 ## 설계 묶음 정리 때 확정한 것 (Q220~Q231)
 

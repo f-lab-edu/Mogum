@@ -7,23 +7,33 @@
 
 ```
 /
-├── build.gradle                 # 단일 Gradle 모듈 — 백엔드만. 화면은 jar 에 넣지 않는다(ADR-060)
-├── src/main/java/…/mogum/
-│   ├── MogumApplication.java    # 루트 — 설정 배선 · app.role 별 빈 등록만
-│   ├── core/                    # 공통 포트(JobStore · UsageLedger · TransactionRunner …)
-│   │   ├── <도메인>/             # curriculum · concept · review · account … — 도메인 모델(record) · 리포지토리 포트 · MasteryPolicy. api 와 생성이 같이 쓴다
-│   │   ├── job/                 # 적재 유스케이스(검사 · 적재 · 재시도) — core.generation 참조 금지
-│   │   └── generation/          # 생성 유스케이스(잡 A · 잡 B ①②③ · resolveConcepts) + 유료 호출 포트(LlmClient · EmbeddingClient · GuardedLlmClient · InputBudget) — worker · infra · 루트만 참조
-│   ├── api/                     # 컨트롤러 · 인증 · DTO · 레이트리밋
-│   ├── worker/                  # 수령 루프 · 실행기 N 개 · 단계 실행
-│   └── infra/                   # JPA 엔티티(여기에만) · Spring Data 리포지토리 · EntityManager 네이티브 쿼리(jobs · job_events · llm_calls · 락 · 벡터) · OpenAI 어댑터 · 슬랙 웹훅
-│       ├── account/             # UserEntity · JpaUserRepository · SpringDataUserRepository — 도메인별 구현
-│       └── SpringTransactionRunner.java # 여러 도메인이 공유하는 트랜잭션 구현
-├── src/main/resources/
-│   ├── db/migration/            # Flyway 버전드 SQL(세션 테이블 포함)
-│   ├── prompts/v6/              # 운영 프롬프트 — 개발하며 새로 만든다. 명세는 03 §2~§6. 바꾸면 v7 로(금지 목록 18)
-│   └── (static/ 없음)           # 화면은 Vercel 에 따로 배포한다
-├── src/test/java/…              # ArchUnit · Testcontainers · 장애 주입 · LLM 스텁
+├── backend/                         # Spring Boot — EC2 에 배포. 단일 Gradle 모듈 · 자체 wrapper(ADR-068)
+│   ├── build.gradle · settings.gradle · gradlew · gradle/wrapper/
+│   ├── Dockerfile · .dockerignore   # 서버 이미지(빌드 → JRE 실행, exec 형식 ENTRYPOINT) — 로컬 compose 가 쓰고 운영도 쓸 수 있다(ADR-069)
+│   ├── src/main/java/…/mogum/
+│   │   ├── MogumApplication.java    # 진입점 · @ConfigurationPropertiesScan
+│   │   ├── config/                  # 설정 값(WebProperties · AuthProperties) · 시계 빈 · app.role 별 빈 등록 — worker · generation 을 조립하는 유일한 곳
+│   │   ├── common/                  # 공통 오류 응답(ApiError · ApiExceptionHandler · NotFoundException → 404) · SeoulClock
+│   │   ├── auth/                    # Spring Security · 구글 OAuth 로그인 처리 · 세션 → 회원 필터 · API 레이트리밋 필터
+│   │   ├── account/                 # 회원 · 로그인 — 도메인 패키지는 항상 아래 다섯 하위 패키지로 나눈다
+│   │   │   ├── controller/          # MeController
+│   │   │   ├── service/             # LoginService · ExternalAccount(입력) · LoginResult(결과)
+│   │   │   ├── repository/          # UserRepository(Spring Data) · 네이티브 쿼리 클래스
+│   │   │   ├── domain/              # User(@Entity) · UserRole · UserStatus · ExternalIdentity · 도메인 규칙
+│   │   │   └── dto/                 # MeResponse — HTTP 요청 · 응답만
+│   │   ├── <도메인>/                 # curriculum · material · concept · review … — account 와 같은 다섯 하위 패키지. MasteryPolicy 등은 domain/
+│   │   ├── job/                     # 적재 · 재시도 · 잡 조회 API · jobs/job_events 네이티브 SQL(repository/) — 같은 다섯 하위 패키지 · generation 참조 금지
+│   │   ├── usage/                   # llm_calls 원장 · 일일 합계(쿼터 · 킬스위치 근거) — 생성과 적재가 함께 쓴다 · 같은 다섯 하위 패키지
+│   │   ├── generation/              # 생성 유스케이스(잡 I · A · B ①②③ · resolveConcepts) + 유료 호출(LlmClient · EmbeddingClient · GuardedLlmClient · InputBudget) — worker · config 만 참조. 계층이 아니라 용도로 나눈다
+│   │   │   └── llm/                 # OpenAI 어댑터 — OpenAI SDK 는 여기에만
+│   │   └── worker/                  # 수령 루프 · 실행기 N 개 · 단계 실행 — config 만 참조
+│   ├── src/main/resources/
+│   │   ├── db/migration/            # Flyway 버전드 SQL(세션 테이블 포함)
+│   │   ├── prompts/v6/              # 운영 프롬프트 — 개발하며 새로 만든다. 명세는 03 §2~§6. 바꾸면 v7 로(금지 목록 18)
+│   │   └── (static/ 없음)           # 화면은 Vercel 에 따로 배포한다
+│   └── src/test/java/…              # 구현과 같은 패키지에 짝 테스트 · ArchUnit(+ archfixture 위반 픽스처) · Testcontainers · 장애 주입 · LLM 스텁
+├── compose.yaml                     # 로컬 Postgres(pgvector) + 서버 컨테이너 — 저장소 루트에서. 포트는 127.0.0.1 에만 연다
+├── .env.example                     # 로컬 백엔드 환경 변수 견본 — .env 는 커밋하지 않는다
 ├── frontend/                    # React + TypeScript · Vite — Vercel 에 정적 파일로 배포
 │   └── src/
 │       ├── pages/               # U1~U9 · P1 · P2 — 화면 하나에 파일 하나
@@ -42,30 +52,30 @@
 
 | 패턴 | 내용 | 상세 |
 |---|---|---|
-| **포트와 어댑터** | `core` 는 포트만 안다. `api` · `worker` · `infra` 가 `core` 를 참조하고 그 반대는 없다. 생성과 유료 호출 포트는 `core.generation` 에 모으고 `worker` · `infra` · 루트만 참조한다. **ArchUnit 이 첫 커밋부터 강제** | [04 §2](./04-jobs-and-cost.md#2-패키지-경계) |
+| **도메인별 패키지 · 표준 계층** | 도메인마다 Controller → Service → Repository 와 엔티티를 한 패키지에 두고, 그 안은 `controller` · `service` · `repository` · `domain` · `dto` 로 항상 나눈다. 생성과 유료 호출은 `generation` 에 모으고 `worker` · `config` 만 참조한다. `worker` 는 `config` 만 참조한다. **ArchUnit 이 첫 커밋부터 강제**(ADR-067) | [04 §2](./04-jobs-and-cost.md#2-패키지-경계) |
 | **잡 테이블이 큐** | `jobs` + `FOR UPDATE SKIP LOCKED`. 수령 한 문장이 FIFO · 동시 수령 방지 · 죽은 잡 회수 · 펜싱 회차 증가를 한다 | [04 §4](./04-jobs-and-cost.md#4-생성-작업--jobs-테이블이-큐다) |
 | **수령 회차 펜싱** | `jobs` 의 모든 쓰기는 명시적 SQL + `lease_epoch` 조건. `0 rows` 면 즉시 중단. JPA 엔티티가 아니다 | [04 §4.4](./04-jobs-and-cost.md) |
-| **드러낸 트랜잭션** | `@Transactional` 대신 `TransactionRunner` — LLM 호출 중에는 커넥션을 쥐지 않는다 | [04 §5](./04-jobs-and-cost.md) |
-| **감싼 LLM 호출** | `GuardedLlmClient` 가 재시도 · `usage` 기록 · 리스 갱신을 모든 호출에 똑같이. 포트는 1턴 단위 | [03 §8](./03-generation.md#8-llm-호출-규약) |
+| **LLM 경로의 드러낸 트랜잭션** | 일반 서비스는 `@Transactional`. LLM 을 부르는 `generation` · `worker` 는 `TransactionTemplate` 으로 짧게 끊고(ArchUnit 이 `@Transactional` 을 막는다) LLM 호출 중에는 커넥션을 쥐지 않는다. 호출을 사이에 둘 때는 엔티티 대신 ID · 값을 넘긴다 | [04 §5](./04-jobs-and-cost.md) |
+| **감싼 LLM 호출** | `GuardedLlmClient` 가 재시도 · `usage` 기록 · 리스 갱신을 모든 호출에 똑같이. `LlmClient` 는 1턴 단위 | [03 §8](./03-generation.md#8-llm-호출-규약) |
 | **독립적인 사용량 기록** | 채팅 · 임베딩 시도별 `llm_calls`. 사용량은 원장 행에 한 번만 확정하고(조건부 UPDATE) 일일 합계는 저장하지 않고 원장에서 더한다. 잡 결과 저장과는 분리. 리스를 잃어도 사용량을 기록한다 | [02 §6.8](./02-domain-data.md) |
 | **작업 전체 호출 상한** | 원장의 종류별 누적 등록 건수를 잡 행 잠금 안에서 검사. 재시작 · 사용자 재시도에도 유지하며, 미확인 호출도 몫을 쓴다 | [04 §4.8](./04-jobs-and-cost.md) |
 | **입력 예산 검사** | 재료 상한의 합으로 단계별 정적 최대 입력을 설계 때 계산하고, 요청마다 전체 요청의 UTF-8 바이트 수(토큰 수의 증명된 상계)를 등록 전에 확인. 초과는 전송하지 않으며, 검사한 요청을 그대로 보낸다 | [03 §8.7](./03-generation.md) |
 | **관련 숙련도 선별** | 주제/목적 임베딩 검색 + 키워드 검색. 사용자 학습 개념만 후보로 삼고, 선별한 ID의 숙련도를 예산 안에서 주입. 검색 근거는 생성 시점 스냅샷으로 보존 | [02 §5.4](./02-domain-data.md) |
 | **단계 산출물 저장** | 잡 B 는 ①②③ 단계마다 `payload` 저장 → 실패한 단계부터 재개 | [04 §4.6](./04-jobs-and-cost.md) |
 | **파생값은 저장하지 않는다** | 숙련도는 조회 때 계산, "생성 중 · 실패"는 잡으로 판단 | [02 §1 · §4](./02-domain-data.md) |
-| **역할 전환(비상용)** | 같은 jar 를 `app.role` = `all` · `api` · `worker` 로. 판단은 루트 설정의 빈 등록에서만 | [04 §3.1](./04-jobs-and-cost.md) |
+| **역할 전환(비상용)** | 같은 jar 를 `app.role` = `all` · `api` · `worker` 로. 판단은 `config` 의 빈 등록에서만 — 실행기는 컴포넌트 스캔으로 올리지 않는다 | [04 §3.1](./04-jobs-and-cost.md) |
 
 ## 데이터 흐름
 
 **로그인 — 회원당 외부 로그인 식별자 하나(ADR-066)**
 
 ```text
-구글 인증 완료 → api.auth: 검증된 등록과 응답을 ExternalAccount로 변환
-              → core.account.Login: 이메일 검증 · 허용 목록 검사
-              → TransactionRunner 안에서 users(provider, subject)로 조회
+구글 인증 완료 → auth: 검증된 등록과 응답을 ExternalAccount로 변환
+              → account.service.LoginService: 이메일 검증 · 허용 목록 검사(DB 접근 전)
+              → UserRepository.findByProviderAndSubject 로 조회
                   기존 회원: 기존 ID 반환, 계정 정보 보존
-                  신규 회원: 외부 식별자를 포함해 users 한 행 생성
-              → api.auth: 사용자 ID만 세션에 저장 · 화면으로 이동
+                  신규 회원: 외부 식별자를 포함해 users 한 행 저장
+              → auth: 사용자 ID만 세션에 저장 · 화면으로 이동
 ```
 
 서비스 회원 ID는 세션과 학습 데이터의 기준이다. 로그인 식별자는 `ExternalIdentity(provider, subject)`로 표현하고 회원 테이블의 복합 unique 제약으로 보호한다. `GoogleAccountMapper`가 구글 응답을 해석하며 현재 활성 제공자는 구글 하나다. V6는 기존 `google_sub`를 `subject`로 바꾸고 provider를 `google`로 채우면서 회원 정보와 ID 세션을 보존한다([02 §6.1](./02-domain-data.md)). 별도 연결 테이블은 두지 않는다.
@@ -74,7 +84,7 @@
 
 ```
 화면 → POST(커리큘럼 · 자료 · 재시도)
-     → api: 킬스위치 → 비용 쿼터 → 진행 중 2개(사용자 advisory lock) → jobs INSERT → 202 { jobId }
+     → job(컨트롤러 → 서비스, @Transactional): 킬스위치 → 비용 쿼터 → 진행 중 2개(사용자 advisory lock) → jobs INSERT → 202 { jobId }
      → 화면: GET /jobs/{id} 2초 폴링(TanStack Query)
 worker 실행기(빈손일 때만 1개 수령)
      → 단계마다: 짧은 트랜잭션으로 읽기 → LLM 호출(커넥션 없음 · 시도마다 리스 갱신) → 짧은 트랜잭션으로 산출물 저장

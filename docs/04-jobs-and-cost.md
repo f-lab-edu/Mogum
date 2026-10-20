@@ -11,10 +11,10 @@
 |---|---|---|---|
 | 언어 · 런타임 | **Java 21**(LTS) | Java 17 · Kotlin | — (1단계 하네스 · SDK 를 21 에서 검증했다) |
 | 프레임워크 | **Spring Boot 4 · Spring MVC** · 플랫폼 스레드 | WebFlux · 가상 스레드 | 초당 수만 건의 가벼운 요청 · 오래 기다리는 연결 수백 개 |
-| LLM | **OpenAI 공식 SDK + 자체 포트** | Spring AI · Anthropic | 프로바이더를 상시 여럿 지원해야 할 때 |
+| LLM | **OpenAI 공식 SDK + 자체 인터페이스(`LlmClient`)** | Spring AI · Anthropic | 프로바이더를 상시 여럿 지원해야 할 때 |
 | 저장소 | **PostgreSQL 하나 + pgvector** | MySQL + 벡터 DB · Redis | 개념 수십만 · 큐 초당 수백 건 |
 | 큐 | **`jobs` 테이블 + `FOR UPDATE SKIP LOCKED`** | Redis ZSET · Kafka | 초당 수백 건(hot row · VACUUM) |
-| DB 접근 | **Spring Data JPA 하나** — 도메인 테이블은 엔티티(`infra` 안)와 Spring Data 리포지토리로 조회 · 저장한다. 일반 CRUD와 메서드 이름으로 표현할 수 있는 조회는 Spring Data JPA를 우선 사용한다. Postgres 고유 기능(`SKIP LOCKED` · advisory lock · `ON CONFLICT` · `RETURNING` · 벡터 거리)과 `jobs` · `job_events` · `llm_calls` 쓰기는 `EntityManager` 네이티브 쿼리 | MyBatis · `JdbcClient` · jOOQ · QueryDSL | 동적 SQL(조건이 이리저리 붙는 검색)이 많아질 때 |
+| DB 접근 | **Spring Data JPA 하나** — 도메인 테이블은 엔티티와 Spring Data 리포지토리(각 도메인 패키지 안)로 조회 · 저장한다. 일반 CRUD와 메서드 이름으로 표현할 수 있는 조회는 Spring Data JPA를 우선 사용한다. Postgres 고유 기능(`SKIP LOCKED` · advisory lock · `ON CONFLICT` · `RETURNING` · 벡터 거리)과 `jobs` · `job_events` · `llm_calls` 쓰기는 `EntityManager` 네이티브 쿼리 | MyBatis · `JdbcClient` · jOOQ · QueryDSL | 동적 SQL(조건이 이리저리 붙는 검색)이 많아질 때 |
 | 마이그레이션 | Flyway | Liquibase | — |
 | 화면 | **React SPA**(TypeScript · Vite · React Router · TanStack Query · Tailwind) — 빌드 결과를 **Vercel** 에 정적 파일로. API 는 `api.` 서브도메인의 EC2 — 같은 사이트 · 다른 출처(ADR-060) | Spring Boot `static/` 에 넣어 jar 하나(ADR-007 — 대체) · Vercel rewrites 프록시 · Next.js(Node 서버 별도) · Thymeleaf | 검색 노출(SSR)이 필요해진다 · 화면과 API 를 같은 등록 도메인에 둘 수 없다 |
 | 경계 강제 | **단일 Gradle 모듈 + ArchUnit** | 멀티모듈 | 규칙이 버거워지거나 배포 단위가 갈릴 때 |
@@ -30,73 +30,90 @@
 
 ## 2. 패키지 경계
 
-`infra`의 도메인 전용 구현은 `infra.<도메인>` 아래에 모은다. 계정의 `UserEntity` · `JpaUserRepository`는 `infra.account`에 두고, 여러 도메인이 공유하는 `SpringTransactionRunner`는 `infra` 최상위에 둔다. 테스트도 대응하는 구현과 같은 패키지에 둔다.
+**도메인별 패키지 + 표준 Spring 계층(Controller → Service → Repository)이다**(ADR-067). 기능 하나의 컨트롤러 · 서비스 · 엔티티 · 리포지토리를 같은 도메인 패키지에 두고, 엔티티를 도메인 모델로 직접 쓴다. 서비스는 Spring Data 리포지토리를 바로 쓴다.
 
-계정의 `JpaUserRepository`는 `SpringDataUserRepository extends JpaRepository<UserEntity, Long>`에 조회 · 저장을 위임하고, 반환한 엔티티를 `User` record로 변환한다. Spring Data 인터페이스는 `infra.account` 내부에서만 사용한다. 호출자는 기존처럼 `TransactionRunner` 안에서 포트를 사용하며, Spring Data의 저장 · 조회는 호출자의 트랜잭션에 참여한다([Spring Data JPA 트랜잭션 규약](https://docs.spring.io/spring-data/jpa/reference/jpa/transactions.html)).
+**도메인 패키지 안은 항상 계층 하위 패키지로 나눈다** — 파일이 하나뿐인 하위 패키지도 만든다. 도메인마다 모양이 같아야 어디에 둘지 판단할 여지가 없다. 테스트는 대응하는 구현과 같은 하위 패키지에 둔다.
+
+| 하위 패키지 | 둘 것 |
+|---|---|
+| `controller` | `@RestController` |
+| `service` | `@Service` · 서비스 메서드의 입력 · 결과 타입(예: `ExternalAccount` · `LoginResult`) |
+| `repository` | Spring Data 리포지토리 · `EntityManager` 네이티브 쿼리 클래스 |
+| `domain` | `@Entity` · enum · 값 타입 · 도메인 규칙(`MasteryPolicy` 등) |
+| `dto` | HTTP 요청 · 응답 타입만 |
+
+`generation` 은 계층이 아니라 용도로 나눈다(`generation.llm` · 잡 종류별 — 해당 TASK 에서 정한다). `auth` · `config` · `common` · `worker` 는 계층 구분이 맞지 않는 기술 코드라 평평하게 둔다. 하위 패키지끼리 참조하므로 클래스와 그 생성자 · 메서드는 `public` 이다.
+
+| 패키지 | 책임 |
+|---|---|
+| 루트 `MogumApplication` | 진입점 · `@ConfigurationPropertiesScan` |
+| `config` | 설정 값(`WebProperties` · `AuthProperties`) · 시계 빈 · `app.role` 별 빈 등록(§3.1). `worker` · `generation` 을 조립하는 유일한 곳 |
+| `common` | 공통 오류 응답(`ApiError` · `ApiExceptionHandler` · `NotFoundException` → 404) · `SeoulClock` |
+| `auth` | Spring Security 설정 · 구글 OAuth 로그인 처리 · 세션 → 회원 필터 |
+| `account` | 회원 엔티티 · 리포지토리 · 로그인 서비스 · `/api/me` |
+| `curriculum` · `material` · `concept` · `review` … | 도메인마다 위 다섯 하위 패키지. `MasteryPolicy` 같은 도메인 규칙은 `domain` 에 둔다 |
+| `job` | 적재(검사 · 적재 · 재시도 · 처음부터 다시 만들기) · 잡 조회 API · `jobs` · `job_events` 네이티브 SQL(`job.repository`) |
+| `usage` | `llm_calls` 원장 기록 · 일일 합계(쿼터 · 킬스위치의 근거). 생성과 적재가 함께 쓰므로 `generation` 밖에 둔다 |
+| `generation` | 생성 유스케이스(잡 I · A · B ①②③ · `resolveConcepts`) + **유료 호출**(`LlmClient` · `EmbeddingClient` · `GuardedLlmClient` · `InputBudget`). OpenAI 어댑터는 `generation.llm` |
+| `worker` | 수령 루프 · 실행기 · 단계 실행 |
+
+```mermaid
+flowchart TD
+    CFG["config — 설정 · app.role 별 빈 등록"]
+    WK["worker — 수령 루프 · 실행기"]
+    GEN["generation — 생성 유스케이스 · 유료 호출<br/>generation.llm — OpenAI 어댑터"]
+    DOM["도메인 패키지 — auth · account · curriculum · material · concept · review · job · usage …<br/>Controller · Service · Entity · Repository"]
+    COM["common — 오류 응답 · 시계"]
+    CFG --> WK
+    CFG --> GEN
+    WK --> GEN
+    WK --> DOM
+    GEN --> DOM
+    DOM --> COM
+```
+
+**`generation` 을 참조할 수 있는 것은 자기 자신 · `worker` · `config` 뿐이다.** "컨트롤러는 안 된다" 가 아니라 "이것들만 된다" 로 적는다 — ArchUnit 은 직접 참조만 보므로, 컨트롤러 금지만 두면 `컨트롤러 → job → EmbeddingClient` 처럼 다른 도메인 패키지를 거친 유료 호출이 빌드를 통과한다. 유료 호출 클라이언트를 모두 이 패키지에 두면 새 클라이언트가 생겨도 규칙에 클래스 이름을 더할 필요가 없다. **`worker` 를 참조할 수 있는 것은 `config` 뿐이다** — 실행기는 역할에 따라 켜고 끄는 진입점이라 도메인이 부르지 않는다.
+
+**ArchUnit 규칙 — 첫 커밋에 쓴다.** 코드가 쌓인 뒤 붙이면 이미 깨져 있고, 그때는 규칙을 무르게 된다. 규칙마다 위반 픽스처(`backend/src/test/java/…/archfixture`)로 규칙이 실제로 걸리는지 확인한다.
+
+```java
+@Test void 생성은_worker만_부른다() {   // 1분짜리 요청 · 유료 호출이 요청 경로에 조용히 들어오는 것을 막는다 — job 을 거친 우회 포함
+    noClasses().that().resideOutsideOfPackages("..generation..", "..worker..", "..config..")
+        .should().dependOnClassesThat().resideInAPackage("..generation..").check(CLASSES);
+}
+@Test void worker를_부르는_곳은_config뿐이다() {
+    noClasses().that().resideOutsideOfPackages("..worker..", "..config..")
+        .should().dependOnClassesThat().resideInAPackage("..worker..").check(CLASSES);
+}
+@Test void LLM을_부르는_패키지는_Transactional을_쓰지_않는다() {   // §5 — 커넥션을 LLM 호출 너머로 끌고 가지 않게
+    noClasses().that().resideInAnyPackage("..generation..", "..worker..")
+        .should().beAnnotatedWith(SPRING_TRANSACTIONAL).orShould().beAnnotatedWith(JAKARTA_TRANSACTIONAL).check(CLASSES);
+    noMethods().that().areDeclaredInClassesThat().resideInAnyPackage("..generation..", "..worker..")
+        .should().beAnnotatedWith(SPRING_TRANSACTIONAL).orShould().beAnnotatedWith(JAKARTA_TRANSACTIONAL).check(CLASSES);
+}
+@Test void OpenAI_SDK는_LLM_어댑터에만_둔다() {
+    noClasses().that().resideOutsideOfPackage("..generation.llm..")
+        .should().dependOnClassesThat().resideInAPackage("com.openai..").check(CLASSES);
+}
+```
+
+역할 설명만 담은 `package-info.java`는 구현이 없는 패키지(`job` · `generation` · `worker`)의 자리를 남기는 데 사용하고, 구현이 생기면 지운다.
 
 **외부 인증과 회원 저장의 경계(ADR-066).** 별도 로그인 연결 테이블 없이 `users(provider, subject)`로 회원을 식별한다. 회원당 로그인 수단은 하나이며 현재 활성 제공자는 구글 하나다([02 §6.1](./02-domain-data.md)).
 
 | 위치 | 책임 |
 |---|---|
-| `core.account.User` | API와 업무에서 필요한 회원 스냅샷. 외부 식별자는 포함하지 않는다 |
-| `core.account.ExternalIdentity` | `(provider, subject)` 값. 회원 테이블의 로그인 식별자를 표현한다 |
-| `core.account.ExternalAccount` | 인증을 마친 외부 식별자·이메일·이메일 검증 여부를 전달하는 입력 |
-| `core.account.Login` | 이메일 검증·허용 목록 검사 후 외부 식별자로 조회 또는 신규 회원 생성. 재로그인 정보 보존 |
-| `core.account.UserRepository` | `findById` · `findByIdentity` · 외부 식별자를 포함한 회원 생성 |
-| `api.auth` | `GoogleAccountMapper`가 검증된 Google 등록과 응답을 해석하고 `OAuthLoginHandler`가 `Login` 호출 후 ID 세션 생성 |
-| `infra.account` | `UserEntity`의 provider·subject 매핑, Spring Data `findByProviderAndSubject`, 포트 어댑터. 트랜잭션 안에서 record로 변환 |
+| `account.domain.User` | 회원 엔티티(`users`). `provider` · `subject` 컬럼을 매핑하지만 getter 로 내놓지 않고 API 응답에도 넣지 않는다 |
+| `account.domain.ExternalIdentity` | `(provider, subject)` 값. 회원 테이블의 로그인 식별자를 표현한다 |
+| `account.service.ExternalAccount` | 인증을 마친 외부 식별자·이메일·이메일 검증 여부를 전달하는 로그인 입력 |
+| `account.service.LoginService` | 이메일 검증·허용 목록 검사(DB 접근 전) 후 `findByProviderAndSubject` 로 조회하거나 신규 회원 저장. 재로그인 정보 보존 |
+| `account.repository.UserRepository` | `JpaRepository<User, Long>` · `findByProviderAndSubject` |
+| `account.controller.MeController` · `account.dto.MeResponse` | `GET /api/me` |
+| `auth` | `GoogleAccountMapper`가 검증된 Google 등록과 응답을 해석하고 `OAuthLoginHandler`가 `LoginService` 호출 후 ID 세션 생성. `SessionUserFilter`가 요청마다 `users`에서 회원을 읽는다 |
+
+`LoginService` 는 메서드 전체에 `@Transactional` 을 붙이지 않는다 — 거절을 DB 접근 전에 하고([02 §6.1.1](./02-domain-data.md)), 조회와 저장은 Spring Data 리포지토리 메서드마다 짧은 트랜잭션이며, 동시 첫 로그인은 `(provider, subject)` unique 제약이 하나만 남긴다. 여러 행을 함께 바꾸는 서비스 메서드는 `@Transactional` 을 붙인다(§5).
 
 제공자 구분은 두 컬럼과 값 타입으로 표현한다. 별도 연결 모델·저장소·동적 제공자 탐색기는 만들지 않는다. 추가 제공자에는 인증 설정·응답 변환·이메일 신뢰 정책이 필요하며 복수 로그인 연결이 필요할 때 테이블 분리를 다시 검토한다. 현재 구글 경로·요청 쿠키·PKCE·토큰 폐기 정책은 유지한다.
-
-역할 설명만 담은 `package-info.java`는 구현이 없는 패키지의 자리를 남기는 데 사용한다. 구현이 있는 `core` · `api` · `infra`에서는 제거하고, 아직 구현이 없는 `core.job` · `core.generation` · `worker`에서는 유지한다.
-
-```mermaid
-flowchart TD
-    APP["루트 — Application · 설정 배선만"]
-    API["api — REST · 인증 · 검증"]
-    WK["worker — 수령 루프 · 실행기"]
-    INF["infra — JPA 엔티티 · 리포지토리 · 네이티브 쿼리 · OpenAI 어댑터 · pgvector"]
-    CORE["core — 도메인 · 유스케이스 · 포트"]
-    APP --> API
-    APP --> WK
-    APP --> INF
-    API --> CORE
-    WK --> CORE
-    INF --> CORE
-```
-
-| 패키지 | 책임 | 참조해도 되는 곳 |
-|---|---|---|
-| `core.<도메인>` | 도메인 모델(record) · 리포지토리 포트 · 도메인 규칙(`curriculum` · `concept` · `review` · `account` … — `MasteryPolicy` 포함). api 와 생성 쪽이 같이 쓴다 | `core` 최상위 |
-| `core.job` | 적재 유스케이스(검사 · 적재 · 재시도 · 처음부터 다시 만들기) | `core` (단 `core.generation` 제외) |
-| `core.generation` | 생성 유스케이스(잡 A · 잡 B ①②③ · `resolveConcepts`) + **유료 호출 포트와 감싸개**(`LlmClient` · `EmbeddingClient` · `GuardedLlmClient` · `InputBudget`) | `core` |
-| `core` 최상위 | 공통 포트 — `JobStore` · `UsageLedger` · `TransactionRunner` … | 없음 |
-| `infra` | 포트 구현 — **JPA 엔티티는 여기에만** · Spring Data 리포지토리 · `EntityManager` 네이티브 쿼리(`jobs` · `job_events` · `llm_calls` · 락 · `ON CONFLICT` · 벡터) · OpenAI 어댑터 | `core` |
-| `api` | 컨트롤러 · 인증 · DTO | `core` (단 `core.generation` 제외) |
-| `worker` | 수령 루프 · 실행기 · 단계 실행 | `core` |
-
-**`core.generation` 을 참조할 수 있는 것은 자기 자신 · `worker` · `infra` · 루트 설정뿐이다.** "api 는 안 된다" 가 아니라 "이것들만 된다" 로 적는다 — ArchUnit 은 직접 참조만 보므로, api 금지만 두면 `api → core.job → EmbeddingClient` 처럼 다른 core 패키지를 거친 유료 호출이 빌드를 통과한다. 유료 포트를 모두 이 패키지에 두면 새 포트가 생겨도 규칙에 클래스 이름을 더할 필요가 없다.
-
-**ArchUnit 규칙 — 첫 커밋에 쓴다.** 코드가 쌓인 뒤 붙이면 이미 깨져 있고, 그때는 규칙을 무르게 된다.
-
-```java
-@Test void 생성은_worker만_부른다() {   // 1분짜리 요청 · 유료 호출이 요청 경로에 조용히 들어오는 것을 막는다 — core.job 을 거친 우회 포함
-    noClasses().that().resideOutsideOfPackages("..core.generation..", "..worker..", "..infra..", "..mogum")   // 마지막은 루트 설정 배선
-        .should().dependOnClassesThat().resideInAPackage("..core.generation..").check(CLASSES);
-}
-@Test void api는_worker를_모른다()      { noClasses().that().resideInAPackage("..api..").should().dependOnClassesThat().resideInAPackage("..worker..").check(CLASSES); }
-@Test void api와_worker는_infra를_모른다() { noClasses().that().resideInAnyPackage("..api..", "..worker..").should().dependOnClassesThat().resideInAPackage("..infra..").check(CLASSES); }
-@Test void core는_바깥을_모른다()        { noClasses().that().resideInAPackage("..core..").should().dependOnClassesThat().resideInAnyPackage("..api..", "..worker..", "..infra..").check(CLASSES); }
-@Test void core는_인프라_기술을_모른다() {
-    noClasses().that().resideInAPackage("..core..").should().dependOnClassesThat().resideInAnyPackage(
-        "org.springframework.web..", "org.springframework.data..",
-        "org.springframework.transaction..",   // @Transactional 금지 — §5
-        "jakarta.persistence..",               // 엔티티는 infra 에만 — core 는 record 를 받는다(§5)
-        "com.openai..").check(CLASSES);
-}
-```
-
-`core` 가 써도 되는 것 — record · 포트 인터페이스 · `@Service`. 쓰면 안 되는 것 — JPA(`jakarta.persistence` — 엔티티는 `infra` 에만) · `@Transactional` · Spring Web · Spring Data · LLM SDK.
 
 ---
 
@@ -114,7 +131,7 @@ flowchart LR
 
 | | 로컬(Docker Compose) | 운영(AWS) |
 |---|---|---|
-| 구성 | 앱 · Postgres · LLM 스텁 · Prometheus · Grafana | 앱 · Postgres · 화면은 Vercel |
+| 구성 | 앱 · Postgres · LLM 스텁 · Prometheus · Grafana — **지금은 앱(`backend/Dockerfile` 이미지) · Postgres 만 있다**(ADR-069). LLM 스텁 · Prometheus · Grafana 는 쓰는 TASK 에서 더한다 | 앱 · Postgres · 화면은 Vercel. 앱 실행 방식(같은 이미지 · jar + systemd)은 `2-deploy` 에서 정한다 |
 | 관측 | Grafana | **관리자 화면 U6**(DB 만 읽는다) — 1GB 에 관측 스택을 올리면 앱이 죽는다 |
 | LLM | 스텁(테스트) · 실제 API(실사용 전 확인) | 실제 API |
 
@@ -146,7 +163,7 @@ java -jar app.jar --app.role=worker \
 | `api` | ✅ | ❌ | — |
 | `worker` | ❌ | ✅ | ✅ |
 
-- 구현은 루트 설정에서 빈 등록을 켜고 끄는 것뿐이다(`@ConditionalOnExpression` 등). 역할 판단을 `api` · `worker` · `core` 코드 안에 넣지 않는다.
+- 구현은 `config` 에서 빈 등록을 켜고 끄는 것뿐이다(`@ConditionalOnExpression` 등). 수령 루프 · 실행기 빈은 컴포넌트 스캔으로 올리지 않고 `config` 에서 등록한다 — 스캔으로 올리면 역할과 무관하게 항상 켜진다. 역할 판단을 컨트롤러 · 서비스 · `worker` · `generation` 코드 안에 넣지 않는다.
 - **이건 평소 기능이 아니라 비상용 배선이다.** *"트리거 없이 미리 만들지 않는다"* 의 예외로 둔 이유 — 비용이 수십 줄인데, 장애 때 *"코드를 고쳐 다시 배포"* 와 *"실행 인자만 바꾸기"* 의 차이가 크다.
 - 나누는 조건 — **워커가 API 응답을 느리게 만드는 것이 관측될 때**(예: 복습 조회 지연이 생성 중에만 튄다). 프로세스를 나누는 실험(격리 측정)은 하지 않는다.
 
@@ -294,7 +311,7 @@ DB 처리 최대 지연에는 원장 등록 · 결과 기록 · 리스 갱신의
 
 ### 4.4 `jobs` 는 JPA 엔티티가 아니다 — 쓰기는 전부 명시적 SQL
 
-수령 회차인 `lease_epoch` 은 수령 · 반납 때 바뀌며 일반적인 행 버전과 역할이 다르다. 실행 권한 조건과 상태 전이를 SQL 에 명시하려고 `jobs` 는 엔티티로 매핑하지 않고 `infra` 가 `EntityManager` 네이티브 쿼리로 다루며 `core` 는 `JobStore` 포트만 안다. 엔티티가 아니므로 Spring Data 리포지토리도 만들지 않는다. `llm_calls` 의 조건부 확정과 일일 합계 조회도 명시적 SQL 로 처리한다(합계는 저장하지 않는다). 도메인 테이블은 JPA 그대로다.
+수령 회차인 `lease_epoch` 은 수령 · 반납 때 바뀌며 일반적인 행 버전과 역할이 다르다. 실행 권한 조건과 상태 전이를 SQL 에 명시하려고 `jobs` 는 엔티티로 매핑하지 않고 `job` 패키지의 저장 클래스가 `EntityManager` 네이티브 쿼리로 다룬다. 엔티티가 아니므로 Spring Data 리포지토리도 만들지 않는다. `llm_calls` 의 조건부 확정과 일일 합계 조회도 명시적 SQL 로 처리한다(합계는 저장하지 않는다). 도메인 테이블은 JPA 그대로다.
 
 | 쓰기 | 조건 | `0 rows` 면 |
 |---|---|---|
@@ -328,7 +345,7 @@ DB 처리 최대 지연에는 원장 등록 · 결과 기록 · 리스 갱신의
 |---|---|---|
 | `spring.lifecycle.timeout-per-shutdown-phase` | 130초(유예 + 여유) | 기본 30초에 Spring 이 기다림을 끊는다 |
 | `server.shutdown` | `graceful` | 진행 중 API 요청이 끊긴다(새 요청은 받지 않는다) |
-| 프로세스 관리자의 강제 종료 대기 | 150초 이상 — systemd `TimeoutStopSec` · Docker `stop_grace_period` | **Docker 기본 10초 · systemd 기본 90초 뒤 SIGKILL** — 기다리는 도중 강제로 죽어 `kill -9` 경로(리스 만료 회수)가 된다 |
+| 프로세스 관리자의 강제 종료 대기 | 150초 이상 — systemd `TimeoutStopSec` · Docker `stop_grace_period`(로컬 `compose.yaml` 은 150초로 둔다. 이미지는 exec 형식 `ENTRYPOINT` 라 java 가 SIGTERM 을 직접 받는다) | **Docker 기본 10초 · systemd 기본 90초 뒤 SIGKILL** — 기다리는 도중 강제로 죽어 `kill -9` 경로(리스 만료 회수)가 된다 |
 
 **대가** — 서버가 한 대라 배포 중 중단 시간이 하던 호출의 남은 시간만큼(최대 약 2분) 늘어난다. 사람이 적은 시간에 배포한다. 백오프 대기 중이던 실행기는 기다리지 않고 바로 반납한다. 무중단 배포는 공개 후에 넣는다(ADR-061).
 
@@ -394,18 +411,21 @@ DB 처리 최대 지연에는 원장 등록 · 결과 기록 · 리스 갱신의
 1분짜리 응답을 기다리며 커넥션을 쥐면 풀이 금방 마르고 **복습 조회까지 멈춘다.**
 
 ```java
-var ctx    = tx.inTransaction(() -> load(jobId));   // 커밋 · 반납
-var result = llmClient.call(ctx);                    // 커넥션 없음
-             tx.inTransaction(() -> save(result));   // 커밋 · 반납
+// generation · worker — TransactionTemplate 으로 경계를 드러낸다
+var ctx    = tx.execute(status -> load(jobId));                 // 커밋 · 반납. 엔티티가 아니라 값(record)을 꺼낸다
+var result = llmClient.call(ctx);                               // 커넥션 없음
+             tx.executeWithoutResult(status -> save(jobId, result));   // ID 로 다시 읽어 바꾸고 커밋 · 반납
 ```
 
-- `core` 는 `@Transactional` 대신 **`TransactionRunner` 포트**를 쓴다(구현은 `TransactionTemplate`) — 어노테이션은 경계를 메서드 뒤에 숨겨 커넥션을 LLM 호출 너머로 끌고 간다. 덤으로 self-invocation 프록시 함정이 없다.
-- 대가 — 트랜잭션 밖 엔티티는 detached 다. 바꿔도 저장되지 않고(예외도 없다), 지연 로딩에서 `LazyInitializationException` 이 난다. 그래서 **JPA 엔티티는 `infra` 안에만 두고, 리포지토리 포트는 트랜잭션 안에서 엔티티를 완전히 채운 record 로 바꿔 돌려준다.** `core` 는 엔티티를 만지지 않는다. `spring.jpa.open-in-view=false`.
+- **컨트롤러가 부르는 일반 서비스는 `@Transactional` 을 쓴다.** 요청 하나가 수 ms~수십 ms 라 메서드 경계가 곧 트랜잭션 경계여도 된다. 리포지토리 메서드 하나로 끝나는 일은 Spring Data 리포지토리의 트랜잭션으로 충분하다. 이 서비스들은 `generation` 을 참조할 수 없으므로(§2) LLM 을 부를 수 없다.
+- **LLM 을 부르는 `generation` · `worker` 는 `@Transactional` 대신 `TransactionTemplate` 을 쓴다** — 어노테이션은 경계를 메서드 뒤에 숨겨 커넥션을 LLM 호출 너머로 끌고 가기 쉽고, 같은 클래스 안 호출(self-invocation)에서는 프록시를 거치지 않아 조용히 빠진다. ArchUnit 이 두 패키지의 `@Transactional` 을 막는다(§2).
+- **LLM 호출을 사이에 둘 때는 엔티티 대신 ID 나 값(record)을 넘기고 다음 트랜잭션에서 다시 읽는다.** 트랜잭션 밖 엔티티는 detached 다 — 바꿔도 저장되지 않고(예외도 없다), 지연 로딩에서 `LazyInitializationException` 이 난다. 앞 트랜잭션에서 필요한 값을 record 로 꺼내 LLM 에 넘기고, 결과 저장 트랜잭션에서 엔티티를 ID 로 다시 조회해 바꾼다. `spring.jpa.open-in-view=false`.
 - **JPA 와 네이티브 쿼리를 한 트랜잭션에서 섞을 때는 `flush()` 를 명시한다.** 엔티티 변경은 flush 때까지 미뤄지므로, JPA 로 바꾼 행을 같은 트랜잭션에서 네이티브 쿼리로 읽거나 참조하기 전에 flush 한다. 네이티브 쿼리 앞의 자동 flush 동작에 기대지 않는다.
 
 ```java
-tx.inTransaction(() -> {
-    lessonEntity.markReady();       // JPA — UPDATE 는 flush 때까지 미뤄진다
+tx.executeWithoutResult(status -> {
+    var lesson = lessons.findById(lessonId).orElseThrow();
+    lesson.markReady();             // JPA — UPDATE 는 flush 때까지 미뤄진다
     em.flush();                     // 명시 — 없으면 아래 네이티브 쿼리가 옛 값을 볼 수 있다
     em.createNativeQuery("SELECT status FROM lessons WHERE id = ?1")...;
 });

@@ -293,7 +293,7 @@ COMMIT;
 
 **`UNIQUE(provider, subject)`**로 외부 계정 하나당 회원 하나를 보장한다. 서로 다른 제공자의 같은 `subject`는 서로 다른 계정이다. 회원당 로그인 수단은 하나이며 별도 연결 테이블은 두지 않는다. 현재 활성 제공자는 구글 하나다. 추가 제공자의 인증 설정·응답 변환·이메일 신뢰 정책은 해당 기능에서 구현하며, 저장 모델의 제공자 구분 테스트가 실제 로그인을 활성화하는 것은 아니다. 복수 로그인 연결·해제·계정 병합은 범위 밖이다.
 
-`User` record는 API와 업무에 필요한 회원 정보의 스냅샷이며 외부 식별자를 포함하지 않는다. `ExternalIdentity(provider, subject)`는 저장소 조회·생성에 사용한다. 세션과 학습 데이터의 기준은 계속 `users.id`다. 이메일은 로그인 키나 자동 병합 근거가 아니며 원본 프로필과 구글 접근/ID 토큰은 보관하지 않는다.
+`User`는 `users`를 매핑한 회원 엔티티다. `provider`·`subject` 컬럼을 매핑하지만 getter로 내놓지 않고 사용자 API 응답에도 넣지 않는다. `ExternalIdentity(provider, subject)`는 로그인 입력과 회원 생성에 사용하고, 조회는 `UserRepository.findByProviderAndSubject`로 한다. 세션과 학습 데이터의 기준은 계속 `users.id`다. 이메일은 로그인 키나 자동 병합 근거가 아니며 원본 프로필과 구글 접근/ID 토큰은 보관하지 않는다.
 
 **재로그인은 계정 정보를 변경하지 않는다.** 같은 `(provider, subject)`의 회원이 있으면 기존 ID로 로그인하고 이메일·역할·상태·약관·가입 시각을 보존한다. 이번 인증 이메일과 관리자 목록은 로그인 허용 여부를 확인하는 데 사용하며 저장된 역할은 덮어쓰지 않는다. 이메일·역할 변경은 별도의 명시적 변경 절차에서 수행한다.
 
@@ -301,9 +301,9 @@ COMMIT;
 
 #### 6.1.1 로그인 · 가입 불변조건
 
-1. `api.auth.GoogleAccountMapper`가 검증된 Google 등록과 응답을 `ExternalAccount(ExternalIdentity(provider, subject), email, emailVerified)`로 변환한다. `provider`는 요청 매개변수·원본 프로필에서 믿지 않고 검증된 서버 등록으로 정한다. 현재 매퍼는 구글만 수락한다. `core.account`는 Spring Security 타입·OAuth 토큰·원본 응답을 알지 않는다.
+1. `auth.GoogleAccountMapper`가 검증된 Google 등록과 응답을 `ExternalAccount(ExternalIdentity(provider, subject), email, emailVerified)`로 변환한다. `provider`는 요청 매개변수·원본 프로필에서 믿지 않고 검증된 서버 등록으로 정한다. 현재 매퍼는 구글만 수락한다. `account`는 Spring Security 타입·OAuth 토큰·원본 응답을 알지 않는다.
 2. 이메일 검증·관리자 허용 목록 검사는 DB 접근 전에 수행한다. 허용 여부는 이번 인증 이메일로 확인하며 기존 이메일을 바꾸지 않는다.
-3. `TransactionRunner` 안에서 `UserRepository.findByIdentity`로 조회한다. 있으면 기존 ID를 반환하고 회원을 쓰지 않는다. 없으면 식별자와 신규 이메일·초기 역할·상태·가입 시각을 한 행에 저장한다. 이메일이 같은 기존 회원을 자동 병합하지 않는다.
+3. `LoginService`가 `UserRepository.findByProviderAndSubject`로 조회한다. 있으면 기존 ID를 반환하고 회원을 쓰지 않는다. 없으면 식별자와 신규 이메일·초기 역할·상태·가입 시각을 한 행에 저장한다. 이메일이 같은 기존 회원을 자동 병합하지 않는다.
 4. 같은 외부 식별자의 동시 첫 로그인은 복합 unique 제약으로 회원 하나만 남긴다. 충돌 요청은 실패해도 되며 다음 로그인은 기존 회원을 찾는다. 추가 잠금·자동 재시도는 넣지 않는다.
 5. 세션에는 `users.id`만 저장하고 상태·역할은 요청마다 DB에서 읽는다. 외부 식별자는 사용자 API 응답에 추가하지 않는다. 탈퇴 시 식별자도 회원 행과 함께 삭제한다.
 
@@ -684,7 +684,7 @@ SELECT c.id, c.name, c.definition,
  ORDER BY c.id;
 ```
 
-- `fsrs:1.0.0` 기본 파라미터 기준 `:factor = 0.6935087808430285` · `:decay = -0.2` (`DECAY = -parameters[20]`, `FACTOR = 0.9^(1/DECAY) - 1`). `src/test/java/com/mogum/learning/FsrsLibraryLearningTest.java` 에서 라이브러리 상수와 정수 경과일의 공식 일치를 고정한다.
+- `fsrs:1.0.0` 기본 파라미터 기준 `:factor = 0.6935087808430285` · `:decay = -0.2` (`DECAY = -parameters[20]`, `FACTOR = 0.9^(1/DECAY) - 1`). `backend/src/test/java/com/mogum/learning/FsrsLibraryLearningTest.java` 에서 라이브러리 상수와 정수 경과일의 공식 일치를 고정한다.
 - 경과 시간은 **실제 경과 시간(소수 일)** 이다(§8.1). FSRS 라이브러리의 `R` 계산은 경과일을 정수로 잘라(`1.0.0` — `ChronoUnit.DAYS`) 같은 날 안에서는 값이 다르다. 숙련도는 읽기 전용 집계라 복습 일정(라이브러리가 정한다)에는 영향이 없다. 공식 · 상수의 일치는 정수 경과일에서 테스트한다([07 §1.2](./07-testing.md)). *(2026-10-12 사용자 결정 — 정수 일로 자르는 안을 대신했다)*
 - 학습 완료한 카드가 전부 미복습인 개념도 결과에 남는다(`r=NULL` · `s=NULL` · `min_review_count=0`). 집계 대상 카드가 없는 개념과 구분한다.
 - 복습한 카드와 미복습 카드가 섞여 있으면 평균은 복습한 카드로만 계산하고 `min_review_count=0` 으로 생략을 막는다. `loadUserMastery` 와 `lookupMastery` 는 같은 집계 규칙을 쓴다.

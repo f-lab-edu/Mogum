@@ -1,6 +1,6 @@
 이 프로젝트의 변경 사항을 리뷰하라. 인자로 task 이름이 오면(`$ARGUMENTS`) `phases/$ARGUMENTS/` 의 phase 를, 없으면 현재 브랜치를 리뷰한다.
 
-구현은 Codex 가 했다. 너는 리뷰만 한다 — 제품 코드(`src/` · `frontend/`)를 직접 고치지 않는다.
+구현은 Codex 가 했다. 너는 리뷰만 한다 — 제품 코드(`backend/` · `frontend/`)를 직접 고치지 않는다.
 
 먼저 다음 문서들을 읽어라:
 - `AGENTS.md` (금지 목록 · 작업 방식)
@@ -13,12 +13,12 @@
 
 ## 체크리스트
 
-1. **아키텍처 준수**: `core` ← `api` · `worker` · `infra` 경계, `core.generation` 참조 제한(금지 목록 1 · 2)을 지키는가?
+1. **아키텍처 준수**: 도메인별 패키지 구조와 그 안의 `controller` · `service` · `repository` · `domain` · `dto` 하위 패키지(ADR-067), `generation` · `worker` 참조 제한 · OpenAI SDK 위치 · `generation` · `worker` 의 `@Transactional` 금지 · LLM 호출을 사이에 둔 엔티티 전달 금지(금지 목록 1~4)를 지키는가?
 2. **기술 스택 준수**: `docs/ADR.md` 기술 선택과 `docs/01-overview.md §6` 제외 항목(금지 목록 5)을 벗어나지 않았는가?
 3. **테스트 존재**: 새 기능에 테스트가 먼저 작성되어 있는가(TDD)? 실제 LLM 호출 테스트가 기본 실행에 섞이지 않았는가?
 4. **금지 목록**: `AGENTS.md` 금지 목록 1~27 중 이 변경이 건드리는 항목을 위반하지 않았는가? 해당 항목 번호를 적는다.
 5. **문서 일치 · 최신화**: 설계와 다르게 간 곳에서 `docs/` 를 먼저 고쳤는가? step 사이에 어긋난 곳은 없는가? 이 변경으로 바뀐 사실이 문서에 반영됐는가 — 버전 · 경로 · 명령어(`AGENTS.md`) · 디렉터리 구조(`docs/ARCHITECTURE.md`) · 🅿️ 값(`docs/PRD.md`) · "구현 · 검증은 아직" 표기(ADR · 01~07) · 진행(SCHEDULE §6 · `docs/01-overview.md` §10)? 화면이 바뀌었으면 — step 에 적힌 시안과 영역 · 문구 · 가장 강조가 맞는가(`docs/design/README.md` 「어디까지 맞추나」), 시안과 일부러 다르게 간 곳이 그 README 「문서와 다른 곳」 에 있는가?
-6. **빌드 가능**: `./gradlew build` · `npm --prefix frontend run lint` · `npm --prefix frontend run test` 가 통과하는가? (해당하는 것만)
+6. **빌드 가능**: `./backend/gradlew -p backend build` · `npm --prefix frontend run lint` · `npm --prefix frontend run test` 가 통과하는가? (해당하는 것만)
 
 ## 출력 형식
 

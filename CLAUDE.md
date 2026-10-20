@@ -18,7 +18,7 @@
     - 찾은 것은 근거(phase · step · 수치 · 로그 위치)와 함께 `phases/HARNESS-BACKLOG.md` 에 바로 적는다. 반복되는 step 작성 교훈은 `/harness` C 의 설계 원칙으로 올린다.
     - 고치는 것은 사용자 확인 뒤, `main` 에서 딴 별도 브랜치에서 테스트부터 쓴다. 실행 중인 phase 브랜치에서 하네스를 고치지 않는다. 실행 중에 step 파일을 고쳐야 하면 `harness-stop` 으로 멈춘 뒤 고친다(`/harness` E).
     - step 리뷰어(`claude -p`)는 이 일을 하지 않는다 — step 판정에 하네스 의견을 섞지 않는다.
-- `src/` · `frontend/` 의 제품 코드는 직접 고치지 않는다 — 사용자가 직접 요청한 경우만 예외. `docs/` · `phases/` · 하네스(`scripts/` · `.claude/` · `.codex/`)는 고친다.
+- `backend/` · `frontend/` 의 제품 코드는 직접 고치지 않는다 — 사용자가 직접 요청한 경우만 예외. `docs/` · `phases/` · 하네스(`scripts/` · `.claude/` · `.codex/`)는 고친다.
 
 ## 포트폴리오 · 이력서 기록
 
