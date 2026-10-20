@@ -2,6 +2,7 @@ package com.mogum.infra.account;
 
 import com.mogum.core.TransactionRunner;
 import com.mogum.core.account.User;
+import com.mogum.core.account.ExternalIdentity;
 import com.mogum.core.account.UserRepository;
 import com.mogum.core.account.UserRole;
 import com.mogum.core.account.UserStatus;
@@ -56,7 +57,7 @@ class JpaUserRepositoryIT extends PostgresTestConfiguration {
         var failure = new IllegalStateException("rollback user creation");
 
         var actual = assertThrows(IllegalStateException.class, () -> transactions.inTransaction(() -> {
-            var saved = repository.create(email, UserStatus.ACTIVE, UserRole.ADMIN, now);
+            var saved = repository.create(new ExternalIdentity("google", "Sub-" + UUID.randomUUID()), email, UserStatus.ACTIVE, UserRole.ADMIN, now);
             ids.add(saved.id());
             assertTrue(saved.id() > 0);
             throw failure;
@@ -75,6 +76,48 @@ class JpaUserRepositoryIT extends PostgresTestConfiguration {
         assertEquals(first.email(), second.email());
     }
 
+    @Test
+    void 외부_식별자는_원문으로_조회하며_중복과_빈값을_거절한다() {
+        String sub = " Sub-" + UUID.randomUUID() + " ";
+        var identity = new ExternalIdentity("google", sub);
+        assertTrue(transactions.inTransaction(() -> repository.findByIdentity(identity)).isEmpty());
+        var saved = transactions.inTransaction(() -> repository.create(identity, email, UserStatus.ACTIVE, UserRole.ADMIN, now));
+        ids.add(saved.id());
+        assertEquals(saved, transactions.inTransaction(() -> repository.findByIdentity(identity).orElseThrow()));
+        assertTrue(transactions.inTransaction(() -> repository.findByIdentity(new ExternalIdentity("google", sub.strip()))).isEmpty());
+        assertTrue(transactions.inTransaction(() -> repository.findByIdentity(new ExternalIdentity("google", sub.toLowerCase(java.util.Locale.ROOT)))).isEmpty());
+        var duplicate = assertThrows(RuntimeException.class, () -> transactions.inTransaction(() ->
+                repository.create(identity, email, UserStatus.ACTIVE, UserRole.ADMIN, now)));
+        assertSqlState("23505", duplicate);
+        for (String blank : java.util.List.of("", "  ", "\t\n")) {
+            var invalid = assertThrows(RuntimeException.class, () -> transactions.inTransaction(() ->
+                    repository.create(new ExternalIdentity("google", blank), email, UserStatus.ACTIVE, UserRole.ADMIN, now)));
+            assertSqlState("23514", invalid);
+        }
+        for (String blank : java.util.List.of("", "  ", "\t\n")) {
+            var invalid = assertThrows(RuntimeException.class, () -> transactions.inTransaction(() ->
+                    repository.create(new ExternalIdentity(blank, sub), email, UserStatus.ACTIVE, UserRole.ADMIN, now)));
+            assertSqlState("23514", invalid);
+        }
+        assertEquals(saved, transactions.inTransaction(() -> repository.findByIdentity(identity).orElseThrow()));
+    }
+
+    @Test
+    void 제공자가_다르면_같은_subject도_별도_회원이다() {
+        String subject = "shared-" + UUID.randomUUID();
+        var google = new ExternalIdentity("google", subject);
+        var other = new ExternalIdentity("other-provider", subject);
+        assertTrue(transactions.inTransaction(() -> repository.findByIdentity(other)).isEmpty());
+        var first = transactions.inTransaction(() -> repository.create(google, email, UserStatus.ACTIVE, UserRole.USER, now));
+        ids.add(first.id());
+        assertTrue(transactions.inTransaction(() -> repository.findByIdentity(other)).isEmpty());
+        var second = transactions.inTransaction(() -> repository.create(other, email, UserStatus.ACTIVE, UserRole.USER, now));
+        ids.add(second.id());
+        assertNotEquals(first.id(), second.id());
+        assertEquals(first, transactions.inTransaction(() -> repository.findByIdentity(google).orElseThrow()));
+        assertEquals(second, transactions.inTransaction(() -> repository.findByIdentity(other).orElseThrow()));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"status", "role"})
     void CHECK가_허용하지_않은_상태와_역할을_거절한다(String column) {
@@ -88,7 +131,7 @@ class JpaUserRepositoryIT extends PostgresTestConfiguration {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"email", "status", "role", "created_at"})
+    @ValueSource(strings = {"provider", "subject", "email", "status", "role", "created_at"})
     void 필수_컬럼은_NULL을_거절한다(String column) {
         var saved = create();
         var failure = assertThrows(RuntimeException.class, () -> transactions.inTransaction(() -> {
@@ -127,7 +170,7 @@ class JpaUserRepositoryIT extends PostgresTestConfiguration {
     }
 
     private User create() {
-        var user = transactions.inTransaction(() -> repository.create(email, UserStatus.ACTIVE, UserRole.ADMIN, now));
+        var user = transactions.inTransaction(() -> repository.create(new ExternalIdentity("google", "Sub-" + UUID.randomUUID()), email, UserStatus.ACTIVE, UserRole.ADMIN, now));
         ids.add(user.id());
         return user;
     }

@@ -7,5 +7,7 @@ import java.util.Optional;
 public interface UserRepository {
     Optional<User> findById(long id);
 
-    User create(String email, UserStatus status, UserRole role, Instant createdAt);
+    Optional<User> findByIdentity(ExternalIdentity identity);
+
+    User create(ExternalIdentity identity, String email, UserStatus status, UserRole role, Instant createdAt);
 }

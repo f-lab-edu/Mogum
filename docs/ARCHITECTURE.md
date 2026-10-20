@@ -57,18 +57,18 @@
 
 ## 데이터 흐름
 
-**로그인 — 회원/외부 식별자 분리(ADR-064)**
+**로그인 — 회원당 외부 로그인 식별자 하나(ADR-066)**
 
 ```text
-구글 인증 완료 → api.auth: 검증된 클라이언트 등록과 구글 응답을 ExternalAccount로 변환
+구글 인증 완료 → api.auth: 검증된 등록과 응답을 ExternalAccount로 변환
               → core.account.Login: 이메일 검증 · 허용 목록 검사
-              → TransactionRunner 안에서 user_identities(provider, subject) 조회
-                  기존 연결: users 조회, 계정 정보 보존
-                  신규 연결: users와 user_identities를 같은 트랜잭션으로 생성
-              → api.auth: 기존 방식으로 사용자 ID만 세션에 저장 · 화면으로 이동
+              → TransactionRunner 안에서 users(provider, subject)로 조회
+                  기존 회원: 기존 ID 반환, 계정 정보 보존
+                  신규 회원: 외부 식별자를 포함해 users 한 행 생성
+              → api.auth: 사용자 ID만 세션에 저장 · 화면으로 이동
 ```
 
-`User`와 학습 데이터의 기준은 서비스 사용자 ID다. 제공자 고유 식별자는 `UserIdentity` / `user_identities`로 분리한다([02 §6.1](./02-domain-data.md)). `GoogleAccountMapper`가 제공자 응답을 해석하고 `OAuthLoginHandler`가 공통 `Login`을 호출한다. V4 마이그레이션이 기존 회원 정보와 ID 세션을 보존하며 구글 식별자를 이전한다. 현재 활성 제공자는 구글 하나다.
+서비스 회원 ID는 세션과 학습 데이터의 기준이다. 로그인 식별자는 `ExternalIdentity(provider, subject)`로 표현하고 회원 테이블의 복합 unique 제약으로 보호한다. `GoogleAccountMapper`가 구글 응답을 해석하며 현재 활성 제공자는 구글 하나다. V6는 기존 `google_sub`를 `subject`로 바꾸고 provider를 `google`로 채우면서 회원 정보와 ID 세션을 보존한다([02 §6.1](./02-domain-data.md)). 별도 연결 테이블은 두지 않는다.
 
 **생성 — 전부 비동기**
 

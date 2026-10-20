@@ -89,7 +89,7 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
                 .addFilters(context.getBean("springSessionRepositoryFilter", jakarta.servlet.Filter.class))
                 .apply(springSecurity()).build();
         testSessions = new TestSessions(sessions);
-        user = transactions.inTransaction(() -> users.create("session@example.com", UserStatus.ACTIVE, UserRole.ADMIN, Instant.now()));
+        user = transactions.inTransaction(() -> users.create(new com.mogum.core.account.ExternalIdentity("google", "session-" + java.util.UUID.randomUUID()), "session@example.com", UserStatus.ACTIVE, UserRole.ADMIN, Instant.now()));
     }
 
     @AfterEach

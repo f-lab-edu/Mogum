@@ -9,7 +9,6 @@
 
 ```mermaid
 erDiagram
-    USERS             ||--o{ USER_IDENTITIES    : "외부 로그인 식별자 연결"
     USERS             ||--o{ CURRICULUMS        : "소유"
     USERS             ||--o{ CURRICULUM_GROUPS  : "전체 목표 소유"
     CURRICULUM_GROUPS ||--o{ CURRICULUM_STEPS   : "분할안 · 순서"
@@ -279,54 +278,41 @@ COMMIT;
 
 ### 6.1 `users`
 
-> **2026-10-19 구현 · 검증 완료(ADR-064).** `V4__separate_user_identities.sql`로 기존 `users.google_sub`를 `user_identities`로 이전했다. 구글 로그인만 제공하는 현재 범위와 화면/API 동작은 유지한다.
+> **2026-10-20 구현·검증 완료(ADR-066).** 회원당 로그인 수단 하나를 `users(provider, subject)`에 저장한다. V1~V5 이력은 보존하고 `V6__generalize_user_login_identity.sql`로 구글 전용 컬럼을 일반화했다. V3/V4/V5 이전과 기존 세션 보존을 포함해 전체 서버 테스트 192개가 통과했다.
 
 | 컬럼 | 타입 | 비고 |
 |---|---|---|
-| `id` | `bigserial` PK | 서비스 사용자 식별자. 학습 데이터 · 비용 · 세션의 기준이며 외부 로그인 제공자가 바뀌어도 유지한다 |
-| `email` | `text` **NOT NULL** | 가입 시 이메일 · 표시용. 재로그인으로 바꾸지 않는다 |
+| `id` | `bigserial` PK | 서비스 사용자 식별자. 학습 데이터 · 비용 · 세션의 기준 |
+| `provider` | `text` **NOT NULL** | 서버가 검증한 로그인 제공자. 현재 활성 값은 `google`. 빈 값 금지 |
+| `subject` | `text` **NOT NULL** | 제공자가 발급한 계정 식별자. 빈 값 금지. 대소문자 변경 · 공백 보정 없이 원문 보존 |
+| `email` | `text` **NOT NULL** | 가입 시 이메일 · 표시용. 재로그인으로 바꾸지 않으며 unique 제약도 두지 않는다 |
 | `status` | `text` **NOT NULL** | CHECK: `PENDING`(약관 전) / `ACTIVE` / `WAITLISTED` |
-| `role` | `text` **NOT NULL** | CHECK: `USER` / `ADMIN` — 신규 가입 시 관리자 이메일 목록으로 초기값을 정하고, 재로그인에서는 저장된 값을 유지한다 |
+| `role` | `text` **NOT NULL** | CHECK: `USER` / `ADMIN` — 신규 가입 시 관리자 이메일 목록으로 초기값을 정하고 재로그인에서는 저장된 값 유지 |
 | `terms_agreed_at` · `terms_version` | `timestamptz` · `text` | 약관 버전이 바뀌면 다시 동의 |
 | `created_at` | `timestamptz` **NOT NULL** | 대기 명단 순서 |
 
-**회원과 로그인 식별자의 책임을 분리한다.** `users`에는 외부 제공자의 ID · 원본 프로필 · 토큰을 두지 않는다. 이메일은 회원 정보이며 외부 계정의 식별 키나 자동 연결 근거로 사용하지 않는다. 이메일 unique 제약도 추가하지 않는다.
+**`UNIQUE(provider, subject)`**로 외부 계정 하나당 회원 하나를 보장한다. 서로 다른 제공자의 같은 `subject`는 서로 다른 계정이다. 회원당 로그인 수단은 하나이며 별도 연결 테이블은 두지 않는다. 현재 활성 제공자는 구글 하나다. 추가 제공자의 인증 설정·응답 변환·이메일 신뢰 정책은 해당 기능에서 구현하며, 저장 모델의 제공자 구분 테스트가 실제 로그인을 활성화하는 것은 아니다. 복수 로그인 연결·해제·계정 병합은 범위 밖이다.
 
-**재로그인은 계정 정보를 변경하지 않는다.** 같은 `(provider, subject)`에 연결된 사용자가 있으면 기존 ID로 로그인하고 이메일 · 역할 · 상태 · 약관 · 가입 시각을 모두 보존한다. 외부 응답의 이메일이나 관리자 목록이 달라져도 저장된 이메일 · 역할을 덮어쓰지 않는다. 이메일 · 역할 변경은 로그인과 분리된 명시적 변경 절차에서만 수행한다(사용자 결정, 2026-10-18).
+`User` record는 API와 업무에 필요한 회원 정보의 스냅샷이며 외부 식별자를 포함하지 않는다. `ExternalIdentity(provider, subject)`는 저장소 조회·생성에 사용한다. 세션과 학습 데이터의 기준은 계속 `users.id`다. 이메일은 로그인 키나 자동 병합 근거가 아니며 원본 프로필과 구글 접근/ID 토큰은 보관하지 않는다.
 
-**세션 테이블** — `spring_session` · `spring_session_attributes`(Spring Session JDBC 의 스키마). 프레임워크가 쓰는 테이블이지만 **Flyway 마이그레이션에 넣는다**(자동 생성은 끈다). `V3__create_spring_session.sql` 은 관리 버전 Spring Session JDBC 4.1.1 jar 의 `org/springframework/session/jdbc/schema-postgresql.sql` 을 그대로 사용한다. 로그인 성공 때 인증 주체 이름(`principal_name`)을 `users.id` 로 둔다 — 탈퇴 때 그 사용자의 세션을 한 번에 지우려고.
-만료 세션은 라이브러리의 정리 작업이 지운다([04 §3.2](./04-jobs-and-cost.md)).
+**재로그인은 계정 정보를 변경하지 않는다.** 같은 `(provider, subject)`의 회원이 있으면 기존 ID로 로그인하고 이메일·역할·상태·약관·가입 시각을 보존한다. 이번 인증 이메일과 관리자 목록은 로그인 허용 여부를 확인하는 데 사용하며 저장된 역할은 덮어쓰지 않는다. 이메일·역할 변경은 별도의 명시적 변경 절차에서 수행한다.
 
-#### 6.1.1 `user_identities` — 외부 로그인 식별자와 회원의 연결
+**세션 테이블** — `spring_session` · `spring_session_attributes`는 Flyway로 관리하며 자동 생성을 끈다. V3는 Spring Session JDBC 4.1.1의 Postgres 스키마다. `principal_name`과 세션 속성에는 `users.id`만 두며 만료 정리는 라이브러리에 맡긴다([04 §3.2](./04-jobs-and-cost.md)).
 
-| 컬럼 | 타입 | 비고 |
-|---|---|---|
-| `id` | `bigserial` PK | 연결 행의 내부 식별자. 서비스 사용자 ID와 구분한다 |
-| `user_id` | `bigint` **NOT NULL** FK → `users.id` | `ON DELETE CASCADE`. 사용자별 조회 · 탈퇴 삭제를 위한 인덱스를 둔다 |
-| `provider` | `text` **NOT NULL** | 서버가 정한 외부 식별자 네임스페이스. 현재 값은 `google`이며 활성화한 제공자만 수락한다 |
-| `subject` | `text` **NOT NULL** | 제공자가 발급한 계정 식별자. 구글에서는 `sub`. 문자열 그대로 보존하며 이메일처럼 대소문자 변경 · 공백 보정을 하지 않는다 |
-| `created_at` | `timestamptz` **NOT NULL** | 이 식별자를 회원에 연결한 시각 |
+#### 6.1.1 로그인 · 가입 불변조건
 
-- **`UNIQUE(provider, subject)`** — 하나의 외부 계정은 서비스 회원 하나에만 연결된다. 서로 다른 제공자의 같은 `subject` 값은 다른 외부 계정이다. 제공자 · 식별자의 빈 값은 허용하지 않는다.
-- `provider`는 요청 매개변수로 믿지 않고, 인증을 완료한 서버의 클라이언트 등록 정보에서 결정한다. 현재는 구글 등록 하나를 `google`로 대응한다. 제공자별 앱/클라이언트에 따라 식별자 범위가 달라질 수 있으므로, 추후 같은 제공자의 다른 앱을 등록하거나 앱을 교체할 때는 식별자 네임스페이스의 호환 여부도 함께 검토한다.
-- 관계는 **회원 1 : 로그인 연결 N**이다. 현재 가입은 회원 하나와 구글 연결 하나를 만든다. 복수 로그인 연결 · 연결 해제 · 계정 병합은 이번 범위에 넣지 않으며, 연결을 추가하는 별도 API도 만들지 않는다. 이 모델 자체가 그러한 동작을 허용하는 API는 아니다.
-- 연결 행에는 이메일 · 역할 · 상태 · 구글 접근/ID 토큰 · 원본 응답을 복제하지 않는다. 커리큘럼을 완전 삭제해도 회원과 로그인 연결은 유지하고, 회원 탈퇴에서만 함께 삭제한다(§7).
+1. `api.auth.GoogleAccountMapper`가 검증된 Google 등록과 응답을 `ExternalAccount(ExternalIdentity(provider, subject), email, emailVerified)`로 변환한다. `provider`는 요청 매개변수·원본 프로필에서 믿지 않고 검증된 서버 등록으로 정한다. 현재 매퍼는 구글만 수락한다. `core.account`는 Spring Security 타입·OAuth 토큰·원본 응답을 알지 않는다.
+2. 이메일 검증·관리자 허용 목록 검사는 DB 접근 전에 수행한다. 허용 여부는 이번 인증 이메일로 확인하며 기존 이메일을 바꾸지 않는다.
+3. `TransactionRunner` 안에서 `UserRepository.findByIdentity`로 조회한다. 있으면 기존 ID를 반환하고 회원을 쓰지 않는다. 없으면 식별자와 신규 이메일·초기 역할·상태·가입 시각을 한 행에 저장한다. 이메일이 같은 기존 회원을 자동 병합하지 않는다.
+4. 같은 외부 식별자의 동시 첫 로그인은 복합 unique 제약으로 회원 하나만 남긴다. 충돌 요청은 실패해도 되며 다음 로그인은 기존 회원을 찾는다. 추가 잠금·자동 재시도는 넣지 않는다.
+5. 세션에는 `users.id`만 저장하고 상태·역할은 요청마다 DB에서 읽는다. 외부 식별자는 사용자 API 응답에 추가하지 않는다. 탈퇴 시 식별자도 회원 행과 함께 삭제한다.
 
-#### 6.1.2 로그인 · 가입 불변조건
+#### 6.1.2 기존 데이터 이전
 
-1. 제공자별 인증과 원본 응답 해석은 `api.auth`에서 끝낸다. 공통 로그인에는 `ExternalIdentity(provider, subject)`와 이메일 · 이메일 검증 여부를 담은 `ExternalAccount`를 전달한다. `core.account`는 `sub` 같은 제공자별 응답 필드나 Spring Security 타입을 알지 않는다([04 §2](./04-jobs-and-cost.md)).
-2. 현재의 이메일 인증 · 관리자 허용 목록 검사는 유지한다. 허용 여부는 이번 인증의 이메일로 확인하고, 기존 회원의 저장된 이메일을 바꾸지 않는다. 검증되지 않은 이메일을 관리자 허용 근거로 사용하지 않는다.
-3. `TransactionRunner`의 한 트랜잭션에서 외부 식별자를 조회한다. 연결이 있으면 그 `user_id`의 회원을 읽어 기존 사용자 ID를 반환한다. 연결 조회 뒤 탈퇴 등으로 회원이 사라졌다면 로그인을 실패시키며 회원을 다시 만들거나 연결을 복원하지 않는다. 재로그인에서 회원이나 연결 행을 쓰지 않는다.
-4. 연결이 없으면 회원을 생성하고 같은 트랜잭션에서 로그인 연결을 삽입한다. 신규 이메일 · 초기 역할 · 상태만 현재 가입 정책으로 정한다. 회원과 연결 중 어느 저장이 실패해도 둘 다 롤백한다. 이메일이 같은 기존 회원을 찾아 연결하지 않는다.
-5. 같은 식별자의 동시 첫 로그인은 `(provider, subject)` unique 제약으로 연결 하나만 남긴다. 충돌한 트랜잭션이 생성한 회원도 함께 롤백해 연결 없는 회원을 남기지 않는다. 기존처럼 충돌한 요청은 실패해도 되며, 다음 로그인은 기존 연결을 찾는다. 추가 잠금 · 자동 재시도 장치는 넣지 않는다.
-6. 세션에는 연결 행 ID나 외부 식별자가 아니라 `users.id` 하나만 저장한다. 상태 · 역할은 요청마다 `users`에서 읽는다. 기존 학습 데이터와 사용자별 한도도 계속 `users.id`에 귀속한다.
-
-#### 6.1.3 기존 데이터 이전
-
-- 기존 V1~V3는 수정하지 않는다. **`V4__separate_user_identities.sql`**이 새 연결 테이블 생성 · 기존 구글 식별자 이전 · 검증 · 기존 컬럼 제거를 수행한다. 새 DB도 V1~V4를 순서대로 적용한다.
-- 새 연결 테이블을 만든 뒤 기존 회원마다 `(user_id=id, provider='google', subject=google_sub, created_at=users.created_at)`를 채운다. 이전 회원 수와 연결 수 · 식별자 대응을 확인한 뒤 `users.google_sub`와 그 전용 제약을 제거한다. 이 변경은 하나의 마이그레이션 트랜잭션으로 수행한다.
-- 기존 `users.id` · 이메일 · 역할 · 상태 · 약관 · 가입 시각과 세션의 사용자 ID를 보존한다. 이전을 이유로 계정을 다시 생성하거나 세션을 전부 지우지 않는다.
-- `UserIdentityMigrationIT`는 V3 회원/ID 세션을 V4로 이전한 뒤 새 서버에서 기존 세션의 `/api/me`와 동일 외부 계정의 재로그인을 검증한다. `LoginTest` · `LoginIT` · 저장소/구글 변환기/HTTP 테스트는 재로그인 정보 보존 · 이메일 자동 연결 금지 · 연결 저장 실패와 동시 가입 충돌의 전체 롤백을 검증한다.
+- 기존 V1~V5는 수정하지 않는다. V4에서 분리했던 연결은 V5가 회원 행으로 통합했고 V6가 구글 전용 컬럼을 일반화한다. 새 DB도 V1~V6를 순서대로 적용한다.
+- V5의 회원당 구글 연결 하나 검사와 잘못된 연결의 이전 거절 계약은 유지한다. V6는 기존 `google_sub`를 `subject`로 이름 변경하고 기존 회원의 `provider`를 `google`로 채운다. provider의 이전용 기본값은 제거해 이후 생성에서 제공자를 명시하게 한다.
+- 구글 전용 unique 제약은 `UNIQUE(provider, subject)`로 교체하고 각 컬럼의 NOT NULL·빈 값 금지 제약을 유지한다. 단일 마이그레이션 트랜잭션으로 적용한다.
+- 회원 ID·전체 회원 정보·식별자 원문·ID 세션을 보존한다. `LoginIdentityMigrationIT`에서 V3/V4/V5부터 최신 스키마까지의 이전, 기존 세션의 실제 `/api/me`, 정보 보존 재로그인, 구글 전용 컬럼과 연결 테이블 제거를 검증한다. 지원하지 않는 V4 연결의 이전 거절·롤백도 유지한다.
 
 ### 6.2 `curriculums` · `lessons`
 
@@ -606,12 +592,11 @@ DELETE FROM lessons           WHERE curriculum_id IN (SELECT id FROM curriculums
 DELETE FROM curriculums       WHERE user_id = :u;
 DELETE FROM curriculum_steps  WHERE group_id IN (SELECT id FROM curriculum_groups WHERE user_id = :u);
 DELETE FROM curriculum_groups WHERE user_id = :u;
-DELETE FROM user_identities   WHERE user_id = :u;                  -- 외부 로그인 연결도 삭제. users FK의 CASCADE로도 보장
 DELETE FROM users             WHERE id = :u;
 COMMIT;
 ```
 
-- 남는 것 — 계정과 작업 연결을 해제한 `llm_calls`(쓴 돈은 쓴 돈이다)과 잡 연결을 해제한 `job_events`의 운영 이력(§6.9). 사용자 비용 합계에서는 빠지고 전역 합계(§6.6)에는 그대로 남는다. `concepts` · `concept_match_logs` · `curriculum_groups` · `curriculum_steps` · `user_identities`는 사용자 소유라 함께 지운다 — 사용자 주제에서 나온 이름 · 정의 · 전체 목표/분할안과 외부 로그인 식별자를 남기지 않는다.
+- 남는 것 — 계정과 작업 연결을 해제한 `llm_calls`(쓴 돈은 쓴 돈이다)과 잡 연결을 해제한 `job_events`의 운영 이력(§6.9). 사용자 비용 합계에서는 빠지고 전역 합계(§6.6)에는 그대로 남는다. `concepts` · `concept_match_logs` · `curriculum_groups` · `curriculum_steps`는 사용자 소유라 함께 지우고 로그인 식별자는 `users` 행과 함께 지운다 — 사용자 주제에서 나온 이름 · 정의 · 전체 목표/분할안과 외부 로그인 식별자를 남기지 않는다.
 - **복습 락을 잡는 이유** — 없으면 진행 중이던 평가 저장이 탈퇴 도중에 새 복습 기록을 커밋해, 뒤의 `flashcards` 삭제가 FK 오류로 실패하고 탈퇴 전체가 롤백된다. 커리큘럼 삭제(§6.2)와 같은 순서(사용량 → 복습)라 서로 교착하지 않는다.
 - **이 트랜잭션은 개념 쓰기 락을 잡지 않는다.** 완료 트랜잭션이 `jobs` 행 → 개념 쓰기 락 순서로 잡으므로, 탈퇴가 개념 락을 먼저 잡고 `jobs` 를 지우면 서로 기다린다(교착). `jobs` 를 먼저 지우는 순서와 `concepts.user_id` FK 로 충분하다 — 완료가 먼저면 `DELETE FROM jobs` 가 기다렸다가 완료가 만든 개념까지 지우고, 탈퇴가 먼저면 완료의 첫 `UPDATE jobs` 가 `0 rows` 로 롤백된다.
 - 탈퇴 뒤 돌아온 응답도 기존 `attempt_id` 의 사용량은 확정한다 — `user_id` 가 비어 있어 전역 합계에만 잡힌다. `user_id` · `job_id` · `provider_request_id` 를 다시 채우거나 잡을 재생성하지 않는다.

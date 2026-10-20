@@ -7,7 +7,8 @@ import com.mogum.core.account.Login;
 import com.mogum.core.account.LoginResult;
 import com.mogum.support.PostgresTestConfiguration;
 import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -26,9 +27,10 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class UserIdentityMigrationIT extends PostgresTestConfiguration {
-    @Test
-    void V3의_회원과_세션을_보존하며_구글_식별자를_별도_테이블로_이전한다() throws Exception {
+class LoginIdentityMigrationIT extends PostgresTestConfiguration {
+    @ParameterizedTest
+    @ValueSource(strings = {"3", "4", "5"})
+    void 기존_회원과_세션을_보존하며_식별자를_provider와_subject로_이전한다(String version) throws Exception {
         var admin = new JdbcTemplate(new DriverManagerDataSource(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
         String schema = "migration_" + UUID.randomUUID().toString().replace("-", "");
@@ -62,21 +64,32 @@ class UserIdentityMigrationIT extends PostgresTestConfiguration {
             jdbc.update("INSERT INTO spring_session_attributes VALUES (?, ?, ?)", primaryId,
                     FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, attribute);
             var sessions = jdbc.queryForList("SELECT * FROM spring_session");
+            if (!version.equals("3")) {
+                Flyway.configure().dataSource(url, POSTGRES.getUsername(), POSTGRES.getPassword())
+                        .defaultSchema(schema).schemas(schema).target(version).load().migrate();
+            }
 
             Flyway.configure().dataSource(url, POSTGRES.getUsername(), POSTGRES.getPassword())
                     .defaultSchema(schema).schemas(schema).load().migrate();
 
             assertEquals(0, jdbc.queryForObject("""
+                    SELECT count(*) FROM information_schema.tables
+                    WHERE table_schema = ? AND table_name = 'user_identities'
+                    """, Integer.class, schema));
+            assertEquals(users, jdbc.queryForList("SELECT id, email, status, role, terms_agreed_at, terms_version, created_at FROM users ORDER BY id"));
+            assertEquals(java.util.List.of("Original-Sub", "other-sub"),
+                    jdbc.queryForList("SELECT subject FROM users ORDER BY id", String.class));
+            assertEquals(java.util.List.of("google", "google"),
+                    jdbc.queryForList("SELECT provider FROM users ORDER BY id", String.class));
+            assertEquals(0, jdbc.queryForObject("""
                     SELECT count(*) FROM information_schema.columns
                     WHERE table_schema = ? AND table_name = 'users' AND column_name = 'google_sub'
                     """, Integer.class, schema));
-            assertEquals(users, jdbc.queryForList("SELECT * FROM users ORDER BY id"));
-            var identities = jdbc.queryForList("SELECT user_id, provider, subject, created_at FROM user_identities ORDER BY user_id");
-            assertEquals(2, identities.size());
-            assertEquals(users.getFirst().get("id"), identities.getFirst().get("user_id"));
-            assertEquals("google", identities.getFirst().get("provider"));
-            assertEquals("Original-Sub", identities.getFirst().get("subject"));
-            assertEquals(users.getFirst().get("created_at"), identities.getFirst().get("created_at"));
+            assertEquals(0, jdbc.queryForObject("""
+                    SELECT count(*) FROM information_schema.columns
+                    WHERE table_schema = ? AND table_name = 'users' AND column_name = 'provider'
+                        AND column_default IS NOT NULL
+                    """, Integer.class, schema));
             assertEquals(sessions, jdbc.queryForList("SELECT * FROM spring_session"));
             assertArrayEquals(attribute, jdbc.queryForObject("SELECT attribute_bytes FROM spring_session_attributes", byte[].class));
 
@@ -98,11 +111,51 @@ class UserIdentityMigrationIT extends PostgresTestConfiguration {
                 long id = ((Number) users.getFirst().get("id")).longValue();
                 assertEquals(new LoginResult.Success(id), app.getBean(Login.class).login(
                         new ExternalAccount(new ExternalIdentity("google", "Original-Sub"), "new@example.com", true)));
-                assertEquals(users, jdbc.queryForList("SELECT * FROM users ORDER BY id"));
-                assertEquals(identities, jdbc.queryForList("SELECT user_id, provider, subject, created_at FROM user_identities ORDER BY user_id"));
+                assertEquals(users, jdbc.queryForList("SELECT id, email, status, role, terms_agreed_at, terms_version, created_at FROM users ORDER BY id"));
+                assertEquals(java.util.List.of("Original-Sub", "other-sub"),
+                        jdbc.queryForList("SELECT subject FROM users ORDER BY id", String.class));
             }
         } finally {
             admin.execute("DROP SCHEMA " + schema + " CASCADE");
         }
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"missing", "multiple", "other"})
+    void 통합할_수_없는_연결은_데이터를_남긴_채_이전을_롤백한다(String scenario) {
+        var admin = new JdbcTemplate(new DriverManagerDataSource(
+                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
+        String schema = "migration_" + UUID.randomUUID().toString().replace("-", "");
+        admin.execute("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public");
+        admin.execute("CREATE SCHEMA " + schema);
+        String url = POSTGRES.getJdbcUrl() + (POSTGRES.getJdbcUrl().contains("?") ? "&" : "?")
+                + "currentSchema=" + schema + ",public";
+        var jdbc = new JdbcTemplate(new DriverManagerDataSource(url, POSTGRES.getUsername(), POSTGRES.getPassword()));
+        try {
+            Flyway.configure().dataSource(url, POSTGRES.getUsername(), POSTGRES.getPassword())
+                    .defaultSchema(schema).schemas(schema).target("4").load().migrate();
+            long id = jdbc.queryForObject("""
+                    INSERT INTO users (email, status, role, created_at)
+                    VALUES ('old@example.com', 'ACTIVE', 'USER', now()) RETURNING id
+                    """, Long.class);
+            if (!scenario.equals("missing")) {
+                jdbc.update("INSERT INTO user_identities (user_id, provider, subject, created_at) VALUES (?, ?, 'original', now())",
+                        id, scenario.equals("other") ? "other-provider" : "google");
+            }
+            if (scenario.equals("multiple")) {
+                jdbc.update("INSERT INTO user_identities (user_id, provider, subject, created_at) VALUES (?, 'google', 'second', now())", id);
+            }
+            var users = jdbc.queryForList("SELECT * FROM users ORDER BY id");
+            var identities = jdbc.queryForList("SELECT * FROM user_identities ORDER BY id");
+            var flyway = Flyway.configure().dataSource(url, POSTGRES.getUsername(), POSTGRES.getPassword())
+                    .defaultSchema(schema).schemas(schema).load();
+            assertThrows(org.flywaydb.core.api.FlywayException.class, flyway::migrate);
+            assertEquals(users, jdbc.queryForList("SELECT * FROM users ORDER BY id"));
+            assertEquals(identities, jdbc.queryForList("SELECT * FROM user_identities ORDER BY id"));
+            assertEquals("4", flyway.info().current().getVersion().toString());
+        } finally {
+            admin.execute("DROP SCHEMA " + schema + " CASCADE");
+        }
+    }
+
 }

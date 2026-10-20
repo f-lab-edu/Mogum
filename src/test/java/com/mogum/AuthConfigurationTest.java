@@ -3,7 +3,6 @@ package com.mogum;
 import com.mogum.core.TransactionRunner;
 import com.mogum.core.account.Login;
 import com.mogum.core.account.UserRepository;
-import com.mogum.core.account.UserIdentityRepository;
 import com.mogum.core.account.UserRole;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -19,7 +18,6 @@ class AuthConfigurationTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(AuthConfiguration.class)
             .withBean(UserRepository.class, () -> mock(UserRepository.class))
-            .withBean(UserIdentityRepository.class, () -> mock(UserIdentityRepository.class))
             .withBean(TransactionRunner.class, () -> mock(TransactionRunner.class))
             .withBean(Clock.class, Clock::systemUTC);
 

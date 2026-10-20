@@ -77,8 +77,8 @@ class OAuthLoginHandlerIT extends PostgresTestConfiguration {
 
     @AfterEach
     void clean() {
-        jdbc.update("DELETE FROM spring_session WHERE principal_name IN (SELECT user_id::text FROM user_identities WHERE provider = 'google' AND subject = ?)", sub);
-        jdbc.update("DELETE FROM users WHERE id IN (SELECT user_id FROM user_identities WHERE provider = 'google' AND subject = ?)", sub);
+        jdbc.update("DELETE FROM spring_session WHERE principal_name IN (SELECT id::text FROM users WHERE provider = 'google' AND subject = ?)", sub);
+        jdbc.update("DELETE FROM users WHERE provider = 'google' AND subject = ?", sub);
     }
 
     @AfterAll
@@ -118,7 +118,7 @@ class OAuthLoginHandlerIT extends PostgresTestConfiguration {
         assertCookieSecurity(sessionHeader);
         assertFalse(sessionHeader.contains("Domain="));
         String sessionCookie = cookiePair(sessionHeader);
-        var row = jdbc.queryForMap("SELECT u.id, u.status, u.role FROM users u JOIN user_identities i ON i.user_id = u.id WHERE i.provider = 'google' AND i.subject = ?", sub);
+        var row = jdbc.queryForMap("SELECT id, status, role FROM users WHERE provider = 'google' AND subject = ?", sub);
         assertEquals("ACTIVE", row.get("status"));
         assertEquals("ADMIN", row.get("role"));
         assertIdOnly(sessionCookie, row.get("id").toString());
@@ -134,7 +134,7 @@ class OAuthLoginHandlerIT extends PostgresTestConfiguration {
     void 재로그인은_세션_번호만_바꾸고_같은_sub의_저장된_이메일과_역할을_보존한다() throws Exception {
         var first = callback(start(null), "ok", null);
         var oldCookie = cookiePair(cookieHeader(first, "SESSION"));
-        long id = jdbc.queryForObject("SELECT user_id FROM user_identities WHERE provider = 'google' AND subject = ?", Long.class, sub);
+        long id = jdbc.queryForObject("SELECT id FROM users WHERE provider = 'google' AND subject = ?", Long.class, sub);
         jdbc.update("UPDATE users SET role = 'USER' WHERE id = ?", id);
         email = "changed@example.com";
         var second = callback(start(oldCookie), "ok", oldCookie);
@@ -147,7 +147,7 @@ class OAuthLoginHandlerIT extends PostgresTestConfiguration {
         var body = new tools.jackson.databind.ObjectMapper().readTree(me.body());
         assertEquals("admin@example.com", body.get("email").asString());
         assertEquals("USER", body.get("role").asString());
-        assertEquals(id, jdbc.queryForObject("SELECT user_id FROM user_identities WHERE provider = 'google' AND subject = ?", Long.class, sub));
+        assertEquals(id, jdbc.queryForObject("SELECT id FROM users WHERE provider = 'google' AND subject = ?", Long.class, sub));
         assertEquals("admin@example.com", jdbc.queryForObject("SELECT email FROM users WHERE id = ?", String.class, id));
         assertEquals("USER", jdbc.queryForObject("SELECT role FROM users WHERE id = ?", String.class, id));
         assertIdOnly(newCookie, Long.toString(id));

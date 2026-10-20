@@ -8,6 +8,6 @@ public sealed interface LoginResult {
     }
 
     enum RejectionReason {
-        EMAIL_NOT_VERIFIED, NOT_ALLOWED, ACCOUNT_NOT_FOUND
+        EMAIL_NOT_VERIFIED, NOT_ALLOWED
     }
 }

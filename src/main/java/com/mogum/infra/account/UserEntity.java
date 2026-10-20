@@ -1,6 +1,7 @@
 package com.mogum.infra.account;
 
 import com.mogum.core.account.User;
+import com.mogum.core.account.ExternalIdentity;
 import com.mogum.core.account.UserRole;
 import com.mogum.core.account.UserStatus;
 import jakarta.persistence.Column;
@@ -11,15 +12,23 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 import java.time.Instant;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", uniqueConstraints = @UniqueConstraint(
+        name = "users_provider_subject_key", columnNames = {"provider", "subject"}))
 public class UserEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false, columnDefinition = "text")
+    private String provider;
+
+    @Column(nullable = false, columnDefinition = "text")
+    private String subject;
 
     @Column(nullable = false, columnDefinition = "text")
     private String email;
@@ -44,7 +53,9 @@ public class UserEntity {
     protected UserEntity() {
     }
 
-    UserEntity(String email, UserStatus status, UserRole role, Instant createdAt) {
+    UserEntity(ExternalIdentity identity, String email, UserStatus status, UserRole role, Instant createdAt) {
+        this.provider = identity.provider();
+        this.subject = identity.subject();
         this.email = email;
         this.status = status;
         this.role = role;

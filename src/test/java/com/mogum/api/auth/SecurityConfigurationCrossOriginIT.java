@@ -56,7 +56,7 @@ class SecurityConfigurationCrossOriginIT extends PostgresTestConfiguration {
                 .addFilters(context.getBean("springSessionRepositoryFilter", jakarta.servlet.Filter.class))
                 .apply(springSecurity()).build();
         testSessions = new TestSessions(sessions);
-        user = transactions.inTransaction(() -> users.create("cors@example.com", UserStatus.ACTIVE, UserRole.ADMIN, Instant.now()));
+        user = transactions.inTransaction(() -> users.create(new com.mogum.core.account.ExternalIdentity("google", "cors-" + java.util.UUID.randomUUID()), "cors@example.com", UserStatus.ACTIVE, UserRole.ADMIN, Instant.now()));
         session = testSessions.create(user.id());
     }
 

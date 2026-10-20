@@ -34,23 +34,19 @@
 
 계정의 `JpaUserRepository`는 `SpringDataUserRepository extends JpaRepository<UserEntity, Long>`에 조회 · 저장을 위임하고, 반환한 엔티티를 `User` record로 변환한다. Spring Data 인터페이스는 `infra.account` 내부에서만 사용한다. 호출자는 기존처럼 `TransactionRunner` 안에서 포트를 사용하며, Spring Data의 저장 · 조회는 호출자의 트랜잭션에 참여한다([Spring Data JPA 트랜잭션 규약](https://docs.spring.io/spring-data/jpa/reference/jpa/transactions.html)).
 
-**회원과 외부 인증의 경계 — 구현 완료(ADR-064).** 저장 모델과 불변조건은 [02 §6.1](./02-domain-data.md)에 둔다. 구글 응답 해석과 회원 로그인을 아래 구조로 분리했다.
+**외부 인증과 회원 저장의 경계(ADR-066).** 별도 로그인 연결 테이블 없이 `users(provider, subject)`로 회원을 식별한다. 회원당 로그인 수단은 하나이며 현재 활성 제공자는 구글 하나다([02 §6.1](./02-domain-data.md)).
 
 | 위치 | 책임 |
 |---|---|
-| `core.account.User` | 서비스 회원 스냅샷. 외부 제공자 식별자를 필드로 갖지 않는다 |
-| `core.account.ExternalIdentity` | `(provider, subject)` 값. 제공자 응답 필드명 · OAuth 토큰 · Spring Security 타입을 알지 않는다 |
-| `core.account.UserIdentity` | 내부 연결 ID · 사용자 ID · 외부 식별자 · 연결 시각의 스냅샷 |
-| `core.account.ExternalAccount` | 인증을 마친 외부 식별자와 이메일 · 이메일 검증 여부를 전달하는 공통 입력 |
-| `core.account.Login` | 기존 연결 조회 또는 회원과 연결의 원자적 생성. 이메일 인증 · 허용 목록 · 신규 초기 역할 정책을 적용한다 |
-| `core.account.UserRepository` | 사용자 ID로 조회 · 회원 생성. 제공자 식별자로 회원을 직접 조회하지 않는다 |
-| `core.account.UserIdentityRepository` | `findByIdentity(ExternalIdentity)`로 연결 스냅샷 조회 · 사용자와 식별자의 연결 생성. 회원 저장소와 같은 `TransactionRunner` 범위에서 사용한다 |
-| `api.auth` | `OAuthLoginHandler`가 검증된 인증 결과를 공통 입력으로 변환해 `Login`을 호출하고 사용자 ID로 세션을 만든다. `GoogleAccountMapper`가 구글의 `sub` · `email` · `email_verified`를 해석한다 |
-| `infra.account` | 회원과 로그인 연결의 JPA 엔티티 · Spring Data 리포지토리 · 포트 어댑터. 엔티티를 트랜잭션 안에서 record로 변환한다 |
+| `core.account.User` | API와 업무에서 필요한 회원 스냅샷. 외부 식별자는 포함하지 않는다 |
+| `core.account.ExternalIdentity` | `(provider, subject)` 값. 회원 테이블의 로그인 식별자를 표현한다 |
+| `core.account.ExternalAccount` | 인증을 마친 외부 식별자·이메일·이메일 검증 여부를 전달하는 입력 |
+| `core.account.Login` | 이메일 검증·허용 목록 검사 후 외부 식별자로 조회 또는 신규 회원 생성. 재로그인 정보 보존 |
+| `core.account.UserRepository` | `findById` · `findByIdentity` · 외부 식별자를 포함한 회원 생성 |
+| `api.auth` | `GoogleAccountMapper`가 검증된 Google 등록과 응답을 해석하고 `OAuthLoginHandler`가 `Login` 호출 후 ID 세션 생성 |
+| `infra.account` | `UserEntity`의 provider·subject 매핑, Spring Data `findByProviderAndSubject`, 포트 어댑터. 트랜잭션 안에서 record로 변환 |
 
-제공자 선택은 검증된 Spring Security 인증의 클라이언트 등록 ID를 사용한다. 현재는 구글 변환기 하나만 구성한다. 추가 제공자는 등록 설정 · 응답 변환기 · 해당 제공자의 이메일 신뢰 정책을 확인한 뒤 연결한다. 구글의 `email_verified` 필드를 다른 제공자에도 있다고 가정하거나, 값이 없을 때 검증된 것으로 취급하지 않는다. 범용 플러그인 탐색기나 동적 제공자 등록 기능은 만들지 않는다.
-
-현재 구글 경로(`/auth/google` · `/auth/google/callback`) · 요청 쿠키 · PKCE · 토큰 폐기 정책은 유지한다. 제공자별 프로토콜 처리는 `api.auth`에 남을 수 있으며, 회원과 학습 도메인이 해당 제공자에 종속되지 않는 것이 이 변경의 목적이다. 여러 제공자를 동시에 활성화하는 API/화면, 계정 연결/해제/병합 동작은 별도 기능으로 다룬다.
+제공자 구분은 두 컬럼과 값 타입으로 표현한다. 별도 연결 모델·저장소·동적 제공자 탐색기는 만들지 않는다. 추가 제공자에는 인증 설정·응답 변환·이메일 신뢰 정책이 필요하며 복수 로그인 연결이 필요할 때 테이블 분리를 다시 검토한다. 현재 구글 경로·요청 쿠키·PKCE·토큰 폐기 정책은 유지한다.
 
 역할 설명만 담은 `package-info.java`는 구현이 없는 패키지의 자리를 남기는 데 사용한다. 구현이 있는 `core` · `api` · `infra`에서는 제거하고, 아직 구현이 없는 `core.job` · `core.generation` · `worker`에서는 유지한다.
 

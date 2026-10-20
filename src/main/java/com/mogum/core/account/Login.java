@@ -10,15 +10,13 @@ import java.util.stream.Collectors;
 
 public final class Login {
     private final UserRepository repository;
-    private final UserIdentityRepository identities;
     private final TransactionRunner transactions;
     private final Clock clock;
     private final Set<String> adminEmails;
 
-    public Login(UserRepository repository, UserIdentityRepository identities, TransactionRunner transactions,
+    public Login(UserRepository repository, TransactionRunner transactions,
                  Clock clock, List<String> adminEmails) {
         this.repository = repository;
-        this.identities = identities;
         this.transactions = transactions;
         this.clock = clock;
         this.adminEmails = adminEmails.stream().map(Login::normalizeEmail)
@@ -35,15 +33,13 @@ public final class Login {
         }
 
         return transactions.inTransaction(() -> {
-            var existing = identities.findByIdentity(account.identity());
+            var existing = repository.findByIdentity(account.identity());
             if (existing.isPresent()) {
-                return repository.findById(existing.get().userId())
-                        .<LoginResult>map(user -> new LoginResult.Success(user.id()))
-                        .orElseGet(() -> new LoginResult.Rejected(LoginResult.RejectionReason.ACCOUNT_NOT_FOUND));
+                return new LoginResult.Success(existing.get().id());
             }
             var now = clock.instant();
-            var user = repository.create(account.email(), UserStatus.ACTIVE, roleFor(account.email()), now);
-            identities.create(user.id(), account.identity(), now);
+            var user = repository.create(account.identity(), account.email(), UserStatus.ACTIVE,
+                    roleFor(account.email()), now);
             return new LoginResult.Success(user.id());
         });
     }

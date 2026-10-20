@@ -19,7 +19,7 @@ class GoogleAccountMapperTest {
     private final GoogleAccountMapper mapper = new GoogleAccountMapper();
 
     @Test
-    void 서버_등록_ID와_구글_응답을_공통_입력으로_변환하고_원문을_보존한다() {
+    void 서버_등록_ID와_구글_응답을_로그인_입력으로_변환하고_원문을_보존한다() {
         assertEquals(new ExternalAccount(new ExternalIdentity("google", " Case-Sensitive-Sub "), "Admin@Example.com", true),
                 mapper.map(authentication("google", attributes())));
     }
