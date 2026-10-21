@@ -1,0 +1,14 @@
+{
+  "project": "Mogum",
+  "phase": "2-deploy",
+  "steps": [
+    { "step": 0, "name": "ops-config", "status": "pending" },
+    { "step": 1, "name": "image-check", "status": "pending" },
+    { "step": 2, "name": "server-runtime", "status": "pending" },
+    { "step": 3, "name": "backup", "status": "pending" },
+    { "step": 4, "name": "aws-policies", "status": "pending" },
+    { "step": 5, "name": "deploy-workflow", "status": "pending" },
+    { "step": 6, "name": "vercel", "status": "pending" },
+    { "step": 7, "name": "runbook", "status": "pending" }
+  ]
+}
