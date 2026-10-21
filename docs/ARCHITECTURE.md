@@ -120,4 +120,4 @@ worker 실행기(빈손일 때만 1개 수령)
 
 성공/실패 전환과 이벤트 저장은 같은 트랜잭션이다. 리스 만료 RUNNING 수령도 회수 이벤트와 함께 커밋한다. U6의 최근 24시간 실패율/회수는 `job_events`, 호출 재시도 등록/429/비용은 `llm_calls`, 현재 대기/실행 상태는 `jobs`에서 읽는다. 작업 삭제/탈퇴 시 이벤트의 잡 연결만 해제하며 사용자/콘텐츠 원문 없는 운영 이력은 보존한다([02 §6.9](./02-domain-data.md)).
 
-화면은 Vercel(`{도메인}` — 정적 파일) · API 는 EC2 한 대(`api.{도메인}`) · JVM 하나(`app.role=all` — API + 워커 실행기 `N` 개) · PostgreSQL + pgvector(🅿️ 위치는 용량 측정 전에) · OpenAI. 운영 관측은 관리자 화면 U6(DB 만 읽는다) + 슬랙 알림 + 외부 헬스체크. ([04 §3](./04-jobs-and-cost.md#3-배포))
+화면은 Vercel(`{도메인}` — 정적 파일) · API 는 EC2 한 대(`api.{도메인}`) · JVM 하나(`app.role=all` — API + 워커 실행기 `N` 개) · PostgreSQL + pgvector(앱과 같은 EC2 · 2GB — EC2 안은 Caddy · 앱 · Postgres 의 Docker Compose, ADR-072) · OpenAI. 운영 관측은 관리자 화면 U6(DB 만 읽는다) + 슬랙 알림 + 외부 헬스체크. ([04 §3](./04-jobs-and-cost.md#3-배포))
