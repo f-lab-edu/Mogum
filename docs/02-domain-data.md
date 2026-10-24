@@ -278,18 +278,41 @@ COMMIT;
 
 ### 6.1 `users`
 
+> **2026-10-20 구현·검증 완료(ADR-066).** 회원당 로그인 수단 하나를 `users(provider, subject)`에 저장한다. V1~V5 이력은 보존하고 `V6__generalize_user_login_identity.sql`로 구글 전용 컬럼을 일반화했다. V3/V4/V5 이전과 기존 세션 보존을 포함해 전체 서버 테스트 192개가 통과했다.
+
 | 컬럼 | 타입 | 비고 |
 |---|---|---|
-| `id` | `bigserial` PK | |
-| `google_sub` | `text` **unique · NOT NULL** | 구글 계정 식별자 — 이메일은 바뀔 수 있다 |
-| `email` | `text` **NOT NULL** | 표시 · 관리자 판정 |
+| `id` | `bigserial` PK | 서비스 사용자 식별자. 학습 데이터 · 비용 · 세션의 기준 |
+| `provider` | `text` **NOT NULL** | 서버가 검증한 로그인 제공자. 현재 활성 값은 `google`. 빈 값 금지 |
+| `subject` | `text` **NOT NULL** | 제공자가 발급한 계정 식별자. 빈 값 금지. 대소문자 변경 · 공백 보정 없이 원문 보존 |
+| `email` | `text` **NOT NULL** | 가입 시 이메일 · 표시용. 재로그인으로 바꾸지 않으며 unique 제약도 두지 않는다 |
 | `status` | `text` **NOT NULL** | CHECK: `PENDING`(약관 전) / `ACTIVE` / `WAITLISTED` |
-| `role` | `text` **NOT NULL** | CHECK: `USER` / `ADMIN` — 설정의 관리자 이메일 목록으로 로그인 때 정한다 |
+| `role` | `text` **NOT NULL** | CHECK: `USER` / `ADMIN` — 신규 가입 시 관리자 이메일 목록으로 초기값을 정하고 재로그인에서는 저장된 값 유지 |
 | `terms_agreed_at` · `terms_version` | `timestamptz` · `text` | 약관 버전이 바뀌면 다시 동의 |
 | `created_at` | `timestamptz` **NOT NULL** | 대기 명단 순서 |
 
-**세션 테이블** — `spring_session` · `spring_session_attributes`(Spring Session JDBC 의 스키마). 프레임워크가 쓰는 테이블이지만 **Flyway 마이그레이션에 넣는다**(자동 생성은 끈다). `V3__create_spring_session.sql` 은 관리 버전 Spring Session JDBC 4.1.1 jar 의 `org/springframework/session/jdbc/schema-postgresql.sql` 을 그대로 사용한다. 로그인 성공 때 인증 주체 이름(`principal_name`)을 `users.id` 로 둔다 — 탈퇴 때 그 사용자의 세션을 한 번에 지우려고.
-만료 세션은 라이브러리의 정리 작업이 지운다([04 §3.2](./04-jobs-and-cost.md)).
+**`UNIQUE(provider, subject)`**로 외부 계정 하나당 회원 하나를 보장한다. 서로 다른 제공자의 같은 `subject`는 서로 다른 계정이다. 회원당 로그인 수단은 하나이며 별도 연결 테이블은 두지 않는다. 현재 활성 제공자는 구글 하나다. 추가 제공자의 인증 설정·응답 변환·이메일 신뢰 정책은 해당 기능에서 구현하며, 저장 모델의 제공자 구분 테스트가 실제 로그인을 활성화하는 것은 아니다. 복수 로그인 연결·해제·계정 병합은 범위 밖이다.
+
+`User`는 `users`를 매핑한 회원 엔티티다. `provider`·`subject`는 사용자 API 응답에 넣지 않는다. 로그인 입력 `ExternalAccount(provider, subject, email, emailVerified)`로 회원을 생성하고, 조회는 `UserRepository.findByProviderAndSubject`로 한다. 세션과 학습 데이터의 기준은 계속 `users.id`다. 이메일은 로그인 키나 자동 병합 근거가 아니며 원본 프로필과 구글 접근/ID 토큰은 보관하지 않는다.
+
+**재로그인은 계정 정보를 변경하지 않는다.** 같은 `(provider, subject)`의 회원이 있으면 기존 ID로 로그인하고 이메일·역할·상태·약관·가입 시각을 보존한다. 이번 인증 이메일과 관리자 목록은 로그인 허용 여부를 확인하는 데 사용하며 저장된 역할은 덮어쓰지 않는다. 이메일·역할 변경은 별도의 명시적 변경 절차에서 수행한다.
+
+**세션 테이블** — `spring_session` · `spring_session_attributes`는 Flyway로 관리하며 자동 생성을 끈다. V3는 Spring Session JDBC 4.1.1의 Postgres 스키마다. `principal_name`과 세션 속성에는 `users.id`만 두며 만료 정리는 라이브러리에 맡긴다([04 §3.2](./04-jobs-and-cost.md)).
+
+#### 6.1.1 로그인 · 가입 불변조건
+
+1. `auth.GoogleAccountMapper`가 검증된 Google 등록과 응답을 `ExternalAccount(provider, subject, email, emailVerified)`로 변환한다. `provider`는 요청 매개변수·원본 프로필에서 믿지 않고 검증된 서버 등록으로 정한다. 현재 매퍼는 구글만 수락한다. `account`는 Spring Security 타입·OAuth 토큰·원본 응답을 알지 않는다.
+2. 이메일 검증·관리자 허용 목록 검사는 DB 접근 전에 수행한다. 허용 여부는 이번 인증 이메일로 확인하며 기존 이메일을 바꾸지 않는다.
+3. `LoginService`가 `UserRepository.findByProviderAndSubject`로 조회한다. 있으면 기존 ID를 반환하고 회원을 쓰지 않는다. 없으면 `User.join`으로 식별자와 신규 이메일·초기 역할·가입 시각을 한 행에 저장한다(처음 상태 `ACTIVE`는 `join` 안에 고정 — ADR-071). 이메일이 같은 기존 회원을 자동 병합하지 않는다.
+4. 같은 외부 식별자의 동시 첫 로그인은 복합 unique 제약으로 회원 하나만 남긴다. 충돌 요청은 실패해도 되며 다음 로그인은 기존 회원을 찾는다. 추가 잠금·자동 재시도는 넣지 않는다.
+5. 세션에는 `users.id`만 저장하고 상태·역할은 요청마다 DB에서 읽는다. 외부 식별자는 사용자 API 응답에 추가하지 않는다. 탈퇴 시 식별자도 회원 행과 함께 삭제한다.
+
+#### 6.1.2 기존 데이터 이전
+
+- 기존 V1~V5는 수정하지 않는다. V4에서 분리했던 연결은 V5가 회원 행으로 통합했고 V6가 구글 전용 컬럼을 일반화한다. 새 DB도 V1~V6를 순서대로 적용한다.
+- V5의 회원당 구글 연결 하나 검사와 잘못된 연결의 이전 거절 계약은 유지한다. V6는 기존 `google_sub`를 `subject`로 이름 변경하고 기존 회원의 `provider`를 `google`로 채운다. provider의 이전용 기본값은 제거해 이후 생성에서 제공자를 명시하게 한다.
+- 구글 전용 unique 제약은 `UNIQUE(provider, subject)`로 교체하고 각 컬럼의 NOT NULL·빈 값 금지 제약을 유지한다. 단일 마이그레이션 트랜잭션으로 적용한다.
+- 회원 ID·전체 회원 정보·식별자 원문·ID 세션을 보존한다. `LoginIdentityMigrationIT`에서 V3/V4/V5부터 최신 스키마까지의 이전, 기존 세션의 실제 `/api/me`, 정보 보존 재로그인, 구글 전용 컬럼과 연결 테이블 제거를 검증한다. 지원하지 않는 V4 연결의 이전 거절·롤백도 유지한다.
 
 ### 6.2 `curriculums` · `lessons`
 
@@ -573,7 +596,7 @@ DELETE FROM users             WHERE id = :u;
 COMMIT;
 ```
 
-- 남는 것 — 계정과 작업 연결을 해제한 `llm_calls`(쓴 돈은 쓴 돈이다)과 잡 연결을 해제한 `job_events`의 운영 이력(§6.9). 사용자 비용 합계에서는 빠지고 전역 합계(§6.6)에는 그대로 남는다. `concepts` · `concept_match_logs` · `curriculum_groups` · `curriculum_steps`는 사용자 소유라 함께 지운다 — 사용자 주제에서 나온 이름 · 정의 · 전체 목표/분할안을 남기지 않는다.
+- 남는 것 — 계정과 작업 연결을 해제한 `llm_calls`(쓴 돈은 쓴 돈이다)과 잡 연결을 해제한 `job_events`의 운영 이력(§6.9). 사용자 비용 합계에서는 빠지고 전역 합계(§6.6)에는 그대로 남는다. `concepts` · `concept_match_logs` · `curriculum_groups` · `curriculum_steps`는 사용자 소유라 함께 지우고 로그인 식별자는 `users` 행과 함께 지운다 — 사용자 주제에서 나온 이름 · 정의 · 전체 목표/분할안과 외부 로그인 식별자를 남기지 않는다.
 - **복습 락을 잡는 이유** — 없으면 진행 중이던 평가 저장이 탈퇴 도중에 새 복습 기록을 커밋해, 뒤의 `flashcards` 삭제가 FK 오류로 실패하고 탈퇴 전체가 롤백된다. 커리큘럼 삭제(§6.2)와 같은 순서(사용량 → 복습)라 서로 교착하지 않는다.
 - **이 트랜잭션은 개념 쓰기 락을 잡지 않는다.** 완료 트랜잭션이 `jobs` 행 → 개념 쓰기 락 순서로 잡으므로, 탈퇴가 개념 락을 먼저 잡고 `jobs` 를 지우면 서로 기다린다(교착). `jobs` 를 먼저 지우는 순서와 `concepts.user_id` FK 로 충분하다 — 완료가 먼저면 `DELETE FROM jobs` 가 기다렸다가 완료가 만든 개념까지 지우고, 탈퇴가 먼저면 완료의 첫 `UPDATE jobs` 가 `0 rows` 로 롤백된다.
 - 탈퇴 뒤 돌아온 응답도 기존 `attempt_id` 의 사용량은 확정한다 — `user_id` 가 비어 있어 전역 합계에만 잡힌다. `user_id` · `job_id` · `provider_request_id` 를 다시 채우거나 잡을 재생성하지 않는다.
@@ -661,7 +684,7 @@ SELECT c.id, c.name, c.definition,
  ORDER BY c.id;
 ```
 
-- `fsrs:1.0.0` 기본 파라미터 기준 `:factor = 0.6935087808430285` · `:decay = -0.2` (`DECAY = -parameters[20]`, `FACTOR = 0.9^(1/DECAY) - 1`). `src/test/java/com/mogum/learning/FsrsLibraryLearningTest.java` 에서 라이브러리 상수와 정수 경과일의 공식 일치를 고정한다.
+- `fsrs:1.0.0` 기본 파라미터 기준 `:factor = 0.6935087808430285` · `:decay = -0.2` (`DECAY = -parameters[20]`, `FACTOR = 0.9^(1/DECAY) - 1`). `backend/src/test/java/com/mogum/learning/FsrsLibraryLearningTest.java` 에서 라이브러리 상수와 정수 경과일의 공식 일치를 고정한다.
 - 경과 시간은 **실제 경과 시간(소수 일)** 이다(§8.1). FSRS 라이브러리의 `R` 계산은 경과일을 정수로 잘라(`1.0.0` — `ChronoUnit.DAYS`) 같은 날 안에서는 값이 다르다. 숙련도는 읽기 전용 집계라 복습 일정(라이브러리가 정한다)에는 영향이 없다. 공식 · 상수의 일치는 정수 경과일에서 테스트한다([07 §1.2](./07-testing.md)). *(2026-10-12 사용자 결정 — 정수 일로 자르는 안을 대신했다)*
 - 학습 완료한 카드가 전부 미복습인 개념도 결과에 남는다(`r=NULL` · `s=NULL` · `min_review_count=0`). 집계 대상 카드가 없는 개념과 구분한다.
 - 복습한 카드와 미복습 카드가 섞여 있으면 평균은 복습한 카드로만 계산하고 `min_review_count=0` 으로 생략을 막는다. `loadUserMastery` 와 `lookupMastery` 는 같은 집계 규칙을 쓴다.

@@ -20,8 +20,8 @@ from typing import Iterable, List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parent.parent
 
-JAVA_MAIN = "src/main/java/"
-JAVA_TEST = "src/test/java/"
+JAVA_MAIN = "backend/src/main/java/"
+JAVA_TEST = "backend/src/test/java/"
 WEB_SRC = "frontend/src/"
 WEB_TEST_SUPPORT = "frontend/src/test/"
 WEB_TEST_NAME = re.compile(r"\.(test|spec)\.tsx?$")

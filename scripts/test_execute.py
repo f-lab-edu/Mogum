@@ -476,6 +476,20 @@ class TestReviewStep:
         assert "git diff abc123" in prompt
         assert "UI를 구현하세요" in prompt
 
+    def test_reviewer_runs_backend_and_frontend_from_repo_root(self, executor):
+        mock_result = MagicMock(returncode=0, stdout=_claude_json(self.APPROVE), stderr="")
+        step = {"step": 2, "name": "ui"}
+
+        with patch("subprocess.run", return_value=mock_result) as mock_run:
+            executor._review_step(step, "abc123")
+
+        cmd = mock_run.call_args[0][0]
+        allowed = cmd[cmd.index("--allowedTools") + 1:]
+        assert "Bash(./backend/gradlew:*)" in allowed
+        assert "Bash(npm --prefix frontend run:*)" in allowed
+        assert "Bash(./gradlew:*)" not in allowed
+        assert "./backend/gradlew -p backend" in mock_run.call_args[1]["input"]
+
     def test_returns_structured_output_and_saves(self, executor):
         mock_result = MagicMock(returncode=0, stdout=_claude_json(self.APPROVE), stderr="")
         step = {"step": 2, "name": "ui"}

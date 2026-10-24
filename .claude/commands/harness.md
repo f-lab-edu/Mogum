@@ -1,6 +1,6 @@
 이 프로젝트는 Harness 프레임워크를 사용한다. 아래 워크플로우에 따라 작업을 진행하라.
 
-**작업 분담** — 기획(A~D)과 리뷰는 Claude Code(너), 구현(E)은 Codex 가 한다. 너는 `src/` · `frontend/` 의 제품 코드를 직접 고치지 않는다(사용자가 직접 요청한 경우만 예외). 고칠 것이 있으면 step 파일로 만들어 Codex 에 넘긴다.
+**작업 분담** — 기획(A~D)과 리뷰는 Claude Code(너), 구현(E)은 Codex 가 한다. 너는 `backend/` · `frontend/` 의 제품 코드를 직접 고치지 않는다(사용자가 직접 요청한 경우만 예외). 고칠 것이 있으면 step 파일로 만들어 Codex 에 넘긴다.
 
 ---
 
@@ -25,7 +25,7 @@
 3. **사전 준비 강제** — 하네스는 설계 문서를 프롬프트에 넣지 않는다. Codex 가 스스로 읽는 것은 `AGENTS.md` 뿐이다. 그래서 이 step 에 필요한 `docs/` 문서(가능하면 절 번호까지)와 이전 step에서 생성/수정된 파일 경로를 반드시 적는다. 경로는 저장소 루트 기준 상대경로로 쓴다(`docs/ADR.md`). `/docs/...` 처럼 `/` 로 시작하면 파일시스템 절대경로로 읽힌다.
 4. **시그니처 수준 지시** — 함수/클래스의 인터페이스만 제시하고 내부 구현은 에이전트 재량에 맡긴다. 단, 설계 의도에서 벗어나면 안 되는 핵심 규칙(멱등성, 보안, 데이터 무결성 등)은 반드시 명시한다. `AGENTS.md` 금지 목록 중 이 step 에서 특히 어기기 쉬운 항목은 번호로 짚는다. 테스트 파일 경로는 TDD 가드의 짝 규칙(`AGENTS.md` 작업 방식)에 맞춰 적는다. 맞지 않으면 Codex 의 구현 파일 쓰기가 막힌다.
 5. **AC는 실행 가능한 커맨드** — "~가 동작해야 한다" 같은 추상적 서술이 아닌 실제 실행 가능한 검증 커맨드를 넣는다. 리뷰어(Claude)가 같은 커맨드를 다시 돌려 확인하므로 **아래 형태로만** 쓴다. 리뷰어는 이 형태만 실행할 수 있다(`scripts/execute.py` 의 `REVIEW_TOOLS`).
-   - 백엔드: `./gradlew test` · `./gradlew test --tests '*FooTest'` · `./gradlew build`
+   - 백엔드: `./backend/gradlew -p backend test` · `./backend/gradlew -p backend test --tests '*FooTest'` · `./backend/gradlew -p backend build` (`cd backend && ...` 형태는 리뷰어가 실행하지 못한다)
    - 화면: `npm --prefix frontend run test` · `npm --prefix frontend run lint` (`cd frontend && ...` 형태는 리뷰어가 실행하지 못한다)
 6. **주의사항은 구체적으로** — "조심해라" 대신 "X를 하지 마라. 이유: Y" 형식으로 적는다.
 7. **네이밍** — step name은 kebab-case slug로, 해당 step의 핵심 모듈/작업을 한두 단어로 표현한다 (예: `project-setup`, `api-layer`, `auth-flow`).
@@ -117,15 +117,15 @@
 ## Acceptance Criteria
 
 ```bash
-./gradlew test                    # 백엔드 테스트 통과 (Testcontainers — Docker 필요)
-npm --prefix frontend run test    # 화면 테스트 통과 (화면 step 일 때)
+./backend/gradlew -p backend test   # 백엔드 테스트 통과 (Testcontainers — Docker 필요)
+npm --prefix frontend run test      # 화면 테스트 통과 (화면 step 일 때)
 ```
 
 ## 검증 절차
 
 1. 위 AC 커맨드를 실행한다.
 2. 아키텍처 체크리스트를 확인한다:
-   - `docs/ARCHITECTURE.md` 패키지 구조(`core` ← `api` · `worker` · `infra`)를 따르는가?
+   - `docs/ARCHITECTURE.md` 패키지 구조(도메인별 패키지 · 그 안은 `controller` · `service` · `repository` · `domain` · `dto` · `generation` 은 `worker` · `config` 만 참조)를 따르는가?
    - `docs/ADR.md` 기술 스택을 벗어나지 않았는가?
    - `AGENTS.md` 금지 목록 · 작업 방식(TDD)을 위반하지 않았는가?
    - (화면 step) 적힌 시안 상태와 영역 순서 · 문구 · 가장 강조가 맞는가? 적히지 않은 상태를 만들지 않았는가? 기준은 `docs/design/README.md` 「어디까지 맞추나」

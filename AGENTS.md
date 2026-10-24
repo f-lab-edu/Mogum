@@ -16,9 +16,9 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 | `docs/05-api.md` · `docs/06-screens.md` | API 계약 · 인증(쿠키 세션) · 화면 문구 |
 | `docs/07-testing.md` | 장애 주입 · 용량 측정 · LLM 스텁 |
 
-**스택** — Java 21 · Spring Boot 4(MVC, 플랫폼 스레드) · Spring Security(구글 OAuth) + Spring Session JDBC · PostgreSQL + pgvector · Spring Data JPA(엔티티는 `infra` · Postgres 고유 기능은 `EntityManager` 네이티브 쿼리) · Flyway · OpenAI SDK(`gpt-5.6-terra` · `gpt-5.6-luna` · `text-embedding-3-large`) · FSRS 라이브러리 · ArchUnit · Testcontainers · Micrometer.
+**스택** — Java 21 · Spring Boot 4(MVC, 플랫폼 스레드) · Spring Security(구글 OAuth) + Spring Session JDBC · PostgreSQL + pgvector · Spring Data JPA(엔티티 · 리포지토리는 각 도메인 패키지 · Postgres 고유 기능은 `EntityManager` 네이티브 쿼리) · Flyway · OpenAI SDK(`gpt-5.6-terra` · `gpt-5.6-luna` · `text-embedding-3-large`) · FSRS 라이브러리 · ArchUnit · Testcontainers · Micrometer · Lombok(엔티티의 `@Getter` · `@NoArgsConstructor(access = PROTECTED)` 만. `@Data` · `@Setter` · `@EqualsAndHashCode` · `@ToString` · `@Builder` 는 엔티티에 쓰지 않는다 — [ADR-070](docs/ADR.md)).
 **화면** — `frontend/` · React + TypeScript(strict) · Vite · React Router · TanStack Query · Tailwind CSS · react-markdown + KaTeX + mermaid · Vitest + Testing Library. 빌드 결과는 **Vercel** 에 정적 파일로 배포하고 jar 에는 넣지 않는다. 화면 `{도메인}` · API `api.{도메인}`(EC2) — 같은 사이트 · 다른 출처라 쿠키 세션은 그대로 쓰고 CORS · `XSRF-TOKEN` 쿠키 도메인을 맞춘다([05 §1.1](docs/05-api.md)).
-**패키지** — `core`(도메인 · 유스케이스 · 포트) ← `api` · `worker` · `infra`. 단일 Gradle 모듈.
+**패키지** — 도메인별 패키지(`account` · `curriculum` · `job` … — 각자 `controller` · `service` · `repository` · `domain` · `dto` 하위 패키지로 항상 나눈다) + `generation`(생성 · 유료 호출) · `worker`(수령 루프 · 실행기) · `config`(설정 · 역할별 빈 등록) · `common`(오류 응답 · 시계) · `auth`(로그인). 단일 Gradle 모듈([ADR-067](docs/ADR.md)).
 **운영** — EC2 한 대 · 프로세스 하나(`app.role=all` — API + 워커 실행기 `N` 개) · 화면은 Vercel. 필요하면 실행 인자만으로 `api` / `worker` 로 나눈다. 무중단 배포는 공개 후(ADR-061). 정원제 실사용자.
 
 **작업 분담** — 큰 흐름의 기획 · 리뷰는 Claude Code, TASK별 세부 설계 · 구현은 Codex가 한다. `scripts/execute.py` 가 `phases/{task}/step{N}.md` 를 하나씩 `codex exec` 로 구현시키고, step 이 끝날 때마다 Claude 가 읽기 전용으로 리뷰한다. 반려되면 지적 사항이 다음 구현 시도에 그대로 전달되고, 승인된 step 만 커밋된다.
@@ -29,10 +29,10 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 
 **구조**
 
-1. **`core.generation`(생성 유스케이스 · `LlmClient` · `EmbeddingClient` 등 유료 호출 포트)을 참조하는 것은 `worker` · `infra` · 루트 설정뿐이다.** `api` 는 물론 `core.job` 등 다른 core 패키지도 참조하지 않는다. 유료 포트는 이 패키지에 둔다. → 요청 경로에서 생성이나 유료 호출을 부르면 1분짜리 요청이 조용히 되살아난다 — `api → core.job → 임베딩` 같은 우회도 같다. ArchUnit 이 빌드를 깬다 — 규칙을 무르지 말고 코드를 고친다.
-2. **`core` 에 Spring Web · Spring Data · JPA(`jakarta.persistence`) · `@Transactional` · LLM SDK 를 들이지 않는다.** → 경계가 무너지고 프로바이더를 바꿀 때 도메인이 같이 바뀐다.
-3. **트랜잭션은 `TransactionRunner` 로 드러낸다. LLM 호출 중에는 DB 커넥션을 쥐지 않는다.** → 1분짜리 호출이 커넥션을 쥐면 풀이 마르고 복습 조회까지 멈춘다. `spring.jpa.open-in-view=false`.
-4. **JPA 엔티티는 `infra` 안에만 둔다. 리포지토리 포트는 트랜잭션 안에서 완전히 채운 record 를 돌려준다. 같은 트랜잭션에서 JPA 로 바꾼 행을 네이티브 쿼리로 읽기 전에 `flush()` 한다.** → 트랜잭션 밖 detached 엔티티는 바꿔도 저장되지 않고(예외도 없다) 지연 로딩에서 `LazyInitializationException` 이 난다. flush 를 빼면 플러시 모드에 따라 네이티브 쿼리가 옛 값을 읽는다 — 지금 설정은 Hibernate 가 네이티브 쿼리 전에 스스로 flush 하는 것을 관찰했지만(`1-auth` step 0) 그 동작에 기대지 않는다.
+1. **`generation`(생성 유스케이스 · `LlmClient` · `EmbeddingClient` 등 유료 호출)을 참조하는 것은 `worker` · `config` 뿐이다. `worker` 를 참조하는 것은 `config` 뿐이다.** 컨트롤러 · 서비스는 물론 `job` 등 다른 도메인 패키지도 `generation` 을 참조하지 않는다. 유료 호출 클라이언트는 이 패키지에 둔다. → 요청 경로에서 생성이나 유료 호출을 부르면 1분짜리 요청이 조용히 되살아난다 — `컨트롤러 → job → 임베딩` 같은 우회도 같다. ArchUnit 이 빌드를 깬다 — 규칙을 무르지 말고 코드를 고친다.
+2. **OpenAI SDK(`com.openai`)는 `generation.llm` 안에서만 쓴다.** → SDK 타입이 생성 유스케이스 · 도메인으로 새면 프로바이더를 바꿀 때 같이 바뀐다. ArchUnit 이 막는다.
+3. **LLM 호출 중에는 DB 커넥션을 쥐지 않는다. `generation` · `worker` 는 `@Transactional` 을 쓰지 않고 `TransactionTemplate` 으로 경계를 드러낸다.** 컨트롤러가 부르는 일반 서비스는 `@Transactional` 을 쓴다. → 1분짜리 호출이 커넥션을 쥐면 풀이 마르고 복습 조회까지 멈춘다. 어노테이션은 경계를 메서드 뒤에 숨기고, 같은 클래스 안 호출(self-invocation)에서는 조용히 빠진다. ArchUnit 이 두 패키지의 `@Transactional` 을 막는다. `spring.jpa.open-in-view=false`.
+4. **LLM 호출을 사이에 둘 때는 엔티티 대신 ID 나 값(record)을 넘기고 다음 트랜잭션에서 다시 읽는다. 같은 트랜잭션에서 JPA 로 바꾼 행을 네이티브 쿼리로 읽기 전에 `flush()` 한다.** → 트랜잭션 밖 detached 엔티티는 바꿔도 저장되지 않고(예외도 없다) 지연 로딩에서 `LazyInitializationException` 이 난다. flush 를 빼면 플러시 모드에 따라 네이티브 쿼리가 옛 값을 읽는다 — 지금 설정은 Hibernate 가 네이티브 쿼리 전에 스스로 flush 하는 것을 관찰했지만(`1-auth` step 0) 그 동작에 기대지 않는다.
 5. **`docs/01-overview.md §6` 의 제외 항목을 트리거 없이 넣지 않는다**(Redis · 레이트리미터 · 가상 스레드 · 선행 생성 · 학습 플랜 · 다크 모드 …). → 측정 근거 없이 복잡도만 는다. 필요해 보이면 트리거부터 확인하고 문서를 먼저 고친다.
     MVP 커리큘럼은 주제 · 목적을 받아 내용과 권장 순서만 만든다. 기간/주당 학습량 입력 · 예상 완료 기간 · 주차별 일정/조정은 후속 학습 플랜 기능이다. 강의는 총 1~40개이며 학습 속도와 순서는 사용자가 선택한다. FSRS 복습 일정은 유지한다.
     단일/그룹은 LLM이 목표의 일관성 · 독립적인 하위 목표 · 선행 관계로 판단하고 사용자가 결과를 검토한다. 초기 첫 생성 호출에서 유형과 단일 강의 목록/그룹 분할안을 함께 반환하며 정상 경로의 생성용 채팅은 1회다. 초기에는 `CURRICULUM_INITIAL` 잡에 주제/목적을 저장하고 성공할 때 단일 커리큘럼 또는 그룹을 생성/연결한다. 빈 단일/그룹을 미리 만들지 않는다. 접수는 `POST /curriculum-requests`, 복귀는 미완료 요청 조회와 잡 결과 유형/ID로 한다. 초기 요청은 요청 식별자로 중복 접수 시 기존 작업에 연결한다. 정확한 출력/예산과 중복 처리의 구현 세부는 해당 TASK에서 설계한다. 사용자는 **실패한** 초기 요청만 지울 수 있다 — 짜는 중인 요청은 지우지 않는다. 서버는 구조/상한/순서를 검증한다. 초기 대기는 U10, 그룹은 묶음 화면 U11 하나로 다루고 단계 커리큘럼은 기존 U3 를 쓴다([03 §2.1](docs/03-generation.md) · [06 §7 · §9](docs/06-screens.md)).
@@ -57,7 +57,7 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 16. **`insufficient_quota` 429 는 재시도하지 않는다.** → 충전 전까지 계속 실패하며 시간만 쓴다.
 17. **채팅 · 임베딩은 외부 시도마다 `llm_calls` 에 등록하고 사용량은 그 행에 한 번만 확정한다. 일일 합계(쿼터 · 킬스위치)는 저장하지 않고 원장에서 더한다.** → 같은 시도의 DB 재기록만 같은 ID로 한다. `usage` 가 없으면 비용 NULL · 미확인으로 남기고, 결과 저장 실패나 리스 상실로 확인된 사용량을 버리지 않는다.
     등록할 때 잡 행을 잠그고 종류별 누적 호출 상한을 검사한다. 재시작 · 반납 · 사용자 재시도로 이력과 상한을 초기화하지 않는다. 미확인 시도도 포함하고, 소진 시 추가 전송을 멈춘다([04 §4.8](docs/04-jobs-and-cost.md)).
-18. **프롬프트를 바꾸면 버전을 올린다**(`src/main/resources/prompts/vN/` · `materials.prompt_version`). 운영 프롬프트는 v6 부터 — 루트 `prompts/` 는 1단계 실험본(저장소 밖)이다. → 품질 전후 비교가 불가능해진다.
+18. **프롬프트를 바꾸면 버전을 올린다**(`backend/src/main/resources/prompts/vN/` · `materials.prompt_version`). 운영 프롬프트는 v6 부터 — 루트 `prompts/` 는 1단계 실험본(저장소 밖)이다. → 품질 전후 비교가 불가능해진다.
     모든 전송은 시스템 · 누적 대화 · 툴/응답 스키마를 포함한 입력 예산을 등록 전에 검사한다. 초과하면 `INPUT_TOO_LARGE`, 자동 절삭 · 요약 · 같은 입력 재시도는 하지 않는다. 검사는 직렬화한 요청 전체의 UTF-8 바이트 수로 한다(토큰 수 ≤ 바이트 수). 재료 상한(글자 수 · 출력 상한 · 툴 결과 개수 · 개념 이름/정의 길이)을 무르면 정적 최대 입력이 깨진다([03 §8.7](docs/03-generation.md)).
     잡 I/A는 주제/목적 임베딩 + 키워드 검색으로 사용자 학습 개념만 선별한다. 초기 I의 예산은 적재 전에 별도로 확정하며 결과 유형에 따라 A 예산으로 바꾸지 않는다. 검색용 임베딩도 비용 · 누적 호출 몫에 포함한다. 관련도는 개념 동일성이나 숙련도 판정이 아니며, 선별 스냅샷은 현재 숙련도 캐시로 쓰지 않는다([02 §5.4](docs/02-domain-data.md)).
 
@@ -72,15 +72,16 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 24. **`R` 공식을 바꾸면 SQL 과 라이브러리 일치 테스트를 함께 고친다. FSRS 간격을 직접 덮어쓰지 않는다**(학습 단계는 비우고 간격은 라이브러리에 맡긴다). → 숙련도 판정이 조용히 틀어진다.
     학습 완료는 강의 ID 기준으로 한 번만 반영한다. 이미 완료한 강의의 재요청도 성공으로 응답하며 카드의 FSRS 상태 · 날짜 · 횟수/버전 · 복습 이력을 초기화하지 않는다. 최초 완료/삭제/동시 완료는 같은 커리큘럼 잠금으로 직렬화하고 카드 상태 생성과 진도 전환을 함께 커밋한다. 첫 복습 목록은 현재 미평가 카드만 반환한다([02 §3](docs/02-domain-data.md)).
 25. **프로세스 메모리에 공유 상태(카운터 · 캐시 · 잠금)를 새로 두지 않는다 — DB 에 둔다.** 예외는 API 레이트리밋 버킷 하나. → 역할 전환(`app.role`)으로 프로세스를 나누는 순간 상태가 쪼개져 상한 · 중복 방지가 조용히 깨진다.
-26. **역할 판단(`app.role`)은 루트 설정의 빈 등록에서만 한다.** `api` · `worker` · `core` 코드에 *"지금 내 역할이 뭐지"* 분기를 넣지 않는다. → 역할이 코드 곳곳에 퍼지면 나눠 띄울 때 무엇이 켜지는지 알 수 없다.
+26. **역할 판단(`app.role`)은 `config` 의 빈 등록에서만 한다.** 수령 루프 · 실행기 빈은 컴포넌트 스캔(`@Component` · `@Service`)으로 올리지 않고 `config` 에서 등록한다. 컨트롤러 · 서비스 · `worker` · `generation` 코드에 *"지금 내 역할이 뭐지"* 분기를 넣지 않는다. → 역할이 코드 곳곳에 퍼지면 나눠 띄울 때 무엇이 켜지는지 알 수 없다. 스캔으로 올린 실행기는 역할과 무관하게 항상 켜진다.
 27. **세션에는 사용자 id 만 둔다. 상태 · 역할은 요청마다 `users` 에서 읽는다.** → 세션에 상태를 넣으면 대기자를 승인하거나 약관이 바뀌어도 로그인 중인 사람에게 반영되지 않는다.
+28. **엔티티는 생성 흐름마다 이름 있는 정적 팩토리 메서드로만 만든다(예: `User.join`).** public 생성자 · `@Builder` 를 두지 않는다 — JPA 용 기본 생성자만 `protected`(ADR-070 · ADR-071). 처음 상태처럼 엔티티 스스로 정할 수 있는 규칙은 팩토리 안에 고정하고, 바깥 정보가 필요한 값(관리자 목록으로 정하는 역할 등)은 서비스가 정해 인자로 넘긴다. 같은 타입 인자가 이어지면 팩토리가 채운 값을 getter 로 확인하는 테스트를 둔다. → 서비스마다 처음 상태를 채우면 TASK 마다 다르게 채워 잘못된 상태의 행이 생기고, 빌더는 필수 값을 빠뜨려도 컴파일된 뒤 INSERT 에서야 NOT NULL 로 터진다.
 
 ## 작업 방식
 
 - **사전 기획은 MVP 범위와 주요 사용자 흐름 중심으로 마무리한다.** DB 컬럼/인덱스, API 세부, 경합/재전송 처리, 수치 설정 등은 관련 TASK를 시작할 때 Codex가 설계·문서화·검증한다. 문서의 ‘구현 전 확정’ 항목은 그 TASK에서 해결할 항목이며 전체 개발 착수를 막는 조건이 아니다. 이미 확정한 제약은 유지하고, MVP 범위나 주요 사용자 동작을 바꾸는 결정은 사용자에게 확인한다. 통상적인 구현 선택마다 확인을 요청하거나 사전 기획 질문을 계속 늘리지 않는다.
 
 - CRITICAL: 새 기능은 **테스트를 먼저 쓰고**, 그 테스트가 통과하는 구현을 쓴다(TDD). 작업을 검증 가능한 목표로 바꾸고 통과할 때까지 반복한다.
-    훅이 강제한다(`scripts/tdd_guard.py` — Claude · Codex 공통). 짝 테스트 없이 구현 파일을 쓰면 막히고, 구현만 바꾸고 끝내면 한 번 되돌려진다. 짝 테스트는 `src/main/java/…/Foo.java` → 같은 패키지의 `src/test/java/…/Foo*Test.java` 또는 `Foo*IT.java`, `frontend/src/…/foo.tsx` → 같은 폴더의 `foo.test.tsx` 또는 `__tests__/foo.test.tsx` 다. interface · record · enum · 예외 · `@Entity` · 타입 전용 파일은 검사하지 않는다.
+    훅이 강제한다(`scripts/tdd_guard.py` — Claude · Codex 공통). 짝 테스트 없이 구현 파일을 쓰면 막히고, 구현만 바꾸고 끝내면 한 번 되돌려진다. 짝 테스트는 `backend/src/main/java/…/Foo.java` → 같은 패키지의 `backend/src/test/java/…/Foo*Test.java` 또는 `Foo*IT.java`, `frontend/src/…/foo.tsx` → 같은 폴더의 `foo.test.tsx` 또는 `__tests__/foo.test.tsx` 다. interface · record · enum · 예외 · `@Entity` · 타입 전용 파일은 검사하지 않는다.
 - 커밋 메시지는 conventional commits(`feat:` · `fix:` · `docs:` · `refactor:` · `test:`).
 - **`main` 은 PR 로만 바뀐다.** `main` 에서 커밋 · 병합하거나 `main` 으로 push 하지 않는다. GitHub 룰셋(PR 필수 · 강제 push/삭제 금지 · 예외 없음)이 서버에서 막고, `.githooks/` 가 로컬에서 먼저 막는다. PR 병합 뒤 로컬 `main` 은 `git pull --ff-only` 로만 따라간다.
 - 설계와 다르게 가야 하면 **코드보다 `docs/` 를 먼저 고친다.** 문서와 코드가 다르면 문서가 틀린 것으로 보고 묻는다.
@@ -93,10 +94,12 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 ## 명령어
 
 ```
-docker compose up -d        # 로컬 Postgres(pgvector) — bootRun 전에
-./gradlew bootRun            # 개발 서버 (API + 워커, app.role=all) — 기동에 GOOGLE_CLIENT_ID · GOOGLE_CLIENT_SECRET 필요(없으면 기동 거부) · 로그인 허용 계정은 APP_AUTH_ADMIN_EMAILS
-./gradlew test               # 백엔드 테스트 (Testcontainers — Docker 필요)
-./gradlew build              # 백엔드 jar 생성 — 화면은 넣지 않는다
+docker compose up -d --build       # 로컬 Postgres(pgvector) + 서버 컨테이너(backend/Dockerfile · 8080) — 저장소 루트에서. 서버는 루트 .env 를 읽는다
+docker compose up -d postgres       # DB 만 — 서버를 IDE · bootRun 으로 띄울 때(8080 이 겹치지 않게 서버 컨테이너는 띄우지 않는다)
+cd backend && ./gradlew bootRun     # 개발 서버 (API + 워커, app.role=all) — 기동에 GOOGLE_CLIENT_ID · GOOGLE_CLIENT_SECRET 필요(없으면 기동 거부) · 로그인 허용 계정은 APP_AUTH_ADMIN_EMAILS
+cd backend && ./gradlew test        # 백엔드 테스트 (Testcontainers — Docker 필요)
+cd backend && ./gradlew build       # 백엔드 jar 생성 — 화면은 넣지 않는다
+./backend/gradlew -p backend test   # 저장소 루트에서 같은 일 — step 의 AC · 리뷰어는 이 형태로 쓴다(cd 불가)
 cd frontend && npm run dev   # 화면 개발 서버 (Vite — API 는 proxy 로 같은 출처처럼)
 cd frontend && npm run build # 화면 빌드 (배포는 Vercel)
 cd frontend && npm run test  # 화면 테스트 (Vitest)

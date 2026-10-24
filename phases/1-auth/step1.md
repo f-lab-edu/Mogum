@@ -1,5 +1,7 @@
 # Step 1: session-api
 
+> 2026-10-19 후속 변경: 이 step의 구글 전용 계정 모델/클래스는 ADR-064로 대체했다. 현재 구현은 `Login` · `ExternalAccount` · `OAuthLoginHandler`와 `user_identities`이며, 기존 V2는 유지하고 V4로 이전한다. 최신 구조와 검증은 [02 §6.1](../../docs/02-domain-data.md) · [04 §2](../../docs/04-jobs-and-cost.md) · [07 §1.2](../../docs/07-testing.md)를 따른다.
+
 ## 읽어야 할 파일
 
 먼저 아래 파일들을 읽고 프로젝트의 아키텍처와 설계 의도를 파악하라:
@@ -10,7 +12,7 @@
 - `docs/04-jobs-and-cost.md` §3.2(만료 세션 정리)
 - `docs/07-testing.md` §1.2 의 "세션" · "소유권" 행
 - `docs/ADR.md` ADR-010 · ADR-060 · ADR-062
-- 이전 step 산출물: `src/main/java/com/mogum/core/account/` · `src/main/java/com/mogum/infra/` 의 사용자 어댑터 · `src/main/resources/db/migration/` · `src/main/resources/application.yml` · `build.gradle` · `src/test/java/com/mogum/support/PostgresTestConfiguration.java`
+- 이전 step 산출물: `src/main/java/com/mogum/core/account/` · `src/main/java/com/mogum/infra/account/` 의 사용자 어댑터 · `src/main/resources/db/migration/` · `src/main/resources/application.yml` · `build.gradle` · `src/test/java/com/mogum/support/PostgresTestConfiguration.java`
 
 이전 step에서 만들어진 코드를 꼼꼼히 읽고, 설계 의도를 이해한 뒤 작업하라.
 
