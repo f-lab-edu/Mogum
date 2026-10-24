@@ -247,10 +247,10 @@ class TestStop:
 
     def test_session_touched_test_is_allowed(self, repo):
         self._write_via_hook(repo, FOO_TEST, "class FooTest {}")
-        self._write_via_hook(repo, FOO, "public class Foo { int run() { return 1; } }")
         subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
         subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c"],
                        cwd=repo, check=True)
+        self._write_via_hook(repo, FOO, "public class Foo { int run() { return 1; } }")
         assert tg.stop(stop_payload(repo), repo) is None
 
     def test_uncommitted_test_in_worktree_is_allowed(self, repo):
@@ -284,6 +284,35 @@ class TestStop:
                        cwd=repo, check=True)
         self._write_via_hook(repo, FOO, "public class Foo { int run() { return 1; } }", sid="codex-1")
         assert tg.stop(stop_payload(repo, sid="claude-1"), repo) is None
+
+    def _commit(self, repo):
+        subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c"],
+                       cwd=repo, check=True)
+
+    def test_committed_prod_is_allowed(self, repo):
+        put(repo, FOO_TEST)
+        self._commit(repo)
+        self._write_via_hook(repo, FOO, "public class Foo { int run() { return 1; } }")
+        self._commit(repo)
+        assert tg.stop(stop_payload(repo), repo) is None
+
+    def test_acknowledged_block_does_not_repeat_next_turn(self, repo):
+        bar, bar_test = FOO.replace("Foo", "Bar"), FOO_TEST.replace("Foo", "Bar")
+        put(repo, FOO_TEST)
+        put(repo, bar_test)
+        self._commit(repo)
+        self._write_via_hook(repo, FOO, "public class Foo { int run() { return 1; } }")
+        assert tg.stop(stop_payload(repo), repo) is not None
+        assert tg.stop(stop_payload(repo, active=True), repo) is None  # 근거를 적고 다시 끝냄
+
+        assert tg.stop(stop_payload(repo), repo) is None  # 다음 턴 — 같은 변경으로 다시 막지 않는다
+
+        self._write_via_hook(repo, bar, "public class Bar { int run() { return 1; } }")
+        msg = tg.stop(stop_payload(repo), repo)  # 새 구현 변경은 다시 검사한다
+        assert msg is not None
+        assert bar in msg
+        assert FOO not in msg
 
 
 # ---------------------------------------------------------------------------
