@@ -1,6 +1,6 @@
 # 운영 절차서
 
-이 문서는 **처음 구축 순서 → 운영 확인 목록 → 첫 배포 때 확인 → 비용 → 구성별 상세** 순서로 읽는다. 저장소의 배포 파일과 자동 테스트는 만들었고, AWS 자원은 [처음 구축 순서](#처음-구축-순서) 2대로 만들었다(2026-10-25~26). **실제 배포 · 운영 도메인 · AWS 백업 복원 연습은 아직 수행하지 않았다.** 아래 체크와 기록은 사람이 실행한 뒤 남긴다. 공개 여부는 [01 §10](../docs/01-overview.md#10-공개-필수-목록)의 별도 판단이다.
+이 문서는 **처음 구축 순서 → 운영 확인 목록 → 첫 배포 때 확인 → 비용 → 구성별 상세** 순서로 읽는다. 저장소의 배포 파일과 자동 테스트는 만들었고, [처음 구축 순서](#처음-구축-순서) 1~5(AWS 자원 · DNS · 서버 준비 · 저장소 변수)를 마쳤다(2026-10-25~26). **실제 배포 · 운영 도메인 · AWS 백업 복원 연습은 아직 수행하지 않았다.** 아래 체크와 기록은 사람이 실행한 뒤 남긴다. 공개 여부는 [01 §10](../docs/01-overview.md#10-공개-필수-목록)의 별도 판단이다.
 
 `{도메인}` · `ACCOUNT_ID` · `BUCKET_NAME` · `INSTANCE_ID`는 자리표시다. 실제 도메인 · 계정 · 버킷 · 이메일 · 자격 정보는 공개 저장소에 적지 않는다. 명령의 자리표시도 실행 전에 바꾼다. AWS 자원 생성/설정은 운영자의 관리자 임시 자격으로 수행하고, 앱 배포/백업은 OIDC와 인스턴스 역할을 쓴다.
 
@@ -37,16 +37,16 @@
 
 3. **Cloudflare DNS.** `api.{도메인}`의 **A 레코드 값은 위 Elastic IP**, 프록시는 **DNS only · 회색 구름**으로 저장한다. 쓸 파일: [Caddyfile](./Caddyfile)의 `API_DOMAIN`, [05 §1.4](../docs/05-api.md#14-우리-api-레이트리밋). 프록시를 켜면 모든 요청이 Cloudflare IP로 보여 IP당 레이트리밋이 깨지고 Caddy 인증서 발급 경로도 바뀐다(ADR-060이 Vercel API 프록시를 뺀 것과 같은 이유). 완료 확인: DNS → Records에서 해당 행의 Proxy status가 **DNS only**인지 다시 연다. 로컬의 `dig +short A api.{도메인}`이 Elastic IP인지 확인한다. 같은 호스트의 예전 A/AAAA 레코드가 다른 서버를 가리키면 정리한다. [Cloudflare 프록시 상태 문서](https://developers.cloudflare.com/dns/proxy-status/). 화면 `{도메인}` 레코드는 6번의 Vercel 안내값으로 만들며 그것도 DNS only다.
 
+   **수행 기록(2026-10-26)** — `api` A 레코드를 DNS only로 저장했다. 공용 리졸버 세 곳과 Cloudflare 권한 네임서버가 모두 Elastic IP를 돌려주고 AAAA/CNAME은 없다(프록시였다면 Cloudflare IP와 AAAA가 나온다).
+
 4. **서버 준비 — Session Manager로 접속.** 쓸 파일: [mogum.env.example](./mogum.env.example), [compose.yaml](./compose.yaml), [deploy.sh](./deploy.sh), [systemd/](./systemd/). 아래 설치/확인을 마친 뒤 env를 채운다. 서버에서 앱을 빌드하지 않는다.
 
    서버 명령은 Bash · Docker Engine/CLI · **Compose 플러그인(`docker compose`)** · AWS CLI **v2** · curl · systemd(`systemctl` · `journalctl` · `systemd-run` · `systemd-analyze`) · GNU coreutils(`cat` · `stat` · `install` · `readlink` · `ln` · `mv` · `sort` · `rm` · `sleep` · `id` · `mktemp` · `date` · `wc` · `chmod`) · diffutils(`cmp`) · findutils(`find`) · tar/gzip · grep다. 호스트 JDK · Gradle · Postgres 도구는 필요 없다.
 
-   SSM 셸에서 `sudo -i` 후 Bash를 사용한다. [AWS의 AL2023 Docker 설치](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-docker.html), [AL2023 DNF](https://docs.aws.amazon.com/linux/al2023/ug/package-management.html), [Compose 수동 설치](https://docs.docker.com/compose/install/linux/#install-the-plugin-manually)를 근거로 한 명령이다. Compose는 전 사용자 경로에 arm64 파일을 설치한다. 아래 버전은 [공식 릴리스 v2.40.3](https://github.com/docker/compose/releases/tag/v2.40.3)이며 AL2023 실제 설치/기동 확인은 아직이다. 수동 설치 플러그인은 자동 갱신되지 않는다.
+   SSM 셸에서 먼저 `sudo -i`만 실행해 root 프롬프트(`#`)를 연 뒤, 아래 블록을 **통째로** 붙여 넣는다. `sudo -i`와 나머지를 한 번에 붙이면 뒤 줄이 새 셸에 전달되지 않고 아무것도 실행되지 않는다(2026-10-26 확인). 블록은 Bash 스크립트 하나라서 실패한 줄에서 멈추고 세션은 닫히지 않는다. [AWS의 AL2023 Docker 설치](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-docker.html), [AL2023 DNF](https://docs.aws.amazon.com/linux/al2023/ug/package-management.html), [Compose 수동 설치](https://docs.docker.com/compose/install/linux/#install-the-plugin-manually)를 근거로 한 명령이다. Compose는 전 사용자 경로에 arm64 파일을 설치한다. 아래 버전은 [공식 릴리스 v2.40.3](https://github.com/docker/compose/releases/tag/v2.40.3)이며, 2026-10-26 AL2023 aarch64에서 Docker 25.0.18 · Compose v2.40.3 · aws-cli 2.38.0으로 설치 · 자동 시작을 확인했다. 수동 설치 플러그인은 자동 갱신되지 않는다.
 
    ```bash
-   sudo -i
-   bash
-   set -euo pipefail
+   bash -euo pipefail <<'EOF'
    test "$(uname -m)" = aarch64
    dnf install -y docker awscli-2 bash coreutils diffutils findutils tar gzip grep
    command -v curl
@@ -61,11 +61,13 @@
    aws --version
    install -d -m 755 /opt/mogum /opt/mogum/releases
    install -d -m 700 /etc/mogum
+   echo "=== SETUP OK ==="
+   EOF
    ```
 
    AL2023 AMI의 기본 `curl-minimal`이 HTTPS curl을 제공한다([AWS 패키지 설명](https://docs.aws.amazon.com/linux/al2023/ug/curl-minimal.html)). `command -v curl` 실패나 패키지/다운로드 오류면 이 단계에서 멈추고 [첫 배포 때 확인](#첫-배포-때-확인)의 설치 항목을 해결한다. AWS CLI 출력은 `aws-cli/2…`여야 한다.
 
-   로컬 저장소의 `deploy/mogum.env.example` **내용을 견본으로만** 서버 편집기에 옮겨 `/etc/mogum/mogum.env`에 저장한다. 최초 파일은 `umask 077; touch /etc/mogum/mogum.env`로 만들고 `vi /etc/mogum/mogum.env`로 채운다. 기존 파일이 있으면 비우거나 견본으로 덮어쓰지 않는다. 비밀을 명령 인자 · 셸 이력 · Actions 로그에 넣지 않는다. 이 파일은 Compose와 systemd `EnvironmentFile`이 함께 읽으므로 `NAME=value` 형식이며 `export`/셸 치환은 쓰지 않는다. 두 파서에서 같은 값이 되는 인용 형식을 사용한다.
+   로컬 저장소의 `deploy/mogum.env.example` **내용을 견본으로만** 서버 편집기에 옮겨 `/etc/mogum/mogum.env`에 저장한다. 최초 파일은 `umask 077; touch /etc/mogum/mogum.env`로 만들고 `vi /etc/mogum/mogum.env`로 채운다. 기존 파일이 있으면 비우거나 견본으로 덮어쓰지 않는다. 비밀을 명령 인자 · 셸 이력 · Actions 로그에 넣지 않는다. `DB_PASSWORD`는 사람이 알 필요가 없으므로 서버에서 `head -c 32 /dev/urandom | od -An -v -tx1 | tr -d ' \n'`(16진수 64자 — 두 파서가 따옴표 없이 같은 값으로 읽는다)으로 만들어 화면에 출력하지 않고 파일에 바로 넣어도 된다. 이 파일은 Compose와 systemd `EnvironmentFile`이 함께 읽으므로 `NAME=value` 형식이며 `export`/셸 치환은 쓰지 않는다. 두 파서에서 같은 값이 되는 인용 형식을 사용한다.
 
    | 이름 | 넣을 값 |
    |---|---|
@@ -92,7 +94,11 @@
    done
    ```
 
+   **수행 기록(2026-10-26)** — 위 설치와 env 작성을 마쳤다. 운영자 자격의 SSM Run Command로 아키텍처 · 버전 · Docker `active`/`enabled` · `/etc/mogum` `700 root` · env `0:600`, 필수 10개 항목이 한 줄씩 값이 있고 공백/따옴표가 없음, `APP_IMAGE` 없음, 도구 26개를 확인했다(값은 출력하지 않았다).
+
 5. **GitHub 저장소 변수.** 쓸 파일: [deploy.yml](../.github/workflows/deploy.yml), [변수 표](#github-actions-배포). Actions Variables에 `AWS_REGION` · `AWS_DEPLOY_ROLE_ARN` · `DEPLOY_BUCKET` · `DEPLOY_INSTANCE_ID` · `API_ORIGIN`을 등록한다. `DEPLOY_BUCKET`은 서버 `MOGUM_BUCKET`과 같다. **`DEPLOY_ENABLED=false`로 유지**한다. AWS 장기 키나 Google 비밀을 등록하지 않는다. 완료 확인: 여섯 변수의 이름/값을 설정 화면에서 대조하고, 워크플로가 `main`에 있으며 조직이 러너/액션을 허용하는지 확인한다.
+
+   **수행 기록(2026-10-26)** — 여섯 변수를 등록했고(`DEPLOY_ENABLED=false`) `gh variable list`로 이름/값을 대조했다. Secrets는 비어 있다. 워크플로가 `main`에 있는지와 조직의 러너/액션 허용은 병합 뒤 8번에서 확인한다.
 
 6. **Vercel 프로젝트 · 환경 변수 · 도메인.** 쓸 파일: [frontend/vercel.json](../frontend/vercel.json), [Vercel 설정 표](#vercel화면). 이미 만든 Hobby 프로젝트를 사용한다. Root Directory `frontend` · Vite · Build Command `npm run build` · Output `dist` · Production Branch `main`. **Production에만** `VITE_API_BASE_URL=https://api.{도메인}` 등록 후 다시 빌드한다. Domains에 `{도메인}`을 추가하고 Vercel 안내 DNS 값을 Cloudflare에 **DNS only**로 넣는다. 완료 확인: Vercel 도메인 연결/인증서가 정상이며 운영 도메인의 `/login` 새로고침이 성공한다. Hobby 비상업 조건은 [첫 배포 때 확인](#첫-배포-때-확인)에서 서비스 적합성을 판단한다. `*.vercel.app` 미리보기에서 로그인은 검사하지 않는다.
 
@@ -187,9 +193,9 @@
 | 1 | 조직 Actions 정책에서 `ubuntu-24.04-arm` 허용/사용 가능 여부, 실제 로그의 arm64와 무료 제공 조건 확인([러너 표](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories)) | 조직 Actions/결제 설정, 필요 시 `.github/workflows/deploy.yml`의 러너 선택을 별도 검토 |
 | 2 | `actions/checkout@v5` · `actions/setup-java@v5` · `aws-actions/configure-aws-credentials@v5`의 허용/해결 성공과 입력 동작을 실제 실행 로그로 확인 | 조직 허용 액션 설정 · `deploy.yml` |
 | 3 | 러너 Docker · AWS CLI v2 · jq · curl · Bash · GNU 도구 · tar/grep, 전체 build와 같은 이미지 `imageTest` 성공 확인([도구 목록](https://github.com/actions/partner-runner-images/blob/main/images/arm-ubuntu-24-image.md)) | 러너 준비 단계/`deploy.yml`, 필요 시 `backend/build.gradle` · `AppImageIT` |
-| 4 | 위 AL2023 패키지 설치 · aarch64 Compose 다운로드 · root의 `docker compose version` · Docker 자동 시작을 실제 SSM 셸에서 확인 | 이 문서의 서버 설치 명령/버전, 호스트 패키지 설정 |
+| 4 | 위 AL2023 패키지 설치 · aarch64 Compose 다운로드 · root의 `docker compose version` · Docker 자동 시작을 실제 SSM 셸에서 확인 — 2026-10-26 수행 | 이 문서의 서버 설치 명령/버전, 호스트 패키지 설정 |
 | 5 | env의 root `600` · 필수 값 · Compose/systemd의 인용값 해석, DB 초기화와 `aws` 프로필 기동 확인(내용 출력 금지) | 서버 `/etc/mogum/mogum.env`; 계약 문제면 견본/Compose/설정 별도 수정 |
-| 6 | SSM Agent Online/접속, 인스턴스 프로파일 · `AmazonSSMManagedInstanceCore`, ECR/S3/SSM 외부 HTTPS 통신 확인 | IAM/EC2/네트워크 설정; 정책 견본 문제면 `aws/instance-policy.json` |
+| 6 | SSM Agent Online/접속, 인스턴스 프로파일 · `AmazonSSMManagedInstanceCore`, ECR/S3/SSM 외부 HTTPS 통신 확인 — Online · Session Manager · Run Command · 프로파일은 2026-10-26 수행, ECR/S3 통신은 8번에서 | IAM/EC2/네트워크 설정; 정책 견본 문제면 `aws/instance-policy.json` |
 | 7 | Cloudflare API/화면 DNS only · Elastic IP/화면 안내 DNS · 80/443 접근 · Caddy 인증서 발급/reload · HTTPS 확인 | Cloudflare DNS/SG, `/etc/mogum/caddy/Caddyfile` 원본인 `deploy/Caddyfile` |
 | 8 | 치환한 JSON 수락 · OIDC audience/sub · `main` 수임 성공, 다른 브랜치/PR/포크 거절 확인. 워크플로에 `environment` 없어야 함 | IAM 공급자/역할 신뢰 · `aws/github-oidc-trust.json` · `deploy.yml` |
 | 9 | [AWS CLI v2 적용 예](#aws-cli-v2-적용-예)의 실제 성공과 SSM [send-command](https://docs.aws.amazon.com/cli/latest/reference/ssm/send-command.html)/[get-command-invocation](https://docs.aws.amazon.com/cli/latest/reference/ssm/get-command-invocation.html) 옵션/응답을 실행 로그로 확인 | 이 문서 CLI 예제/운영 CLI 버전 · `deploy.yml`의 명령/결과 처리 |
