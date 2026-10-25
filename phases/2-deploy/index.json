@@ -61,7 +61,10 @@
     {
       "step": 7,
       "name": "runbook",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-25T16:03:52+0900",
+      "summary": "deploy/README.md 를 처음 배포 절차서로 완성 — 절: 처음 구축 순서(1~8) · 운영 확인 목록 · 첫 배포 때 확인(18개) · 비용(대략) · 서버 구성 · AWS 설정 · GitHub Actions 배포 · Vercel(화면) · 백업 · 복원. 설계 문서: ARCHITECTURE(디렉터리 구조 · 배포 절 링크) · 04 §3(만들었다 · 실제 AWS · 운영 확인은 아직) · ADR-072 검증(저장소 쪽만 확인 · 실제 배포 · 복원 연습은 아직) · 05 §1.1(절차서 링크). 1차 리뷰 지적(APP_AUTH_ADMIN_EMAILS 빈 값은 Compose 기동 거부)은 Codex 사용 한도로 Claude 가 문서 한 줄을 고쳤다",
+      "completed_at": "2026-10-25T17:46:10+0900"
     }
   ],
   "created_at": "2026-10-25T15:23:32+0900"
