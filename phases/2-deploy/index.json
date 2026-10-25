@@ -73,6 +73,11 @@
       "started_at": "2026-10-26T00:46:25+0900",
       "summary": "deploy.yml 식별자 3개(AWS_DEPLOY_ROLE_ARN·DEPLOY_BUCKET·DEPLOY_INSTANCE_ID)는 Secrets, 공개 설정 3개는 Variables로 분리; 첫 검사 단계의 ::add-mask::로 ARN에서 추출한 계정 ID를 오류 출력·레지스트리 구성·AWS 호출 전에 등록하고 mask-aws-account-id=true 적용; WorkflowFilesTest 참조 집합·가림 순서·누락/형식 검사 불변식 보강(36개), AC 전체 280개 통과(23초); README 처음 구축 5번·Variables/Secrets 표·첫 배포 확인, 04 §3 배포 행·ADR-072 트레이드오프 반영; 수행 기록·배포 흐름·권한 보존, 실제 설정 이전/Actions 확인·커밋 없음",
       "completed_at": "2026-10-26T00:50:35+0900"
+    },
+    {
+      "step": 9,
+      "name": "action-pinning",
+      "status": "pending"
     }
   ],
   "created_at": "2026-10-25T15:23:32+0900",
