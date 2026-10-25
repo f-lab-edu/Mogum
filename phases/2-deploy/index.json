@@ -53,7 +53,10 @@
     {
       "step": 6,
       "name": "vercel",
-      "status": "pending"
+      "status": "completed",
+      "summary": "frontend/vercel.json에 정적 파일 우선 후 /(.*) → /index.html SPA rewrite 하나만 추가(API·OAuth 프록시 없음), vercelConfig.test.ts 신규 3개로 규칙·외부 목적지 금지·API/auth 별도 라우팅 금지 검사, deploy/README.md에 기존 Hobby 프로젝트 설정·Production API 출처·DNS only 도메인 연결·main·요금제 및 첫 배포 확인 목록 반영; npm --prefix frontend run test 전체 64개(10파일)·lint·build(tsc 타입 검사 포함) 모두 통과, 운영 도메인·Hobby 비상업 조건 확인은 첫 배포 목록에 유지, 커밋 없음",
+      "started_at": "2026-10-25T16:01:05+0900",
+      "completed_at": "2026-10-25T16:03:51+0900"
     },
     {
       "step": 7,
