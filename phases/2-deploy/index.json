@@ -81,6 +81,11 @@
       "started_at": "2026-10-26T06:30:01+0900",
       "summary": "configure-aws-credentials v5.1.1·checkout v5.1.0·setup-java v5.7.0을 지정된 40자 SHA로 고정; WorkflowFilesTest의 SHA 형식·정확한 액션 집합/SHA·릴리스 주석 불변식과 기존 입력 검사 유지; README GitHub Actions 배포·첫 배포 확인 수정 및 공식 저장소 입력 확인 기록 보존; AC 전체 280개 통과(23초), actionlint 미설치로 건너뜀; 커밋 없음",
       "completed_at": "2026-10-26T06:35:29+0900"
+    },
+    {
+      "step": 10,
+      "name": "oidc-immutable-sub",
+      "status": "pending"
     }
   ],
   "created_at": "2026-10-25T15:23:32+0900",
