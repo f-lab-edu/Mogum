@@ -193,7 +193,7 @@
 | # | 확인할 사실 · 방법 | 틀렸을 때 고칠 곳 |
 |---|---|---|
 | 1 | 조직 Actions 정책에서 `ubuntu-24.04-arm` 허용/사용 가능 여부, 실제 로그의 arm64와 무료 제공 조건 확인([러너 표](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories)) | 조직 Actions/결제 설정, 필요 시 `.github/workflows/deploy.yml`의 러너 선택을 별도 검토 |
-| 2 | `actions/checkout@v5` · `actions/setup-java@v5` · `aws-actions/configure-aws-credentials@v5`의 허용/해결 성공과 입력 동작을 실제 실행 로그로 확인 | 조직 허용 액션 설정 · `deploy.yml` |
+| 2 | `actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09`(v5.1.0) · `actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961`(v5.7.0) · `aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708`(v5.1.1)의 허용/해결 성공과 입력 동작을 실제 실행 로그로 확인 | 조직 허용 액션 설정 · `deploy.yml` |
 | 3 | 러너 Docker · AWS CLI v2 · jq · curl · Bash · GNU 도구 · tar/grep, 전체 build와 같은 이미지 `imageTest` 성공 확인([도구 목록](https://github.com/actions/partner-runner-images/blob/main/images/arm-ubuntu-24-image.md)) | 러너 준비 단계/`deploy.yml`, 필요 시 `backend/build.gradle` · `AppImageIT` |
 | 4 | 위 AL2023 패키지 설치 · aarch64 Compose 다운로드 · root의 `docker compose version` · Docker 자동 시작을 실제 SSM 셸에서 확인 — 2026-10-26 수행 | 이 문서의 서버 설치 명령/버전, 호스트 패키지 설정 |
 | 5 | env의 root `600` · 필수 값 · Compose/systemd의 인용값 해석, DB 초기화와 `aws` 프로필 기동 확인(내용 출력 금지) | 서버 `/etc/mogum/mogum.env`; 계약 문제면 견본/Compose/설정 별도 수정 |
@@ -354,12 +354,14 @@ JSON 파싱과 권한 범위는 `AwsFilesTest`로 검증했으며 실제 IAM 평
 | `DEPLOY_BUCKET` | `<전용 버킷 이름>` | S3 버킷 이름. `s3://` 없이 서버 `MOGUM_BUCKET`과 같은 값 |
 | `DEPLOY_INSTANCE_ID` | `i-<인스턴스 ID>` | EC2 인스턴스 상세 ID. 배포 정책의 대상 한 대 |
 
-활성화된 작업은 빌드나 AWS 호출에 앞서 필수 Variables · Secrets의 빈 값을 검사하며, 비었으면 **종류(variable/secret)와 이름만** 출력하고 실패한다. 브랜치 · SHA · 리전 · 식별자 형식도 먼저 검사한다. 자격은 [configure-aws-credentials@v5](https://github.com/aws-actions/configure-aws-credentials/tree/v5)의 OIDC 임시 자격만 사용하며 워크플로 권한은 `contents: read` · `id-token: write`다. GitHub `environment`는 지정하지 않는다. 지정하면 OIDC sub가 `environment:…`로 바뀌어 기존 `ref:refs/heads/main` 신뢰 조건과 맞지 않는다.
+활성화된 작업은 빌드나 AWS 호출에 앞서 필수 Variables · Secrets의 빈 값을 검사하며, 비었으면 **종류(variable/secret)와 이름만** 출력하고 실패한다. 브랜치 · SHA · 리전 · 식별자 형식도 먼저 검사한다. 자격은 [configure-aws-credentials@v5.1.1](https://github.com/aws-actions/configure-aws-credentials/tree/v5.1.1)의 OIDC 임시 자격만 사용하며 워크플로 권한은 `contents: read` · `id-token: write`다. GitHub `environment`는 지정하지 않는다. 지정하면 OIDC sub가 `environment:…`로 바뀌어 기존 `ref:refs/heads/main` 신뢰 조건과 맞지 않는다.
+
+세 액션은 현재 사용 중인 v5 릴리스의 전체 40자 커밋 SHA로 고정하고 줄 끝 주석에 릴리스를 남긴다. 태그는 다른 커밋으로 옮겨질 수 있고 이 워크플로는 AWS 배포 자격을 받으므로, 자격을 받은 뒤 실행되는 액션까지 고정한다. 버전을 올릴 때는 새 릴리스 태그의 커밋 SHA를 확인해 워크플로 SHA · 릴리스 주석 · `WorkflowFilesTest` 기대값을 함께 바꾼다.
 
 일반 push와 `sha` 없는 수동 실행은 다음 순서다.
 
 1. 서버와 같은 **`ubuntu-24.04-arm`** 작업에서 ECR `mogum-app:{전체 40자 소문자 SHA}`를 조회한다. 있으면 이전 실행이 검사 후 올린 이미지이므로 빌드 · 이미지 검사 · push를 건너뛰고 지문을 재사용한다. 태그가 없다는 응답만 새 빌드로 진행하며 권한/통신 오류는 실패한다. 덮어쓰기 금지 태그를 다시 push하지 않는다.
-2. 새 이미지가 필요하면 [checkout@v5](https://github.com/actions/checkout/tree/v5) · [setup-java@v5](https://github.com/actions/setup-java/tree/v5)(Temurin 21)를 사용해 `./backend/gradlew -p backend build`로 테스트와 빌드를 수행한다. Docker로 `backend/` 이미지를 **한 번** 빌드한 뒤 `./backend/gradlew -p backend imageTest -PappImage=<그 이미지>`로 검사한다. Testcontainers는 러너의 Docker를 사용한다.
+2. 새 이미지가 필요하면 [checkout@v5.1.0](https://github.com/actions/checkout/tree/v5.1.0) · [setup-java@v5.7.0](https://github.com/actions/setup-java/tree/v5.7.0)(Temurin 21)를 사용해 `./backend/gradlew -p backend build`로 테스트와 빌드를 수행한다. Docker로 `backend/` 이미지를 **한 번** 빌드한 뒤 `./backend/gradlew -p backend imageTest -PappImage=<그 이미지>`로 검사한다. Testcontainers는 러너의 Docker를 사용한다.
 3. 검사한 로컬 이미지를 ECR의 전체 SHA 태그로 바꿔 올리고 `DescribeImages`로 지문을 조회한다. 다시 빌드하지 않는다.
 4. 해당 커밋의 `deploy/`와 지문 한 줄인 `app-image.ref`를 묶어 `s3://{DEPLOY_BUCKET}/releases/{SHA}.tar.gz`에 업로드한다. 같은 SHA 재실행은 동일 커밋의 배포 파일과 기존 지문으로 묶음을 다시 올릴 수 있어 이미지 push 후 업로드가 실패한 경우에도 재개할 수 있다.
 5. SSM `AWS-RunShellScript`로 지정한 인스턴스 한 대에서 root로 묶음을 받는다. `/opt/mogum/releases/` 아래 임시 디렉터리에서 풀고 지문을 확인한 뒤 `/opt/mogum/releases/{SHA}/`로 옮겨 `bash deploy/deploy.sh {SHA}`를 실행한다. 같은 SHA의 디렉터리가 이미 있으면 지문을 비교하고 그대로 사용해 활성 디렉터리를 덮어쓰지 않는다. 임시 파일은 정리한다.
@@ -385,7 +387,7 @@ docker logs --tail 50 mogum-postgres-1
 
 ### 워크플로 검증 범위
 
-불변식과 명령 대체 테스트는 `WorkflowFilesTest`로 실행한다. 액션의 위 메이저 태그와 입력은 공식 저장소에서 확인했다. [GitHub 러너 표](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories)에서 `ubuntu-24.04-arm`의 공개 저장소 무료 제공을 확인했고, [arm64 이미지 도구 목록](https://github.com/actions/partner-runner-images/blob/main/images/arm-ubuntu-24-image.md)에서 Docker · AWS CLI · jq · curl을 확인했다. 스크립트는 Bash · GNU 기본 도구 · tar · grep도 사용하며 `rg`에 의존하지 않는다. SSM 옵션/결과 필드는 [send-command](https://docs.aws.amazon.com/cli/latest/reference/ssm/send-command.html) · [get-command-invocation](https://docs.aws.amazon.com/cli/latest/reference/ssm/get-command-invocation.html) 공식 문서와 대조했다. 실제 GitHub Actions · AWS 실행은 아직 수행하지 않았다. 실제 실행 확인은 [첫 배포 때 확인](#첫-배포-때-확인) 1~3 · 8~13번에 모았다.
+불변식과 명령 대체 테스트는 `WorkflowFilesTest`로 실행한다. 액션의 릴리스 · 커밋 SHA와 입력은 공식 저장소에서 확인했다(SHA는 2026-10-26 GitHub API로 각 `v5` 태그가 가리키는 커밋으로 확인). `WorkflowFilesTest`는 고정 SHA · 릴리스 주석과 주요 입력을 검사한다. [GitHub 러너 표](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories)에서 `ubuntu-24.04-arm`의 공개 저장소 무료 제공을 확인했고, [arm64 이미지 도구 목록](https://github.com/actions/partner-runner-images/blob/main/images/arm-ubuntu-24-image.md)에서 Docker · AWS CLI · jq · curl을 확인했다. 스크립트는 Bash · GNU 기본 도구 · tar · grep도 사용하며 `rg`에 의존하지 않는다. SSM 옵션/결과 필드는 [send-command](https://docs.aws.amazon.com/cli/latest/reference/ssm/send-command.html) · [get-command-invocation](https://docs.aws.amazon.com/cli/latest/reference/ssm/get-command-invocation.html) 공식 문서와 대조했다. 실제 GitHub Actions · AWS 실행은 아직 수행하지 않았다. 실제 실행 확인은 [첫 배포 때 확인](#첫-배포-때-확인) 1~3 · 8~13번에 모았다.
 
 ## Vercel(화면)
 

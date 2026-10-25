@@ -80,8 +80,23 @@ class WorkflowFilesTest {
                 assertFalse(script.contains("set -x"));
             }
         }
-        assertEquals(Set.of("actions/checkout@v5", "actions/setup-java@v5",
-                "aws-actions/configure-aws-credentials@v5"), Set.copyOf(actions));
+        var actionReleases = Map.of(
+                "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09", "v5.1.0",
+                "actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961", "v5.7.0",
+                "aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708", "v5.1.1");
+        for (var action : actions) {
+            assertTrue(action.matches("[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}"),
+                    "액션은 전체 40자 소문자 커밋 SHA로 고정한다: " + action);
+        }
+        assertEquals(actionReleases.keySet(), Set.copyOf(actions));
+        var usesLines = text.lines().filter(line -> line.matches("\\s*(?:-\\s+)?uses\\s*:.*")).toList();
+        assertEquals(actions.size(), usesLines.size());
+        for (var line : usesLines) {
+            assertTrue(actionReleases.entrySet().stream().anyMatch(action -> line.matches(
+                    "\\s*(?:-\\s+)?uses: " + Pattern.quote(action.getKey())
+                            + " # " + Pattern.quote(action.getValue()) + "\\s*")),
+                    "uses 줄 끝에 고정한 릴리스 주석을 남긴다: " + line);
+        }
         assertEquals("21", map(step("java").get("with")).get("java-version"));
         var credentials = map(step("credentials").get("with"));
         assertEquals("${{ secrets.AWS_DEPLOY_ROLE_ARN }}", credentials.get("role-to-assume"));
