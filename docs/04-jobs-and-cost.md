@@ -352,8 +352,8 @@ DB 처리 최대 지연에는 원장 등록 · 결과 기록 · 리스 갱신의
 
 | 설정 | 값 | 안 맞추면 |
 |---|---|---|
-| `spring.lifecycle.timeout-per-shutdown-phase` | 130초(유예 + 여유) | 기본 30초에 Spring 이 기다림을 끊는다 |
-| `server.shutdown` | `graceful` | 진행 중 API 요청이 끊긴다(새 요청은 받지 않는다) |
+| `spring.lifecycle.timeout-per-shutdown-phase` | 130초(유예 + 여유) — `application.yml` 에 명시 | 기본 30초에 Spring 이 기다림을 끊는다 |
+| `server.shutdown` | `graceful` — `application.yml` 에 명시 | 진행 중 API 요청이 끊긴다(새 요청은 받지 않는다) |
 | 프로세스 관리자의 강제 종료 대기 | 150초 이상 — systemd `TimeoutStopSec` · Docker `stop_grace_period`(로컬 `compose.yaml` 은 150초로 둔다. 이미지는 exec 형식 `ENTRYPOINT` 라 java 가 SIGTERM 을 직접 받는다) | **Docker 기본 10초 · systemd 기본 90초 뒤 SIGKILL** — 기다리는 도중 강제로 죽어 `kill -9` 경로(리스 만료 회수)가 된다 |
 
 **대가** — 서버가 한 대라 배포 중 중단 시간이 하던 호출의 남은 시간만큼(최대 약 2분) 늘어난다. 사람이 적은 시간에 배포한다. 백오프 대기 중이던 실행기는 기다리지 않고 바로 반납한다. 무중단 배포는 공개 후에 넣는다(ADR-061).
@@ -553,7 +553,7 @@ U6 는 들어가 봐야 보인다. **사람이 바로 움직여야 하는 일**�
 | `PROVIDER_SPEND_CAP` | 크레딧을 채우기 전까지 **모든 생성이 실패**한다 | 앱 — 실패 판정 직후 |
 | 킬스위치 발동 | 오늘 신규 생성이 닫혔다 | 앱 — 적재 거부 직후 |
 | `LLM_REQUEST_REJECTED` | **우리 버그**다 — 다시 시도해도 같다 | 앱 — 실패 판정 직후 |
-| 헬스체크 실패 | 앱이 죽으면 앱이 알릴 수 없다 | **외부 헬스체크**(UptimeRobot 등) → `/actuator/health` |
+| 헬스체크 실패 | 앱이 죽으면 앱이 알릴 수 없다 | **외부 헬스체크**(UptimeRobot 등) → `/actuator/health`(세부 정보 없이 상태만 공개) |
 
 - 같은 이벤트는 **하루 한 번** — `alert_logs` 에 `INSERT … ON CONFLICT DO NOTHING` 이 성공했을 때만 보낸다([02 §6.7](./02-domain-data.md)). 프로세스를 나눠도 DB 라 한 번이다.
 - 전송은 잡 · 요청 경로를 막지 않는다 — 짧은 타임아웃(3초) · 실패는 로그와 `alert.send.failure` 만. 알림 실패로 잡이 실패하지 않는다.

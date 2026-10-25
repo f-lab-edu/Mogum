@@ -143,6 +143,7 @@ public class SecurityConfiguration {
                         }))
                 .authorizeHttpRequests(requests -> requests.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET, "/auth/google", "/auth/google/callback").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())
                 .logout(logout -> logout.logoutRequestMatcher(logoutRequest)

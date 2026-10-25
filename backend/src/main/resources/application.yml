@@ -1,6 +1,8 @@
 spring:
   application:
     name: mogum
+  lifecycle:
+    timeout-per-shutdown-phase: 130s
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/mogum}
     username: ${DB_USERNAME:mogum_local}
@@ -24,12 +26,25 @@ spring:
             redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:5173/auth/google/callback}
 
 server:
+  shutdown: graceful
   servlet:
     session:
       cookie:
         http-only: true
         secure: true
         same-site: lax
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-components: never
+      show-details: never
+      probes:
+        enabled: false
 
 app:
   web:
