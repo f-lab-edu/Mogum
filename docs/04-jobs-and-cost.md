@@ -145,11 +145,11 @@ flowchart LR
 
 - 공개 운영에 더하는 것 — 도메인(화면 → Vercel · `api.` → EC2) · HTTPS(구글 콜백 · `Secure` 쿠키) · Vercel 프로젝트(API 주소 환경 변수 `VITE_API_BASE_URL` · 화면 주소 새로고침을 `index.html` 로 · 요금제 약관 확인) · DB 백업 · 슬랙 알림 · 외부 헬스체크(§9.1).
 
-**운영 구성과 배포 흐름**(ADR-072) — 배포 파일 · 워크플로 · 처음 배포 절차서는 `2-deploy` 에서 만든다(아직). 실제 AWS · 도메인 설정과 운영 확인은 사람이 절차서를 따라 한다.
+**운영 구성과 배포 흐름**(ADR-072) — 운영 Compose · Caddyfile · 서버 배포 스크립트 · env 견본과 [서버 구성 절차서](../deploy/README.md#서버-구성)는 `2-deploy` step 2에서 만들었다. 워크플로 · 처음 배포 순서는 후속 step에서 완성한다. 실제 AWS · 도메인 설정과 운영 확인은 사람이 절차서를 따라 한다.
 
 | | 정한 것 |
 |---|---|
-| 서버 | 서울 리전 EC2 한 대(arm64 · 2GB). 호스트에는 Docker 만. Compose 가 Caddy(HTTPS 자동 발급 · 80/443) · 앱 · Postgres 를 띄우고 Postgres 포트는 밖에 열지 않는다. 서비스별 메모리 상한은 잠정값 — `16-capacity` 에서 같은 Compose 파일로 재서 확정한다. 비밀은 서버의 env 파일에만. SSH 포트 없음 — 접속은 SSM Session Manager |
+| 서버 | 서울 리전 EC2 한 대(arm64 · 2GB). 호스트에는 Docker 만. Compose 가 Caddy(HTTPS 자동 발급 · 80/443) · 앱 · Postgres 를 띄우고 Postgres 포트는 밖에 열지 않는다. 메모리 상한 잠정값은 앱 1024MiB · Postgres 512MiB · Caddy 128MiB(합계 1664MiB) — `16-capacity` 에서 같은 Compose 파일로 재서 확정한다. 비밀은 서버의 env 파일에만. SSH 포트 없음 — 접속은 SSM Session Manager. 파일 위치 · 배포/복귀 규칙 · 필요한 명령은 [deploy/README.md](../deploy/README.md#서버-구성) |
 | 백엔드 배포 | `main` 병합(백엔드 · `deploy/` · 배포 워크플로 변경) → GitHub Actions 가 서버와 같은 arm64 러너에서 이미지를 한 번 빌드 → 그 이미지로 기동 · 정상 종료 검사 → ECR(태그 덮어쓰기 금지 · 전체 SHA 태그) → `deploy/` + 이미지 지문 묶음을 S3 에 → SSM Run Command 로 서버의 배포 스크립트 → 서버는 지문으로 받아 교체 · 헬스 확인 · 실패하면 직전 릴리스로 되돌림. AWS 자격은 OIDC. 수동 실행에 이전 SHA 를 주면 빌드 없이 다시 배포한다. Flyway 는 되돌리지 않는다 |
 | 화면 배포 | Vercel Git 연동 — 같은 `main` 병합에서 배포한다 |
 | 도메인 · DNS | Cloudflare 에서 등록 · DNS(2026-10-25). `{도메인}`(→ Vercel) · `api.{도메인}`(→ Elastic IP) 두 레코드 모두 **프록시를 끈다(DNS only)** — 켜면 모든 요청이 Cloudflare IP 로 보여 IP 당 레이트리밋([05 §1.4](./05-api.md))이 깨진다(ADR-060 과 같은 이유). 실제 도메인 이름은 공개 저장소의 파일에 적지 않는다 |
@@ -354,7 +354,7 @@ DB 처리 최대 지연에는 원장 등록 · 결과 기록 · 리스 갱신의
 |---|---|---|
 | `spring.lifecycle.timeout-per-shutdown-phase` | 130초(유예 + 여유) — `application.yml` 에 명시 | 기본 30초에 Spring 이 기다림을 끊는다 |
 | `server.shutdown` | `graceful` — `application.yml` 에 명시 | 진행 중 API 요청이 끊긴다(새 요청은 받지 않는다) |
-| 프로세스 관리자의 강제 종료 대기 | 150초 이상 — systemd `TimeoutStopSec` · Docker `stop_grace_period`(로컬 `compose.yaml` 은 150초로 둔다. 이미지는 exec 형식 `ENTRYPOINT` 라 java 가 SIGTERM 을 직접 받는다) | **Docker 기본 10초 · systemd 기본 90초 뒤 SIGKILL** — 기다리는 도중 강제로 죽어 `kill -9` 경로(리스 만료 회수)가 된다 |
+| 프로세스 관리자의 강제 종료 대기 | 150초 이상 — systemd `TimeoutStopSec` · Docker `stop_grace_period`(로컬 `compose.yaml` · 운영 `deploy/compose.yaml` 은 150초로 둔다. 이미지는 exec 형식 `ENTRYPOINT` 라 java 가 SIGTERM 을 직접 받는다) | **Docker 기본 10초 · systemd 기본 90초 뒤 SIGKILL** — 기다리는 도중 강제로 죽어 `kill -9` 경로(리스 만료 회수)가 된다 |
 
 **대가** — 서버가 한 대라 배포 중 중단 시간이 하던 호출의 남은 시간만큼(최대 약 2분) 늘어난다. 사람이 적은 시간에 배포한다. 백오프 대기 중이던 실행기는 기다리지 않고 바로 반납한다. 무중단 배포는 공개 후에 넣는다(ADR-061).
 
