@@ -1,6 +1,6 @@
 # 운영 절차서
 
-이 문서는 **처음 구축 순서 → 운영 확인 목록 → 첫 배포 때 확인 → 비용 → 구성별 상세** 순서로 읽는다. 저장소의 배포 파일과 자동 테스트는 만들었지만, **실제 AWS · 운영 도메인 배포와 AWS 백업 복원 연습은 아직 수행하지 않았다.** 아래 체크와 기록은 사람이 실행한 뒤 남긴다. 공개 여부는 [01 §10](../docs/01-overview.md#10-공개-필수-목록)의 별도 판단이다.
+이 문서는 **처음 구축 순서 → 운영 확인 목록 → 첫 배포 때 확인 → 비용 → 구성별 상세** 순서로 읽는다. 저장소의 배포 파일과 자동 테스트는 만들었고, AWS 자원은 [처음 구축 순서](#처음-구축-순서) 2대로 만들었다(2026-10-25~26). **실제 배포 · 운영 도메인 · AWS 백업 복원 연습은 아직 수행하지 않았다.** 아래 체크와 기록은 사람이 실행한 뒤 남긴다. 공개 여부는 [01 §10](../docs/01-overview.md#10-공개-필수-목록)의 별도 판단이다.
 
 `{도메인}` · `ACCOUNT_ID` · `BUCKET_NAME` · `INSTANCE_ID`는 자리표시다. 실제 도메인 · 계정 · 버킷 · 이메일 · 자격 정보는 공개 저장소에 적지 않는다. 명령의 자리표시도 실행 전에 바꾼다. AWS 자원 생성/설정은 운영자의 관리자 임시 자격으로 수행하고, 앱 배포/백업은 OIDC와 인스턴스 역할을 쓴다.
 
@@ -10,17 +10,30 @@
 
 2. **AWS 자원 생성 — 서울 `ap-northeast-2`.** 쓸 파일: [aws/의 여섯 JSON 견본](#견본과-자리표시). 실제 값을 넣은 사본은 저장소 밖에서 만든다. 아래 순서로 생성하고 각 완료 조건을 확인한다([상세 설정](#aws-설정)).
 
+   **계정 준비 — 새 가입 방식(Builder ID · 프로젝트) 계정이면 자원보다 먼저 한다.** 이 저장소의 운영 계정이 이 방식이다(2026-10-25). 운영 자원은 조직의 **멤버 계정(프로젝트)** 하나에 만들고, SCP 수정만 **관리 계정** 세션에서 한다.
+
+   | 할 일 | 끝났는지 확인 |
+   |---|---|
+   | **서울 허용.** 프로젝트 리전은 연락처 국가로 정해져(한국 → `ap-southeast-2`) 조직 SCP가 다른 리전을 막는다. 관리 계정 → Organizations → 정책 → 서비스 제어 정책 → 리전 제한 정책(`AdvancedModeRegionRestriction…`)의 **`RegionFloor` 문장**(`StringNotEquals`) 리전 목록에만 `ap-northeast-2`를 넣는다. `UsEast1Partitional` · `UsWest2Partitional`(`StringEquals`)에 넣으면 서울에서 전역 서비스만 허용되어 EC2 · ECR · S3가 막힌다. 이 계정은 Paid plan 전환과 조직 고급 기능 활성화(되돌릴 수 없다) 뒤 고쳤다 | **멤버 계정** 자격으로 `aws ec2 describe-availability-zones --region ap-northeast-2` 성공, `aws ec2 run-instances --dry-run …`이 `DryRunOperation`. SCP는 관리 계정에 적용되지 않으므로 관리 계정에서 확인하지 않는다 |
+   | **콘솔 표시 리전.** 서울 화면이 「리전 제한됨」이면 콘솔 표시 설정이다(API 권한과 무관). 「표시되는 리전 편집」에서 서울을 켠다 | 서울 콘솔 화면이 열린다 |
+   | **EBS 기본 암호화.** 서울 EC2 → 계정 속성 → EBS 암호화를 켠다(키 `aws/ebs`). 루트 볼륨 암호화는 만든 뒤 켤 수 없다 | `aws ec2 get-ebs-encryption-by-default --region ap-northeast-2`가 `true` |
+   | **월 예산 알림.** 멤버 계정 Budgets에서 비용 예산 · 월별 · 고정 금액([비용](#비용대략) 합계 + 여유 — 2026-10-25 $30) · 요금 집계 「일반 요금」(Unblended) · 범위 「특정 AWS 비용의 차원 필터링」 → 차원 「요금 유형」에서 **크레딧 · 환불 제외** · 알림 실제 100%와 예측 100% 이메일. 크레딧을 빼지 않으면 크레딧이 남는 동안 알림이 오지 않는다. **예산 작업은 연결하지 않는다**(자동 SCP 적용이 서버를 멈출 수 있다) | `aws budgets describe-budget`의 `FilterExpression`이 `Not RECORD_TYPE Credit, Refund`, 알림 2개 |
+
    | 순서 | 할 일 · 쓸 파일 | 끝났는지 확인 |
    |---|---|---|
    | OIDC 공급자 | IAM에 `https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com` 등록 | 공급자 URL · audience · 계정 내 ARN 확인 |
    | ECR | 비공개 `mogum-app`, 태그 `IMMUTABLE` · 예외 없음, `aws/ecr-lifecycle.json` 적용 | 콘솔에서 태그 덮어쓰기 금지 · 최근 이미지 30개 규칙 확인 |
    | S3 | 전용 범용 버킷 · 공개 차단 네 항목 · Bucket owner enforced · 기본 SSE-S3 · 버전 관리 Enabled · `aws/s3-lifecycle.json` 적용 | 보안/속성/관리 탭에서 설정과 `backups/` · `releases/` 두 규칙 확인 |
    | 인스턴스 역할 | `mogum-instance`에 `aws/ec2-trust.json` · `aws/instance-policy.json`과 `AmazonSSMManagedInstanceCore` 연결, 인스턴스 프로파일 생성 | 역할의 신뢰/권한과 같은 이름 프로파일의 역할 연결 확인 |
-   | EC2 | `t4g.small` · Amazon Linux 2023 **arm64** · 위 인스턴스 프로파일. 인터넷 게이트웨이 경로가 있는 공개 서브넷, 외부 ECR/S3/SSM HTTPS 통신 가능. 보안 그룹 인바운드는 웹 TCP **80/443만**, **22와 5432는 열지 않는다** | EC2 상태 검사 통과 · 프로파일 연결 · SG 확인 · SSM 관리형 노드 Online · Session Manager 접속 성공 |
+   | EC2 | `t4g.small` · Amazon Linux 2023 **arm64** · 위 인스턴스 프로파일. 인터넷 게이트웨이 경로가 있는 공개 서브넷(기본 VPC), 외부 ECR/S3/SSM HTTPS 통신 가능. 보안 그룹 인바운드는 웹 TCP **80/443만**, **22와 5432는 열지 않는다**. 키 페어 없음 · IMDSv2 필수 · 종료 방지 켬(지우거나 다시 만들 때는 먼저 끈다) | EC2 상태 검사 통과 · 프로파일 연결 · SG 확인 · 루트 볼륨 암호화 · SSM 관리형 노드 Online · Session Manager 접속 성공 |
    | Elastic IP | 서울 리전 주소 할당 후 위 EC2에 연결 | 인스턴스의 공인 IPv4와 Elastic IP 연결 대상이 일치 |
-   | 배포 역할 | `mogum-deploy`에 `aws/github-oidc-trust.json` · `aws/deploy-policy.json` 적용. 이제 얻은 `INSTANCE_ID`를 권한 사본에 넣는다 | 신뢰 sub는 `repo:f-lab-edu/Mogum:ref:refs/heads/main`, SSM 대상은 해당 한 대. 실제 수임/배포는 8번에서 확인 |
+   | 배포 역할 | `mogum-deploy`에 `aws/github-oidc-trust.json` · `aws/deploy-policy.json` 적용. 이제 얻은 `INSTANCE_ID`를 권한 사본에 넣는다. 콘솔에서는 「사용자 지정 신뢰 정책」에 치환한 신뢰 견본을 그대로 붙인다 | 신뢰 sub는 `repo:f-lab-edu/Mogum:ref:refs/heads/main`, SSM 대상은 해당 한 대. 실제 수임/배포는 8번에서 확인 |
 
-   EC2의 EBS는 OS · DB · 로컬 릴리스 3개 · 현재/직전 이미지 · 덤프/복원 임시 공간을 담아야 한다. 생성 화면에서 종류/용량을 정하고 비용 계산에 함께 넣는다. 루트 볼륨 손실 시 S3 백업으로 복구하므로 EBS만 백업으로 여기지 않는다.
+   EC2의 EBS는 OS · DB · 로컬 릴리스 3개 · 현재/직전 이미지 · 덤프/복원 임시 공간을 담아야 한다. **gp3 30GiB(기본 3000 IOPS · 125MiB/s) · 암호화**로 정했다(2026-10-26 — 기본 8GiB로는 부족하다). 루트 볼륨 손실 시 S3 백업으로 복구하므로 EBS만 백업으로 여기지 않는다.
+
+   콘솔의 한국어 이름은 견본 용어와 다를 수 있다 — OIDC 공급자는 IAM 「ID 제공업체」, Bucket owner enforced는 S3 객체 소유권 「ACL 비활성화됨(권장)」, 미완료 multipart 정리는 S3 수명 주기 작업 「만료된 객체 삭제 마커 또는 완료되지 않은 멀티파트 업로드 삭제」 안의 「불완전 멀티파트 업로드 삭제」다(현재 버전 만료와 함께 고르면 삭제 마커 항목은 비활성이 맞다).
+
+   **수행 기록(2026-10-25~26)** — 위 7개를 콘솔로 만들고 CLI 읽기로 견본과 대조했다: OIDC URL · audience, ECR IMMUTABLE · 예외 없음 · AES256 · 수명주기 일치, S3 공개 차단 4개 · `BucketOwnerEnforced` · SSE-S3 · 버전 관리 · 수명주기 일치, 두 역할의 신뢰 · 권한이 치환본과 일치, EC2 상태 검사 ok · SSM Online · 루트 볼륨 암호화, Elastic IP 연결. IAM 시뮬레이터로 두 역할의 허용 9건 · 거부 12건이 기대대로였다(아래 [첫 배포 때 확인](#첫-배포-때-확인) 11의 시뮬레이터 부분). 실제 수임 · 업로드 · 배포는 8번에서 확인한다. 실제 ID · 주소는 비공개 운영 기록에 둔다.
 
 3. **Cloudflare DNS.** `api.{도메인}`의 **A 레코드 값은 위 Elastic IP**, 프록시는 **DNS only · 회색 구름**으로 저장한다. 쓸 파일: [Caddyfile](./Caddyfile)의 `API_DOMAIN`, [05 §1.4](../docs/05-api.md#14-우리-api-레이트리밋). 프록시를 켜면 모든 요청이 Cloudflare IP로 보여 IP당 레이트리밋이 깨지고 Caddy 인증서 발급 경로도 바뀐다(ADR-060이 Vercel API 프록시를 뺀 것과 같은 이유). 완료 확인: DNS → Records에서 해당 행의 Proxy status가 **DNS only**인지 다시 연다. 로컬의 `dig +short A api.{도메인}`이 Elastic IP인지 확인한다. 같은 호스트의 예전 A/AAAA 레코드가 다른 서버를 가리키면 정리한다. [Cloudflare 프록시 상태 문서](https://developers.cloudflare.com/dns/proxy-status/). 화면 `{도메인}` 레코드는 6번의 Vercel 안내값으로 만들며 그것도 DNS only다.
 
@@ -181,7 +194,7 @@
 | 8 | 치환한 JSON 수락 · OIDC audience/sub · `main` 수임 성공, 다른 브랜치/PR/포크 거절 확인. 워크플로에 `environment` 없어야 함 | IAM 공급자/역할 신뢰 · `aws/github-oidc-trust.json` · `deploy.yml` |
 | 9 | [AWS CLI v2 적용 예](#aws-cli-v2-적용-예)의 실제 성공과 SSM [send-command](https://docs.aws.amazon.com/cli/latest/reference/ssm/send-command.html)/[get-command-invocation](https://docs.aws.amazon.com/cli/latest/reference/ssm/get-command-invocation.html) 옵션/응답을 실행 로그로 확인 | 이 문서 CLI 예제/운영 CLI 버전 · `deploy.yml`의 명령/결과 처리 |
 | 10 | 배포 역할의 ECR push/지문 조회 · releases 업로드/조회 · 지정 인스턴스 SSM/결과 조회 성공, 다른 문서/인스턴스/`backups/` 접근 거절 확인 | IAM 연결 정책 · `aws/deploy-policy.json` |
-| 11 | 인스턴스 역할의 ECR pull · releases 다운로드 · backups 업로드(multipart 포함)/목록/다운로드 성공. 두 역할 삭제/설정 변경 권한 부재를 IAM 시뮬레이터로 확인 | IAM 연결 정책 · `aws/instance-policy.json` · `aws/deploy-policy.json` |
+| 11 | 인스턴스 역할의 ECR pull · releases 다운로드 · backups 업로드(multipart 포함)/목록/다운로드 성공. 두 역할 삭제/설정 변경 권한 부재를 IAM 시뮬레이터로 확인 — 시뮬레이터에는 `aws:RequestedRegion=ap-northeast-2` 문맥을 넣는다(없으면 조직 SCP `RegionFloor`가 모두 명시 거부로 평가한다). 시뮬레이터 부분은 2026-10-26 수행 | IAM 연결 정책 · `aws/instance-policy.json` · `aws/deploy-policy.json` |
 | 12 | `main` 실행의 OIDC → ECR → S3 → SSM → HTTPS 200, 같은 SHA 재실행의 빌드/검사/push 생략 확인 | 저장소 변수 · `deploy.yml` · `deploy.sh` |
 | 13 | 보관된 이전 SHA 재배포, 실패 SSM 출력/실패 코드와 서버 자동 복귀, 로컬 직전 이미지/릴리스 보존, 공개 로그의 비밀 부재 확인. 정상 수동 재배포만으로 실패 자동 복귀 검증을 대체하지 않음 | `deploy.yml` · `deploy.sh` · `aws/` 정책; Flyway 호환성은 해당 마이그레이션 |
 | 14 | `systemd-analyze calendar '*-*-* 19:00:00 UTC'`와 `TZ=Asia/Seoul date`로 일정이 한국 04:00인지 확인 | `systemd/mogum-backup.timer`, 이 문서의 시간 표기 |
@@ -192,17 +205,18 @@
 
 ## 비용(대략)
 
-**2026-10-25 공식 AWS 요금 페이지 확인 기준**, USD · 세금/환율 제외. 프리티어는 이미 끝났다([04 §3](../docs/04-jobs-and-cost.md#3-배포)). 서울 리전 단가를 확인하지 못한 항목은 추측하지 않고 **[요금 계산기로 확인](https://calculator.aws/)**한다. EC2는 Linux 온디맨드 `t4g.small` 한 대 · 월 730시간, 공인 IPv4 한 개를 기준으로 입력한다.
+**서울 리전 단가 — AWS Price List API(`aws pricing get-products`) 2026-10-25 조회 기준**, USD · 세금 제외. 운영 계정은 새 가입 방식이라 EC2 무료 사용량이 없어 처음부터 과금되고, 가입 크레딧이 남는 동안 청구액에서 빠진다([04 §3](../docs/04-jobs-and-cost.md#3-배포)). 단가는 바뀔 수 있으니 다시 계산할 때는 같은 API나 [요금 계산기](https://calculator.aws/)로 확인한다. EC2는 Linux 온디맨드 `t4g.small` 한 대 · 월 730시간, 공인 IPv4 한 개 기준이다.
 
-| 항목 | 월 대략치/확인 조건 | 출처 |
-|---|---|---|
-| EC2 `t4g.small` | **요금 계산기로 확인** — 서울 Linux 온디맨드 단가 × 730시간. CPU 크레딧 추가 과금 조건도 확인 | [EC2 요금](https://aws.amazon.com/ec2/pricing/on-demand/) |
-| EBS | **요금 계산기로 확인** — 실제 선택한 볼륨 종류/GB와 추가 IOPS/처리량 입력. 서울 단가 미확인 | [EBS 요금](https://aws.amazon.com/ebs/pricing/) |
-| Elastic IP(공인 IPv4) | **시간당 $0.005 × 730시간 = 약 $3.65/월**(한 개). 사용/미사용 모두 같은 단가 | [VPC 공인 IPv4 요금](https://aws.amazon.com/vpc/pricing/) |
-| S3 | **요금 계산기로 확인** — 서울 Standard, 백업 현재/이전 버전과 릴리스의 저장 GB · 요청 · 전송량 입력 | [S3 요금](https://aws.amazon.com/s3/pricing/) |
-| ECR | **요금 계산기로 확인** — 서울 private 저장 GB · 전송량 입력. 최근 30개는 용량 상한이 아니며 공유 레이어/실제 크기로 산정 | [ECR 요금](https://aws.amazon.com/ecr/pricing/) |
+| 항목 | 단가 | 월 대략치 | 출처 |
+|---|---|---|---|
+| EC2 `t4g.small` | $0.0208/시간 | × 730시간 = **$15.18** | [EC2 요금](https://aws.amazon.com/ec2/pricing/on-demand/) |
+| CPU 크레딧(unlimited) | 초과분 $0.04/vCPU-시간 | 평소 $0. 24시간 평균이 기준(vCPU당 20%)을 넘을 때만 과금 — 한 달 내내 100%면 약 $46.7 | [EC2 요금](https://aws.amazon.com/ec2/pricing/on-demand/) |
+| EBS gp3 | $0.0912/GB-월(3000 IOPS · 125MiB/s 기본 포함) | 30GiB = **$2.74** | [EBS 요금](https://aws.amazon.com/ebs/pricing/) |
+| Elastic IP(공인 IPv4) | $0.005/시간 | × 730시간 = **$3.65**. 사용/미사용 모두 같은 단가 | [VPC 공인 IPv4 요금](https://aws.amazon.com/vpc/pricing/) |
+| S3 Standard | $0.025/GB-월(첫 50TB) + 요청 | 백업 7일 · 릴리스 30일이라 $0.1 미만 예상(실측 전) | [S3 요금](https://aws.amazon.com/s3/pricing/) |
+| ECR | $0.10/GB-월 | 최근 30개는 용량 상한이 아니며 공유 레이어라 수 GB — 약 $0.3 예상(실측 전) | [ECR 요금](https://aws.amazon.com/ecr/pricing/) |
 
-확인한 금액만으로 전체 월 합계를 만들지 않는다. 위 인프라 외 도메인 갱신 · OpenAI · 데이터 전송 · Vercel 요금제 조건도 별도로 확인한다. 실제 운영 사용량이 생기면 Billing/Cost Explorer와 계산기 추정치를 비교한다.
+합계는 약 **$22/월**(세금 제외 — 한국 청구지 부가세 10%는 별도)이다. 인터넷으로 나가는 전송 · 도메인 갱신 · OpenAI · Vercel 요금제 조건은 별도로 확인한다. 월 예산 알림([계정 준비](#처음-구축-순서))은 이 합계 위에 여유를 둔 금액으로 건다. 실제 운영 사용량이 생기면 Billing/Cost Explorer와 이 추정치를 비교한다.
 
 ## 서버 구성
 

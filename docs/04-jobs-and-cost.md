@@ -134,10 +134,10 @@ flowchart LR
 | 관측 | Grafana | **관리자 화면 U6**(DB 만 읽는다) — 앱과 Postgres 가 함께 쓰는 2GB 에 관측 스택을 올리지 않는다 |
 | LLM | 스텁(테스트) · 실제 API(실사용 전 확인) | 실제 API |
 
-- **AWS 계정은 2025-07-15 이전에 만들었다** — *월 750시간 합산* 방식이고 가입 12개월 무료 기간이 이미 끝났다. EC2 는 크기와 무관하게 처음부터 유료다(ADR-072).
+- **AWS 계정은 2026-10-25 새 가입 방식(Builder ID · 프로젝트)으로 새로 만들었다** — 처음 계획한 2025-07-15 이전 계정(무료 기간 끝남)은 쓰지 않는다. 조직(Paid plan · 고급 기능)의 멤버 계정 하나에 운영 자원을 둔다. EC2 무료 사용량이 없어 처음부터 시간당 과금이고, 가입 크레딧($120)이 남는 동안 청구액에서 빠진다. 크레딧을 뺀 실제 사용액을 월 예산 알림으로 본다(계정 준비 · 서울 단가는 [절차서](../deploy/README.md#처음-구축-순서) — ADR-072).
 - **Postgres 위치 — 같은 EC2 · 2GB 로 정했다**(ADR-072 · ADR-022). 용량 측정은 이 메모리 조건으로 잰다([07 §2](./07-testing.md)). 비교한 후보:
 
-  | 후보 | 측정 조건 | 백업 | 추가 비용(월 · 프리티어 이후) |
+  | 후보 | 측정 조건 | 백업 | 추가 비용(월 · 2026-10-21 추정) |
   |---|---|---|---|
   | ① **같은 EC2 · 2GB 로 상향** — 1순위 | 앱 + Postgres 합쳐 2GB | `pg_dump` → S3 cron | 약 1.5만 원 |
   | ② RDS(db.t4g.micro) | 앱만 1GB | RDS 자동 백업 | 약 2만 원 |
@@ -145,11 +145,11 @@ flowchart LR
 
 - 공개 운영에 더하는 것 — 도메인(화면 → Vercel · `api.` → EC2) · HTTPS(구글 콜백 · `Secure` 쿠키) · Vercel 프로젝트(API 주소 환경 변수 `VITE_API_BASE_URL` · 화면 주소 새로고침을 `index.html` 로 · 요금제 약관 확인) · DB 백업 · 슬랙 알림 · 외부 헬스체크(§9.1).
 
-**운영 구성과 배포 흐름**(ADR-072) — 운영 Compose · Caddyfile · 서버 배포 스크립트 · env 견본과 [서버 구성 절차서](../deploy/README.md#서버-구성)는 `2-deploy` step 2에서 만들었다. step 4에서 `deploy/aws/`의 OIDC/EC2 신뢰 · 두 역할 권한 · ECR/S3 수명주기 JSON 견본 여섯 개와 [AWS 설정 절차](../deploy/README.md#aws-설정)를 추가했다(계정/버킷/인스턴스는 자리표시). step 5에서 [배포 워크플로](../.github/workflows/deploy.yml)와 [GitHub Actions 배포 절차](../deploy/README.md#github-actions-배포)를 추가했다. step 6에서 `frontend/vercel.json`의 SPA rewrite와 Vercel 설정 절차를, step 7에서 [처음 구축 · 운영 확인 · 외부 미검증 목록 · 비용을 포함한 배포 절차서](../deploy/README.md)를 완성했다. 저장소의 배포 파일 · 워크플로 · 절차서는 만들었으며, 실제 AWS · 운영 도메인 배포와 운영 확인 · AWS 백업 복원 연습은 아직 수행하지 않았다. 사람이 절차서를 따라 실행한 뒤 기록한다.
+**운영 구성과 배포 흐름**(ADR-072) — 운영 Compose · Caddyfile · 서버 배포 스크립트 · env 견본과 [서버 구성 절차서](../deploy/README.md#서버-구성)는 `2-deploy` step 2에서 만들었다. step 4에서 `deploy/aws/`의 OIDC/EC2 신뢰 · 두 역할 권한 · ECR/S3 수명주기 JSON 견본 여섯 개와 [AWS 설정 절차](../deploy/README.md#aws-설정)를 추가했다(계정/버킷/인스턴스는 자리표시). step 5에서 [배포 워크플로](../.github/workflows/deploy.yml)와 [GitHub Actions 배포 절차](../deploy/README.md#github-actions-배포)를 추가했다. step 6에서 `frontend/vercel.json`의 SPA rewrite와 Vercel 설정 절차를, step 7에서 [처음 구축 · 운영 확인 · 외부 미검증 목록 · 비용을 포함한 배포 절차서](../deploy/README.md)를 완성했다. 저장소의 배포 파일 · 워크플로 · 절차서는 만들었다. AWS 자원(절차서 처음 구축 순서 2)은 2026-10-25~26 사람이 만들고 설정을 읽어 견본과 대조했다. 실제 배포 · 운영 도메인 · 운영 확인 · AWS 백업 복원 연습은 아직 수행하지 않았다. 사람이 절차서를 따라 실행한 뒤 기록한다.
 
 | | 정한 것 |
 |---|---|
-| 서버 | 서울 리전 EC2 한 대(arm64 · 2GB). 호스트에는 Docker 만. Compose 가 Caddy(HTTPS 자동 발급 · 80/443) · 앱 · Postgres 를 띄우고 Postgres 포트는 밖에 열지 않는다. 메모리 상한 잠정값은 앱 1024MiB · Postgres 512MiB · Caddy 128MiB(합계 1664MiB) — `16-capacity` 에서 같은 Compose 파일로 재서 확정한다. 비밀은 서버의 env 파일에만. SSH 포트 없음 — 접속은 SSM Session Manager. 파일 위치 · 배포/복귀 규칙 · 필요한 명령은 [deploy/README.md](../deploy/README.md#서버-구성) |
+| 서버 | 서울 리전 EC2 한 대(`t4g.small` · arm64 · 2GB · 루트 gp3 30GiB 암호화). 호스트에는 Docker 만. Compose 가 Caddy(HTTPS 자동 발급 · 80/443) · 앱 · Postgres 를 띄우고 Postgres 포트는 밖에 열지 않는다. 메모리 상한 잠정값은 앱 1024MiB · Postgres 512MiB · Caddy 128MiB(합계 1664MiB) — `16-capacity` 에서 같은 Compose 파일로 재서 확정한다. 비밀은 서버의 env 파일에만. SSH 포트 없음 — 접속은 SSM Session Manager. 파일 위치 · 배포/복귀 규칙 · 필요한 명령은 [deploy/README.md](../deploy/README.md#서버-구성) |
 | 백엔드 배포 | [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml): `main` 병합(백엔드 · `deploy/` · 배포 워크플로 변경) → GitHub Actions 가 서버와 같은 arm64 러너에서 테스트하고 이미지를 한 번 빌드 → 그 이미지로 기동 · 정상 종료 검사 → ECR(태그 덮어쓰기 금지 · 전체 SHA 태그) → `deploy/` + 이미지 지문 묶음을 S3 에 → SSM Run Command 로 서버의 배포 스크립트 → 서버는 지문으로 받아 교체 · 로컬 헬스 확인 · 실패하면 직전 릴리스로 되돌림 → Actions에서 명령 결과와 공개 HTTPS 200 확인. AWS 자격은 OIDC. 저장소 변수는 `DEPLOY_ENABLED` · `AWS_REGION` · `AWS_DEPLOY_ROLE_ARN` · `DEPLOY_BUCKET` · `DEPLOY_INSTANCE_ID` · `API_ORIGIN`; `DEPLOY_ENABLED=true`일 때만 실행하며 진행 중 배포를 취소하지 않는다. 같은 SHA의 기존 이미지는 빌드/검사/push 없이 지문을 재사용한다. 수동 실행에 이전 SHA를 주면 기존 묶음/이미지를 확인해 빌드 없이 재배포한다. Flyway는 되돌리지 않는다. 실제 Actions/AWS 배포는 아직 수행하지 않았다 |
 | 화면 배포 | Vercel Git 연동 — 같은 `main` 병합에서 배포한다 |
 | 도메인 · DNS | Cloudflare 에서 등록 · DNS(2026-10-25). `{도메인}`(→ Vercel) · `api.{도메인}`(→ Elastic IP) 두 레코드 모두 **프록시를 끈다(DNS only)** — 켜면 모든 요청이 Cloudflare IP 로 보여 IP 당 레이트리밋([05 §1.4](./05-api.md))이 깨진다(ADR-060 과 같은 이유). 실제 도메인 이름은 공개 저장소의 파일에 적지 않는다 |
@@ -570,5 +570,5 @@ U6 는 들어가 봐야 보인다. **사람이 바로 움직여야 하는 일**�
 | 실행기 `N` · 워커 폴링 주기 | 용량 측정 ([07 §2](./07-testing.md)) |
 | 정원 `U_max` 최종값 | 용량 측정 vs 예산 중 작은 쪽 |
 | 잡 1건 최대비용 · 사용자 일일 쿼터 값 · 전역 킬스위치 금액 | 호출별 토큰 상한 · 누적 호출 몫 · 적용 단가로 최대치 계산, 실사용 비용으로 적정성 평가 |
-| ~~AWS 계정 방식 · Postgres 위치 · 백업~~ | **정했다(2026-10-21)** — 월 750시간 방식(무료 기간 끝남) · 같은 EC2 2GB · 매일 S3 총 7일(§3 · ADR-072) |
+| ~~AWS 계정 방식 · Postgres 위치 · 백업~~ | **정했다(2026-10-21)** — 같은 EC2 2GB · 매일 S3 총 7일. 계정은 2026-10-25 새 가입 방식 계정(크레딧 · Paid plan)으로 바꿨다(§3 · ADR-072) |
 | 타임아웃 재계산 · 백오프 상한 60초 적정성 | 실사용 기록 · 429 주입 테스트 |
