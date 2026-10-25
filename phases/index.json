@@ -9,6 +9,12 @@
       "dir": "1-auth",
       "status": "completed",
       "completed_at": "2026-10-12T22:00:40+0900"
+    },
+    {
+      "dir": "2-deploy",
+      "status": "completed",
+      "failed_at": "2026-10-25T16:13:11+0900",
+      "completed_at": "2026-10-26T06:35:29+0900"
     }
   ]
 }

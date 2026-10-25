@@ -10,6 +10,7 @@
 ### 1.0 로컬 서버 테스트 실행
 
 - Docker를 실행한 뒤 `cd backend && ./gradlew test`(저장소 루트에서는 `./backend/gradlew -p backend test`)로 전체 서버 테스트를 실행한다. DB 테스트는 Testcontainers가 별도 PostgreSQL을 띄우며, 실제 Google 인증 대신 가짜 설정과 HTTP 서버를 사용한다.
+- `./backend/gradlew -p backend imageTest`는 서버 이미지(`mogum-app:image-test`)를 빌드해 기동 · 헬스 · 비루트 · SIGTERM 정상 종료(코드 143)를 확인한다(Docker 필요 · 기본 `test` 제외). `-PappImage=<이미지 이름>`을 주면 빌드 없이 이미 만든 이미지를 검사한다.
 - Gradle `test` 작업은 테스트용 `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` 시스템 속성을 주입한다. VS Code의 Test Runner for Java에서 직접 실행할 때는 Gradle 작업을 거치지 않으므로, 로컬 `.vscode/settings.json`에 같은 값을 지정한다. `.vscode/`는 Git 추적 대상이 아니다. 아래 항목을 기존 설정에 추가한다([VS Code 공식 문서](https://code.visualstudio.com/docs/java/java-testing#_customize-test-configurations)).
 
 ```json
@@ -214,7 +215,7 @@
 
 | 항목 | 내용 |
 |---|---|
-| 환경 | 로컬 Docker Compose · **운영과 같은 메모리 조건으로 묶는다** · Postgres · LLM 스텁(§3). **측정 전에 Postgres 위치를 정한다**([04 §3](./04-jobs-and-cost.md)) — 같은 인스턴스면 앱 + Postgres 를 **합쳐서** 인스턴스 크기로 묶고, RDS 면 앱 컨테이너만 묶는다. 위치를 정하지 않고 재면 그 숫자로 정원을 정하지 않는다 |
+| 환경 | 로컬 Docker Compose · **운영과 같은 메모리 조건으로 묶는다** · Postgres · LLM 스텁(§3). **Postgres 는 앱과 같은 EC2(2GB)로 정했다**([04 §3](./04-jobs-and-cost.md) · ADR-072) — 앱 + Postgres 를 **합쳐서** 2GB 로 묶고, 운영 Compose 파일의 서비스별 메모리 상한을 그대로 쓴다 |
 | 가상 사용자 | `POST /dev/session` 으로 만든다(`loadtest` 프로필 · k6 쿠키 저장소) |
 | 사용 패턴(**가정 — 리포트에 명시**) | 활성 사용자 1명이 저녁 몰리는 시간에: 강의 1개 열기(생성 + 2초 폴링) → 읽기 → 학습 완료 → 첫 복습 → 오늘의 복습 20~30장. 가끔 커리큘럼 생성 · 다시 짜기 |
 | 늘리는 것 | 동시 활성 사용자 수 · 실행기 `N` |

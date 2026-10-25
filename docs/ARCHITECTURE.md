@@ -34,7 +34,15 @@
 │   └── src/test/java/…              # 구현과 같은 패키지에 짝 테스트 · ArchUnit(+ archfixture 위반 픽스처) · Testcontainers · 장애 주입 · LLM 스텁
 ├── compose.yaml                     # 로컬 Postgres(pgvector) + 서버 컨테이너 — 저장소 루트에서. 포트는 127.0.0.1 에만 연다
 ├── .env.example                     # 로컬 백엔드 환경 변수 견본 — .env 는 커밋하지 않는다
+├── deploy/                          # 운영 EC2 배포
+│   ├── compose.yaml · Caddyfile     # Caddy · 앱 · Postgres, HTTPS · 메모리 · 종료 대기
+│   ├── deploy.sh · backup.sh · restore.sh · mogum.env.example
+│   ├── aws/                        # OIDC/EC2 신뢰 · 역할 권한 · ECR/S3 수명주기 JSON 견본
+│   ├── systemd/                    # 일일 백업 service · timer
+│   └── README.md                   # 처음 구축 · 운영 확인 · 복원/되돌리기 절차서
+├── .github/workflows/deploy.yml     # main → OIDC · ECR · S3 · SSM 배포 · 공개 HTTPS 헬스
 ├── frontend/                    # React + TypeScript · Vite — Vercel 에 정적 파일로 배포
+│   ├── vercel.json             # 정적 파일 우선 · SPA index.html rewrite
 │   └── src/
 │       ├── pages/               # U1~U9 · P1 · P2 — 화면 하나에 파일 하나
 │       ├── components/          # 상단 바 · 카드 · 막힘 문구 · 마크다운 렌더러(KaTeX · mermaid)
@@ -120,4 +128,6 @@ worker 실행기(빈손일 때만 1개 수령)
 
 성공/실패 전환과 이벤트 저장은 같은 트랜잭션이다. 리스 만료 RUNNING 수령도 회수 이벤트와 함께 커밋한다. U6의 최근 24시간 실패율/회수는 `job_events`, 호출 재시도 등록/429/비용은 `llm_calls`, 현재 대기/실행 상태는 `jobs`에서 읽는다. 작업 삭제/탈퇴 시 이벤트의 잡 연결만 해제하며 사용자/콘텐츠 원문 없는 운영 이력은 보존한다([02 §6.9](./02-domain-data.md)).
 
-화면은 Vercel(`{도메인}` — 정적 파일) · API 는 EC2 한 대(`api.{도메인}`) · JVM 하나(`app.role=all` — API + 워커 실행기 `N` 개) · PostgreSQL + pgvector(🅿️ 위치는 용량 측정 전에) · OpenAI. 운영 관측은 관리자 화면 U6(DB 만 읽는다) + 슬랙 알림 + 외부 헬스체크. ([04 §3](./04-jobs-and-cost.md#3-배포))
+화면은 Vercel(`{도메인}` — 정적 파일) · API 는 EC2 한 대(`api.{도메인}`) · JVM 하나(`app.role=all` — API + 워커 실행기 `N` 개) · PostgreSQL + pgvector(앱과 같은 EC2 · 2GB — EC2 안은 Caddy · 앱 · Postgres 의 Docker Compose, ADR-072) · OpenAI. 운영 관측은 관리자 화면 U6(DB 만 읽는다) + 슬랙 알림 + 외부 헬스체크. ([04 §3](./04-jobs-and-cost.md#3-배포))
+
+처음 구축 · 운영 확인 · 백업/복원 · 되돌리기는 [운영 절차서](../deploy/README.md)를 따른다. 저장소의 배포 파일과 워크플로는 만들었고, 절차서의 처음 구축 순서 1~5(AWS 자원 · DNS · 서버 준비 · 저장소 Variables · Secrets)는 2026-10-25~26 수행했다. 실제 배포 · 운영 도메인 확인 · 복원 연습은 아직 수행하지 않았다.

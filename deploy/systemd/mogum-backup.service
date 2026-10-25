@@ -1,0 +1,11 @@
+[Unit]
+Description=Mogum daily Postgres backup to S3
+Requires=docker.service
+Wants=network-online.target
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=/etc/mogum/mogum.env
+ExecStart=/opt/mogum/current/deploy/backup.sh

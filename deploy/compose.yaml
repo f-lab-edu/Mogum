@@ -1,0 +1,59 @@
+name: mogum
+
+services:
+  caddy:
+    image: caddy:2
+    restart: always
+    mem_limit: 128m
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?API_DOMAIN is required}
+    ports:
+      - "80:80/tcp"
+      - "443:443/tcp"
+    volumes:
+      - /etc/mogum/caddy:/etc/caddy:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  backend:
+    image: ${APP_IMAGE:?APP_IMAGE digest is required}
+    restart: always
+    mem_limit: 1024m
+    stop_grace_period: 150s
+    environment:
+      SPRING_PROFILES_ACTIVE: aws
+      DB_URL: jdbc:postgresql://postgres:5432/mogum
+      DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID is required}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET is required}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:?GOOGLE_REDIRECT_URI is required}
+      APP_WEB_ORIGIN: ${APP_WEB_ORIGIN:?APP_WEB_ORIGIN is required}
+      APP_WEB_COOKIE_DOMAIN: ${APP_WEB_COOKIE_DOMAIN:?APP_WEB_COOKIE_DOMAIN is required}
+      APP_AUTH_ADMIN_EMAILS: ${APP_AUTH_ADMIN_EMAILS:?APP_AUTH_ADMIN_EMAILS is required}
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: always
+    mem_limit: 512m
+    environment:
+      POSTGRES_DB: mogum
+      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME is required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

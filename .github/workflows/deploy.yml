@@ -1,0 +1,251 @@
+name: Deploy backend
+
+'on':
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'deploy/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Existing release SHA to redeploy (empty builds the current commit)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: mogum-backend-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_DEPLOY_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+      DEPLOY_BUCKET: ${{ secrets.DEPLOY_BUCKET }}
+      DEPLOY_INSTANCE_ID: ${{ secrets.DEPLOY_INSTANCE_ID }}
+      API_ORIGIN: ${{ vars.API_ORIGIN }}
+      INPUT_SHA: ${{ inputs.sha }}
+      COMMIT_SHA: ${{ github.sha }}
+      SOURCE_REF: ${{ github.ref }}
+      EVENT_NAME: ${{ github.event_name }}
+      LOCAL_IMAGE: mogum-app:${{ github.sha }}
+      AWS_PAGER: ''
+      AWS_RETRY_MODE: standard
+      AWS_MAX_ATTEMPTS: '3'
+
+    steps:
+      - name: Validate configuration before build or AWS calls
+        id: validate
+        run: |
+          set -euo pipefail
+          if [[ $AWS_DEPLOY_ROLE_ARN =~ ^arn:aws:iam::([0-9]{12}): ]]; then
+            printf '::add-mask::%s\n' "${BASH_REMATCH[1]}"
+          fi
+          missing=false
+          for name in AWS_REGION AWS_DEPLOY_ROLE_ARN DEPLOY_BUCKET DEPLOY_INSTANCE_ID API_ORIGIN; do
+            if [[ -z ${!name} ]]; then
+              kind=variable
+              case "$name" in
+                AWS_DEPLOY_ROLE_ARN|DEPLOY_BUCKET|DEPLOY_INSTANCE_ID) kind=secret ;;
+              esac
+              printf 'Missing repository %s: %s\n' "$kind" "$name" >&2
+              missing=true
+            fi
+          done
+          [[ $missing == false ]] || exit 1
+          [[ $SOURCE_REF == refs/heads/main ]] || { echo 'Deployment requires main.' >&2; exit 1; }
+          redeploy=false
+          sha=$COMMIT_SHA
+          if [[ $EVENT_NAME == workflow_dispatch && -n $INPUT_SHA ]]; then
+            sha=$INPUT_SHA
+            redeploy=true
+          fi
+          [[ $sha =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid SHA: expected 40 lowercase hex characters.' >&2; exit 1; }
+          [[ $AWS_REGION == ap-northeast-2 ]] || { echo 'Invalid AWS_REGION.' >&2; exit 1; }
+          [[ $AWS_DEPLOY_ROLE_ARN =~ ^arn:aws:iam::([0-9]{12}):role/[A-Za-z0-9_+=,.@/-]+$ ]] || { echo 'Invalid AWS_DEPLOY_ROLE_ARN.' >&2; exit 1; }
+          registry="${BASH_REMATCH[1]}.dkr.ecr.ap-northeast-2.amazonaws.com"
+          [[ $DEPLOY_BUCKET =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]] || { echo 'Invalid DEPLOY_BUCKET.' >&2; exit 1; }
+          [[ $DEPLOY_INSTANCE_ID =~ ^i-([0-9a-f]{8}|[0-9a-f]{17})$ ]] || { echo 'Invalid DEPLOY_INSTANCE_ID.' >&2; exit 1; }
+          [[ $API_ORIGIN =~ ^https://[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || { echo 'Invalid API_ORIGIN: use an HTTPS origin without a trailing slash.' >&2; exit 1; }
+          printf 'RELEASE_SHA=%s\nREGISTRY=%s\nREDEPLOY=%s\n' "$sha" "$registry" "$redeploy" >> "$GITHUB_ENV"
+          printf 'redeploy=%s\n' "$redeploy" >> "$GITHUB_OUTPUT"
+
+      - name: Assume deployment role with OIDC
+        id: credentials
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          mask-aws-account-id: true
+          role-duration-seconds: 3600
+
+      - name: Find an already tested immutable SHA image
+        id: image
+        run: |
+          set -euo pipefail
+          if aws ecr describe-images --repository-name mogum-app --image-ids "imageTag=$RELEASE_SHA" \
+              --output json > "$RUNNER_TEMP/image.json" 2> "$RUNNER_TEMP/image-error"; then
+            digest=$(jq -er '.imageDetails[0].imageDigest' "$RUNNER_TEMP/image.json")
+            [[ $digest =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'Invalid ECR image digest.' >&2; exit 1; }
+            printf 'APP_IMAGE_REF=%s/mogum-app@%s\n' "$REGISTRY" "$digest" >> "$GITHUB_ENV"
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+            echo 'Reusing previously tested SHA image; no build, image test or push.'
+          elif grep -q 'ImageNotFoundException' "$RUNNER_TEMP/image-error"; then
+            [[ $REDEPLOY == false ]] || { echo 'Missing release image in ECR.' >&2; exit 1; }
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'Could not inspect ECR image.' >&2
+            cat "$RUNNER_TEMP/image-error" >&2
+            exit 1
+          fi
+
+      - name: Check existing rollback bundle against the image
+        id: inspect-release
+        if: ${{ steps.validate.outputs.redeploy == 'true' }}
+        run: |
+          set -euo pipefail
+          aws s3 cp "s3://$DEPLOY_BUCKET/releases/$RELEASE_SHA.tar.gz" "$RUNNER_TEMP/release.tar.gz" \
+            --only-show-errors || { echo 'Missing or unreadable release bundle in S3.' >&2; exit 1; }
+          tar -xOf "$RUNNER_TEMP/release.tar.gz" app-image.ref > "$RUNNER_TEMP/release-image.ref"
+          printf '%s\n' "$APP_IMAGE_REF" | cmp - "$RUNNER_TEMP/release-image.ref" \
+            || { echo 'Release bundle and ECR image digest do not match.' >&2; exit 1; }
+
+      - name: Check out the current release commit
+        id: checkout
+        if: ${{ steps.validate.outputs.redeploy == 'false' }}
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 21
+        id: java
+        if: ${{ steps.image.outputs.exists == 'false' }}
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Test, build one arm64 image and inspect that image
+        id: build
+        if: ${{ steps.image.outputs.exists == 'false' }}
+        run: |
+          set -euo pipefail
+          ./backend/gradlew -p backend build
+          docker build -t "$LOCAL_IMAGE" backend
+          ./backend/gradlew -p backend imageTest -PappImage="$LOCAL_IMAGE"
+
+      - name: Publish the tested image and resolve its digest
+        id: publish
+        if: ${{ steps.image.outputs.exists == 'false' }}
+        run: |
+          set -euo pipefail
+          aws ecr get-login-password | docker login --username AWS --password-stdin "$REGISTRY" >/dev/null 2>&1
+          docker tag "$LOCAL_IMAGE" "$REGISTRY/mogum-app:$RELEASE_SHA"
+          docker push "$REGISTRY/mogum-app:$RELEASE_SHA"
+          digest=$(aws ecr describe-images --repository-name mogum-app --image-ids "imageTag=$RELEASE_SHA" \
+            --query 'imageDetails[0].imageDigest' --output text)
+          [[ $digest =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'Invalid ECR image digest.' >&2; exit 1; }
+          printf 'APP_IMAGE_REF=%s/mogum-app@%s\n' "$REGISTRY" "$digest" >> "$GITHUB_ENV"
+
+      - name: Upload the deployment files and immutable image reference
+        id: bundle
+        if: ${{ steps.validate.outputs.redeploy == 'false' }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$APP_IMAGE_REF" > app-image.ref
+          tar -czf "$RUNNER_TEMP/release.tar.gz" deploy app-image.ref
+          aws s3 cp "$RUNNER_TEMP/release.tar.gz" "s3://$DEPLOY_BUCKET/releases/$RELEASE_SHA.tar.gz" --only-show-errors
+
+      - name: Deploy through SSM and print the command result
+        id: ssm
+        run: |
+          set -euo pipefail
+          # Values inserted into the remote script were validated before assuming the role.
+          remote=$(
+            printf "export RELEASE_SHA='%s' DEPLOY_BUCKET='%s' AWS_REGION='%s' EXPECTED_IMAGE='%s'\n" \
+              "$RELEASE_SHA" "$DEPLOY_BUCKET" "$AWS_REGION" "$APP_IMAGE_REF"
+            cat <<'REMOTE'
+          bash -se <<'MOGUM_DEPLOY'
+          set -euo pipefail
+          [[ $(id -u) == 0 ]] || { echo 'SSM deployment requires root.' >&2; exit 1; }
+          umask 077
+          install -d -m 755 /opt/mogum/releases
+          stage=$(mktemp -d /opt/mogum/releases/.incoming.XXXXXX)
+          trap 'rm -rf -- "$stage"' EXIT
+          aws s3 cp "s3://$DEPLOY_BUCKET/releases/$RELEASE_SHA.tar.gz" "$stage/release.tar.gz" --only-show-errors
+          mkdir "$stage/content"
+          tar -xzf "$stage/release.tar.gz" -C "$stage/content"
+          printf '%s\n' "$EXPECTED_IMAGE" | cmp - "$stage/content/app-image.ref"
+          release="/opt/mogum/releases/$RELEASE_SHA"
+          if [[ -e $release ]]; then
+            # Repeating the same SHA must not rewrite the active release directory.
+            cmp "$stage/content/app-image.ref" "$release/app-image.ref"
+          else
+            mv "$stage/content" "$release"
+          fi
+          bash "$release/deploy/deploy.sh" "$RELEASE_SHA"
+          MOGUM_DEPLOY
+          REMOTE
+          )
+          jq -n --arg command "$remote" '{commands: [$command], executionTimeout: ["1080"]}' > "$RUNNER_TEMP/ssm-parameters.json"
+          command_id=$(aws ssm send-command --instance-ids "$DEPLOY_INSTANCE_ID" --document-name AWS-RunShellScript \
+            --parameters "file://$RUNNER_TEMP/ssm-parameters.json" --timeout-seconds 60 \
+            --query 'Command.CommandId' --output text --cli-connect-timeout 5 --cli-read-timeout 15)
+          printf 'SSM command: %s\n' "$command_id"
+          deadline=$((SECONDS + 1200))
+          invocation=''
+          show_output() {
+            if [[ -n $invocation ]]; then
+              jq -r '"SSM status: " + .Status, "--- stdout ---", .StandardOutputContent, "--- stderr ---", .StandardErrorContent' <<< "$invocation"
+            fi
+          }
+          while (( SECONDS < deadline )); do
+            if invocation=$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$DEPLOY_INSTANCE_ID" \
+                --output json --cli-connect-timeout 5 --cli-read-timeout 15 2> "$RUNNER_TEMP/ssm-error"); then
+              status=$(jq -er '.Status' <<< "$invocation")
+              case "$status" in
+                Pending|InProgress|Delayed|Cancelling) ;;
+                Success)
+                  show_output
+                  [[ $(jq -r '.ResponseCode' <<< "$invocation") == 0 ]]
+                  exit ;;
+                *) show_output; exit 1 ;;
+              esac
+            elif ! grep -q 'InvocationDoesNotExist' "$RUNNER_TEMP/ssm-error"; then
+              echo 'Could not read SSM command result.' >&2
+              cat "$RUNNER_TEMP/ssm-error" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          show_output
+          echo 'SSM command did not succeed within 20 minutes; inspect the command before another deployment.' >&2
+          exit 1
+
+      - name: Check public HTTPS health
+        id: health
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 60))
+          while (( SECONDS < deadline )); do
+            remaining=$((deadline - SECONDS))
+            (( remaining <= 5 )) || remaining=5
+            status=$(curl --silent --output /dev/null --write-out '%{http_code}' --connect-timeout 2 \
+              --max-time "$remaining" "$API_ORIGIN/actuator/health") || status=000
+            [[ $status != 200 ]] || { echo 'Public HTTPS health is 200.'; exit 0; }
+            (( SECONDS >= deadline )) || sleep 1
+          done
+          echo 'Public HTTPS health did not return 200 within 60 seconds.' >&2
+          exit 1

@@ -1,0 +1,36 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EcrAuthentication",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*"
+    },
+    {
+      "Sid": "PullAppImage",
+      "Effect": "Allow",
+      "Action": ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:BatchCheckLayerAvailability"],
+      "Resource": "arn:aws:ecr:ap-northeast-2:ACCOUNT_ID:repository/mogum-app"
+    },
+    {
+      "Sid": "ReadReleaseBundlesAndBackups",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": ["arn:aws:s3:::BUCKET_NAME/releases/*", "arn:aws:s3:::BUCKET_NAME/backups/*"]
+    },
+    {
+      "Sid": "UploadBackup",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:AbortMultipartUpload"],
+      "Resource": "arn:aws:s3:::BUCKET_NAME/backups/*"
+    },
+    {
+      "Sid": "ListBackupsForRestoreCheck",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::BUCKET_NAME",
+      "Condition": {"StringEquals": {"s3:prefix": "backups/"}}
+    }
+  ]
+}
