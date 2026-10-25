@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "backup",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-25T15:38:24+0900",
+      "summary": "deploy/backup.sh·restore.sh·systemd/mogum-backup.service·timer, BackupFilesTest.java, env/절차서·04 §3 반영; 성공한 custom 덤프만 root 전용 임시 파일에서 s3://${MOGUM_BUCKET}/backups/YYYYMMDDTHHMMSS+0900.dump로 업로드(Asia/Seoul), S3 삭제 없음·총 7일(수명주기 step 4); 매일 한국 04:00(OnCalendar=*-*-* 19:00:00 UTC·Persistent=true), deploy.sh는 헬스/링크 갱신 성공 뒤 변경된 unit만 복사·daemon-reload·enable --now; restore는 mogum_restore_check만 복원·행 수 출력·실패 시 정리; 신규 23개(BackupFilesTest 21개·배포 2개) 포함 AC 전체 226개 통과(20초), 별도 로컬 pgvector/pg17 실제 덤프/복원·원본 불변·손상 덤프 정리 확인(S3 대체); 실제 AWS/AL2023 확인은 첫 배포 목록에 명시",
+      "completed_at": "2026-10-25T15:45:40+0900"
     },
     {
       "step": 4,
