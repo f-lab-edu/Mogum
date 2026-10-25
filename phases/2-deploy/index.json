@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "deploy-workflow",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-25T15:51:59+0900",
+      "summary": ".github/workflows/deploy.yml 단일 arm64 작업: 변수/main/SHA 검사→OIDC→기존 이미지 조회→신규만 build·1회 docker build·같은 이미지 imageTest→ECR SHA/지문→S3 묶음→SSM 결과/출력·HTTPS 헬스; actions/checkout@v5·actions/setup-java@v5·aws-actions/configure-aws-credentials@v5, vars DEPLOY_ENABLED·AWS_REGION·AWS_DEPLOY_ROLE_ARN·DEPLOY_BUCKET·DEPLOY_INSTANCE_ID·API_ORIGIN; 같은 SHA는 빌드/검사/push 생략·기존 지문 재사용, 수동 SHA는 기존 묶음/이미지 일치 확인 후 재배포; WorkflowFilesTest 신규 26개·AC 전체 270개 통과(21초), actionlint v1.7.12 통과; Gradle 워크플로 입력·절차서·04 §3 반영, 기존 AWS 정책 범위 유지·실제 AWS 호출/커밋 없음",
+      "completed_at": "2026-10-25T16:01:05+0900"
     },
     {
       "step": 6,
