@@ -112,6 +112,7 @@ class DeployFilesTest {
             if (!matcher.group(1).equals("APP_IMAGE")) expected.add(matcher.group(1));
         }
         expected.add("API_DOMAIN");
+        expected.add("MOGUM_BUCKET");
         var actual = new HashSet<String>();
         for (var line : Files.readAllLines(DEPLOY.resolve("mogum.env.example"))) {
             if (line.isBlank() || line.startsWith("#")) continue;
@@ -143,7 +144,7 @@ class DeployFilesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"success", "unhealthy", "up-failure", "pull-failure", "first-failure",
+    @ValueSource(strings = {"success", "unchanged-units", "changed-unit", "unhealthy", "up-failure", "pull-failure", "first-failure",
             "rollback-failure", "link-failure", "invalid-sha", "invalid-reference"})
     @Timeout(20)
     void 배포_실패는_직전으로_복귀하고_성공만_링크와_보존_대상을_바꾼다(String scenario, @TempDir Path root) throws Exception {
@@ -163,12 +164,21 @@ class DeployFilesTest {
         var envFile = root.resolve("server-env");
         Files.writeString(envFile, "GOOGLE_CLIENT_SECRET=must-never-be-printed\n");
 
+        var systemd = Files.createDirectory(root.resolve("systemd"));
+        if (List.of("unchanged-units", "changed-unit").contains(scenario)) {
+            for (var unit : List.of("mogum-backup.service", "mogum-backup.timer")) {
+                Files.copy(DEPLOY.resolve("systemd/" + unit), systemd.resolve(unit));
+            }
+            if (scenario.equals("changed-unit")) Files.writeString(systemd.resolve("mogum-backup.timer"), "# old\n");
+        }
+
         // 실제 서버 경로와 GNU 전용 명령을 임시 경로/명령으로 대체한다. Docker/AWS에는 접속하지 않는다.
         var script = Files.readString(DEPLOY.resolve("deploy.sh"))
                 .replace("/opt/mogum/releases", releases.toString())
                 .replace("/opt/mogum/current", current.toString())
                 .replace("/etc/mogum/mogum.env", envFile.toString())
                 .replace("/etc/mogum/caddy", root.resolve("caddy").toString())
+                .replace("/etc/systemd/system", systemd.toString())
                 .replace("health_timeout=180", "health_timeout=1");
         var scriptPath = root.resolve("deploy.sh");
         Files.writeString(scriptPath, script);
@@ -180,9 +190,10 @@ class DeployFilesTest {
                 case "$tool" in
                   stat) printf '0:600' ;;
                   aws) printf 'test-login-token\n' ;;
+                  systemctl) printf 'systemctl %s\\n' "$*" >> "$TEST_ROOT/commands" ;;
                   curl)
                     active=$(cat "$TEST_ROOT/active" 2>/dev/null || true)
-                    if [[ $SCENARIO == success || $SCENARIO == link-failure ||
+                    if [[ $SCENARIO == success || $SCENARIO == unchanged-units || $SCENARIO == changed-unit || $SCENARIO == link-failure ||
                           ( $active == "$PREVIOUS_IMAGE" && $SCENARIO != rollback-failure ) ]]; then
                       printf 200
                     else printf 503; fi ;;
@@ -217,7 +228,7 @@ class DeployFilesTest {
                     esac ;;
                 esac
                 """;
-        for (var command : List.of("stat", "aws", "curl", "sleep", "mv", "find", "docker")) {
+        for (var command : List.of("stat", "aws", "curl", "sleep", "mv", "find", "docker", "systemctl")) {
             var path = bin.resolve(command);
             Files.writeString(path, fakeCommand);
             assertTrue(path.toFile().setExecutable(true));
@@ -228,11 +239,12 @@ class DeployFilesTest {
                 "PREVIOUS_IMAGE", previousImage, "PATH", bin + ":" + System.getenv("PATH")));
         var process = builder.start();
         var output = new String(process.getInputStream().readAllBytes());
-        assertEquals(scenario.equals("success") ? 0 : 1, process.waitFor(), output);
+        boolean success = List.of("success", "unchanged-units", "changed-unit").contains(scenario);
+        assertEquals(success ? 0 : 1, process.waitFor(), output);
         assertFalse(output.contains("must-never-be-printed"));
         assertFalse(output.contains("test-login-token"));
         var commands = Files.exists(root.resolve("commands")) ? Files.readString(root.resolve("commands")) : "";
-        if (scenario.equals("success")) {
+        if (success) {
             assertEquals(release, Files.readSymbolicLink(current));
             assertTrue(Files.exists(previous));
             assertFalse(Files.exists(oldest));
@@ -241,7 +253,18 @@ class DeployFilesTest {
             assertFalse(commands.contains("image rm previous-id"));
             assertFalse(commands.contains("image rm current-id"));
             assertTrue(output.contains("Deployment healthy"));
+            if (scenario.equals("unchanged-units")) {
+                assertFalse(commands.contains("systemctl"));
+            } else {
+                assertTrue(commands.contains("systemctl daemon-reload\nsystemctl enable --now mogum-backup.timer"), commands);
+            }
+            for (var unit : List.of("mogum-backup.service", "mogum-backup.timer")) {
+                assertEquals(Files.readString(release.resolve("deploy/systemd/" + unit)),
+                        Files.readString(systemd.resolve(unit)));
+            }
         } else {
+            assertFalse(commands.contains("systemctl"), "헬스 실패나 링크 갱신 실패에서는 설치하지 않는다");
+            try (var units = Files.list(systemd)) { assertEquals(0, units.count()); }
             assertTrue(Files.exists(oldest), "실패 시에는 릴리스/이미지를 정리하지 않는다");
             assertFalse(commands.contains("image rm"));
             if (scenario.equals("first-failure")) {
@@ -269,6 +292,10 @@ class DeployFilesTest {
         var deploy = Files.createDirectory(directory.resolve("deploy"));
         Files.copy(DEPLOY.resolve("compose.yaml"), deploy.resolve("compose.yaml"), StandardCopyOption.REPLACE_EXISTING);
         Files.writeString(deploy.resolve("Caddyfile"), "# " + sha + "\n" + Files.readString(DEPLOY.resolve("Caddyfile")));
+        var systemd = Files.createDirectory(deploy.resolve("systemd"));
+        for (var unit : List.of("mogum-backup.service", "mogum-backup.timer")) {
+            Files.copy(DEPLOY.resolve("systemd/" + unit), systemd.resolve(unit));
+        }
         Files.writeString(directory.resolve("app-image.ref"), image + "\n");
         return directory;
     }

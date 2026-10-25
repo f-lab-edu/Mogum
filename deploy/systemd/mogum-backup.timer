@@ -1,0 +1,9 @@
+[Unit]
+Description=Mogum backup at 04:00 Asia/Seoul daily
+
+[Timer]
+OnCalendar=*-*-* 19:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
