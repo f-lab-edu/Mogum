@@ -77,6 +77,33 @@ Actions → **Deploy backend** → **Run workflow**에서 브랜치 `main`을 �
 - 변수를 등록한 `main` 실행에서 OIDC 수임 → ECR → S3 → SSM → 외부 HTTPS 200을 확인한다. 같은 SHA 재실행은 빌드/검사/push를 건너뛰어야 한다.
 - 보관된 이전 SHA로 수동 롤백을 한 번 수행하고, SSM 실패 시 출력/실패 코드와 서버의 자동 복귀를 확인한다. 공개 로그에 비밀이 없어야 한다.
 
+## Vercel(화면)
+
+프로젝트는 **2026-10-25에 Hobby 팀에서 이미 만들었다.** 다시 만들 때도 Vercel의 Git 가져오기에서 이 GitHub 저장소 **`f-lab-edu/Mogum`**을 연결하고 다음 값을 사용한다. 운영 브랜치는 **`main`**이며 병합마다 Vercel Git 연동이 화면을 빌드 · 배포한다(ADR-060 · ADR-072).
+
+| 프로젝트 설정 | 값 |
+|---|---|
+| Root Directory | `frontend` |
+| Framework Preset | `Vite` |
+| Build Command | 덮어쓰기를 켜고 **`npm run build`** — `tsc --noEmit` 타입 검사 후 Vite 빌드 |
+| Output Directory | `dist` — Vite 감지 기본값 유지 |
+| Production Branch | `main` |
+
+환경 변수 **`VITE_API_BASE_URL=https://api.{도메인}`**은 **Production에만** 등록하고 운영 배포를 다시 빌드한다. 브라우저는 이 출처의 `/api/*`와 `/auth/*`로 직접 요청한다. PR 미리보기(`*.vercel.app`)는 API와 다른 사이트라 세션 쿠키가 실리지 않으므로 로그인 확인에 사용하지 않는다([05 §1.1](../docs/05-api.md#11-인증--구글-oauth--쿠키-세션db-저장)).
+
+프로젝트의 Domains에 **`{도메인}`**을 연결한다. Vercel이 안내하는 DNS 레코드 종류 · 이름 · 값을 Cloudflare에 그대로 등록하고 **프록시를 끈다(DNS only)**. Vercel이 인증서를 직접 받도록 앞에 프록시를 두지 않는다.
+
+[frontend/vercel.json](../frontend/vercel.json)은 전체 경로를 `/index.html`로 보내는 rewrite 하나만 둔다. Vercel은 정적 파일을 먼저 찾으므로 `index.html` · `assets/…` 등 존재하는 빌드 파일은 그대로 제공하고, 없는 주소만 주소창 경로를 유지한 채 React Router로 처리한다([Vercel rewrite 우선순위](https://vercel.com/docs/project-configuration/vercel-json#rewrites) · [Vite SPA 설정](https://vercel.com/docs/frameworks/frontend/vite#using-vite-to-make-spas)). 빌드 명령 · 출력 디렉터리는 이 파일에 넣지 않는다. API 프록시 · redirect · 함수 · SSR 없이 정적 SPA로 배포한다.
+
+### 요금제 · 첫 배포 때 확인
+
+**Hobby에서 조직 소유 저장소의 Git 연동은 확인했다** — 2026-10-25에 Hobby 팀으로 `f-lab-edu/Mogum`을 가져와 `main` 빌드 · 배포에 성공했다. **Hobby의 비상업 조건은 아직 확인하지 않았다.** 조직 저장소 연동 성공과 약관 적합성 확인은 별개다.
+
+- [01 §10 공개 필수 목록](../docs/01-overview.md#10-공개-필수-목록)에 따라 Hobby 비상업 조건에 이 서비스가 맞는지 확인한다. 조건에 막히면 화면 배포 방식은 사용자가 다시 정한다.
+- 운영 도메인의 DNS가 Vercel 안내값이고 Cloudflare가 DNS only인지, HTTPS 인증서가 유효한지 확인한다.
+- Production 환경 변수와 `main` 운영 브랜치 설정을 확인하고 운영 도메인에서 로그인 · CSRF를 확인한다. 미리보기에서는 확인하지 않는다.
+- `/login`과 `/curriculums/1` 같은 화면 주소를 직접 열고 새로고침해 Vercel 404 없이 SPA가 뜨는지, 빌드된 `assets/…` 요청이 HTML 대신 원래 정적 파일을 반환하는지 확인한다. 현재 미구현 화면은 앱의 기존 경로 처리에 따른다.
+
 ## 백업 · 복원
 
 `mogum-backup.timer`가 매일 **한국 시각 04:00**에 `mogum-backup.service`(root · oneshot)를 실행한다. 일정은 서버 시간대와 무관한 `OnCalendar=*-*-* 19:00:00 UTC`이며 `Persistent=true`로 꺼져 있던 동안 놓친 실행은 켤 때 한 번 보충한다([systemd 시간 형식](https://freedesktop.org/software/systemd/man/latest/systemd.time.html) · [Persistent 규칙](https://www.freedesktop.org/software/systemd/man/252/systemd.timer.html)). 서비스는 `/etc/mogum/mogum.env`에서 환경을 받아 `/opt/mogum/current/deploy/backup.sh`를 실행한다. `MOGUM_BUCKET`에 백업과 릴리스가 공유하는 버킷 이름을 넣는다. 자격은 EC2 인스턴스 역할이며 키 파일은 두지 않는다.
