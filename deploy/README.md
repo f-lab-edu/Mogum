@@ -37,6 +37,46 @@ Flyway 마이그레이션은 되돌리지 않는다. 직전 앱이 새 스키마
 
 배포 파일 불변식과 명령 대체를 통한 성공/실패 경로는 저장소 루트에서 `./backend/gradlew -p backend test`로 검사한다. 실제 EC2 · ECR · 운영 도메인에서의 기동/복귀 확인은 아직 수행하지 않았다.
 
+## GitHub Actions 배포
+
+[deploy.yml](../.github/workflows/deploy.yml)의 `Deploy backend`는 `main` push 중 **`backend/**` · `deploy/**` · `.github/workflows/deploy.yml`** 중 하나가 바뀐 경우에 실행한다. 문서나 화면만 바뀌면 서버를 재시작하지 않는다. `workflow_dispatch`는 경로와 무관하게 실행하며 `main`만 허용한다. 단일 `mogum-backend-deploy` 동시 실행 그룹에서 진행 중인 배포를 취소하지 않는다. GitHub 동시 실행 그룹의 대기 실행은 새 실행으로 교체될 수 있으므로 모든 중간 커밋의 순차 배포를 보장하지는 않는다([동시 실행 규칙](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)). 화면은 별도 Vercel Git 연동으로 배포한다.
+
+저장소 **Settings → Secrets and variables → Actions → Variables**에 다음 여섯 개를 등록한다. 식별자이며 Secrets에 넣지 않는다. `DEPLOY_ENABLED`가 정확히 `true`일 때만 작업이 실행된다. 처음 AWS를 준비하는 동안에는 미설정 또는 `false`로 두고, 서버 env · AWS · DNS 설정이 끝난 뒤 `true`로 켠다. 끄면 다음 실행부터 건너뛰며 진행 중인 배포는 취소하지 않는다.
+
+| 이름 | 값 예 | 어디서 얻나 |
+|---|---|---|
+| `DEPLOY_ENABLED` | `true` / `false` | 운영자가 배포 활성화 여부를 정한다 |
+| `AWS_REGION` | `ap-northeast-2` | 위 AWS 설정에서 정한 서울 리전 |
+| `AWS_DEPLOY_ROLE_ARN` | `arn:aws:iam::<계정 ID>:role/mogum-deploy` | IAM의 `mogum-deploy` 역할 상세 ARN |
+| `DEPLOY_BUCKET` | `<전용 버킷 이름>` | S3 버킷 이름. `s3://` 없이 서버 `MOGUM_BUCKET`과 같은 값 |
+| `DEPLOY_INSTANCE_ID` | `i-<인스턴스 ID>` | EC2 인스턴스 상세 ID. 배포 정책의 대상 한 대 |
+| `API_ORIGIN` | `https://api.{도메인}` | DNS · Caddy에 설정한 공개 API 출처. 끝 `/` 없이 입력 |
+
+활성화된 작업은 빌드나 AWS 호출에 앞서 필수 변수의 빈 값을 검사하며, 비었으면 **변수 이름만** 출력하고 실패한다. 브랜치 · SHA · 리전 · 식별자 형식도 먼저 검사한다. 자격은 [configure-aws-credentials@v5](https://github.com/aws-actions/configure-aws-credentials/tree/v5)의 OIDC 임시 자격만 사용하며 워크플로 권한은 `contents: read` · `id-token: write`다. GitHub `environment`는 지정하지 않는다. 지정하면 OIDC sub가 `environment:…`로 바뀌어 기존 `ref:refs/heads/main` 신뢰 조건과 맞지 않는다.
+
+일반 push와 `sha` 없는 수동 실행은 다음 순서다.
+
+1. 서버와 같은 **`ubuntu-24.04-arm`** 작업에서 ECR `mogum-app:{전체 40자 소문자 SHA}`를 조회한다. 있으면 이전 실행이 검사 후 올린 이미지이므로 빌드 · 이미지 검사 · push를 건너뛰고 지문을 재사용한다. 태그가 없다는 응답만 새 빌드로 진행하며 권한/통신 오류는 실패한다. 덮어쓰기 금지 태그를 다시 push하지 않는다.
+2. 새 이미지가 필요하면 [checkout@v5](https://github.com/actions/checkout/tree/v5) · [setup-java@v5](https://github.com/actions/setup-java/tree/v5)(Temurin 21)를 사용해 `./backend/gradlew -p backend build`로 테스트와 빌드를 수행한다. Docker로 `backend/` 이미지를 **한 번** 빌드한 뒤 `./backend/gradlew -p backend imageTest -PappImage=<그 이미지>`로 검사한다. Testcontainers는 러너의 Docker를 사용한다.
+3. 검사한 로컬 이미지를 ECR의 전체 SHA 태그로 바꿔 올리고 `DescribeImages`로 지문을 조회한다. 다시 빌드하지 않는다.
+4. 해당 커밋의 `deploy/`와 지문 한 줄인 `app-image.ref`를 묶어 `s3://{DEPLOY_BUCKET}/releases/{SHA}.tar.gz`에 업로드한다. 같은 SHA 재실행은 동일 커밋의 배포 파일과 기존 지문으로 묶음을 다시 올릴 수 있어 이미지 push 후 업로드가 실패한 경우에도 재개할 수 있다.
+5. SSM `AWS-RunShellScript`로 지정한 인스턴스 한 대에서 root로 묶음을 받는다. `/opt/mogum/releases/` 아래 임시 디렉터리에서 풀고 지문을 확인한 뒤 `/opt/mogum/releases/{SHA}/`로 옮겨 `bash deploy/deploy.sh {SHA}`를 실행한다. 같은 SHA의 디렉터리가 이미 있으면 지문을 비교하고 그대로 사용해 활성 디렉터리를 덮어쓰지 않는다. 임시 파일은 정리한다.
+6. SSM 명령 ID를 출력하고 최대 **20분** 동안 결과를 조회한다(명령 전달 제한 60초 · 서버 실행 제한 1080초). 최초 `InvocationDoesNotExist`는 결과 반영 지연으로 재조회한다. 성공 상태와 종료 코드 0을 모두 확인하고 표준 출력 · 오류를 Actions 로그에 표시한다. 이어 공개 `{API_ORIGIN}/actuator/health`의 HTTPS 응답이 **200**인지 최대 **60초** 확인한다.
+
+### 수동 롤백 · 실패 확인
+
+Actions → **Deploy backend** → **Run workflow**에서 브랜치 `main`을 선택하고 `sha`에 이전 릴리스의 **전체 40자 소문자 SHA**를 넣는다. 비워 두면 현재 커밋의 일반 빌드/배포 경로다. SHA가 있으면 checkout · Java 설정 · 빌드 · 검사 · 업로드 없이, 해당 SHA의 ECR 이미지와 S3 기존 묶음을 먼저 조회하고 묶음의 지문까지 일치하는지 확인한다. 이미지/묶음이 없거나 읽을 수 없으면 어느 쪽인지 출력하고 SSM을 보내지 않는다. 보관 범위는 **S3 현재 릴리스 30일과 ECR 최근 이미지 30개 중 먼저 끝나는 쪽**이다([상세](#보관과-롤백-범위)). `Flyway` 마이그레이션은 되돌리지 않으므로 이전 앱과 현재 스키마의 호환성을 먼저 확인한다.
+
+실패하면 워크플로의 **Deploy through SSM and print the command result** 단계에서 명령 ID · 상태 · stdout · stderr를 본다. `deploy.sh`가 로컬 헬스 실패로 직전 앱에 복귀했어도 워크플로는 실패한다. 결과 조회 상한을 넘기거나 조회 자체가 실패하면 로그의 명령 ID로 Systems Manager Run Command 상태를 확인한 뒤 재배포한다. 공개 헬스만 실패하면 DNS · HTTPS · Caddy를 확인한다. 이 경우 로컬 헬스를 통과한 서버의 `current`는 유지된다. 로그에 비밀/env 파일을 추가 출력하거나 `set -x`를 켜지 않는다.
+
+### 첫 배포 때 확인
+
+불변식과 명령 대체 테스트는 `WorkflowFilesTest`로 실행한다. 액션의 위 메이저 태그와 입력은 공식 저장소에서 확인했다. [GitHub 러너 표](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories)에서 `ubuntu-24.04-arm`의 공개 저장소 무료 제공을 확인했고, [arm64 이미지 도구 목록](https://github.com/actions/partner-runner-images/blob/main/images/arm-ubuntu-24-image.md)에서 Docker · AWS CLI · jq · curl을 확인했다. 스크립트는 Bash · GNU 기본 도구 · tar · grep도 사용하며 `rg`에 의존하지 않는다. SSM 옵션/결과 필드는 [send-command](https://docs.aws.amazon.com/cli/latest/reference/ssm/send-command.html) · [get-command-invocation](https://docs.aws.amazon.com/cli/latest/reference/ssm/get-command-invocation.html) 공식 문서와 대조했다. 실제 GitHub Actions · AWS 실행은 아직 수행하지 않았다.
+
+- 조직의 Actions 정책이 이 러너와 공식 액션 세 개를 허용하는지, 실제 러너의 arm64 Docker에서 전체 테스트와 `imageTest`가 성공하는지 확인한다.
+- 변수를 등록한 `main` 실행에서 OIDC 수임 → ECR → S3 → SSM → 외부 HTTPS 200을 확인한다. 같은 SHA 재실행은 빌드/검사/push를 건너뛰어야 한다.
+- 보관된 이전 SHA로 수동 롤백을 한 번 수행하고, SSM 실패 시 출력/실패 코드와 서버의 자동 복귀를 확인한다. 공개 로그에 비밀이 없어야 한다.
+
 ## 백업 · 복원
 
 `mogum-backup.timer`가 매일 **한국 시각 04:00**에 `mogum-backup.service`(root · oneshot)를 실행한다. 일정은 서버 시간대와 무관한 `OnCalendar=*-*-* 19:00:00 UTC`이며 `Persistent=true`로 꺼져 있던 동안 놓친 실행은 켤 때 한 번 보충한다([systemd 시간 형식](https://freedesktop.org/software/systemd/man/latest/systemd.time.html) · [Persistent 규칙](https://www.freedesktop.org/software/systemd/man/252/systemd.timer.html)). 서비스는 `/etc/mogum/mogum.env`에서 환경을 받아 `/opt/mogum/current/deploy/backup.sh`를 실행한다. `MOGUM_BUCKET`에 백업과 릴리스가 공유하는 버킷 이름을 넣는다. 자격은 EC2 인스턴스 역할이며 키 파일은 두지 않는다.
