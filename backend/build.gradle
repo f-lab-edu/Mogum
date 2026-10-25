@@ -41,9 +41,39 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-tasks.named('test') {
+def fakeGoogleCredentials = [
+    GOOGLE_CLIENT_ID: 'test-google-client',
+    GOOGLE_CLIENT_SECRET: 'test-only-not-a-real-secret'
+]
+
+tasks.withType(Test).configureEach {
     useJUnitPlatform()
     // 모든 SpringBootTest는 실제 Google 비밀 없이 main 설정을 그대로 읽는다.
-    systemProperty 'GOOGLE_CLIENT_ID', 'test-google-client'
-    systemProperty 'GOOGLE_CLIENT_SECRET', 'test-only-not-a-real-secret'
+    systemProperties fakeGoogleCredentials
+}
+
+tasks.named('test') {
+    exclude '**/*ImageIT.class'
+}
+
+def suppliedAppImage = providers.gradleProperty('appImage')
+def localAppImage = 'mogum-app:image-test'
+def buildTestImage = tasks.register('buildTestImage', Exec) {
+    description = 'Builds the local app image with Docker CLI (BuildKit).'
+    workingDir projectDir
+    commandLine 'docker', 'build', '-t', localAppImage, '.'
+}
+
+tasks.register('imageTest', Test) {
+    group = 'verification'
+    description = 'Checks app image startup, health, non-root Java and SIGTERM exit; accepts -PappImage.'
+    if (!suppliedAppImage.isPresent()) {
+        dependsOn buildTestImage
+    }
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include '**/*ImageIT.class'
+    systemProperty 'appImage', suppliedAppImage.getOrElse(localAppImage)
+    // 같은 태그의 이미지 내용이 바뀔 수 있으므로 매번 실제 컨테이너를 검사한다.
+    outputs.upToDateWhen { false }
 }
