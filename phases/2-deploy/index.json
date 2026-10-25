@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "aws-policies",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-25T15:45:40+0900",
+      "summary": "deploy/aws/{github-oidc-trust,deploy-policy,ec2-trust,instance-policy,ecr-lifecycle,s3-lifecycle}.json·AwsFilesTest.java·deploy/README.md·docs/04-jobs-and-cost.md 반영; ACCOUNT_ID·BUCKET_NAME·INSTANCE_ID 자리표시/서울 리전, OIDC main 정확 일치, 배포 역할 ECR push·releases 읽기/쓰기·단일 인스턴스 SSM, 인스턴스 역할 ECR pull·releases 읽기·backups 읽기/쓰기/접두사 목록(SSM 관리형 정책 연결 절차), 삭제/설정 변경 권한 없음; ECR 최근 30개·S3 backups 현재 6일+이전 1일/releases 30일+1일·미완료 업로드 1일·Days 기반 삭제 표시 정리, 비동기 삭제 지연/첫 적용 확인 명시; 신규 18개 포함 AC 전체 244개 통과(21초), 실제 AWS 호출·적용·커밋 없음",
+      "completed_at": "2026-10-25T15:51:59+0900"
     },
     {
       "step": 5,
