@@ -1,6 +1,6 @@
 # 운영 절차서
 
-이 문서는 **처음 구축 순서 → 운영 확인 목록 → 첫 배포 때 확인 → 비용 → 구성별 상세** 순서로 읽는다. 저장소의 배포 파일과 자동 테스트는 만들었고, [처음 구축 순서](#처음-구축-순서) 1~5(AWS 자원 · DNS · 서버 준비 · 저장소 변수)를 마쳤다(2026-10-25~26). **실제 배포 · 운영 도메인 · AWS 백업 복원 연습은 아직 수행하지 않았다.** 아래 체크와 기록은 사람이 실행한 뒤 남긴다. 공개 여부는 [01 §10](../docs/01-overview.md#10-공개-필수-목록)의 별도 판단이다.
+이 문서는 **처음 구축 순서 → 운영 확인 목록 → 첫 배포 때 확인 → 비용 → 구성별 상세** 순서로 읽는다. 저장소의 배포 파일과 자동 테스트는 만들었고, [처음 구축 순서](#처음-구축-순서) 1~5(AWS 자원 · DNS · 서버 준비 · 저장소 Variables · Secrets)를 마쳤다(2026-10-25~26). **실제 배포 · 운영 도메인 · AWS 백업 복원 연습은 아직 수행하지 않았다.** 아래 체크와 기록은 사람이 실행한 뒤 남긴다. 공개 여부는 [01 §10](../docs/01-overview.md#10-공개-필수-목록)의 별도 판단이다.
 
 `{도메인}` · `ACCOUNT_ID` · `BUCKET_NAME` · `INSTANCE_ID`는 자리표시다. 실제 도메인 · 계정 · 버킷 · 이메일 · 자격 정보는 공개 저장소에 적지 않는다. 명령의 자리표시도 실행 전에 바꾼다. AWS 자원 생성/설정은 운영자의 관리자 임시 자격으로 수행하고, 앱 배포/백업은 OIDC와 인스턴스 역할을 쓴다.
 
@@ -98,7 +98,7 @@
 
 5. **GitHub 저장소 Variables · Secrets.** 쓸 파일: [deploy.yml](../.github/workflows/deploy.yml), [설정 표](#github-actions-배포). Actions **Variables 3개**(`DEPLOY_ENABLED` · `AWS_REGION` · `API_ORIGIN`)와 **Secrets 3개**(`AWS_DEPLOY_ROLE_ARN` · `DEPLOY_BUCKET` · `DEPLOY_INSTANCE_ID`)를 등록한다. 이미 Variables에 넣은 세 식별자는 **사람이 Secrets로 옮기고 Variables에서는 지운다.** `DEPLOY_BUCKET`은 서버 `MOGUM_BUCKET`과 같다. **`DEPLOY_ENABLED=false`로 유지**한다. AWS 장기 키나 Google 비밀을 등록하지 않는다. 완료 확인: Variables 3개와 Secrets 3개의 등록 위치/이름을 설정 화면에서 대조하고, 세 식별자가 Variables에 남지 않았는지 확인한다. 워크플로가 `main`에 있으며 조직이 러너/액션을 허용하는지도 확인한다.
 
-   **수행 기록(2026-10-26)** — 여섯 변수를 등록했고(`DEPLOY_ENABLED=false`) `gh variable list`로 이름/값을 대조했다. Secrets는 비어 있다. 워크플로가 `main`에 있는지와 조직의 러너/액션 허용은 병합 뒤 8번에서 확인한다.
+   **수행 기록(2026-10-26)** — 여섯 변수를 등록했고(`DEPLOY_ENABLED=false`) `gh variable list`로 이름/값을 대조했다. step 8(로그 가림) 뒤 세 식별자를 Secrets로 옮기고 Variables에서 지웠다 — `gh secret list`로 이름 세 개, `gh variable list`로 남은 Variables 세 개의 이름/값을 확인했다(Secret 값은 읽을 수 없어 첫 배포의 형식 검사에서 확인된다). 워크플로가 `main`에 있는지와 조직의 러너/액션 허용은 병합 뒤 8번에서 확인한다.
 
 6. **Vercel 프로젝트 · 환경 변수 · 도메인.** 쓸 파일: [frontend/vercel.json](../frontend/vercel.json), [Vercel 설정 표](#vercel화면). 이미 만든 Hobby 프로젝트를 사용한다. Root Directory `frontend` · Vite · Build Command `npm run build` · Output `dist` · Production Branch `main`. **Production에만** `VITE_API_BASE_URL=https://api.{도메인}` 등록 후 다시 빌드한다. Domains에 `{도메인}`을 추가하고 Vercel 안내 DNS 값을 Cloudflare에 **DNS only**로 넣는다. 완료 확인: Vercel 도메인 연결/인증서가 정상이며 운영 도메인의 `/login` 새로고침이 성공한다. Hobby 비상업 조건은 [첫 배포 때 확인](#첫-배포-때-확인)에서 서비스 적합성을 판단한다. `*.vercel.app` 미리보기에서 로그인은 검사하지 않는다.
 
@@ -203,7 +203,7 @@
 | 9 | [AWS CLI v2 적용 예](#aws-cli-v2-적용-예)의 실제 성공과 SSM [send-command](https://docs.aws.amazon.com/cli/latest/reference/ssm/send-command.html)/[get-command-invocation](https://docs.aws.amazon.com/cli/latest/reference/ssm/get-command-invocation.html) 옵션/응답을 실행 로그로 확인 | 이 문서 CLI 예제/운영 CLI 버전 · `deploy.yml`의 명령/결과 처리 |
 | 10 | 배포 역할의 ECR push/지문 조회 · releases 업로드/조회 · 지정 인스턴스 SSM/결과 조회 성공, 다른 문서/인스턴스/`backups/` 접근 거절 확인 | IAM 연결 정책 · `aws/deploy-policy.json` |
 | 11 | 인스턴스 역할의 ECR pull · releases 다운로드 · backups 업로드(multipart 포함)/목록/다운로드 성공. 두 역할 삭제/설정 변경 권한 부재를 IAM 시뮬레이터로 확인 — 시뮬레이터에는 `aws:RequestedRegion=ap-northeast-2` 문맥을 넣는다(없으면 조직 SCP `RegionFloor`가 모두 명시 거부로 평가한다). 시뮬레이터 부분은 2026-10-26 수행 | IAM 연결 정책 · `aws/instance-policy.json` · `aws/deploy-policy.json` |
-| 12 | `main` 실행의 OIDC → ECR → S3 → SSM → HTTPS 200, 같은 SHA 재실행의 빌드/검사/push 생략 확인 | 저장소 변수 · `deploy.yml` · `deploy.sh` |
+| 12 | `main` 실행의 OIDC → ECR → S3 → SSM → HTTPS 200, 같은 SHA 재실행의 빌드/검사/push 생략 확인 | 저장소 Variables · Secrets · `deploy.yml` · `deploy.sh` |
 | 13 | 보관된 이전 SHA 재배포, 실패 SSM 출력/실패 코드와 서버 자동 복귀, 로컬 직전 이미지/릴리스 보존, 공개 로그의 비밀 부재 확인. 첫 실행의 단계 env · docker push · AWS 오류 · SSM 출력에서 계정 ID · 버킷 이름 · 인스턴스 ID가 `***`로 가려졌는지 확인. 정상 수동 재배포만으로 실패 자동 복귀 검증을 대체하지 않음 | `deploy.yml` · `deploy.sh` · `aws/` 정책; Flyway 호환성은 해당 마이그레이션 |
 | 14 | `systemd-analyze calendar '*-*-* 19:00:00 UTC'`와 `TZ=Asia/Seoul date`로 일정이 한국 04:00인지 확인 | `systemd/mogum-backup.timer`, 이 문서의 시간 표기 |
 | 15 | 성공 배포 후 unit 설치 · timer enabled/다음 실행 · `Persistent=true`의 놓친 실행 보충, 수동 백업/복원의 객체 키·행 수·DB 정리·원본 불변 확인 | `deploy.sh` · `systemd/` · `backup.sh` · `restore.sh` · 서버 env |
