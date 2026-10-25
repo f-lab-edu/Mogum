@@ -1,6 +1,6 @@
 # 운영 절차서
 
-이 문서는 **처음 구축 순서 → 운영 확인 목록 → 첫 배포 때 확인 → 비용 → 구성별 상세** 순서로 읽는다. 저장소의 배포 파일과 자동 테스트는 만들었고, [처음 구축 순서](#처음-구축-순서) 1~5(AWS 자원 · DNS · 서버 준비 · 저장소 Variables · Secrets)를 마쳤다(2026-10-25~26). **실제 배포 · 운영 도메인 · AWS 백업 복원 연습은 아직 수행하지 않았다.** 아래 체크와 기록은 사람이 실행한 뒤 남긴다. 공개 여부는 [01 §10](../docs/01-overview.md#10-공개-필수-목록)의 별도 판단이다.
+이 문서는 **처음 구축 순서 → 운영 확인 목록 → 첫 배포 때 확인 → 비용 → 구성별 상세** 순서로 읽는다. 저장소의 배포 파일과 자동 테스트는 만들었고, [처음 구축 순서](#처음-구축-순서) 1~8을 마쳤다(2026-10-25~26) — 첫 배포가 성공했고 운영 도메인 · 백업 · 복원 연습 · 정상 종료를 확인했다. **운영 확인 목록의 목록 밖 계정 거절 · `SESSION` 쿠키 · CSRF/로그아웃 · 되돌리기 연습과, 첫 배포 때 확인의 거절 · 실패 경로는 아직 수행하지 않았다.** 아래 체크와 기록은 사람이 실행한 뒤 남긴다. 공개 여부는 [01 §10](../docs/01-overview.md#10-공개-필수-목록)의 별도 판단이다.
 
 `{도메인}` · `ACCOUNT_ID` · `BUCKET_NAME` · `INSTANCE_ID`는 자리표시다. 실제 도메인 · 계정 · 버킷 · 이메일 · 자격 정보는 공개 저장소에 적지 않는다. 명령의 자리표시도 실행 전에 바꾼다. AWS 자원 생성/설정은 운영자의 관리자 임시 자격으로 수행하고, 앱 배포/백업은 OIDC와 인스턴스 역할을 쓴다.
 
@@ -27,7 +27,9 @@
    | 인스턴스 역할 | `mogum-instance`에 `aws/ec2-trust.json` · `aws/instance-policy.json`과 `AmazonSSMManagedInstanceCore` 연결, 인스턴스 프로파일 생성 | 역할의 신뢰/권한과 같은 이름 프로파일의 역할 연결 확인 |
    | EC2 | `t4g.small` · Amazon Linux 2023 **arm64** · 위 인스턴스 프로파일. 인터넷 게이트웨이 경로가 있는 공개 서브넷(기본 VPC), 외부 ECR/S3/SSM HTTPS 통신 가능. 보안 그룹 인바운드는 웹 TCP **80/443만**, **22와 5432는 열지 않는다**. 키 페어 없음 · IMDSv2 필수 · 종료 방지 켬(지우거나 다시 만들 때는 먼저 끈다) | EC2 상태 검사 통과 · 프로파일 연결 · SG 확인 · 루트 볼륨 암호화 · SSM 관리형 노드 Online · Session Manager 접속 성공 |
    | Elastic IP | 서울 리전 주소 할당 후 위 EC2에 연결 | 인스턴스의 공인 IPv4와 Elastic IP 연결 대상이 일치 |
-   | 배포 역할 | `mogum-deploy`에 `aws/github-oidc-trust.json` · `aws/deploy-policy.json` 적용. 이제 얻은 `INSTANCE_ID`를 권한 사본에 넣는다. 콘솔에서는 「사용자 지정 신뢰 정책」에 치환한 신뢰 견본을 그대로 붙인다 | 신뢰 sub는 `repo:f-lab-edu/Mogum:ref:refs/heads/main`, SSM 대상은 해당 한 대. 실제 수임/배포는 8번에서 확인 |
+   | 배포 역할 | `mogum-deploy`에 `aws/github-oidc-trust.json` · `aws/deploy-policy.json` 적용. 이제 얻은 `INSTANCE_ID`를 권한 사본에 넣는다. 콘솔에서는 「사용자 지정 신뢰 정책」에 치환한 신뢰 견본을 그대로 붙인다 | 신뢰 sub는 `repo:f-lab-edu@54677968/Mogum@1378404194:ref:refs/heads/main`, SSM 대상은 해당 한 대. 실제 수임/배포는 8번에서 확인 |
+
+   이 저장소는 불변 subject를 쓰므로 `sub`에 조직 · 저장소 ID가 들어간다. `gh api repos/f-lab-edu/Mogum/actions/oidc/customization/sub`의 `sub_claim_prefix` 뒤에 `:ref:refs/heads/main`을 붙인 값이 신뢰 정책과 같은지 확인한다.
 
    EC2의 EBS는 OS · DB · 로컬 릴리스 3개 · 현재/직전 이미지 · 덤프/복원 임시 공간을 담아야 한다. **gp3 30GiB(기본 3000 IOPS · 125MiB/s) · 암호화**로 정했다(2026-10-26 — 기본 8GiB로는 부족하다). 루트 볼륨 손실 시 S3 백업으로 복구하므로 EBS만 백업으로 여기지 않는다.
 
@@ -108,19 +110,21 @@
 
 8. **첫 배포.** 위 준비가 끝나면 `DEPLOY_ENABLED=true`로 바꾸고 Actions → **Deploy backend → Run workflow**에서 브랜치 **`main`**, **`sha`는 빈칸**으로 실행한다. 쓸 파일: [deploy.yml](../.github/workflows/deploy.yml), [deploy.sh](./deploy.sh). 완료 확인: 빌드/`imageTest`(새 이미지일 때) · ECR · S3 · **Deploy through SSM and print the command result**의 `Success`/종료 코드 0 · **Check public HTTPS health**의 200을 확인한다. SSM stdout에 `Deployment healthy; current release updated.`가 있어야 한다. 이후 아래 운영 확인을 수행한다. 실패하면 [수동 롤백 · 실패 확인](#수동-롤백--실패-확인)을 따르며 첫 배포에는 직전 릴리스가 없다.
 
+   **수행 기록(2026-10-26)** — 병합 push 실행은 `DEPLOY_ENABLED=false`라 건너뛰었다. `true`로 바꾸고 Run workflow를 실행하자 **OIDC 단계가 `Not authorized to perform sts:AssumeRoleWithWebIdentity`로 실패**했다. 이 저장소는 GitHub OIDC의 불변 subject(`use_immutable_subject`)를 써서 토큰 `sub`가 `repo:f-lab-edu@54677968/Mogum@1378404194:ref:refs/heads/main`인데 신뢰 정책은 이름 형식(`repo:f-lab-edu/Mogum:…`)이었다. CloudTrail의 `AssumeRoleWithWebIdentity` 실패 이벤트 `principalId`에서 실제 sub를 확인하고, 운영자 승인 뒤 CLI(`iam update-assume-role-policy`)로 신뢰 정책의 sub만 바꿔 다시 실행했다. 재실행은 약 4분에 성공했다 — 빌드/`imageTest` 2분 35초 · ECR push · S3 묶음 · SSM `Success`(stdout `Deployment healthy; current release updated.`, 백업 timer 설치) · 공개 HTTPS 헬스 200. 공개 로그 전체에서 계정 ID · 버킷 · 인스턴스 ID는 `***`로 가려졌다.
+
 ## 운영 확인 목록
 
-아직 실행하지 않은 목록이다. 운영 도메인을 사용하고 브라우저 개발자 도구 Network의 Preserve log를 켠다. 응답/쿠키 값이 포함된 화면이나 HAR를 공개 저장소에 올리지 않는다.
+체크한 항목은 2026-10-26 첫 배포 뒤 확인했고, 체크하지 않은 항목은 아직 수행하지 않았다. 운영 도메인을 사용하고 브라우저 개발자 도구 Network의 Preserve log를 켠다. 응답/쿠키 값이 포함된 화면이나 HAR를 공개 저장소에 올리지 않는다.
 
-- [ ] **화면 · SPA 새로고침:** `https://{도메인}`을 열고 `/login`으로 이동한 뒤 새로고침한다. 기대: Vercel 404 없이 **U1 로그인 화면**. Network에서 `assets/…`가 HTML이 아닌 JS/CSS로 응답한다. `/curriculums/1` 직접 열기/새로고침도 SPA까지 도달해야 하며 미구현 화면은 기존 앱 경로 처리를 따른다.
-- [ ] **헬스 · 인증서:** 로컬에서 아래 명령을 실행한다. 기대: 인증 우회 옵션 없이 TLS 검증 성공 · HTTP **200**, 본문 **`{"status":"UP"}`**만. 브라우저 보안 정보에서도 API/화면 인증서의 호스트/유효기간을 확인한다.
+- [x] **화면 · SPA 새로고침:** `https://{도메인}`을 열고 `/login`으로 이동한 뒤 새로고침한다. 기대: Vercel 404 없이 **U1 로그인 화면**. Network에서 `assets/…`가 HTML이 아닌 JS/CSS로 응답한다. `/curriculums/1` 직접 열기/새로고침도 SPA까지 도달해야 하며 미구현 화면은 기존 앱 경로 처리를 따른다. — 2026-10-26: `/login` · `/curriculums/1` 200 HTML, 애셋 JS/CSS 타입(curl)
+- [x] **헬스 · 인증서:** 로컬에서 아래 명령을 실행한다. 기대: 인증 우회 옵션 없이 TLS 검증 성공 · HTTP **200**, 본문 **`{"status":"UP"}`**만. 브라우저 보안 정보에서도 API/화면 인증서의 호스트/유효기간을 확인한다. — 2026-10-26: 200 `{"status":"UP"}`, API 인증서 Let's Encrypt · 호스트 일치 · 90일(`openssl s_client`), HTTP는 308로 HTTPS 이동
 
   ```bash
   curl --fail-with-body --silent --show-error -i https://api.{도메인}/actuator/health
   ```
 
-- [ ] **Google 로그인:** 관리자 목록 계정으로 U1에서 로그인한다. 기대: 화면 `/`로 복귀하고 Network의 **`GET https://api.{도메인}/api/me`가 200**. 시크릿 창에서 관리자 목록 밖 계정으로 시도하면 화면 **`/login?error=not_allowed`**. Google 테스트 모드의 계정 제한에 먼저 막히면 테스트 사용자 설정을 확인한 뒤 다시 검사한다.
-- [ ] **쿠키:** 로그인 직후 Network 콜백/API 응답의 **Set-Cookie**와 Application → Cookies를 함께 본다. 기대: `SESSION`은 **Domain 속성 없음(API 호스트 전용)** · **HttpOnly · Secure · SameSite=Lax**, `XSRF-TOKEN`은 **Domain={도메인} · HttpOnly 아님 · Secure · SameSite=Lax**. 브라우저의 표시상 선행 점은 허용한다. Domain 없음 여부는 Set-Cookie로 판단한다.
+- [ ] **Google 로그인:** 관리자 목록 계정으로 U1에서 로그인한다. 기대: 화면 `/`로 복귀하고 Network의 **`GET https://api.{도메인}/api/me`가 200**. 시크릿 창에서 관리자 목록 밖 계정으로 시도하면 화면 **`/login?error=not_allowed`**. Google 테스트 모드의 계정 제한에 먼저 막히면 테스트 사용자 설정을 확인한 뒤 다시 검사한다. — 2026-10-26: 관리자 계정 로그인 성공(사람, 모바일 브라우저). 목록 밖 계정 거절은 아직
+- [ ] **쿠키:** 로그인 직후 Network 콜백/API 응답의 **Set-Cookie**와 Application → Cookies를 함께 본다. 기대: `SESSION`은 **Domain 속성 없음(API 호스트 전용)** · **HttpOnly · Secure · SameSite=Lax**, `XSRF-TOKEN`은 **Domain={도메인} · HttpOnly 아님 · Secure · SameSite=Lax**. 브라우저의 표시상 선행 점은 허용한다. Domain 없음 여부는 Set-Cookie로 판단한다. — 2026-10-26: 비로그인 응답의 `XSRF-TOKEN` 속성은 기대와 같다(curl). `SESSION`은 로그인 뒤에만 생겨 아직
 - [ ] **CSRF · 로그아웃:** 로그인한 **화면 출처**의 개발자 도구 Console에서 아래를 순서대로 실행하고 Network에서 확인한다(현재 화면에 로그아웃 버튼이 없어도 실행 가능). 기대: 헤더 없는 요청은 **403** · JSON `code=CSRF_INVALID`, 세션은 유지된다. 쿠키 토큰을 헤더에 넣은 같은 요청은 **204**, 세션 만료 후 `/api/me`는 **401**. 토큰/세션 값은 출력하지 않는다.
 
   ```javascript
@@ -138,7 +142,7 @@
   await fetch(`${apiOrigin}/api/me`, { credentials: 'include' });
   ```
 
-- [ ] **CORS:** 아래 비허용 출처의 preflight와 실제 GET을 실행한다. 기대: **403**이고 **`Access-Control-Allow-Origin`/`Access-Control-Allow-Credentials` 없음**. 위 화면 출처의 정상 `/api/me` 응답에는 정확한 화면 Origin과 credentials `true`가 있어야 한다.
+- [x] **CORS:** 아래 비허용 출처의 preflight와 실제 GET을 실행한다. 기대: **403**이고 **`Access-Control-Allow-Origin`/`Access-Control-Allow-Credentials` 없음**. 위 화면 출처의 정상 `/api/me` 응답에는 정확한 화면 Origin과 credentials `true`가 있어야 한다. — 2026-10-26: 비허용 출처 preflight · GET 모두 403, 두 헤더 없음. 화면 출처의 preflight · `/api/me`(비로그인 401)에 정확한 Origin과 credentials `true`
 
   ```bash
   curl --silent --show-error -i -X OPTIONS https://api.{도메인}/api/me \
@@ -149,7 +153,7 @@
     -H 'Origin: https://other.example'
   ```
 
-- [ ] **배포 중 정상 종료:** 한가할 때 SSM root Bash에서 아래를 실행한다. 기대: 종료 대기 설정 **150초**, 직전 컨테이너 종료 코드 **143** · OOM `false`, 앱 로그에 graceful shutdown 시작/완료. **137/SIGKILL이면 실패**이며 원인을 확인한다. 재시작 후 로컬/공개 헬스가 다시 UP이어야 한다. 실행기의 호출 완료/반납은 아직 없으므로 **`4-job-queue`에서 별도 확인**한다.
+- [x] **배포 중 정상 종료:** 한가할 때 SSM root Bash에서 아래를 실행한다. 기대: 종료 대기 설정 **150초**, 직전 컨테이너 종료 코드 **143** · OOM `false`, 앱 로그에 graceful shutdown 시작/완료. **137/SIGKILL이면 실패**이며 원인을 확인한다. 재시작 후 로컬/공개 헬스가 다시 UP이어야 한다. 실행기의 호출 완료/반납은 아직 없으므로 **`4-job-queue`에서 별도 확인**한다. — 2026-10-26(SSM Run Command): 150초 · 143 · OOM `false`, graceful shutdown 시작/완료 → JPA · 커넥션 풀 종료 로그, 정지 1초 · 재시작 12초 뒤 로컬 UP · 공개 200
 
   ```bash
   export APP_IMAGE="$(cat /opt/mogum/current/app-image.ref)"
@@ -168,8 +172,8 @@
 
   기동 직후 curl이 실패하면 UP까지 기다려 다시 확인한다. 앱 로그는 SSM에서만 보고 비밀이 섞이지 않았는지 확인한다.
 
-- [ ] **백업:** SSM에서 `sudo systemctl start mogum-backup.service`, 이어 `sudo journalctl -u mogum-backup.service --since '10 minutes ago' --no-pager`. 기대: 성공한 **`s3://…/backups/…dump`와 바이트 크기**, S3 콘솔에 같은 객체가 있다. `sudo systemctl is-enabled mogum-backup.timer`는 `enabled`, `sudo systemctl list-timers mogum-backup.timer --all`의 다음 실행은 **한국 04:00(UTC 19:00)**. [백업 상세](#백업--복원).
-- [ ] **복원 연습:** [복원 연습 명령](#복원-연습)의 `restore.sh latest`를 실행한다. 기대: 종료 코드 0 · 사용한 객체 키 · 테이블별 행 수가 나오고 **`mogum_restore_check`가 제거**된다. 확인은 아래 명령의 결과가 빈 값인지 본다. 원본 `mogum`의 데이터는 바뀌지 않아야 한다. 아래 기록 칸은 실행 후 채운다.
+- [x] **백업:** SSM에서 `sudo systemctl start mogum-backup.service`, 이어 `sudo journalctl -u mogum-backup.service --since '10 minutes ago' --no-pager`. 기대: 성공한 **`s3://…/backups/…dump`와 바이트 크기**, S3 콘솔에 같은 객체가 있다. `sudo systemctl is-enabled mogum-backup.timer`는 `enabled`, `sudo systemctl list-timers mogum-backup.timer --all`의 다음 실행은 **한국 04:00(UTC 19:00)**. [백업 상세](#백업--복원). — 2026-10-26(SSM Run Command): `backups/20261026T070915+0900.dump` 10,076바이트, S3 `head-object`로 크기 · SSE-S3 · 버전 대조, timer `enabled` · 다음 실행 19:00 UTC
+- [x] **복원 연습:** [복원 연습 명령](#복원-연습)의 `restore.sh latest`를 실행한다. 기대: 종료 코드 0 · 사용한 객체 키 · 테이블별 행 수가 나오고 **`mogum_restore_check`가 제거**된다. 확인은 아래 명령의 결과가 빈 값인지 본다. 원본 `mogum`의 데이터는 바뀌지 않아야 한다. 아래 기록 칸은 실행 후 채운다.
 
   ```bash
   postgres=$(sudo docker ps --filter label=com.docker.compose.project=mogum \
@@ -180,7 +184,7 @@
 
   | 실행 날짜(한국) | 객체 키 | 테이블별 행 수 | 종료 코드 · 확인용 DB 삭제 · 원본 불변 확인 |
   |---|---|---|---|
-  | 미수행 | — | — | — |
+  | 2026-10-26 07:10 | `backups/20261026T070915+0900.dump` | `flyway_schema_history` 6 · `spring_session` 2 · `spring_session_attributes` 2 · `users` 1 | 0 · 제거 확인 · 원본 `users` · `flyway_schema_history` 행 수 전후 같음 |
 
   실제 값이 든 운영 기록은 비공개 운영 기록에 남긴다. 이 표에는 비밀/실제 계정 값을 넣지 않는다.
 
@@ -192,24 +196,24 @@
 
 | # | 확인할 사실 · 방법 | 틀렸을 때 고칠 곳 |
 |---|---|---|
-| 1 | 조직 Actions 정책에서 `ubuntu-24.04-arm` 허용/사용 가능 여부, 실제 로그의 arm64와 무료 제공 조건 확인([러너 표](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories)) | 조직 Actions/결제 설정, 필요 시 `.github/workflows/deploy.yml`의 러너 선택을 별도 검토 |
-| 2 | `actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09`(v5.1.0) · `actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961`(v5.7.0) · `aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708`(v5.1.1)의 허용/해결 성공과 입력 동작을 실제 실행 로그로 확인 | 조직 허용 액션 설정 · `deploy.yml` |
-| 3 | 러너 Docker · AWS CLI v2 · jq · curl · Bash · GNU 도구 · tar/grep, 전체 build와 같은 이미지 `imageTest` 성공 확인([도구 목록](https://github.com/actions/partner-runner-images/blob/main/images/arm-ubuntu-24-image.md)) | 러너 준비 단계/`deploy.yml`, 필요 시 `backend/build.gradle` · `AppImageIT` |
+| 1 | 조직 Actions 정책에서 `ubuntu-24.04-arm` 허용/사용 가능 여부, 실제 로그의 arm64와 무료 제공 조건 확인([러너 표](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories)) — 2026-10-26: 저장소 Actions 허용, 러너 배정 · 실행 성공(로그의 `JAVA_HOME_21_ARM64`) | 조직 Actions/결제 설정, 필요 시 `.github/workflows/deploy.yml`의 러너 선택을 별도 검토 |
+| 2 | `actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09`(v5.1.0) · `actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961`(v5.7.0) · `aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708`(v5.1.1)의 허용/해결 성공과 입력 동작을 실제 실행 로그로 확인 — 2026-10-26: 저장소 허용 액션 `all`, 세 액션 해결 · 입력 동작 성공 | 조직 허용 액션 설정 · `deploy.yml` |
+| 3 | 러너 Docker · AWS CLI v2 · jq · curl · Bash · GNU 도구 · tar/grep, 전체 build와 같은 이미지 `imageTest` 성공 확인([도구 목록](https://github.com/actions/partner-runner-images/blob/main/images/arm-ubuntu-24-image.md)) — 2026-10-26: 전체 build · 같은 이미지 `imageTest` 성공(2분 35초) | 러너 준비 단계/`deploy.yml`, 필요 시 `backend/build.gradle` · `AppImageIT` |
 | 4 | 위 AL2023 패키지 설치 · aarch64 Compose 다운로드 · root의 `docker compose version` · Docker 자동 시작을 실제 SSM 셸에서 확인 — 2026-10-26 수행 | 이 문서의 서버 설치 명령/버전, 호스트 패키지 설정 |
-| 5 | env의 root `600` · 필수 값 · Compose/systemd의 인용값 해석, DB 초기화와 `aws` 프로필 기동 확인(내용 출력 금지) | 서버 `/etc/mogum/mogum.env`; 계약 문제면 견본/Compose/설정 별도 수정 |
-| 6 | SSM Agent Online/접속, 인스턴스 프로파일 · `AmazonSSMManagedInstanceCore`, ECR/S3/SSM 외부 HTTPS 통신 확인 — Online · Session Manager · Run Command · 프로파일은 2026-10-26 수행, ECR/S3 통신은 8번에서 | IAM/EC2/네트워크 설정; 정책 견본 문제면 `aws/instance-policy.json` |
-| 7 | Cloudflare API/화면 DNS only · Elastic IP/화면 안내 DNS · 80/443 접근 · Caddy 인증서 발급/reload · HTTPS 확인 | Cloudflare DNS/SG, `/etc/mogum/caddy/Caddyfile` 원본인 `deploy/Caddyfile` |
-| 8 | 치환한 JSON 수락 · OIDC audience/sub · `main` 수임 성공, 다른 브랜치/PR/포크 거절 확인. 워크플로에 `environment` 없어야 함 | IAM 공급자/역할 신뢰 · `aws/github-oidc-trust.json` · `deploy.yml` |
-| 9 | [AWS CLI v2 적용 예](#aws-cli-v2-적용-예)의 실제 성공과 SSM [send-command](https://docs.aws.amazon.com/cli/latest/reference/ssm/send-command.html)/[get-command-invocation](https://docs.aws.amazon.com/cli/latest/reference/ssm/get-command-invocation.html) 옵션/응답을 실행 로그로 확인 | 이 문서 CLI 예제/운영 CLI 버전 · `deploy.yml`의 명령/결과 처리 |
-| 10 | 배포 역할의 ECR push/지문 조회 · releases 업로드/조회 · 지정 인스턴스 SSM/결과 조회 성공, 다른 문서/인스턴스/`backups/` 접근 거절 확인 | IAM 연결 정책 · `aws/deploy-policy.json` |
-| 11 | 인스턴스 역할의 ECR pull · releases 다운로드 · backups 업로드(multipart 포함)/목록/다운로드 성공. 두 역할 삭제/설정 변경 권한 부재를 IAM 시뮬레이터로 확인 — 시뮬레이터에는 `aws:RequestedRegion=ap-northeast-2` 문맥을 넣는다(없으면 조직 SCP `RegionFloor`가 모두 명시 거부로 평가한다). 시뮬레이터 부분은 2026-10-26 수행 | IAM 연결 정책 · `aws/instance-policy.json` · `aws/deploy-policy.json` |
-| 12 | `main` 실행의 OIDC → ECR → S3 → SSM → HTTPS 200, 같은 SHA 재실행의 빌드/검사/push 생략 확인 | 저장소 Variables · Secrets · `deploy.yml` · `deploy.sh` |
-| 13 | 보관된 이전 SHA 재배포, 실패 SSM 출력/실패 코드와 서버 자동 복귀, 로컬 직전 이미지/릴리스 보존, 공개 로그의 비밀 부재 확인. 첫 실행의 단계 env · docker push · AWS 오류 · SSM 출력에서 계정 ID · 버킷 이름 · 인스턴스 ID가 `***`로 가려졌는지 확인. 정상 수동 재배포만으로 실패 자동 복귀 검증을 대체하지 않음 | `deploy.yml` · `deploy.sh` · `aws/` 정책; Flyway 호환성은 해당 마이그레이션 |
-| 14 | `systemd-analyze calendar '*-*-* 19:00:00 UTC'`와 `TZ=Asia/Seoul date`로 일정이 한국 04:00인지 확인 | `systemd/mogum-backup.timer`, 이 문서의 시간 표기 |
-| 15 | 성공 배포 후 unit 설치 · timer enabled/다음 실행 · `Persistent=true`의 놓친 실행 보충, 수동 백업/복원의 객체 키·행 수·DB 정리·원본 불변 확인 | `deploy.sh` · `systemd/` · `backup.sh` · `restore.sh` · 서버 env |
+| 5 | env의 root `600` · 필수 값 · Compose/systemd의 인용값 해석, DB 초기화와 `aws` 프로필 기동 확인(내용 출력 금지) — 2026-10-26: 첫 배포 기동 · DB 초기화 · `aws` 프로필 헬스 UP, systemd `EnvironmentFile`로 백업 성공(내용 출력 없음) | 서버 `/etc/mogum/mogum.env`; 계약 문제면 견본/Compose/설정 별도 수정 |
+| 6 | SSM Agent Online/접속, 인스턴스 프로파일 · `AmazonSSMManagedInstanceCore`, ECR/S3/SSM 외부 HTTPS 통신 확인 — Online · Session Manager · Run Command · 프로파일은 2026-10-26 수행, ECR/S3 통신은 2026-10-26 첫 배포 · 백업에서 확인 | IAM/EC2/네트워크 설정; 정책 견본 문제면 `aws/instance-policy.json` |
+| 7 | Cloudflare API/화면 DNS only · Elastic IP/화면 안내 DNS · 80/443 접근 · Caddy 인증서 발급/reload · HTTPS 확인 — 2026-10-26: Caddy가 Let's Encrypt 인증서를 발급, HTTP→HTTPS 308 · HTTPS 200 | Cloudflare DNS/SG, `/etc/mogum/caddy/Caddyfile` 원본인 `deploy/Caddyfile` |
+| 8 | 치환한 JSON 수락 · OIDC audience/sub · `main` 수임 성공, 다른 브랜치/PR/포크 거절 확인. 워크플로에 `environment` 없어야 함 — 2026-10-26: `main` 수임 성공. 첫 시도는 **토큰 sub가 불변 ID 형식**이라 거절돼 신뢰 정책을 고쳤다([처음 구축 순서](#처음-구축-순서) 8번 기록). 다른 브랜치/PR/포크 거절은 아직 | IAM 공급자/역할 신뢰 · `aws/github-oidc-trust.json` · `deploy.yml` |
+| 9 | [AWS CLI v2 적용 예](#aws-cli-v2-적용-예)의 실제 성공과 SSM [send-command](https://docs.aws.amazon.com/cli/latest/reference/ssm/send-command.html)/[get-command-invocation](https://docs.aws.amazon.com/cli/latest/reference/ssm/get-command-invocation.html) 옵션/응답을 실행 로그로 확인 — 2026-10-26: 워크플로와 운영자 Run Command의 `send-command`/`get-command-invocation` 성공. 적용 예의 자원 생성 CLI는 콘솔로 만들어 실행하지 않았다 | 이 문서 CLI 예제/운영 CLI 버전 · `deploy.yml`의 명령/결과 처리 |
+| 10 | 배포 역할의 ECR push/지문 조회 · releases 업로드/조회 · 지정 인스턴스 SSM/결과 조회 성공, 다른 문서/인스턴스/`backups/` 접근 거절 확인 — 2026-10-26: 성공 경로(ECR push/지문 · releases 업로드 · SSM/결과 조회) 확인. 거절 경로의 실제 호출은 아직 | IAM 연결 정책 · `aws/deploy-policy.json` |
+| 11 | 인스턴스 역할의 ECR pull · releases 다운로드 · backups 업로드(multipart 포함)/목록/다운로드 성공. 두 역할 삭제/설정 변경 권한 부재를 IAM 시뮬레이터로 확인 — 시뮬레이터에는 `aws:RequestedRegion=ap-northeast-2` 문맥을 넣는다(없으면 조직 SCP `RegionFloor`가 모두 명시 거부로 평가한다). 시뮬레이터 부분은 2026-10-26 수행. ECR pull · releases 다운로드 · backups 업로드(단일 파트)/목록/다운로드는 2026-10-26 첫 배포 · 백업 · 복원 연습에서 확인, multipart는 아직 | IAM 연결 정책 · `aws/instance-policy.json` · `aws/deploy-policy.json` |
+| 12 | `main` 실행의 OIDC → ECR → S3 → SSM → HTTPS 200, 같은 SHA 재실행의 빌드/검사/push 생략 확인 — 2026-10-26: OIDC → ECR → S3 → SSM → HTTPS 200 확인. 같은 SHA 재실행의 생략은 아직 | 저장소 Variables · Secrets · `deploy.yml` · `deploy.sh` |
+| 13 | 보관된 이전 SHA 재배포, 실패 SSM 출력/실패 코드와 서버 자동 복귀, 로컬 직전 이미지/릴리스 보존, 공개 로그의 비밀 부재 확인. 첫 실행의 단계 env · docker push · AWS 오류 · SSM 출력에서 계정 ID · 버킷 이름 · 인스턴스 ID가 `***`로 가려졌는지 확인. 정상 수동 재배포만으로 실패 자동 복귀 검증을 대체하지 않음 — 2026-10-26: 첫 실행 공개 로그의 세 식별자 가림 확인(로그 전체에서 0건). 이전 SHA 재배포 · 실패 자동 복귀는 아직 | `deploy.yml` · `deploy.sh` · `aws/` 정책; Flyway 호환성은 해당 마이그레이션 |
+| 14 | `systemd-analyze calendar '*-*-* 19:00:00 UTC'`와 `TZ=Asia/Seoul date`로 일정이 한국 04:00인지 확인 — 2026-10-26: `systemctl list-timers`의 다음 실행 `19:00 UTC`(한국 04:00)로 확인 | `systemd/mogum-backup.timer`, 이 문서의 시간 표기 |
+| 15 | 성공 배포 후 unit 설치 · timer enabled/다음 실행 · `Persistent=true`의 놓친 실행 보충, 수동 백업/복원의 객체 키·행 수·DB 정리·원본 불변 확인 — 2026-10-26: unit 설치 · timer enabled/다음 실행 · 수동 백업/복원(객체 키 · 행 수 · 확인용 DB 제거 · 원본 불변) 확인. `Persistent=true` 보충은 아직 | `deploy.sh` · `systemd/` · `backup.sh` · `restore.sh` · 서버 env |
 | 16 | ECR IMMUTABLE/최근 30개, S3 공개 차단/SSE-S3/버전 관리/두 수명주기 적용 확인. 시간이 지난 표본의 현재 만료 → 이전 버전 삭제 → 삭제 표시 정리 · 미완료 multipart 정리와 지연을 기록 | AWS 설정 · `aws/ecr-lifecycle.json` · `aws/s3-lifecycle.json`; 실제 지연은 [보관 설명](#보관과-롤백-범위)에 반영 |
 | 17 | [Hobby 비상업 조건](https://vercel.com/docs/plans/hobby)에 서비스가 맞는지 공개 전에 판단. Hobby 조직 저장소 Git 연동은 2026-10-25에 성공했으나 약관 적합성은 미확인 | Vercel 요금제/화면 배포 방식은 사용자 결정, [01 §10](../docs/01-overview.md#10-공개-필수-목록) |
-| 18 | Vercel main/Production 변수 · 커스텀 도메인/인증서 · SPA 직접 열기/새로고침/정적 파일 · 운영 Google 로그인/거절 · 쿠키/CSRF/CORS를 위 운영 목록으로 확인 | Vercel 프로젝트/DNS/Google 콘솔/서버 env; SPA 규칙 문제면 `frontend/vercel.json` |
+| 18 | Vercel main/Production 변수 · 커스텀 도메인/인증서 · SPA 직접 열기/새로고침/정적 파일 · 운영 Google 로그인/거절 · 쿠키/CSRF/CORS를 위 운영 목록으로 확인 — 2026-10-26: Production 변수 · 도메인/인증서 · SPA · 관리자 로그인 · CORS 확인. 목록 밖 계정 거절 · `SESSION` · CSRF는 아직 | Vercel 프로젝트/DNS/Google 콘솔/서버 env; SPA 규칙 문제면 `frontend/vercel.json` |
 
 ## 비용(대략)
 
@@ -261,7 +265,7 @@ Flyway 마이그레이션은 되돌리지 않는다. 직전 앱이 새 스키마
 
 서버에 필요한 명령은 **Bash**, **Docker Engine**, **Docker Compose 플러그인**(`docker compose`), **AWS CLI v2**(`aws`), **curl**, **systemd**(`systemctl`), 그리고 Amazon Linux 2023 기본 도구인 `cat` · `stat` · `install` · `readlink` · `ln` · `mv` · `sort` · `rm` · `sleep` · `id` · `mktemp` · `date` · `wc`(GNU coreutils), `cmp`(GNU diffutils), `find`(GNU findutils)다. Docker 데몬은 부팅 시 자동 시작하도록 활성화해야 한다. 설치와 초기화는 [처음 구축 순서](#처음-구축-순서)의 4번을 따른다. 스크립트는 AWS 키를 받지 않고 인스턴스 역할을 사용한다.
 
-배포 파일 불변식과 명령 대체를 통한 성공/실패 경로는 저장소 루트에서 `./backend/gradlew -p backend test`로 검사한다. 실제 EC2 · ECR · 운영 도메인에서의 기동/복귀 확인은 아직 수행하지 않았다.
+배포 파일 불변식과 명령 대체를 통한 성공/실패 경로는 저장소 루트에서 `./backend/gradlew -p backend test`로 검사한다. 실제 EC2 · ECR · 운영 도메인에서의 기동은 2026-10-26 첫 배포로 확인했다. 헬스 실패 시 자동 복귀는 아직 수행하지 않았다.
 
 ## AWS 설정
 
@@ -293,7 +297,7 @@ Flyway 마이그레이션은 되돌리지 않는다. 직전 앱이 새 스키마
 아래는 자원별 설정 참조다. **생성 순서는 [처음 구축 순서](#처음-구축-순서) 2번을 따른다**(EC2 생성 후 얻은 인스턴스 ID로 배포 역할을 완성한다). 기존 자원이 있으면 같은 설정인지 확인한다.
 
 1. **IAM OIDC 공급자** — URL `https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com`. 배포 역할 신뢰 정책의 공급자 ARN은 이 계정의 공급자를 가리킨다.
-2. **배포 역할 `mogum-deploy`** — `github-oidc-trust.json`과 `deploy-policy.json`을 각각 신뢰/인라인 정책에 적용한다. GitHub Actions가 이 역할 ARN으로 OIDC 임시 자격을 받는다. `aud`와 `sub`의 연산자는 `StringEquals`, sub는 **`repo:f-lab-edu/Mogum:ref:refs/heads/main`** 그대로다. `main` push와 `main`에서의 `workflow_dispatch`만 사용하며 워크플로에 GitHub `environment`를 지정하지 않는다(environment를 쓰면 sub가 바뀐다).
+2. **배포 역할 `mogum-deploy`** — `github-oidc-trust.json`과 `deploy-policy.json`을 각각 신뢰/인라인 정책에 적용한다. GitHub Actions가 이 역할 ARN으로 OIDC 임시 자격을 받는다. `aud`와 `sub`의 연산자는 `StringEquals`, sub는 **`repo:f-lab-edu@54677968/Mogum@1378404194:ref:refs/heads/main`** 그대로다. 이 저장소는 불변 subject를 쓰므로 조직 · 저장소 ID가 들어가며, 이름이 같아도 ID가 다른 저장소는 신뢰하지 않는다. `gh api repos/f-lab-edu/Mogum/actions/oidc/customization/sub`의 `sub_claim_prefix` 뒤에 `:ref:refs/heads/main`을 붙여 형식을 확인한다. `main` push와 `main`에서의 `workflow_dispatch`만 사용하며 워크플로에 GitHub `environment`를 지정하지 않는다(environment를 쓰면 sub 끝이 `environment:…`로 바뀐다).
 3. **인스턴스 역할 `mogum-instance`** — `ec2-trust.json`과 `instance-policy.json`을 적용하고, AWS 관리형 정책 **`arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore`**를 추가로 연결한다. 관리형 정책은 파일로 복제하지 않는다. 인스턴스 프로파일 `mogum-instance`에 이 역할을 넣어 EC2에 연결한다(EC2용 역할을 콘솔에서 만들면 프로파일도 생성된다). 다른 권한 정책을 추가하지 않는다.
 4. **ECR 비공개 저장소 `mogum-app`** — 태그 변경 불가 **`IMMUTABLE`**, 예외 없음. 이미지는 전체 40자 소문자 커밋 SHA 태그로 올리고 실행은 지문을 쓴다. `ecr-lifecycle.json`을 수명주기에 적용한다.
 5. **S3 범용 버킷 `BUCKET_NAME`** — 전용 버킷 하나에 **퍼블릭 액세스 차단 네 항목 모두 활성화**, 객체 소유권은 **Bucket owner enforced(ACL 비활성화)**, 기본 암호화는 **SSE-S3(AES-256)**, **버전 관리 Enabled**. `s3-lifecycle.json` 전체를 적용한다. KMS 키는 사용하지 않으므로 두 역할에 KMS 권한이 필요하지 않다.
@@ -354,7 +358,7 @@ JSON 파싱과 권한 범위는 `AwsFilesTest`로 검증했으며 실제 IAM 평
 | `DEPLOY_BUCKET` | `<전용 버킷 이름>` | S3 버킷 이름. `s3://` 없이 서버 `MOGUM_BUCKET`과 같은 값 |
 | `DEPLOY_INSTANCE_ID` | `i-<인스턴스 ID>` | EC2 인스턴스 상세 ID. 배포 정책의 대상 한 대 |
 
-활성화된 작업은 빌드나 AWS 호출에 앞서 필수 Variables · Secrets의 빈 값을 검사하며, 비었으면 **종류(variable/secret)와 이름만** 출력하고 실패한다. 브랜치 · SHA · 리전 · 식별자 형식도 먼저 검사한다. 자격은 [configure-aws-credentials@v5.1.1](https://github.com/aws-actions/configure-aws-credentials/tree/v5.1.1)의 OIDC 임시 자격만 사용하며 워크플로 권한은 `contents: read` · `id-token: write`다. GitHub `environment`는 지정하지 않는다. 지정하면 OIDC sub가 `environment:…`로 바뀌어 기존 `ref:refs/heads/main` 신뢰 조건과 맞지 않는다.
+활성화된 작업은 빌드나 AWS 호출에 앞서 필수 Variables · Secrets의 빈 값을 검사하며, 비었으면 **종류(variable/secret)와 이름만** 출력하고 실패한다. 브랜치 · SHA · 리전 · 식별자 형식도 먼저 검사한다. 자격은 [configure-aws-credentials@v5.1.1](https://github.com/aws-actions/configure-aws-credentials/tree/v5.1.1)의 OIDC 임시 자격만 사용하며 워크플로 권한은 `contents: read` · `id-token: write`다. GitHub `environment`는 지정하지 않는다. 지정하면 OIDC sub 끝이 `environment:…`로 바뀌어 불변 subject의 `:ref:refs/heads/main`으로 끝나는 정확 일치 신뢰 조건과 맞지 않는다.
 
 세 액션은 현재 사용 중인 v5 릴리스의 전체 40자 커밋 SHA로 고정하고 줄 끝 주석에 릴리스를 남긴다. 태그는 다른 커밋으로 옮겨질 수 있고 이 워크플로는 AWS 배포 자격을 받으므로, 자격을 받은 뒤 실행되는 액션까지 고정한다. 버전을 올릴 때는 새 릴리스 태그의 커밋 SHA를 확인해 워크플로 SHA · 릴리스 주석 · `WorkflowFilesTest` 기대값을 함께 바꾼다.
 
@@ -370,6 +374,8 @@ JSON 파싱과 권한 범위는 `AwsFilesTest`로 검증했으며 실제 IAM 평
 ### 수동 롤백 · 실패 확인
 
 Actions → **Deploy backend** → **Run workflow**에서 브랜치 `main`을 선택하고 `sha`에 이전 릴리스의 **전체 40자 소문자 SHA**를 넣는다. 비워 두면 현재 커밋의 일반 빌드/배포 경로다. SHA가 있으면 checkout · Java 설정 · 빌드 · 검사 · 업로드 없이, 해당 SHA의 ECR 이미지와 S3 기존 묶음을 먼저 조회하고 묶음의 지문까지 일치하는지 확인한다. 이미지/묶음이 없거나 읽을 수 없으면 어느 쪽인지 출력하고 SSM을 보내지 않는다. 보관 범위는 **S3 현재 릴리스 30일과 ECR 최근 이미지 30개 중 먼저 끝나는 쪽**이다([상세](#보관과-롤백-범위)). `Flyway` 마이그레이션은 되돌리지 않으므로 이전 앱과 현재 스키마의 호환성을 먼저 확인한다.
+
+OIDC 단계가 `Not authorized to perform sts:AssumeRoleWithWebIdentity`로 실패하면 배포 리전(`ap-northeast-2`)의 CloudTrail 이벤트 기록에서 이벤트 이름 `AssumeRoleWithWebIdentity`의 실패 이벤트를 연다. `userIdentity.principalId` 끝의 실제 `sub`를 역할 신뢰 정책의 `token.actions.githubusercontent.com:sub`와 비교한다.
 
 실패하면 워크플로의 **Deploy through SSM and print the command result** 단계에서 명령 ID · 상태 · stdout · stderr를 본다. `deploy.sh`가 로컬 헬스 실패로 직전 앱에 복귀했어도 워크플로는 실패한다. 결과 조회 상한을 넘기거나 조회 자체가 실패하면 로그의 명령 ID로 Systems Manager Run Command 상태를 확인한 뒤 재배포한다. 공개 헬스만 실패하면 DNS · HTTPS · Caddy를 확인한다. 이 경우 로컬 헬스를 통과한 서버의 `current`는 유지된다. 로그에 비밀/env 파일을 추가 출력하거나 `set -x`를 켜지 않는다.
 
@@ -488,4 +494,4 @@ sudo journalctl -u mogum-backup.service --since '2 days ago' --no-pager
 sudo systemctl list-timers mogum-backup.timer --all
 ```
 
-실제 AWS 백업/복원과 Amazon Linux 2023의 systemd 일정 검증은 아직 수행하지 않았다. 확인 방법과 수정 위치는 [첫 배포 때 확인](#첫-배포-때-확인) 14~16번, 실행 명령과 복원 기록 칸은 [운영 확인 목록](#운영-확인-목록)에 모았다.
+실제 AWS 백업 · 복원 연습과 Amazon Linux 2023 timer의 다음 실행(한국 04:00)은 2026-10-26 확인했다. `Persistent=true`의 놓친 실행 보충과 수명주기 만료 지연은 아직 확인하지 않았다. 확인 방법과 수정 위치는 [첫 배포 때 확인](#첫-배포-때-확인) 14~16번, 실행 명령과 복원 기록 칸은 [운영 확인 목록](#운영-확인-목록)에 모았다.
