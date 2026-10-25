@@ -152,6 +152,7 @@ flowchart LR
 | 서버 | 서울 리전 EC2 한 대(arm64 · 2GB). 호스트에는 Docker 만. Compose 가 Caddy(HTTPS 자동 발급 · 80/443) · 앱 · Postgres 를 띄우고 Postgres 포트는 밖에 열지 않는다. 서비스별 메모리 상한은 잠정값 — `16-capacity` 에서 같은 Compose 파일로 재서 확정한다. 비밀은 서버의 env 파일에만. SSH 포트 없음 — 접속은 SSM Session Manager |
 | 백엔드 배포 | `main` 병합(백엔드 · `deploy/` · 배포 워크플로 변경) → GitHub Actions 가 서버와 같은 arm64 러너에서 이미지를 한 번 빌드 → 그 이미지로 기동 · 정상 종료 검사 → ECR(태그 덮어쓰기 금지 · 전체 SHA 태그) → `deploy/` + 이미지 지문 묶음을 S3 에 → SSM Run Command 로 서버의 배포 스크립트 → 서버는 지문으로 받아 교체 · 헬스 확인 · 실패하면 직전 릴리스로 되돌림. AWS 자격은 OIDC. 수동 실행에 이전 SHA 를 주면 빌드 없이 다시 배포한다. Flyway 는 되돌리지 않는다 |
 | 화면 배포 | Vercel Git 연동 — 같은 `main` 병합에서 배포한다 |
+| 도메인 · DNS | Cloudflare 에서 등록 · DNS(2026-10-25). `{도메인}`(→ Vercel) · `api.{도메인}`(→ Elastic IP) 두 레코드 모두 **프록시를 끈다(DNS only)** — 켜면 모든 요청이 Cloudflare IP 로 보여 IP 당 레이트리밋([05 §1.4](./05-api.md))이 깨진다(ADR-060 과 같은 이유). 실제 도메인 이름은 공개 저장소의 파일에 적지 않는다 |
 | 백업 | 매일 `pg_dump` → S3. 끝까지 성공한 덤프만 백업이 된다. 버전 관리를 켜고 현재 + 이전 버전 합쳐 **총 7일** 이하(현재 6일 + 이전 1일). 복원 스크립트로 한 번 복원 연습을 한다 |
 
 ### 3.1 역할 전환 — 비상용 배선

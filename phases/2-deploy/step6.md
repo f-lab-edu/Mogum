@@ -38,7 +38,7 @@
 
 ### 3. 문서
 
-- `deploy/README.md` — 「Vercel(화면)」 절: 프로젝트 가져오기(이 GitHub 저장소 · 루트 디렉터리 `frontend` · 프레임워크 Vite 기본값 · 빌드 `npm run build` · 출력 `dist`) · 운영 환경 변수 `VITE_API_BASE_URL=https://api.{도메인}`(Production 에만 — 미리보기는 다른 사이트라 어차피 로그인이 안 된다, 05 §1.1) · 도메인 `{도메인}` 연결(DNS 레코드는 Vercel 이 안내하는 값) · `main` 이 운영 브랜치 · **요금제 확인 두 가지** — Hobby 의 비상업 조건(01 §10)과 Hobby 가 **조직 소유 저장소**(`f-lab-edu/Mogum`)의 Git 연동을 허용하는지. 둘 다 확인하지 않았으므로 「첫 배포 때 확인」 목록에 적고, 막히면 화면 배포 방식을 사용자가 다시 정한다고 적는다.
+- `deploy/README.md` — 「Vercel(화면)」 절: 프로젝트 설정(이미 만들었다 — 2026-10-25 · Hobby 팀 · 이 GitHub 저장소 · 루트 디렉터리 `frontend` · 프레임워크 Vite · 빌드 명령은 덮어써서 `npm run build`(타입 검사 포함) · 출력 `dist` 기본값. 다시 만들 때를 위해 적는다) · 운영 환경 변수 `VITE_API_BASE_URL=https://api.{도메인}`(Production 에만 — 미리보기는 다른 사이트라 어차피 로그인이 안 된다, 05 §1.1) · 도메인 `{도메인}` 연결(DNS 레코드는 Vercel 이 안내하는 값을 Cloudflare 에 넣고 **프록시를 끈다(DNS only)** — Vercel 이 인증서를 직접 받고, 앞에 프록시를 두지 않는다) · `main` 이 운영 브랜치 · **요금제 확인** — Hobby 가 **조직 소유 저장소**(`f-lab-edu/Mogum`)의 Git 연동을 허용하는 것은 확인했다(2026-10-25 — 가져오기 · `main` 빌드 · 배포 성공). Hobby 의 비상업 조건(01 §10)은 확인하지 않았으므로 「첫 배포 때 확인」 목록에 적고, 막히면 화면 배포 방식을 사용자가 다시 정한다고 적는다.
 
 ## Acceptance Criteria
 
