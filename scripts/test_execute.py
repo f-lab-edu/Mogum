@@ -225,6 +225,12 @@ class TestBuildPreamble:
         assert "Docker 미실행" in result
         assert "처음부터 다시 만들지 말고" in result
 
+    def test_tells_not_to_write_completed_at(self, executor):
+        """completed_at 은 리뷰 승인 기록이다 — Codex 가 쓰면 리뷰 중 중단 복구가 무력해진다(H12)."""
+        result = executor._build_preamble("")
+        assert "completed_at" in result
+        assert "쓰지 마라" in result
+
 
 # ---------------------------------------------------------------------------
 # _update_top_index
@@ -274,6 +280,21 @@ class TestUpdateTopIndex:
     def test_no_top_index_file(self, executor, tmp_path):
         executor._top_index_file = tmp_path / "nonexistent.json"
         executor._update_top_index("completed")  # should not raise
+
+    def test_completed_clears_earlier_failure_marks(self, executor, top_index):
+        """멈췄다 재개해 끝낸 phase 에 이전 failed_at · blocked_at 이 남지 않는다(H17)."""
+        data = json.loads(top_index.read_text())
+        mvp = next(p for p in data["phases"] if p["dir"] == "0-mvp")
+        mvp.update(status="error", failed_at="2026-10-25T16:13:11+0900", blocked_at="2026-10-25T16:00:00+0900")
+        top_index.write_text(json.dumps(data))
+        executor._top_index_file = top_index
+
+        executor._update_top_index("completed")
+
+        mvp = next(p for p in json.loads(top_index.read_text())["phases"] if p["dir"] == "0-mvp")
+        assert mvp["status"] == "completed"
+        assert "failed_at" not in mvp
+        assert "blocked_at" not in mvp
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +351,81 @@ class TestCheckoutBranch:
         with pytest.raises(SystemExit) as exc_info:
             executor._checkout_branch()
         assert exc_info.value.code == 1
+
+    # 아래는 phase 브랜치가 이미 있을 때 현재 커밋과의 관계별 동작이다(H20).
+
+    def _git_with_ancestry(self, executor, *, head_in_branch: bool, branch_in_head: bool):
+        """현재 브랜치 fix-x, phase 브랜치 feat-mvp 가 있다. merge-base --is-ancestor 결과만 정한다."""
+        calls = []
+
+        def fake_git(*args):
+            calls.append(args)
+            if args[:2] == ("rev-parse", "--abbrev-ref"):
+                return MagicMock(returncode=0, stdout="fix-x\n", stderr="")
+            if args[:2] == ("merge-base", "--is-ancestor"):
+                ok = head_in_branch if args[2:] == ("HEAD", "feat-mvp") else branch_in_head
+                return MagicMock(returncode=0 if ok else 1, stdout="", stderr="")
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        executor._run_git = fake_git
+        return calls
+
+    def test_phase_branch_ahead_of_head_is_checked_out(self, executor):
+        """main 처럼 phase 브랜치보다 뒤인 곳에서 실행하면 phase 브랜치로 옮겨 이어 한다."""
+        calls = self._git_with_ancestry(executor, head_in_branch=True, branch_in_head=False)
+
+        executor._checkout_branch()
+
+        assert ("checkout", "feat-mvp") in calls
+
+    def test_phase_branch_behind_head_is_fast_forwarded(self, executor, capsys):
+        """병합 뒤 수정 step 을 새 커밋에 얹었으면 phase 브랜치를 그 커밋까지 옮긴다 — 커밋을 잃지 않는다."""
+        calls = self._git_with_ancestry(executor, head_in_branch=False, branch_in_head=True)
+
+        executor._checkout_branch()
+
+        assert ("checkout", "-B", "feat-mvp") in calls
+        assert ("checkout", "feat-mvp") not in calls
+        assert "feat-mvp" in capsys.readouterr().out
+
+    def test_diverged_phase_branch_stops_without_checkout(self, executor, capsys):
+        """서로 모르는 커밋이 있으면 어느 쪽을 버릴지 하네스가 정하지 않는다 — 옮기지 않고 멈춘다."""
+        calls = self._git_with_ancestry(executor, head_in_branch=False, branch_in_head=False)
+
+        with pytest.raises(SystemExit) as exc_info:
+            executor._checkout_branch()
+
+        assert exc_info.value.code == 1
+        assert not any(c[0] == "checkout" for c in calls)
+        out = capsys.readouterr().out
+        assert "fix-x" in out and "feat-mvp" in out
+
+
+# ---------------------------------------------------------------------------
+# run — 브랜치를 바꾼 뒤 index 를 읽는다 (mocked)
+# ---------------------------------------------------------------------------
+
+class TestRun:
+    def test_reads_steps_after_checkout(self, executor, capsys):
+        """체크아웃 전 브랜치의 index 로 step 수 · 막힘을 판단하지 않는다(H20)."""
+        order = []
+
+        def switch_branch():
+            order.append("checkout")
+            index = json.loads(executor._index_file.read_text())
+            index["steps"].append({"step": 3, "name": "api", "status": "pending"})
+            executor._index_file.write_text(json.dumps(index))
+
+        executor._checkout_branch = switch_branch
+        executor._check_blockers = lambda: order.append("blockers")
+        executor._ensure_created_at = lambda: None
+        executor._execute_all_steps = lambda: None
+        executor._finalize = lambda: None
+
+        executor.run()
+
+        assert order == ["checkout", "blockers"]
+        assert "Steps: 4" in capsys.readouterr().out
 
 
 # ---------------------------------------------------------------------------
@@ -529,6 +625,37 @@ class TestReviewStep:
 # _execute_single_step — Codex 구현 → Claude 리뷰 루프 (mocked)
 # ---------------------------------------------------------------------------
 
+# 2-deploy 2차 step 7 의 Codex 출력에서 옮긴 형태 — 앞의 error 이벤트는 실패가 아닌 경고다.
+USAGE_LIMIT_STDOUT = "\n".join([
+    json.dumps({"type": "error", "message": "`--dangerously-bypass-hook-trust` is enabled. "
+                                            "Enabled hooks may run without review for this invocation."}),
+    json.dumps({"type": "turn.started"}),
+    json.dumps({"type": "error", "message": "You’ve hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), "
+                                            "visit https://chatgpt.com/settings/usage to purchase more credits or try again at 8:23 PM."}),
+    json.dumps({"type": "turn.failed", "error": {"message": "You’ve hit your usage limit. Upgrade to Pro "
+                                                            "(https://chatgpt.com/explore/pro), visit https://chatgpt.com/settings/usage "
+                                                            "to purchase more credits or try again at 8:23 PM."}}),
+])
+
+
+class TestUsageLimitMessage:
+    def test_finds_usage_limit_event(self):
+        message = ex.StepExecutor._usage_limit_message({"stdout": USAGE_LIMIT_STDOUT, "stderr": ""})
+        assert "usage limit" in message
+        assert "try again at 8:23 PM" in message
+
+    def test_ignores_warnings_and_non_json_lines(self):
+        stdout = "\n".join([
+            "not json",
+            json.dumps({"type": "error", "message": "`--dangerously-bypass-hook-trust` is enabled."}),
+            json.dumps({"type": "turn.completed"}),
+        ])
+        assert ex.StepExecutor._usage_limit_message({"stdout": stdout, "stderr": ""}) is None
+
+    def test_no_output(self):
+        assert ex.StepExecutor._usage_limit_message(None) is None
+
+
 class TestExecuteSingleStep:
     REJECT = {"verdict": "request_changes", "summary": "테스트 없음",
               "findings": ["Foo.java:10 — 테스트가 없다 → FooTest 추가"]}
@@ -616,7 +743,114 @@ class TestExecuteSingleStep:
         with patch.object(ex, "progress_indicator", fake_progress):
             executor._execute_single_step(self._step2(executor))
 
-        assert "[42s]" in capsys.readouterr().out
+        # Codex 시간과 리뷰 시간을 함께 찍는다 — 리뷰만 다시 한 step 도 [0s] 로 보이지 않는다(H17)
+        assert "[42s · 리뷰 42s]" in capsys.readouterr().out
+
+    def test_completed_at_written_by_codex_is_cleared_before_review(self, executor):
+        """completed_at 은 하네스가 승인 때만 쓴다 — 리뷰 중에 끊겨도 재실행이 리뷰를 건너뛰지 않는다(H12)."""
+        preambles, commits = self._wire(executor, [])
+        complete = executor._invoke_codex
+
+        def codex_writes_completed_at(step, preamble):
+            complete(step, preamble)
+            index = json.loads(executor._index_file.read_text())
+            next(s for s in index["steps"] if s["step"] == 2)["completed_at"] = "2026-10-26T00:00:00+0900"
+            executor._index_file.write_text(json.dumps(index))
+
+        seen_during_review = []
+
+        def review(step, base):
+            seen_during_review.append("completed_at" in self._step2(executor))
+            return self.APPROVE
+
+        executor._invoke_codex = codex_writes_completed_at
+        executor._review_step = review
+
+        assert executor._execute_single_step(self._step2(executor)) is True
+        assert seen_during_review == [False]
+        assert self._step2(executor)["completed_at"] != "2026-10-26T00:00:00+0900"
+
+    def test_usage_limit_blocks_without_spending_retries(self, executor):
+        """사용 한도는 다시 시도해도 같다 — 시도로 세지 않고 blocked 로 멈춘다(H14)."""
+        preambles, commits = self._wire(executor, [])
+
+        def codex_hits_limit(step, preamble):
+            preambles.append(preamble)
+            return {"exitCode": 1, "timedOut": False, "stdout": USAGE_LIMIT_STDOUT, "stderr": ""}
+
+        executor._invoke_codex = codex_hits_limit
+
+        with pytest.raises(SystemExit) as exc_info:
+            executor._execute_single_step(self._step2(executor))
+
+        assert exc_info.value.code == 2
+        assert len(preambles) == 1
+        assert commits == []
+        step = self._step2(executor)
+        assert step["status"] == "blocked"
+        assert "try again at 8:23 PM" in step["blocked_reason"]
+        assert "blocked_at" in step
+
+    def test_usage_limit_after_rejection_keeps_review_findings(self, executor):
+        """재개한 첫 시도가 고칠 것을 알도록 직전 리뷰 지적을 blocked_reason 에 남긴다(H14 · H15)."""
+        preambles, commits = self._wire(executor, [self.REJECT])
+        complete = executor._invoke_codex
+        attempts = {"n": 0}
+
+        def codex(step, preamble):
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                return complete(step, preamble)
+            return {"exitCode": 1, "timedOut": False, "stdout": USAGE_LIMIT_STDOUT, "stderr": ""}
+
+        executor._invoke_codex = codex
+
+        with pytest.raises(SystemExit) as exc_info:
+            executor._execute_single_step(self._step2(executor))
+
+        assert exc_info.value.code == 2
+        reason = self._step2(executor)["blocked_reason"]
+        assert "usage limit" in reason
+        assert "FooTest 추가" in reason
+
+    def test_review_findings_survive_a_later_failure(self, executor):
+        """반려 뒤 다음 시도가 다른 이유로 실패해도 그다음 시도에 지적이 남는다(H15)."""
+        preambles, commits = self._wire(executor, [self.REJECT, self.APPROVE])
+        complete = executor._invoke_codex
+        attempts = {"n": 0}
+
+        def codex(step, preamble):
+            attempts["n"] += 1
+            if attempts["n"] == 2:
+                preambles.append(preamble)
+                return None  # status 를 갱신하지 못하고 끝났다
+            return complete(step, preamble)
+
+        executor._invoke_codex = codex
+
+        assert executor._execute_single_step(self._step2(executor)) is True
+        assert len(preambles) == 3
+        assert "Step did not update status" in preambles[2]
+        assert "FooTest 추가" in preambles[2]
+
+    def test_final_error_keeps_last_review_findings(self, executor):
+        preambles, commits = self._wire(executor, [self.REJECT])
+        complete = executor._invoke_codex
+        attempts = {"n": 0}
+
+        def codex(step, preamble):
+            attempts["n"] += 1
+            return complete(step, preamble) if attempts["n"] == 1 else None
+
+        executor._invoke_codex = codex
+
+        with pytest.raises(SystemExit) as exc_info:
+            executor._execute_single_step(self._step2(executor))
+
+        assert exc_info.value.code == 1
+        message = self._step2(executor)["error_message"]
+        assert "Step did not update status" in message
+        assert "FooTest 추가" in message
 
     def test_codex_timeout_is_fed_to_next_attempt(self, executor):
         preambles, commits = self._wire(executor, [self.APPROVE])

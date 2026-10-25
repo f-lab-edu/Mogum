@@ -104,9 +104,11 @@ class StepExecutor:
         self._total = len(idx["steps"])
 
     def run(self):
+        self._checkout_branch()
+        # 브랜치를 바꾸면 index 도 바뀐다 — step 수 · 막힘은 바꾼 뒤의 index 로 판단한다
+        self._total = len(self._read_json(self._index_file)["steps"])
         self._print_header()
         self._check_blockers()
-        self._checkout_branch()
         self._ensure_created_at()
         self._execute_all_steps()
         self._finalize()
@@ -141,11 +143,23 @@ class StepExecutor:
             print(f"  {r.stderr.strip()}")
             sys.exit(1)
 
-        if r.stdout.strip() == branch:
+        current = r.stdout.strip()
+        if current == branch:
             return
 
-        r = self._run_git("rev-parse", "--verify", branch)
-        r = self._run_git("checkout", branch) if r.returncode == 0 else self._run_git("checkout", "-b", branch)
+        note = ""
+        if self._run_git("rev-parse", "--verify", branch).returncode != 0:
+            r = self._run_git("checkout", "-b", branch)
+        elif self._run_git("merge-base", "--is-ancestor", "HEAD", branch).returncode == 0:
+            r = self._run_git("checkout", branch)
+        elif self._run_git("merge-base", "--is-ancestor", branch, "HEAD").returncode == 0:
+            # 병합 뒤 수정 step 처럼 phase 브랜치가 현재 커밋보다 뒤다 — 앞으로만 옮기므로 잃는 커밋이 없다.
+            r = self._run_git("checkout", "-B", branch)
+            note = f" ({current} 의 커밋까지 앞으로 옮겼다)"
+        else:
+            print(f"  ERROR: '{current}' 와 '{branch}' 에 서로 없는 커밋이 있다 — 어느 쪽을 이어 갈지 정한 뒤 다시 실행하라.")
+            print(f"  Hint: '{current}' 의 작업을 이어 가려면 '{branch}' 를 정리해 맞추고, 아니면 '{branch}' 에서 실행한다.")
+            sys.exit(1)
 
         if r.returncode != 0:
             print(f"  ERROR: 브랜치 '{branch}' checkout 실패.")
@@ -153,7 +167,7 @@ class StepExecutor:
             print(f"  Hint: 변경사항을 stash하거나 commit한 후 다시 시도하세요.")
             sys.exit(1)
 
-        print(f"  Branch: {branch}")
+        print(f"  Branch: {branch}{note}")
 
     def _commit_step(self, step_num: int, step_name: str):
         output_rel = f"phases/{self._phase_dir_name}/step{step_num}-output.json"
@@ -191,6 +205,10 @@ class StepExecutor:
                 ts_key = {"completed": "completed_at", "error": "failed_at", "blocked": "blocked_at"}.get(status)
                 if ts_key:
                     phase[ts_key] = ts
+                if status == "completed":
+                    # 멈췄다 재개해 끝낸 phase — 이전 멈춤 기록을 남기지 않는다
+                    phase.pop("failed_at", None)
+                    phase.pop("blocked_at", None)
                 break
         self._write_json(self._top_index_file, top)
 
@@ -239,7 +257,8 @@ class StepExecutor:
             f"   - AC 통과 → \"completed\" + \"summary\" 필드에 이 step의 산출물을 한 줄로 요약\n"
             f"   - {self.MAX_RETRIES}회 수정 시도 후에도 실패 → \"error\" + \"error_message\" 기록\n"
             f"   - 사용자 개입이 필요한 경우 (API 키, 인증, 수동 설정, 문서와 코드가 어긋나 판단이 필요한 경우 등) → \"blocked\" + \"blocked_reason\" 기록 후 즉시 중단\n"
-            f"6. 커밋하지 마라. \"completed\"로 끝내면 Claude가 변경을 리뷰하고, 승인되면 하네스가 커밋한다.\n\n---\n\n"
+            f"6. 커밋하지 마라. \"completed\"로 끝내면 Claude가 변경을 리뷰하고, 승인되면 하네스가 커밋한다.\n"
+            f"7. \"completed_at\" 은 쓰지 마라 — 리뷰 승인 기록이라 하네스가 쓴다.\n\n---\n\n"
         )
 
     # --- 에이전트 실행 (Codex · Claude 공통) ---
@@ -291,6 +310,27 @@ class StepExecutor:
 
         return output
 
+    @staticmethod
+    def _usage_limit_message(output: Optional[dict]) -> Optional[str]:
+        """Codex 가 사용 한도로 멈췄으면 그 메시지(다시 쓸 수 있는 시각 포함). 아니면 None.
+        같은 출력에 실패가 아닌 error 이벤트(훅 신뢰 경고)도 있어 메시지 내용으로 가린다."""
+        for line in ((output or {}).get("stdout") or "").splitlines():
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(event, dict):
+                continue
+            if event.get("type") == "error":
+                message = event.get("message")
+            elif event.get("type") == "turn.failed" and isinstance(event.get("error"), dict):
+                message = event["error"].get("message")
+            else:
+                continue
+            if isinstance(message, str) and "usage limit" in message.lower():
+                return message
+        return None
+
     # --- Claude 리뷰 ---
 
     def _review_step(self, step: dict, base: str) -> Optional[dict]:
@@ -340,22 +380,31 @@ class StepExecutor:
         })
         return review
 
-    def _review_with_retry(self, step: dict, base: str) -> Optional[dict]:
-        """판정을 얻을 때까지 리뷰만 최대 REVIEW_ATTEMPTS 번 돌린다. 끝내 못 얻으면 None."""
+    def _review_with_retry(self, step: dict, base: str) -> tuple:
+        """판정을 얻을 때까지 리뷰만 최대 REVIEW_ATTEMPTS 번 돌린다. (판정 또는 None, 리뷰에 쓴 초)."""
         step_num = step["step"]
+        spent = 0.0
         for attempt in range(1, self.REVIEW_ATTEMPTS + 1):
-            with progress_indicator(f"Step {step_num}: Claude 리뷰"):
+            with progress_indicator(f"Step {step_num}: Claude 리뷰") as pi:
                 review = self._review_step(step, base)
+            spent += pi.elapsed
             if review is not None:
-                return review
+                return review, int(spent)
             if attempt < self.REVIEW_ATTEMPTS:
                 print(f"  ↻ Step {step_num}: 리뷰 판정을 얻지 못했다 — 리뷰만 다시 한다")
-        return None
+        return None, int(spent)
 
     @staticmethod
     def _format_review(review: dict) -> str:
         findings = "\n".join(f"- {f}" for f in review.get("findings", []))
         return f"[Claude 리뷰 반려] {review.get('summary', '')}\n{findings}".rstrip()
+
+    @staticmethod
+    def _with_last_review(message: str, last_review: Optional[str]) -> str:
+        """마지막 리뷰 반려 지적을 다른 실패 문구에 덧붙인다 — 반려 뒤 다른 이유로 실패해도 지적이 사라지지 않는다."""
+        if not last_review or message == last_review:
+            return message
+        return f"{message}\n\n{last_review}"
 
     # --- 헤더 & 검증 ---
 
@@ -412,6 +461,7 @@ class StepExecutor:
         # 리뷰는 이 step 이 시작된 커밋부터의 변경 전체를 본다 — 재시도분과 Codex 가 임의로 한 커밋까지.
         base = self._run_git("rev-parse", "HEAD").stdout.strip()
         prev_error = None
+        last_review = None  # 마지막 리뷰 반려 지적 — 뒤이은 다른 실패에 덮이지 않게 따로 든다
         resume_reason = self._take_resume_reason(step_num)
 
         for attempt in range(1, self.MAX_RETRIES + 1):
@@ -432,12 +482,18 @@ class StepExecutor:
                 elapsed = int(pi.elapsed)  # progress_indicator 는 블록이 끝날 때 elapsed 를 채운다
                 timed_out = bool(output and output.get("timedOut"))
 
+                # 사용 한도는 다시 시도해도 같다 — 남은 시도를 쓰지 않고 멈춘다
+                limit = self._usage_limit_message(output)
+                if limit:
+                    self._block_step(step_num, step_name, elapsed,
+                                     self._with_last_review(f"Codex 사용 한도 — {limit}", last_review))
+                self._drop_completed_at(step_num)
+
             index = self._read_json(self._index_file)
             status = next((s.get("status", "pending") for s in index["steps"] if s["step"] == step_num), "pending")
-            ts = self._stamp()
 
             if status == "completed":
-                review = self._review_with_retry(step, base)
+                review, review_elapsed = self._review_with_retry(step, base)
                 if review is None:
                     self._fail_step(step_num, step_name,
                                     f"Claude 리뷰 판정을 얻지 못했다 — phases/{self._phase_dir_name}/step{step_num}-review.json 확인")
@@ -447,20 +503,13 @@ class StepExecutor:
                             s["completed_at"] = self._stamp()
                     self._write_json(self._index_file, index)
                     self._commit_step(step_num, step_name)
-                    print(f"  ✓ Step {step_num}: {step_name} [{elapsed}s] — 리뷰 승인")
+                    print(f"  ✓ Step {step_num}: {step_name} [{elapsed}s · 리뷰 {review_elapsed}s] — 리뷰 승인")
                     return True
                 err_msg = self._format_review(review)
+                last_review = err_msg
 
             elif status == "blocked":
-                for s in index["steps"]:
-                    if s["step"] == step_num:
-                        s["blocked_at"] = ts
-                self._write_json(self._index_file, index)
-                reason = next((s.get("blocked_reason", "") for s in index["steps"] if s["step"] == step_num), "")
-                print(f"  ⏸ Step {step_num}: {step_name} blocked [{elapsed}s]")
-                print(f"    Reason: {reason}")
-                self._update_top_index("blocked")
-                sys.exit(2)
+                self._block_step(step_num, step_name, elapsed)
 
             elif timed_out:
                 err_msg = (f"Codex 가 {self.CODEX_TIMEOUT}초 안에 끝나지 않아 중단됐다 — "
@@ -479,12 +528,35 @@ class StepExecutor:
                         s.pop("error_message", None)
                         s.pop("summary", None)
                 self._write_json(self._index_file, index)
-                prev_error = err_msg
+                prev_error = self._with_last_review(err_msg, last_review)
                 print(f"  ↻ Step {step_num}: retry {attempt}/{self.MAX_RETRIES} — {err_msg.splitlines()[0]}")
             else:
-                self._fail_step(step_num, step_name, f"[{self.MAX_RETRIES}회 시도 후 실패] {err_msg}")
+                self._fail_step(step_num, step_name,
+                                f"[{self.MAX_RETRIES}회 시도 후 실패] {self._with_last_review(err_msg, last_review)}")
 
         return False  # unreachable
+
+    def _drop_completed_at(self, step_num: int):
+        """Codex 가 쓴 completed_at 을 지운다 — 리뷰 승인 기록이라 하네스만 쓴다.
+        남겨 두면 리뷰 중에 하네스가 끊겼을 때 재실행이 리뷰를 건너뛴다."""
+        index = self._read_json(self._index_file)
+        s = next(s for s in index["steps"] if s["step"] == step_num)
+        if s.pop("completed_at", None) is not None:
+            self._write_json(self._index_file, index)
+
+    def _block_step(self, step_num: int, step_name: str, elapsed: int, reason: Optional[str] = None):
+        """step 을 blocked 로 표시하고 멈춘다. reason 이 없으면 Codex 가 적은 blocked_reason 을 쓴다."""
+        index = self._read_json(self._index_file)
+        s = next(s for s in index["steps"] if s["step"] == step_num)
+        s["status"] = "blocked"
+        if reason is not None:
+            s["blocked_reason"] = reason
+        s["blocked_at"] = self._stamp()
+        self._write_json(self._index_file, index)
+        print(f"  ⏸ Step {step_num}: {step_name} blocked [{elapsed}s]")
+        print(f"    Reason: {s.get('blocked_reason', '')}")
+        self._update_top_index("blocked")
+        sys.exit(2)
 
     def _fail_step(self, step_num: int, step_name: str, err_msg: str):
         """step 을 error 로 표시하고 멈춘다. 변경은 커밋하지 않는다 — 재실행 때 리뷰가 이 변경까지 다시 본다."""
