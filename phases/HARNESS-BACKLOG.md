@@ -36,6 +36,7 @@
 | H15 | 할 일 | 리뷰 반려 뒤 재시도가 다른 이유로 실패하면 반려 지적이 사라진다 — `prev_error` 가 새 실패 문구로 바뀌어 다음 시도의 Codex 도, 최종 `error_message` 도 지적을 모른다(H3 의 재개 전달이 빈 사유를 넘긴다) | `2-deploy` 2차 step 7 — 1차 반려 지적(`APP_AUTH_ADMIN_EMAILS`)이 `[3회 시도 후 실패] Step did not update status` 로 덮였다. 감시 Claude 가 대화 기록 · 리뷰 파일로 복원했다 | 마지막 리뷰 지적을 따로 들고 있다가 다음 시도 프롬프트와 `error_message` 에 함께 넣는다(H6 의 시도별 기록과 같이 고친다) |
 | H16 | 관찰 | 진행 표시(스피너)가 TTY 가 아닌 출력에도 프레임마다 찍혀 실행 로그가 커지고 읽기 어렵다 | `2-deploy` 2차 — `logs/2-deploy-execute.log` 가 약 900KB, 대부분 `◐ Step N: … [Ns]` 줄이다. 결과 줄은 `grep "✓ Step"` 으로 골라 읽었다 | 트리거: 다음 phase 도 로그로 감시하면 — `sys.stdout.isatty()` 가 아니면 스피너 대신 시작 · 끝 줄만 찍는다 |
 | H17 | 관찰 | 재개 기록이 어긋난다 — 리뷰만 다시 한 step 의 승인 줄이 `[0s]`, phase 가 끝난 뒤에도 `phases/index.json` 에 이전 `failed_at` 이 남는다 | `2-deploy` 2차 step 7 재개 — `✓ Step 7: runbook [0s]` · `2-deploy` 항목에 `failed_at` 과 `completed_at` 이 함께 있다 | 다른 하네스 수정과 함께 — 리뷰 시간을 승인 줄에 넣고, 완료 표시 때 `failed_at` · `blocked_at` 을 지운다 |
+| H18 | 관찰 | 사람이 붙여 넣어 실행하는 절차서 명령 블록은 자동 테스트도 step 리뷰도 실행해 보지 못한다 — 대화형 셸에서의 동작은 실제 실행에서야 드러난다 | `2-deploy` 2차 step 7 절차서 4번 — `sudo -i` 와 설치 명령을 한 블록으로 두어, 한 번에 붙여 넣으면 새 root 셸에 뒤 줄이 전달되지 않고 아무것도 실행되지 않았다(2026-10-26 사람이 실행하다 발견 · 문서 커밋 `3a535ef` 로 고침). 같은 블록의 `set -euo pipefail` 은 대화형 셸에서 실패 한 번에 세션을 닫는다 | step 작성 원칙(`/harness` C)에 "사람이 실행할 블록은 권한 전환(`sudo -i`)을 따로 두고, 나머지는 `bash -euo pipefail <<'EOF'` 스크립트 한 덩어리로 쓴다" 를 올리는 안 — 사용자 확인 뒤 |
 
 ## step 작성 교훈
 

@@ -102,6 +102,8 @@
 
 6. **Vercel 프로젝트 · 환경 변수 · 도메인.** 쓸 파일: [frontend/vercel.json](../frontend/vercel.json), [Vercel 설정 표](#vercel화면). 이미 만든 Hobby 프로젝트를 사용한다. Root Directory `frontend` · Vite · Build Command `npm run build` · Output `dist` · Production Branch `main`. **Production에만** `VITE_API_BASE_URL=https://api.{도메인}` 등록 후 다시 빌드한다. Domains에 `{도메인}`을 추가하고 Vercel 안내 DNS 값을 Cloudflare에 **DNS only**로 넣는다. 완료 확인: Vercel 도메인 연결/인증서가 정상이며 운영 도메인의 `/login` 새로고침이 성공한다. Hobby 비상업 조건은 [첫 배포 때 확인](#첫-배포-때-확인)에서 서비스 적합성을 판단한다. `*.vercel.app` 미리보기에서 로그인은 검사하지 않는다.
 
+   **수행 기록(2026-10-25~26)** — 프로젝트 · Production `VITE_API_BASE_URL` · 도메인 연결을 마쳤다. 운영 `/`는 200이고 번들에 API 출처가 들어 있다. `/login` 새로고침은 아직 404다 — SPA rewrite(`frontend/vercel.json`)가 `main`에 들어간 뒤 운영 확인 목록에서 다시 본다.
+
 7. **Google 콘솔 운영 콜백.** 쓸 문서: [05 §1.1](../docs/05-api.md#11-인증--구글-oauth--쿠키-세션db-저장), 서버의 `GOOGLE_REDIRECT_URI`. 기존 OAuth 웹 클라이언트의 승인된 리디렉션 URI에 **`https://api.{도메인}/auth/google/callback`을 추가**한다. 로컬 **`http://localhost:5173/auth/google/callback`은 유지**한다. 완료 확인: 두 URI가 모두 저장되어 있고 서버 값과 스킴/호스트/경로가 정확히 같다. Google 동의 화면이 테스트 모드라면 검사할 계정이 테스트 사용자에 포함되는지도 확인한다.
 
 8. **첫 배포.** 위 준비가 끝나면 `DEPLOY_ENABLED=true`로 바꾸고 Actions → **Deploy backend → Run workflow**에서 브랜치 **`main`**, **`sha`는 빈칸**으로 실행한다. 쓸 파일: [deploy.yml](../.github/workflows/deploy.yml), [deploy.sh](./deploy.sh). 완료 확인: 빌드/`imageTest`(새 이미지일 때) · ECR · S3 · **Deploy through SSM and print the command result**의 `Success`/종료 코드 0 · **Check public HTTPS health**의 200을 확인한다. SSM stdout에 `Deployment healthy; current release updated.`가 있어야 한다. 이후 아래 운영 확인을 수행한다. 실패하면 [수동 롤백 · 실패 확인](#수동-롤백--실패-확인)을 따르며 첫 배포에는 직전 릴리스가 없다.
@@ -361,6 +363,18 @@ JSON 파싱과 권한 범위는 `AwsFilesTest`로 검증했으며 실제 IAM 평
 Actions → **Deploy backend** → **Run workflow**에서 브랜치 `main`을 선택하고 `sha`에 이전 릴리스의 **전체 40자 소문자 SHA**를 넣는다. 비워 두면 현재 커밋의 일반 빌드/배포 경로다. SHA가 있으면 checkout · Java 설정 · 빌드 · 검사 · 업로드 없이, 해당 SHA의 ECR 이미지와 S3 기존 묶음을 먼저 조회하고 묶음의 지문까지 일치하는지 확인한다. 이미지/묶음이 없거나 읽을 수 없으면 어느 쪽인지 출력하고 SSM을 보내지 않는다. 보관 범위는 **S3 현재 릴리스 30일과 ECR 최근 이미지 30개 중 먼저 끝나는 쪽**이다([상세](#보관과-롤백-범위)). `Flyway` 마이그레이션은 되돌리지 않으므로 이전 앱과 현재 스키마의 호환성을 먼저 확인한다.
 
 실패하면 워크플로의 **Deploy through SSM and print the command result** 단계에서 명령 ID · 상태 · stdout · stderr를 본다. `deploy.sh`가 로컬 헬스 실패로 직전 앱에 복귀했어도 워크플로는 실패한다. 결과 조회 상한을 넘기거나 조회 자체가 실패하면 로그의 명령 ID로 Systems Manager Run Command 상태를 확인한 뒤 재배포한다. 공개 헬스만 실패하면 DNS · HTTPS · Caddy를 확인한다. 이 경우 로컬 헬스를 통과한 서버의 `current`는 유지된다. 로그에 비밀/env 파일을 추가 출력하거나 `set -x`를 켜지 않는다.
+
+`deploy.sh`는 공개 로그로 env 값이 새지 않도록 Compose · pull 출력을 버리고 단계 이름만 출력한다. 마지막으로 찍힌 단계(`ECR login.` · `Pull image by digest.` · `Apply release.` · `Wait for local health …`)가 실패한 곳이다. 자세한 원인은 Session Manager(비공개)에서 본다. 출력에는 이메일 같은 운영 데이터가 섞일 수 있으니 공개 저장소 · 이슈 · PR에 붙이지 않는다.
+
+```bash
+sudo -i
+docker ps -a --filter label=com.docker.compose.project=mogum --format '{{.Names}}\t{{.Status}}'
+docker logs --tail 100 mogum-backend-1
+docker logs --tail 50 mogum-caddy-1
+docker logs --tail 50 mogum-postgres-1
+```
+
+`ECR login.` · `Pull image by digest.`에서 멈췄으면 인스턴스 역할과 외부 통신([첫 배포 때 확인](#첫-배포-때-확인) 6 · 11), `Apply release.`면 env 값과 Compose 해석(5), 헬스 대기면 위 backend 로그를 본다.
 
 ### 워크플로 검증 범위
 
