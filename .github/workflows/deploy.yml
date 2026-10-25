@@ -32,9 +32,9 @@ jobs:
         shell: bash
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
-      AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-      DEPLOY_BUCKET: ${{ vars.DEPLOY_BUCKET }}
-      DEPLOY_INSTANCE_ID: ${{ vars.DEPLOY_INSTANCE_ID }}
+      AWS_DEPLOY_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+      DEPLOY_BUCKET: ${{ secrets.DEPLOY_BUCKET }}
+      DEPLOY_INSTANCE_ID: ${{ secrets.DEPLOY_INSTANCE_ID }}
       API_ORIGIN: ${{ vars.API_ORIGIN }}
       INPUT_SHA: ${{ inputs.sha }}
       COMMIT_SHA: ${{ github.sha }}
@@ -50,10 +50,17 @@ jobs:
         id: validate
         run: |
           set -euo pipefail
+          if [[ $AWS_DEPLOY_ROLE_ARN =~ ^arn:aws:iam::([0-9]{12}): ]]; then
+            printf '::add-mask::%s\n' "${BASH_REMATCH[1]}"
+          fi
           missing=false
           for name in AWS_REGION AWS_DEPLOY_ROLE_ARN DEPLOY_BUCKET DEPLOY_INSTANCE_ID API_ORIGIN; do
             if [[ -z ${!name} ]]; then
-              printf 'Missing repository variable: %s\n' "$name" >&2
+              kind=variable
+              case "$name" in
+                AWS_DEPLOY_ROLE_ARN|DEPLOY_BUCKET|DEPLOY_INSTANCE_ID) kind=secret ;;
+              esac
+              printf 'Missing repository %s: %s\n' "$kind" "$name" >&2
               missing=true
             fi
           done
@@ -80,7 +87,8 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v5
         with:
           aws-region: ${{ vars.AWS_REGION }}
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          mask-aws-account-id: true
           role-duration-seconds: 3600
 
       - name: Find an already tested immutable SHA image

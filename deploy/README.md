@@ -96,7 +96,7 @@
 
    **수행 기록(2026-10-26)** — 위 설치와 env 작성을 마쳤다. 운영자 자격의 SSM Run Command로 아키텍처 · 버전 · Docker `active`/`enabled` · `/etc/mogum` `700 root` · env `0:600`, 필수 10개 항목이 한 줄씩 값이 있고 공백/따옴표가 없음, `APP_IMAGE` 없음, 도구 26개를 확인했다(값은 출력하지 않았다).
 
-5. **GitHub 저장소 변수.** 쓸 파일: [deploy.yml](../.github/workflows/deploy.yml), [변수 표](#github-actions-배포). Actions Variables에 `AWS_REGION` · `AWS_DEPLOY_ROLE_ARN` · `DEPLOY_BUCKET` · `DEPLOY_INSTANCE_ID` · `API_ORIGIN`을 등록한다. `DEPLOY_BUCKET`은 서버 `MOGUM_BUCKET`과 같다. **`DEPLOY_ENABLED=false`로 유지**한다. AWS 장기 키나 Google 비밀을 등록하지 않는다. 완료 확인: 여섯 변수의 이름/값을 설정 화면에서 대조하고, 워크플로가 `main`에 있으며 조직이 러너/액션을 허용하는지 확인한다.
+5. **GitHub 저장소 Variables · Secrets.** 쓸 파일: [deploy.yml](../.github/workflows/deploy.yml), [설정 표](#github-actions-배포). Actions **Variables 3개**(`DEPLOY_ENABLED` · `AWS_REGION` · `API_ORIGIN`)와 **Secrets 3개**(`AWS_DEPLOY_ROLE_ARN` · `DEPLOY_BUCKET` · `DEPLOY_INSTANCE_ID`)를 등록한다. 이미 Variables에 넣은 세 식별자는 **사람이 Secrets로 옮기고 Variables에서는 지운다.** `DEPLOY_BUCKET`은 서버 `MOGUM_BUCKET`과 같다. **`DEPLOY_ENABLED=false`로 유지**한다. AWS 장기 키나 Google 비밀을 등록하지 않는다. 완료 확인: Variables 3개와 Secrets 3개의 등록 위치/이름을 설정 화면에서 대조하고, 세 식별자가 Variables에 남지 않았는지 확인한다. 워크플로가 `main`에 있으며 조직이 러너/액션을 허용하는지도 확인한다.
 
    **수행 기록(2026-10-26)** — 여섯 변수를 등록했고(`DEPLOY_ENABLED=false`) `gh variable list`로 이름/값을 대조했다. Secrets는 비어 있다. 워크플로가 `main`에 있는지와 조직의 러너/액션 허용은 병합 뒤 8번에서 확인한다.
 
@@ -204,7 +204,7 @@
 | 10 | 배포 역할의 ECR push/지문 조회 · releases 업로드/조회 · 지정 인스턴스 SSM/결과 조회 성공, 다른 문서/인스턴스/`backups/` 접근 거절 확인 | IAM 연결 정책 · `aws/deploy-policy.json` |
 | 11 | 인스턴스 역할의 ECR pull · releases 다운로드 · backups 업로드(multipart 포함)/목록/다운로드 성공. 두 역할 삭제/설정 변경 권한 부재를 IAM 시뮬레이터로 확인 — 시뮬레이터에는 `aws:RequestedRegion=ap-northeast-2` 문맥을 넣는다(없으면 조직 SCP `RegionFloor`가 모두 명시 거부로 평가한다). 시뮬레이터 부분은 2026-10-26 수행 | IAM 연결 정책 · `aws/instance-policy.json` · `aws/deploy-policy.json` |
 | 12 | `main` 실행의 OIDC → ECR → S3 → SSM → HTTPS 200, 같은 SHA 재실행의 빌드/검사/push 생략 확인 | 저장소 변수 · `deploy.yml` · `deploy.sh` |
-| 13 | 보관된 이전 SHA 재배포, 실패 SSM 출력/실패 코드와 서버 자동 복귀, 로컬 직전 이미지/릴리스 보존, 공개 로그의 비밀 부재 확인. 정상 수동 재배포만으로 실패 자동 복귀 검증을 대체하지 않음 | `deploy.yml` · `deploy.sh` · `aws/` 정책; Flyway 호환성은 해당 마이그레이션 |
+| 13 | 보관된 이전 SHA 재배포, 실패 SSM 출력/실패 코드와 서버 자동 복귀, 로컬 직전 이미지/릴리스 보존, 공개 로그의 비밀 부재 확인. 첫 실행의 단계 env · docker push · AWS 오류 · SSM 출력에서 계정 ID · 버킷 이름 · 인스턴스 ID가 `***`로 가려졌는지 확인. 정상 수동 재배포만으로 실패 자동 복귀 검증을 대체하지 않음 | `deploy.yml` · `deploy.sh` · `aws/` 정책; Flyway 호환성은 해당 마이그레이션 |
 | 14 | `systemd-analyze calendar '*-*-* 19:00:00 UTC'`와 `TZ=Asia/Seoul date`로 일정이 한국 04:00인지 확인 | `systemd/mogum-backup.timer`, 이 문서의 시간 표기 |
 | 15 | 성공 배포 후 unit 설치 · timer enabled/다음 실행 · `Persistent=true`의 놓친 실행 보충, 수동 백업/복원의 객체 키·행 수·DB 정리·원본 불변 확인 | `deploy.sh` · `systemd/` · `backup.sh` · `restore.sh` · 서버 env |
 | 16 | ECR IMMUTABLE/최근 30개, S3 공개 차단/SSE-S3/버전 관리/두 수명주기 적용 확인. 시간이 지난 표본의 현재 만료 → 이전 버전 삭제 → 삭제 표시 정리 · 미완료 multipart 정리와 지연을 기록 | AWS 설정 · `aws/ecr-lifecycle.json` · `aws/s3-lifecycle.json`; 실제 지연은 [보관 설명](#보관과-롤백-범위)에 반영 |
@@ -336,18 +336,25 @@ JSON 파싱과 권한 범위는 `AwsFilesTest`로 검증했으며 실제 IAM 평
 
 [deploy.yml](../.github/workflows/deploy.yml)의 `Deploy backend`는 `main` push 중 **`backend/**` · `deploy/**` · `.github/workflows/deploy.yml`** 중 하나가 바뀐 경우에 실행한다. 문서나 화면만 바뀌면 서버를 재시작하지 않는다. `workflow_dispatch`는 경로와 무관하게 실행하며 `main`만 허용한다. 단일 `mogum-backend-deploy` 동시 실행 그룹에서 진행 중인 배포를 취소하지 않는다. GitHub 동시 실행 그룹의 대기 실행은 새 실행으로 교체될 수 있으므로 모든 중간 커밋의 순차 배포를 보장하지는 않는다([동시 실행 규칙](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)). 화면은 별도 Vercel Git 연동으로 배포한다.
 
-저장소 **Settings → Secrets and variables → Actions → Variables**에 다음 여섯 개를 등록한다. 식별자이며 Secrets에 넣지 않는다. `DEPLOY_ENABLED`가 정확히 `true`일 때만 작업이 실행된다. 처음 AWS를 준비하는 동안에는 미설정 또는 `false`로 두고, 서버 env · AWS · DNS 설정이 끝난 뒤 `true`로 켠다. 끄면 다음 실행부터 건너뛰며 진행 중인 배포는 취소하지 않는다.
+저장소 **Settings → Secrets and variables → Actions**의 **Variables 3개**와 **Secrets 3개**에 아래 값을 나누어 등록한다. 공개 Actions 로그에서 역할 ARN · 버킷 이름 · 인스턴스 ID를 가리기 위해 식별자는 Secrets로 받는다. 역할 ARN에서 추출한 계정 ID도 첫 검사 단계에서 출력 전에 `::add-mask::`로 등록하고 `configure-aws-credentials`의 `mask-aws-account-id`를 켜서 레지스트리 주소와 AWS 출력에서도 가린다. AWS 장기 키 · Google 비밀은 등록하지 않는다. `DEPLOY_ENABLED`가 정확히 `true`일 때만 작업이 실행된다. 처음 AWS를 준비하는 동안에는 미설정 또는 `false`로 두고, 서버 env · AWS · DNS 설정이 끝난 뒤 `true`로 켠다. 끄면 다음 실행부터 건너뛰며 진행 중인 배포는 취소하지 않는다.
+
+**Variables 3개**
 
 | 이름 | 값 예 | 어디서 얻나 |
 |---|---|---|
 | `DEPLOY_ENABLED` | `true` / `false` | 운영자가 배포 활성화 여부를 정한다 |
 | `AWS_REGION` | `ap-northeast-2` | 위 AWS 설정에서 정한 서울 리전 |
+| `API_ORIGIN` | `https://api.{도메인}` | DNS · Caddy에 설정한 공개 API 출처. 끝 `/` 없이 입력 |
+
+**Secrets 3개**
+
+| 이름 | 값 예 | 어디서 얻나 |
+|---|---|---|
 | `AWS_DEPLOY_ROLE_ARN` | `arn:aws:iam::<계정 ID>:role/mogum-deploy` | IAM의 `mogum-deploy` 역할 상세 ARN |
 | `DEPLOY_BUCKET` | `<전용 버킷 이름>` | S3 버킷 이름. `s3://` 없이 서버 `MOGUM_BUCKET`과 같은 값 |
 | `DEPLOY_INSTANCE_ID` | `i-<인스턴스 ID>` | EC2 인스턴스 상세 ID. 배포 정책의 대상 한 대 |
-| `API_ORIGIN` | `https://api.{도메인}` | DNS · Caddy에 설정한 공개 API 출처. 끝 `/` 없이 입력 |
 
-활성화된 작업은 빌드나 AWS 호출에 앞서 필수 변수의 빈 값을 검사하며, 비었으면 **변수 이름만** 출력하고 실패한다. 브랜치 · SHA · 리전 · 식별자 형식도 먼저 검사한다. 자격은 [configure-aws-credentials@v5](https://github.com/aws-actions/configure-aws-credentials/tree/v5)의 OIDC 임시 자격만 사용하며 워크플로 권한은 `contents: read` · `id-token: write`다. GitHub `environment`는 지정하지 않는다. 지정하면 OIDC sub가 `environment:…`로 바뀌어 기존 `ref:refs/heads/main` 신뢰 조건과 맞지 않는다.
+활성화된 작업은 빌드나 AWS 호출에 앞서 필수 Variables · Secrets의 빈 값을 검사하며, 비었으면 **종류(variable/secret)와 이름만** 출력하고 실패한다. 브랜치 · SHA · 리전 · 식별자 형식도 먼저 검사한다. 자격은 [configure-aws-credentials@v5](https://github.com/aws-actions/configure-aws-credentials/tree/v5)의 OIDC 임시 자격만 사용하며 워크플로 권한은 `contents: read` · `id-token: write`다. GitHub `environment`는 지정하지 않는다. 지정하면 OIDC sub가 `environment:…`로 바뀌어 기존 `ref:refs/heads/main` 신뢰 조건과 맞지 않는다.
 
 일반 push와 `sha` 없는 수동 실행은 다음 순서다.
 

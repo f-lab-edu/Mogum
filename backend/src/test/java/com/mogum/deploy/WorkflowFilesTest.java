@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -21,8 +23,8 @@ class WorkflowFilesTest {
     private static final String SHA = "a".repeat(40);
     private static final String DIGEST = "sha256:" + "b".repeat(64);
     private static final String REGISTRY = "000000000000.dkr.ecr.ap-northeast-2.amazonaws.com";
-    private static final Set<String> VARIABLES = Set.of("DEPLOY_ENABLED", "AWS_REGION", "AWS_DEPLOY_ROLE_ARN",
-            "DEPLOY_BUCKET", "DEPLOY_INSTANCE_ID", "API_ORIGIN");
+    private static final Set<String> VARIABLES = Set.of("DEPLOY_ENABLED", "AWS_REGION", "API_ORIGIN");
+    private static final Set<String> SECRETS = Set.of("AWS_DEPLOY_ROLE_ARN", "DEPLOY_BUCKET", "DEPLOY_INSTANCE_ID");
 
     @Test
     void main과_세_경로의_push_및_SHA_선택_수동_실행만_받는다() throws Exception {
@@ -56,10 +58,17 @@ class WorkflowFilesTest {
     }
 
     @Test
-    void 변수는_vars이고_OIDC와_존재를_확인한_공식_액션만_쓴다() throws Exception {
+    void 공개_변수와_식별자_Secrets를_구분하고_OIDC와_공식_액션만_쓴다() throws Exception {
         var text = Files.readString(WORKFLOW);
-        for (var variable : VARIABLES) assertTrue(text.contains("vars." + variable), variable);
-        assertFalse(text.contains("secrets."));
+        assertEquals(VARIABLES, Pattern.compile("vars\\.([A-Za-z0-9_]+)").matcher(text).results()
+                .map(match -> match.group(1)).collect(Collectors.toSet()));
+        assertEquals(SECRETS, Pattern.compile("secrets\\.([A-Za-z0-9_]+)").matcher(text).results()
+                .map(match -> match.group(1)).collect(Collectors.toSet()));
+        var environment = map(job().get("env"));
+        for (var secret : SECRETS) assertEquals("${{ secrets." + secret + " }}", environment.get(secret));
+        for (var variable : List.of("AWS_REGION", "API_ORIGIN")) {
+            assertEquals("${{ vars." + variable + " }}", environment.get(variable));
+        }
         assertFalse(text.contains("aws-access-key-id"));
         assertFalse(text.contains("aws-secret-access-key"));
         var actions = new ArrayList<String>();
@@ -75,9 +84,25 @@ class WorkflowFilesTest {
                 "aws-actions/configure-aws-credentials@v5"), Set.copyOf(actions));
         assertEquals("21", map(step("java").get("with")).get("java-version"));
         var credentials = map(step("credentials").get("with"));
-        assertEquals("${{ vars.AWS_DEPLOY_ROLE_ARN }}", credentials.get("role-to-assume"));
+        assertEquals("${{ secrets.AWS_DEPLOY_ROLE_ARN }}", credentials.get("role-to-assume"));
         assertEquals("${{ vars.AWS_REGION }}", credentials.get("aws-region"));
+        assertEquals(true, credentials.get("mask-aws-account-id"));
         assertEquals("validate", steps().getFirst().get("id"));
+    }
+
+    @Test
+    void 계정_ID는_레지스트리_구성과_AWS_호출_전에_가림_등록한다() throws Exception {
+        var validation = script("validate");
+        int mask = validation.indexOf("::add-mask::");
+        assertTrue(mask >= 0);
+        assertTrue(mask < validation.indexOf("registry="));
+        assertTrue(mask < validation.indexOf("Missing repository"));
+        var scripts = steps().stream().filter(step -> step.containsKey("run"))
+                .map(step -> step.get("run").toString()).collect(Collectors.joining("\n"));
+        int aws = scripts.indexOf("aws ");
+        assertTrue(aws >= 0);
+        assertTrue(scripts.indexOf("::add-mask::") < aws);
+        assertTrue(steps().indexOf(step("validate")) < steps().indexOf(step("credentials")));
     }
 
     @Test
@@ -107,7 +132,8 @@ class WorkflowFilesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"push", "manual", "rollback", "invalid-sha", "uppercase-sha", "other-branch", "missing-vars"})
+    @ValueSource(strings = {"push", "manual", "rollback", "invalid-sha", "uppercase-sha", "other-branch", "missing-vars",
+            "invalid-region", "invalid-role", "invalid-bucket", "invalid-instance"})
     @Timeout(15)
     void AWS와_빌드_전에_입력과_변수를_검사한다(String scenario, @TempDir Path root) throws Exception {
         var environment = baseEnvironment();
@@ -119,6 +145,12 @@ class WorkflowFilesTest {
             default -> "";
         });
         if (scenario.equals("other-branch")) environment.put("SOURCE_REF", "refs/heads/other");
+        switch (scenario) {
+            case "invalid-region" -> environment.put("AWS_REGION", "invalid-region");
+            case "invalid-role" -> environment.put("AWS_DEPLOY_ROLE_ARN", "arn:aws:iam::000000000000:user/invalid");
+            case "invalid-bucket" -> environment.put("DEPLOY_BUCKET", "INVALID_BUCKET");
+            case "invalid-instance" -> environment.put("DEPLOY_INSTANCE_ID", "invalid-instance");
+        }
         if (scenario.equals("missing-vars")) {
             environment.put("DEPLOY_BUCKET", "");
             environment.put("API_ORIGIN", "");
@@ -127,18 +159,37 @@ class WorkflowFilesTest {
         boolean success = Set.of("push", "manual", "rollback").contains(scenario);
         assertEquals(success ? 0 : 1, result.status(), result.output());
         assertFalse(Files.exists(root.resolve("injected")));
+        assertEquals("", result.commands(), "검사 중에는 AWS를 호출하지 않는다");
+        assertTrue(result.output().startsWith("::add-mask::000000000000\n"), "오류 출력보다 먼저 계정 ID를 가린다");
+        assertFalse(result.output().substring(result.output().indexOf('\n') + 1).contains("000000000000"));
         if (success) {
+            assertEquals("::add-mask::000000000000\n", result.output());
             assertTrue(result.environment().contains("RELEASE_SHA=" + (scenario.equals("rollback") ? "c".repeat(40) : SHA)));
             assertTrue(result.outputs().contains("redeploy=" + scenario.equals("rollback")));
         } else {
             assertTrue(result.environment().isEmpty());
             if (scenario.equals("missing-vars")) {
-                assertTrue(result.output().contains("DEPLOY_BUCKET"));
-                assertTrue(result.output().contains("API_ORIGIN"));
+                assertTrue(result.output().contains("Missing repository secret: DEPLOY_BUCKET"));
+                assertTrue(result.output().contains("Missing repository variable: API_ORIGIN"));
                 assertFalse(result.output().contains("test-bucket"));
                 assertFalse(result.output().contains("example.invalid"));
             }
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"AWS_REGION", "API_ORIGIN", "AWS_DEPLOY_ROLE_ARN", "DEPLOY_BUCKET", "DEPLOY_INSTANCE_ID"})
+    @Timeout(15)
+    void 누락된_설정은_종류와_이름만_출력한다(String name, @TempDir Path root) throws Exception {
+        var environment = baseEnvironment();
+        environment.put(name, "");
+        var result = run("validate", root, environment, "");
+        assertEquals(1, result.status());
+        var mask = name.equals("AWS_DEPLOY_ROLE_ARN") ? "" : "::add-mask::000000000000\n";
+        var kind = SECRETS.contains(name) ? "secret" : "variable";
+        assertEquals(mask + "Missing repository " + kind + ": " + name + "\n", result.output());
+        assertEquals("", result.environment());
+        assertEquals("", result.commands());
     }
 
     @ParameterizedTest
