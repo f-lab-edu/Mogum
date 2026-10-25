@@ -12,7 +12,8 @@
     },
     {
       "dir": "2-deploy",
-      "status": "pending"
+      "status": "error",
+      "failed_at": "2026-10-25T16:13:11+0900"
     }
   ]
 }

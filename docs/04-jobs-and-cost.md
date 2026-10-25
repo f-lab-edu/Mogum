@@ -145,7 +145,7 @@ flowchart LR
 
 - 공개 운영에 더하는 것 — 도메인(화면 → Vercel · `api.` → EC2) · HTTPS(구글 콜백 · `Secure` 쿠키) · Vercel 프로젝트(API 주소 환경 변수 `VITE_API_BASE_URL` · 화면 주소 새로고침을 `index.html` 로 · 요금제 약관 확인) · DB 백업 · 슬랙 알림 · 외부 헬스체크(§9.1).
 
-**운영 구성과 배포 흐름**(ADR-072) — 운영 Compose · Caddyfile · 서버 배포 스크립트 · env 견본과 [서버 구성 절차서](../deploy/README.md#서버-구성)는 `2-deploy` step 2에서 만들었다. step 4에서 `deploy/aws/`의 OIDC/EC2 신뢰 · 두 역할 권한 · ECR/S3 수명주기 JSON 견본 여섯 개와 [AWS 설정 절차](../deploy/README.md#aws-설정)를 추가했다(계정/버킷/인스턴스는 자리표시). step 5에서 [배포 워크플로](../.github/workflows/deploy.yml)와 [GitHub Actions 배포 절차](../deploy/README.md#github-actions-배포)를 추가했다. 처음 배포의 전체 순서는 step 7에서 완성한다. 실제 AWS · 도메인 설정과 운영 확인은 사람이 절차서를 따라 한다.
+**운영 구성과 배포 흐름**(ADR-072) — 운영 Compose · Caddyfile · 서버 배포 스크립트 · env 견본과 [서버 구성 절차서](../deploy/README.md#서버-구성)는 `2-deploy` step 2에서 만들었다. step 4에서 `deploy/aws/`의 OIDC/EC2 신뢰 · 두 역할 권한 · ECR/S3 수명주기 JSON 견본 여섯 개와 [AWS 설정 절차](../deploy/README.md#aws-설정)를 추가했다(계정/버킷/인스턴스는 자리표시). step 5에서 [배포 워크플로](../.github/workflows/deploy.yml)와 [GitHub Actions 배포 절차](../deploy/README.md#github-actions-배포)를 추가했다. step 6에서 `frontend/vercel.json`의 SPA rewrite와 Vercel 설정 절차를, step 7에서 [처음 구축 · 운영 확인 · 외부 미검증 목록 · 비용을 포함한 배포 절차서](../deploy/README.md)를 완성했다. 저장소의 배포 파일 · 워크플로 · 절차서는 만들었으며, 실제 AWS · 운영 도메인 배포와 운영 확인 · AWS 백업 복원 연습은 아직 수행하지 않았다. 사람이 절차서를 따라 실행한 뒤 기록한다.
 
 | | 정한 것 |
 |---|---|
