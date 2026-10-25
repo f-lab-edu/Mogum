@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "server-runtime",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-25T15:30:53+0900",
+      "summary": "deploy/compose.yaml·Caddyfile·deploy.sh·mogum.env.example·README.md, DeployFilesTest.java, backend/build.gradle, docs/04-jobs-and-cost.md 반영; 서버 env 이름 API_DOMAIN·DB_USERNAME·DB_PASSWORD·GOOGLE_CLIENT_ID·GOOGLE_CLIENT_SECRET·GOOGLE_REDIRECT_URI·APP_WEB_ORIGIN·APP_WEB_COOKIE_DOMAIN·APP_AUTH_ADMIN_EMAILS, 스크립트 APP_IMAGE 지문 주입·Compose DB_URL/SPRING_PROFILES_ACTIVE=aws 고정; 메모리 backend 1024MiB·postgres 512MiB·caddy 128MiB(잠정 합계 1664MiB), 종료 대기 150초; deploy.sh는 SHA/명령/env 권한/지문 검사→ECR 로그인·pull→Compose up·Caddy reload→로컬 헬스 최대 180초→current 교체·릴리스 3개/직전 이미지 보존 정리, 실패 시 로컬 이미지로 직전 Compose·Caddyfile 복귀 후 실패 코드; YAML 불변식 7개·명령 대체 시나리오 9개 포함 AC 전체 203개 통과, 릴리스 경로 변경 시 postgres/caddy Compose 해시 동일 확인",
+      "completed_at": "2026-10-25T15:38:24+0900"
     },
     {
       "step": 3,
