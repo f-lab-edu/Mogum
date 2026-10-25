@@ -2,13 +2,49 @@
   "project": "Mogum",
   "phase": "2-deploy",
   "steps": [
-    { "step": 0, "name": "ops-config", "status": "pending" },
-    { "step": 1, "name": "image-check", "status": "pending" },
-    { "step": 2, "name": "server-runtime", "status": "pending" },
-    { "step": 3, "name": "backup", "status": "pending" },
-    { "step": 4, "name": "aws-policies", "status": "pending" },
-    { "step": 5, "name": "deploy-workflow", "status": "pending" },
-    { "step": 6, "name": "vercel", "status": "pending" },
-    { "step": 7, "name": "runbook", "status": "pending" }
-  ]
+    {
+      "step": 0,
+      "name": "ops-config",
+      "status": "completed",
+      "summary": "backend/build.gradle·SecurityConfiguration.java·application.yml·SecurityConfigurationHealthIT.java·docs/04-jobs-and-cost.md·phases/2-deploy/index.json 반영: GET /actuator/health만 비인증 허용, 세부 정보 없는 {\"status\":\"UP\"}(DB 연결 실패 시 503 DOWN), graceful·130s 명시, 신규 7개 포함 전체 187개 테스트 통과",
+      "started_at": "2026-10-25T15:23:32+0900",
+      "completed_at": "2026-10-25T15:27:07+0900"
+    },
+    {
+      "step": 1,
+      "name": "image-check",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "server-runtime",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "backup",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "aws-policies",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "deploy-workflow",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "vercel",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "runbook",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-10-25T15:23:32+0900"
 }
