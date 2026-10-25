@@ -1,0 +1,20 @@
+{
+  "Rules": [
+    {
+      "ID": "BackupsSixCurrentPlusOneNoncurrentDay",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "backups/"},
+      "Expiration": {"Days": 6},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 1},
+      "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 1}
+    },
+    {
+      "ID": "ReleasesThirtyCurrentPlusOneNoncurrentDay",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "releases/"},
+      "Expiration": {"Days": 30},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 1},
+      "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 1}
+    }
+  ]
+}

@@ -43,7 +43,7 @@ Flyway 마이그레이션은 되돌리지 않는다. 직전 앱이 새 스키마
 
 백업은 Compose 프로젝트 `mogum` · 서비스 `postgres` 라벨로 실행 중 컨테이너를 찾는다. Compose 파일을 읽지 않으므로 `APP_IMAGE`가 없어도 실행한다. 재부팅 직후에는 5초 간격으로 최대 120초 준비를 기다린다. 컨테이너 안의 `pg_dump -Fc`로 운영 DB `mogum` 전체(스키마 · 데이터 · 시퀀스 · 확장)를 custom 형식으로 받아, 덤프가 성공하고 파일이 비어 있지 않을 때만 업로드한다. 호스트 임시 파일은 root 전용(`umask 077` · 600)이며 성공/실패 시 trap으로 지운다. 강제 전원 종료/SIGKILL은 trap을 실행할 수 없으므로 서버 재기동 후 남은 임시 파일 유무를 확인한다. 출력은 객체 경로와 바이트 크기 한 줄이다. 호스트에 PostgreSQL 도구를 설치하지 않는다.
 
-객체 형식은 **`s3://${MOGUM_BUCKET}/backups/YYYYMMDDTHHMMSS+0900.dump`**(예: `backups/20261025T040000+0900.dump`)다. 키의 시각은 `TZ=Asia/Seoul`로 만든다. 배포 묶음은 같은 버킷의 `releases/`를 쓴다. 버전 관리를 켜고 **현재 버전 6일 + 이전 버전 1일, 합쳐 총 7일 상한**으로 보관한다(ADR-072). 수명주기 규칙과 IAM 정책 파일은 step 4에서 만든다. 백업/연습 스크립트에는 S3 객체나 버전을 지우는 명령이 없으며 서버 역할에도 삭제 권한을 주지 않는다. 이 설정은 버킷에 적용한 뒤 첫 배포 때 확인해야 한다.
+객체 형식은 **`s3://${MOGUM_BUCKET}/backups/YYYYMMDDTHHMMSS+0900.dump`**(예: `backups/20261025T040000+0900.dump`)다. 키의 시각은 `TZ=Asia/Seoul`로 만든다. 배포 묶음은 같은 버킷의 `releases/`를 쓴다. 버전 관리를 켜고 **현재 버전 6일 + 이전 버전 1일, 합쳐 총 7일 상한**으로 보관한다(ADR-072). [AWS 설정](#aws-설정)의 수명주기 규칙과 IAM 정책 견본을 적용한다. 백업/연습 스크립트에는 S3 객체나 버전을 지우는 명령이 없으며 서버 역할에도 삭제 권한을 주지 않는다. 이 설정은 버킷에 적용한 뒤 첫 배포 때 확인해야 한다.
 
 ### 복원 연습
 
@@ -118,5 +118,81 @@ sudo systemctl list-timers mogum-backup.timer --all
 
 - `systemd-analyze calendar '*-*-* 19:00:00 UTC'`가 매일 한국 04:00에 해당하는 다음 실행을 표시하는지 확인한다. 서버 시간대가 UTC여도 동일해야 한다.
 - `systemctl is-enabled mogum-backup.timer`와 `list-timers`로 설치/활성화/다음 실행을 확인한다. `Persistent=true`의 재부팅 후 보충 실행도 확인한다.
-- `sudo systemctl start mogum-backup.service` 후 저널의 성공 객체 키/크기를 확인하고, 버킷의 버전 관리 및 총 7일 수명주기(step 4)가 적용됐는지 확인한다.
+- `sudo systemctl start mogum-backup.service` 후 저널의 성공 객체 키/크기를 확인하고, 버킷의 버전 관리 및 [총 7일 수명주기](#보관과-롤백-범위)가 적용됐는지 확인한다.
 - 위 `restore.sh latest`를 한 번 실행해 테이블별 행 수와 종료 코드를 확인하고 `mogum_restore_check`가 제거됐는지 확인한다. 운영 DB에 데이터 변경이 없어야 한다.
+
+## AWS 설정
+
+`2-deploy` step 4의 산출물은 아래 **JSON 견본**과 불변식 테스트다. 실제 AWS API 호출이나 적용은 수행하지 않았다. 운영자가 기존 관리자 세션의 임시 자격으로 설정하며, 배포 역할과 인스턴스 역할에 자원 생성/설정 권한을 추가하지 않는다. 처음 구축의 전체 순서는 step 7에서 정리한다. 리전은 **`ap-northeast-2`**로 고정한다.
+
+### 견본과 자리표시
+
+| 파일 | 적용 위치와 용도 |
+|---|---|
+| [github-oidc-trust.json](./aws/github-oidc-trust.json) | `mogum-deploy` 역할의 신뢰 정책. 계정의 GitHub OIDC 공급자에서 STS audience와 저장소 `main` sub가 정확히 일치할 때만 수임 |
+| [deploy-policy.json](./aws/deploy-policy.json) | `mogum-deploy`의 인라인 권한 정책 `mogum-deploy-access`. `mogum-app` push/존재·지문 조회, `releases/*` 읽기/쓰기, 운영 인스턴스 한 대의 지정 SSM 문서 실행과 결과 조회 |
+| [ec2-trust.json](./aws/ec2-trust.json) | `mogum-instance` 역할의 신뢰 정책. EC2 서비스만 수임 |
+| [instance-policy.json](./aws/instance-policy.json) | `mogum-instance`의 인라인 권한 정책 `mogum-instance-access`. ECR pull, `releases/*` 읽기, `backups/*` 읽기/쓰기, `backups/` 목록 조회 |
+| [ecr-lifecycle.json](./aws/ecr-lifecycle.json) | ECR `mogum-app` 수명주기. 태그 유무와 무관하게 최근 이미지 30개 보존 |
+| [s3-lifecycle.json](./aws/s3-lifecycle.json) | 같은 S3 버킷의 `backups/`와 `releases/`에 적용하는 규칙 두 개 |
+
+견본 여섯 개를 **저장소 밖 로컬 디렉터리**에 복사한 뒤 편집기의 전체 바꾸기로 다음 문자열을 치환한다. 실제 값을 넣은 사본은 커밋하지 않는다. 치환 뒤 JSON 파싱과 미치환 자리표시가 없는지 확인하고 콘솔에 붙여 넣거나 아래 CLI의 파일 입력으로 사용한다.
+
+| 자리표시 | 치환할 값 |
+|---|---|
+| `ACCOUNT_ID` | 자원을 만드는 AWS 계정의 12자리 ID(모든 ARN에서 동일) |
+| `BUCKET_NAME` | 서울 리전에 만들 전용 S3 버킷의 전역 고유 이름(`s3://` 없이). 서버 `MOGUM_BUCKET`에도 동일한 값 |
+| `INSTANCE_ID` | 운영 EC2 한 대의 `i-`로 시작하는 인스턴스 ID |
+
+리전 · 저장소 `mogum-app` · GitHub 저장소명 · OIDC 조건은 바꾸지 않는다. AWS 소유 SSM 문서 ARN의 계정 칸은 **비어 있는 것이 맞다**. `ACCOUNT_ID`를 여기에 추가하지 않는다.
+
+### 만들 자원과 연결
+
+콘솔에서는 다음 자원과 설정을 만든다. 기존 자원이 있으면 같은 설정인지 확인한다.
+
+1. **IAM OIDC 공급자** — URL `https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com`. 배포 역할 신뢰 정책의 공급자 ARN은 이 계정의 공급자를 가리킨다.
+2. **배포 역할 `mogum-deploy`** — `github-oidc-trust.json`과 `deploy-policy.json`을 각각 신뢰/인라인 정책에 적용한다. GitHub Actions가 이 역할 ARN으로 OIDC 임시 자격을 받는다. `aud`와 `sub`의 연산자는 `StringEquals`, sub는 **`repo:f-lab-edu/Mogum:ref:refs/heads/main`** 그대로다. `main` push와 `main`에서의 `workflow_dispatch`만 사용하며 워크플로에 GitHub `environment`를 지정하지 않는다(environment를 쓰면 sub가 바뀐다).
+3. **인스턴스 역할 `mogum-instance`** — `ec2-trust.json`과 `instance-policy.json`을 적용하고, AWS 관리형 정책 **`arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore`**를 추가로 연결한다. 관리형 정책은 파일로 복제하지 않는다. 인스턴스 프로파일 `mogum-instance`에 이 역할을 넣어 EC2에 연결한다(EC2용 역할을 콘솔에서 만들면 프로파일도 생성된다). 다른 권한 정책을 추가하지 않는다.
+4. **ECR 비공개 저장소 `mogum-app`** — 태그 변경 불가 **`IMMUTABLE`**, 예외 없음. 이미지는 전체 40자 소문자 커밋 SHA 태그로 올리고 실행은 지문을 쓴다. `ecr-lifecycle.json`을 수명주기에 적용한다.
+5. **S3 범용 버킷 `BUCKET_NAME`** — 전용 버킷 하나에 **퍼블릭 액세스 차단 네 항목 모두 활성화**, 객체 소유권은 **Bucket owner enforced(ACL 비활성화)**, 기본 암호화는 **SSE-S3(AES-256)**, **버전 관리 Enabled**. `s3-lifecycle.json` 전체를 적용한다. KMS 키는 사용하지 않으므로 두 역할에 KMS 권한이 필요하지 않다.
+6. **운영 EC2 한 대** — 서울 · arm64 · `t4g.small` · Amazon Linux 2023, 인스턴스 프로파일 `mogum-instance`. SSM Agent가 실행되어 Systems Manager의 관리형 노드에 Online으로 보여야 한다. 보안 그룹은 웹 TCP 80/443만 열고 SSH와 Postgres는 열지 않는다. ECR/S3/SSM으로 나가는 HTTPS 통신이 가능해야 한다. 생성 후 나온 ID로 정책 사본의 `INSTANCE_ID`를 치환한다.
+
+역할에 붙인 두 권한 정책에는 이미지/객체/버전 삭제나 저장소·버킷 정책/수명주기/버전 관리 변경이 없다. 배포 역할은 `backups/`에 접근하지 못하고, 서버 역할은 이미지를 올리거나 `releases/`에 쓰지 못한다. ECR 인증 `GetAuthorizationToken`과 SSM 결과 `GetCommandInvocation`만 자원 `*`를 쓴다. [SSM 권한 표](https://docs.aws.amazon.com/service-authorization/latest/reference/list_ssm.html)에서 결과 조회는 자원별 제한을 지원하지 않는다. 명령 전송은 AWS 소유 `AWS-RunShellScript` 문서와 운영 EC2 ARN 두 개로 제한한다.
+
+`aws s3 cp`의 multipart 업로드 시작/조각 전송/완료는 `s3:PutObject`를 사용하며, 실패한 미완료 업로드를 취소하는 `s3:AbortMultipartUpload`도 쓰기 접두사에만 허용한다. 완성된 객체/버전 삭제 권한은 아니다([S3 multipart 권한](https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpuoverview.html)). `restore.sh latest`의 `ListObjectsV2`는 버킷 ARN과 `StringEquals: s3:prefix=backups/`로 제한하며 전체 버킷/버전 목록 권한은 주지 않는다. SSM 에이전트 통신 권한은 위 AWS 관리형 정책이 담당한다.
+
+### AWS CLI v2 적용 예
+
+아래 명령은 **운영자가 적용할 예시이며 이 step에서 실행하지 않았다**. 저장소 루트에서 실행하되 `BUCKET_NAME`과 `file://` 뒤 경로를 치환한 사본의 경로로 바꾼다. 수명주기 적용은 기존 구성을 교체하므로 전용 저장소/버킷인지 먼저 확인한다. 명령 형식은 [ECR 생성](https://docs.aws.amazon.com/cli/latest/reference/ecr/create-repository.html) · [ECR 수명주기 적용](https://docs.aws.amazon.com/cli/latest/reference/ecr/put-lifecycle-policy.html) · [S3 수명주기 적용](https://docs.aws.amazon.com/cli/latest/reference/s3api/put-bucket-lifecycle-configuration.html)의 공식 CLI v2 문서와 대조했다.
+
+```bash
+aws ecr create-repository --region ap-northeast-2 \
+  --repository-name mogum-app --image-tag-mutability IMMUTABLE
+aws ecr put-lifecycle-policy --region ap-northeast-2 \
+  --repository-name mogum-app \
+  --lifecycle-policy-text file:///LOCAL/RENDERED/ecr-lifecycle.json
+aws s3api put-bucket-lifecycle-configuration --region ap-northeast-2 \
+  --bucket BUCKET_NAME \
+  --lifecycle-configuration file:///LOCAL/RENDERED/s3-lifecycle.json
+```
+
+### 보관과 롤백 범위
+
+백업의 설정상 보관은 **현재 6일 + 이전 1일 = 총 7일**이며 각각을 7일로 바꾸지 않는다. 현재 객체 만료 시 삭제 표시가 생기고 이전 버전이 된 덤프는 1일 뒤 영구 삭제 대상이 된다. `releases/`는 현재 30일 · 이전 1일이다. 두 접두사 모두 미완료 multipart 업로드는 시작 1일 뒤 정리한다. 이전 버전 개수 보존 조건을 추가하지 않는다.
+
+삭제 표시는 `Expiration.Days`의 만료 동작으로 이전 버전이 모두 없어진 뒤 자동 정리된다([S3 삭제 표시 정리](https://docs.aws.amazon.com/AmazonS3/latest/userguide/ManagingDelMarkers.html)). `Expiration`에 `Days`와 `ExpiredObjectDeleteMarker`를 함께 넣을 수 없으므로 견본에는 `Days`만 사용한다([S3 수명주기 예제](https://docs.aws.amazon.com/AmazonS3/latest/userguide/lifecycle-configuration-examples.html#lifecycle-config-conceptual-ex6)). 따라서 규칙 두 개로 만료 · 이전 버전 삭제 · 삭제 표시 정리 · 미완료 업로드 정리를 모두 수행한다.
+
+**S3 수명주기 삭제는 비동기다.** 일 단위 만료 계산과 처리 지연 때문에 정확히 업로드 168시간 안에 물리 삭제된다는 보장은 아니다. 총 7일은 설정한 현재/이전 일수의 합이며, 실제 삭제는 늦어질 수 있다([S3 만료 동작](https://docs.aws.amazon.com/AmazonS3/latest/userguide/lifecycle-expire-general-considerations.html)).
+
+원격 수동 재배포 범위는 **ECR 최근 이미지 30개와 S3 릴리스 현재 객체 30일 중 먼저 끝나는 쪽**이다. ECR은 일수가 아니라 이미지 수 기준이다. S3 이전 버전을 읽는 권한은 주지 않는다. 서버의 자동 실패 복귀는 앞 절처럼 로컬 직전 이미지와 릴리스로 수행하며, 로컬 릴리스는 현재/직전 포함 최근 3개다. 어떤 복귀도 Flyway를 되돌리지 않는다.
+
+### 첫 배포 때 확인
+
+JSON 파싱과 권한 범위는 `AwsFilesTest`로 검증했으며 실제 IAM 평가 · AWS 자원 적용은 검증하지 않았다. 새 CLI 예제의 명령/옵션 형식은 위 공식 문서로 확인했지만 실제 환경의 실행은 다음 목록에 남긴다.
+
+- 치환한 신뢰/권한 정책을 콘솔이 받아들이는지, OIDC 공급자 audience와 역할의 신뢰 조건이 일치하는지 확인한다. `main`의 push/수동 실행은 수임되고 다른 브랜치/PR/포크는 거절되어야 한다. 워크플로에는 `environment`가 없어야 한다(step 5).
+- `mogum-deploy`와 `mogum-instance`에 이 절에서 정한 정책만 연결됐는지 확인한다. 인스턴스 프로파일과 `AmazonSSMManagedInstanceCore` 연결, SSM Agent Online을 확인한다.
+- 위 CLI v2 세 명령의 실제 적용 성공과 ECR `IMMUTABLE`/최근 30개, S3 공개 차단/기본 암호화/버전 관리/접두사별 규칙 두 개를 콘솔에서 확인한다.
+- 배포 역할의 이미지 push·지문 조회·릴리스 업로드/존재 확인·지정 인스턴스 SSM 전송/결과 조회를 확인한다. 다른 인스턴스/문서 전송과 `backups/` 접근은 거절되어야 한다.
+- 인스턴스 역할로 `deploy.sh`의 로그인/pull, 릴리스 묶음 다운로드, `backup.sh` 업로드, `restore.sh latest`의 목록/다운로드를 확인한다. multipart 업로드도 가능해야 한다. 두 역할의 삭제/설정 변경 권한 부재는 IAM 정책 시뮬레이터로 확인한다.
+- 시간이 지난 표본의 현재 만료 → 이전 버전 영구 삭제 → 만료된 삭제 표시 정리와 미완료 multipart 정리를 확인한다. 실제 삭제 시각과 지연을 기록한다.

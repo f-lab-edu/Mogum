@@ -145,7 +145,7 @@ flowchart LR
 
 - 공개 운영에 더하는 것 — 도메인(화면 → Vercel · `api.` → EC2) · HTTPS(구글 콜백 · `Secure` 쿠키) · Vercel 프로젝트(API 주소 환경 변수 `VITE_API_BASE_URL` · 화면 주소 새로고침을 `index.html` 로 · 요금제 약관 확인) · DB 백업 · 슬랙 알림 · 외부 헬스체크(§9.1).
 
-**운영 구성과 배포 흐름**(ADR-072) — 운영 Compose · Caddyfile · 서버 배포 스크립트 · env 견본과 [서버 구성 절차서](../deploy/README.md#서버-구성)는 `2-deploy` step 2에서 만들었다. 워크플로 · 처음 배포 순서는 후속 step에서 완성한다. 실제 AWS · 도메인 설정과 운영 확인은 사람이 절차서를 따라 한다.
+**운영 구성과 배포 흐름**(ADR-072) — 운영 Compose · Caddyfile · 서버 배포 스크립트 · env 견본과 [서버 구성 절차서](../deploy/README.md#서버-구성)는 `2-deploy` step 2에서 만들었다. step 4에서 `deploy/aws/`의 OIDC/EC2 신뢰 · 두 역할 권한 · ECR/S3 수명주기 JSON 견본 여섯 개와 [AWS 설정 절차](../deploy/README.md#aws-설정)를 추가했다(계정/버킷/인스턴스는 자리표시). 워크플로 · 처음 배포 순서는 후속 step에서 완성한다. 실제 AWS · 도메인 설정과 운영 확인은 사람이 절차서를 따라 한다.
 
 | | 정한 것 |
 |---|---|
@@ -153,7 +153,7 @@ flowchart LR
 | 백엔드 배포 | `main` 병합(백엔드 · `deploy/` · 배포 워크플로 변경) → GitHub Actions 가 서버와 같은 arm64 러너에서 이미지를 한 번 빌드 → 그 이미지로 기동 · 정상 종료 검사 → ECR(태그 덮어쓰기 금지 · 전체 SHA 태그) → `deploy/` + 이미지 지문 묶음을 S3 에 → SSM Run Command 로 서버의 배포 스크립트 → 서버는 지문으로 받아 교체 · 헬스 확인 · 실패하면 직전 릴리스로 되돌림. AWS 자격은 OIDC. 수동 실행에 이전 SHA 를 주면 빌드 없이 다시 배포한다. Flyway 는 되돌리지 않는다 |
 | 화면 배포 | Vercel Git 연동 — 같은 `main` 병합에서 배포한다 |
 | 도메인 · DNS | Cloudflare 에서 등록 · DNS(2026-10-25). `{도메인}`(→ Vercel) · `api.{도메인}`(→ Elastic IP) 두 레코드 모두 **프록시를 끈다(DNS only)** — 켜면 모든 요청이 Cloudflare IP 로 보여 IP 당 레이트리밋([05 §1.4](./05-api.md))이 깨진다(ADR-060 과 같은 이유). 실제 도메인 이름은 공개 저장소의 파일에 적지 않는다 |
-| 백업 | `deploy/backup.sh`가 `pg_dump -Fc`를 root 전용 임시 파일로 받아 끝까지 성공한 비어 있지 않은 덤프만 `s3://${MOGUM_BUCKET}/backups/YYYYMMDDTHHMMSS+0900.dump`에 올린다. `mogum-backup.service` · `mogum-backup.timer`로 매일 **한국 04:00**(`OnCalendar=*-*-* 19:00:00 UTC` · `Persistent=true`) 실행. 헬스 통과 후 배포가 변경된 unit만 설치한다. 버전 관리를 켜고 현재 + 이전 버전 합쳐 **총 7일** 이하(현재 6일 + 이전 1일 · 수명주기 파일은 step 4). `deploy/restore.sh`는 별도 `mogum_restore_check` DB에만 복원하고 정리한다. [복원 연습 · 실제 복구 · 탈퇴/삭제 재적용 · 실패 확인](../deploy/README.md#백업--복원). 실제 AWS 백업/복원과 Amazon Linux 2023 타이머 검증은 아직 수행하지 않았다 |
+| 백업 | `deploy/backup.sh`가 `pg_dump -Fc`를 root 전용 임시 파일로 받아 끝까지 성공한 비어 있지 않은 덤프만 `s3://${MOGUM_BUCKET}/backups/YYYYMMDDTHHMMSS+0900.dump`에 올린다. `mogum-backup.service` · `mogum-backup.timer`로 매일 **한국 04:00**(`OnCalendar=*-*-* 19:00:00 UTC` · `Persistent=true`) 실행. 헬스 통과 후 배포가 변경된 unit만 설치한다. 버전 관리를 켜고 현재 + 이전 버전 합쳐 **총 7일** 이하(현재 6일 + 이전 1일 · `deploy/aws/s3-lifecycle.json`, 삭제는 비동기). `deploy/restore.sh`는 별도 `mogum_restore_check` DB에만 복원하고 정리한다. [복원 연습 · 실제 복구 · 탈퇴/삭제 재적용 · 실패 확인](../deploy/README.md#백업--복원). 실제 AWS 백업/복원과 Amazon Linux 2023 타이머 검증은 아직 수행하지 않았다 |
 
 ### 3.1 역할 전환 — 비상용 배선
 
