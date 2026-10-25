@@ -49,7 +49,7 @@ class AwsFilesTest {
                   "Action":"sts:AssumeRoleWithWebIdentity",
                   "Condition":{"StringEquals":{
                     "token.actions.githubusercontent.com:aud":"sts.amazonaws.com",
-                    "token.actions.githubusercontent.com:sub":"repo:f-lab-edu/Mogum:ref:refs/heads/main"
+                    "token.actions.githubusercontent.com:sub":"repo:f-lab-edu@54677968/Mogum@1378404194:ref:refs/heads/main"
                   }}
                 }]}
                 """), read("github-oidc-trust.json"));

@@ -27,7 +27,9 @@
    | 인스턴스 역할 | `mogum-instance`에 `aws/ec2-trust.json` · `aws/instance-policy.json`과 `AmazonSSMManagedInstanceCore` 연결, 인스턴스 프로파일 생성 | 역할의 신뢰/권한과 같은 이름 프로파일의 역할 연결 확인 |
    | EC2 | `t4g.small` · Amazon Linux 2023 **arm64** · 위 인스턴스 프로파일. 인터넷 게이트웨이 경로가 있는 공개 서브넷(기본 VPC), 외부 ECR/S3/SSM HTTPS 통신 가능. 보안 그룹 인바운드는 웹 TCP **80/443만**, **22와 5432는 열지 않는다**. 키 페어 없음 · IMDSv2 필수 · 종료 방지 켬(지우거나 다시 만들 때는 먼저 끈다) | EC2 상태 검사 통과 · 프로파일 연결 · SG 확인 · 루트 볼륨 암호화 · SSM 관리형 노드 Online · Session Manager 접속 성공 |
    | Elastic IP | 서울 리전 주소 할당 후 위 EC2에 연결 | 인스턴스의 공인 IPv4와 Elastic IP 연결 대상이 일치 |
-   | 배포 역할 | `mogum-deploy`에 `aws/github-oidc-trust.json` · `aws/deploy-policy.json` 적용. 이제 얻은 `INSTANCE_ID`를 권한 사본에 넣는다. 콘솔에서는 「사용자 지정 신뢰 정책」에 치환한 신뢰 견본을 그대로 붙인다 | 신뢰 sub는 `repo:f-lab-edu/Mogum:ref:refs/heads/main`, SSM 대상은 해당 한 대. 실제 수임/배포는 8번에서 확인 |
+   | 배포 역할 | `mogum-deploy`에 `aws/github-oidc-trust.json` · `aws/deploy-policy.json` 적용. 이제 얻은 `INSTANCE_ID`를 권한 사본에 넣는다. 콘솔에서는 「사용자 지정 신뢰 정책」에 치환한 신뢰 견본을 그대로 붙인다 | 신뢰 sub는 `repo:f-lab-edu@54677968/Mogum@1378404194:ref:refs/heads/main`, SSM 대상은 해당 한 대. 실제 수임/배포는 8번에서 확인 |
+
+   이 저장소는 불변 subject를 쓰므로 `sub`에 조직 · 저장소 ID가 들어간다. `gh api repos/f-lab-edu/Mogum/actions/oidc/customization/sub`의 `sub_claim_prefix` 뒤에 `:ref:refs/heads/main`을 붙인 값이 신뢰 정책과 같은지 확인한다.
 
    EC2의 EBS는 OS · DB · 로컬 릴리스 3개 · 현재/직전 이미지 · 덤프/복원 임시 공간을 담아야 한다. **gp3 30GiB(기본 3000 IOPS · 125MiB/s) · 암호화**로 정했다(2026-10-26 — 기본 8GiB로는 부족하다). 루트 볼륨 손실 시 S3 백업으로 복구하므로 EBS만 백업으로 여기지 않는다.
 
@@ -295,7 +297,7 @@ Flyway 마이그레이션은 되돌리지 않는다. 직전 앱이 새 스키마
 아래는 자원별 설정 참조다. **생성 순서는 [처음 구축 순서](#처음-구축-순서) 2번을 따른다**(EC2 생성 후 얻은 인스턴스 ID로 배포 역할을 완성한다). 기존 자원이 있으면 같은 설정인지 확인한다.
 
 1. **IAM OIDC 공급자** — URL `https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com`. 배포 역할 신뢰 정책의 공급자 ARN은 이 계정의 공급자를 가리킨다.
-2. **배포 역할 `mogum-deploy`** — `github-oidc-trust.json`과 `deploy-policy.json`을 각각 신뢰/인라인 정책에 적용한다. GitHub Actions가 이 역할 ARN으로 OIDC 임시 자격을 받는다. `aud`와 `sub`의 연산자는 `StringEquals`, sub는 **`repo:f-lab-edu/Mogum:ref:refs/heads/main`** 그대로다. `main` push와 `main`에서의 `workflow_dispatch`만 사용하며 워크플로에 GitHub `environment`를 지정하지 않는다(environment를 쓰면 sub가 바뀐다).
+2. **배포 역할 `mogum-deploy`** — `github-oidc-trust.json`과 `deploy-policy.json`을 각각 신뢰/인라인 정책에 적용한다. GitHub Actions가 이 역할 ARN으로 OIDC 임시 자격을 받는다. `aud`와 `sub`의 연산자는 `StringEquals`, sub는 **`repo:f-lab-edu@54677968/Mogum@1378404194:ref:refs/heads/main`** 그대로다. 이 저장소는 불변 subject를 쓰므로 조직 · 저장소 ID가 들어가며, 이름이 같아도 ID가 다른 저장소는 신뢰하지 않는다. `gh api repos/f-lab-edu/Mogum/actions/oidc/customization/sub`의 `sub_claim_prefix` 뒤에 `:ref:refs/heads/main`을 붙여 형식을 확인한다. `main` push와 `main`에서의 `workflow_dispatch`만 사용하며 워크플로에 GitHub `environment`를 지정하지 않는다(environment를 쓰면 sub 끝이 `environment:…`로 바뀐다).
 3. **인스턴스 역할 `mogum-instance`** — `ec2-trust.json`과 `instance-policy.json`을 적용하고, AWS 관리형 정책 **`arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore`**를 추가로 연결한다. 관리형 정책은 파일로 복제하지 않는다. 인스턴스 프로파일 `mogum-instance`에 이 역할을 넣어 EC2에 연결한다(EC2용 역할을 콘솔에서 만들면 프로파일도 생성된다). 다른 권한 정책을 추가하지 않는다.
 4. **ECR 비공개 저장소 `mogum-app`** — 태그 변경 불가 **`IMMUTABLE`**, 예외 없음. 이미지는 전체 40자 소문자 커밋 SHA 태그로 올리고 실행은 지문을 쓴다. `ecr-lifecycle.json`을 수명주기에 적용한다.
 5. **S3 범용 버킷 `BUCKET_NAME`** — 전용 버킷 하나에 **퍼블릭 액세스 차단 네 항목 모두 활성화**, 객체 소유권은 **Bucket owner enforced(ACL 비활성화)**, 기본 암호화는 **SSE-S3(AES-256)**, **버전 관리 Enabled**. `s3-lifecycle.json` 전체를 적용한다. KMS 키는 사용하지 않으므로 두 역할에 KMS 권한이 필요하지 않다.
@@ -356,7 +358,7 @@ JSON 파싱과 권한 범위는 `AwsFilesTest`로 검증했으며 실제 IAM 평
 | `DEPLOY_BUCKET` | `<전용 버킷 이름>` | S3 버킷 이름. `s3://` 없이 서버 `MOGUM_BUCKET`과 같은 값 |
 | `DEPLOY_INSTANCE_ID` | `i-<인스턴스 ID>` | EC2 인스턴스 상세 ID. 배포 정책의 대상 한 대 |
 
-활성화된 작업은 빌드나 AWS 호출에 앞서 필수 Variables · Secrets의 빈 값을 검사하며, 비었으면 **종류(variable/secret)와 이름만** 출력하고 실패한다. 브랜치 · SHA · 리전 · 식별자 형식도 먼저 검사한다. 자격은 [configure-aws-credentials@v5.1.1](https://github.com/aws-actions/configure-aws-credentials/tree/v5.1.1)의 OIDC 임시 자격만 사용하며 워크플로 권한은 `contents: read` · `id-token: write`다. GitHub `environment`는 지정하지 않는다. 지정하면 OIDC sub가 `environment:…`로 바뀌어 기존 `ref:refs/heads/main` 신뢰 조건과 맞지 않는다.
+활성화된 작업은 빌드나 AWS 호출에 앞서 필수 Variables · Secrets의 빈 값을 검사하며, 비었으면 **종류(variable/secret)와 이름만** 출력하고 실패한다. 브랜치 · SHA · 리전 · 식별자 형식도 먼저 검사한다. 자격은 [configure-aws-credentials@v5.1.1](https://github.com/aws-actions/configure-aws-credentials/tree/v5.1.1)의 OIDC 임시 자격만 사용하며 워크플로 권한은 `contents: read` · `id-token: write`다. GitHub `environment`는 지정하지 않는다. 지정하면 OIDC sub 끝이 `environment:…`로 바뀌어 불변 subject의 `:ref:refs/heads/main`으로 끝나는 정확 일치 신뢰 조건과 맞지 않는다.
 
 세 액션은 현재 사용 중인 v5 릴리스의 전체 40자 커밋 SHA로 고정하고 줄 끝 주석에 릴리스를 남긴다. 태그는 다른 커밋으로 옮겨질 수 있고 이 워크플로는 AWS 배포 자격을 받으므로, 자격을 받은 뒤 실행되는 액션까지 고정한다. 버전을 올릴 때는 새 릴리스 태그의 커밋 SHA를 확인해 워크플로 SHA · 릴리스 주석 · `WorkflowFilesTest` 기대값을 함께 바꾼다.
 
@@ -372,6 +374,8 @@ JSON 파싱과 권한 범위는 `AwsFilesTest`로 검증했으며 실제 IAM 평
 ### 수동 롤백 · 실패 확인
 
 Actions → **Deploy backend** → **Run workflow**에서 브랜치 `main`을 선택하고 `sha`에 이전 릴리스의 **전체 40자 소문자 SHA**를 넣는다. 비워 두면 현재 커밋의 일반 빌드/배포 경로다. SHA가 있으면 checkout · Java 설정 · 빌드 · 검사 · 업로드 없이, 해당 SHA의 ECR 이미지와 S3 기존 묶음을 먼저 조회하고 묶음의 지문까지 일치하는지 확인한다. 이미지/묶음이 없거나 읽을 수 없으면 어느 쪽인지 출력하고 SSM을 보내지 않는다. 보관 범위는 **S3 현재 릴리스 30일과 ECR 최근 이미지 30개 중 먼저 끝나는 쪽**이다([상세](#보관과-롤백-범위)). `Flyway` 마이그레이션은 되돌리지 않으므로 이전 앱과 현재 스키마의 호환성을 먼저 확인한다.
+
+OIDC 단계가 `Not authorized to perform sts:AssumeRoleWithWebIdentity`로 실패하면 배포 리전(`ap-northeast-2`)의 CloudTrail 이벤트 기록에서 이벤트 이름 `AssumeRoleWithWebIdentity`의 실패 이벤트를 연다. `userIdentity.principalId` 끝의 실제 `sub`를 역할 신뢰 정책의 `token.actions.githubusercontent.com:sub`와 비교한다.
 
 실패하면 워크플로의 **Deploy through SSM and print the command result** 단계에서 명령 ID · 상태 · stdout · stderr를 본다. `deploy.sh`가 로컬 헬스 실패로 직전 앱에 복귀했어도 워크플로는 실패한다. 결과 조회 상한을 넘기거나 조회 자체가 실패하면 로그의 명령 ID로 Systems Manager Run Command 상태를 확인한 뒤 재배포한다. 공개 헬스만 실패하면 DNS · HTTPS · Caddy를 확인한다. 이 경우 로컬 헬스를 통과한 서버의 `current`는 유지된다. 로그에 비밀/env 파일을 추가 출력하거나 `set -x`를 켜지 않는다.
 
