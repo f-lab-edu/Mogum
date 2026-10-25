@@ -12,8 +12,9 @@
     },
     {
       "dir": "2-deploy",
-      "status": "error",
-      "failed_at": "2026-10-25T16:13:11+0900"
+      "status": "completed",
+      "failed_at": "2026-10-25T16:13:11+0900",
+      "completed_at": "2026-10-25T17:46:10+0900"
     }
   ]
 }
