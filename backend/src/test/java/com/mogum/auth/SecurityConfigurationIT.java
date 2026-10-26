@@ -43,6 +43,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.test.json.JsonAssert;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.bind.annotation.RestController;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
@@ -149,27 +150,34 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
     }
 
     @Test
-    void 현재_사용자_응답은_정해진_다섯_필드만_포함한다() throws Exception {
+    void 아키텍처_검사용_컨트롤러는_앱_컨텍스트에_등록되지_않는다() {
+        assertTrue(Arrays.stream(context.getBeanNamesForAnnotation(RestController.class))
+                .map(context::getType)
+                .noneMatch(type -> type.getName().startsWith("com.mogum.ArchitectureTest$")));
+    }
+
+    @Test
+    void 현재_사용자_응답은_data_하나_안에_정해진_다섯_필드만_포함한다() throws Exception {
         var cookie = session();
         mvc.perform(get("/api/me").cookie(cookie)).andExpect(status().isOk())
                 .andExpect(content().json("""
-                        {"email":"session@example.com","status":"ACTIVE","role":"ADMIN",
-                         "termsAgreed":false,"waitlistPosition":null}
+                        {"data":{"email":"session@example.com","status":"ACTIVE","role":"ADMIN",
+                         "termsAgreed":false,"waitlistPosition":null}}
                         """, org.springframework.test.json.JsonCompareMode.STRICT));
         jdbc.update("UPDATE users SET terms_agreed_at = now(), terms_version = 'v1' WHERE id = ?", user.getId());
-        mvc.perform(get("/api/me").cookie(cookie)).andExpect(jsonPath("$.termsAgreed").value(true));
+        mvc.perform(get("/api/me").cookie(cookie)).andExpect(jsonPath("$.data.termsAgreed").value(true));
     }
 
     @Test
     void 역할과_상태를_DB에서_매번_읽는다() throws Exception {
         var cookie = session();
-        mvc.perform(get("/api/me").cookie(cookie)).andExpect(jsonPath("$.role").value("ADMIN"));
+        mvc.perform(get("/api/me").cookie(cookie)).andExpect(jsonPath("$.data.role").value("ADMIN"));
         jdbc.update("UPDATE users SET role = 'USER', status = 'WAITLISTED' WHERE id = ?", user.getId());
         mvc.perform(get("/api/me").cookie(cookie)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.role").value("USER"))
-                .andExpect(jsonPath("$.status").value("WAITLISTED"));
+                .andExpect(jsonPath("$.data.role").value("USER"))
+                .andExpect(jsonPath("$.data.status").value("WAITLISTED"));
         jdbc.update("UPDATE users SET status = 'ACTIVE' WHERE id = ?", user.getId());
-        mvc.perform(get("/api/me").cookie(cookie)).andExpect(jsonPath("$.status").value("ACTIVE"));
+        mvc.perform(get("/api/me").cookie(cookie)).andExpect(jsonPath("$.data.status").value("ACTIVE"));
     }
 
     @Test

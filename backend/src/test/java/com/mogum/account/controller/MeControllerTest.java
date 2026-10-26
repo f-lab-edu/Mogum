@@ -16,7 +16,7 @@ class MeControllerTest {
     void 현재_사용자의_공개_필드와_약관_동의를_변환한다() {
         var user = User.join("google", "sub", "me@example.com", UserRole.ADMIN, Instant.now());
         ReflectionTestUtils.setField(user, "termsAgreedAt", Instant.now());
-        var response = new MeController().me(user);
+        var response = new MeController().me(user).data();
         assertEquals("me@example.com", response.email());
         assertEquals(UserStatus.ACTIVE, response.status());
         assertEquals(UserRole.ADMIN, response.role());

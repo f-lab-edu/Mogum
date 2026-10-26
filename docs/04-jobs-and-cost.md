@@ -48,7 +48,7 @@
 |---|---|
 | 루트 `MogumApplication` | 진입점 · `@ConfigurationPropertiesScan` |
 | `config` | 설정 값(`WebProperties` · `AuthProperties`) · 시계 빈 · `app.role` 별 빈 등록(§3.1). `worker` · `generation` 을 조립하는 유일한 곳 |
-| `common` | 공통 오류 응답(`ErrorCode` · `ApiException` · `ApiError` · `ApiErrorResponses` · `ApiExceptionHandler` · `ApiErrorController`) · `SeoulClock` |
+| `common` | `ApiResponse`(성공 응답 감싸기) · 공통 오류 응답(`ErrorCode` · `ApiException` · `ApiError` · `ApiErrorResponses` · `ApiExceptionHandler` · `ApiErrorController`) · `SeoulClock` |
 | `auth` | Spring Security 설정 · 구글 OAuth 로그인 처리 · 세션 → 회원 필터 |
 | `account` | 회원 엔티티 · 리포지토리 · 로그인 서비스 · `/api/me` |
 | `curriculum` · `material` · `concept` · `review` … | 도메인마다 위 다섯 하위 패키지. `MasteryPolicy` 같은 도메인 규칙은 `domain` 에 둔다 |

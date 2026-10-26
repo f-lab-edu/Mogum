@@ -427,6 +427,7 @@
 **트레이드오프**: 모든 성공 응답에 한 겹이 더해지고 지금은 그 옆에 둘 메타가 없다. `204` 는 감싸기 규칙의 예외다. 성공과 오류의 모양이 달라 클라이언트는 HTTP 상태로 먼저 가른다. Bean Validation 의존성이 늘고, `@Valid` 를 빼먹으면 검증이 조용히 빠진다 — ArchUnit 규칙으로 막는다. `@Size` 는 UTF-16 단위로 세어 일부 이모지가 2자다. 배포 순간 화면(Vercel)과 API(EC2)가 몇 분 어긋날 수 있다 — 공개 전 사용자가 관리자 한 명이라 두 형식을 함께 받는 호환 코드를 두지 않는다.
 **검증**: 아직 수행하지 않았다(`2a-api-response`).
 - 백엔드 오류 경로: 2026-10-26 실제 HTTP로 `ApiException`의 선택적 `retryAfterSeconds`·`Retry-After` 일치/생략, 401·CSRF 403·404·400·405·500의 엄격한 JSON 본문, 405 `Allow` 및 컨테이너 ERROR 디스패치를 확인했다. `./backend/gradlew -p backend test`로 전체 서버 테스트 303개 통과(실패·건너뜀 0).
+- 백엔드 성공 응답: `ApiResponse.of(DTO)`로 `/api/me`를 한 겹 감싸고 최상위 `data` 하나와 내부 다섯 필드를 STRICT로 확인했다. ArchUnit `CONTROLLER_RESPONSE_TYPES`는 `ApiErrorController`를 제외한 REST 요청 매핑의 제네릭 반환 타입까지 검사하며 `ApiResponse<…>` · `ResponseEntity<ApiResponse<…>>` · `ResponseEntity<Void>` · `void`만 허용한다. `ArchitectureTest`의 중첩 static fixture로 위반 검출/허용과 앱 컨텍스트 제외를 확인했다. 앱의 `ObjectMapper` 빈으로 Jackson 3 · Boot 4.1.1 기본값이 null 필드 보존 · ISO-8601 UTC `Instant` 문자열 · 대문자 enum을 만족함을 확인했으며 별도 설정은 추가하지 않았다. 오류 선택 필드 생략도 유지된다. `./backend/gradlew -p backend test`로 전체 서버 테스트 315개 통과(실패·건너뜀 0).
 
 ## 설계 묶음 정리 때 확정한 것 (Q220~Q231)
 
