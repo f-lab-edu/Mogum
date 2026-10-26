@@ -18,7 +18,8 @@
     },
     {
       "dir": "2a-api-response",
-      "status": "pending"
+      "status": "completed",
+      "completed_at": "2026-10-26T14:35:10+0900"
     }
   ]
 }
