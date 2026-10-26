@@ -2,9 +2,29 @@
   "project": "Mogum",
   "phase": "2b-ops-logging",
   "steps": [
-    { "step": 0, "name": "common-split", "status": "pending" },
-    { "step": 1, "name": "request-log", "status": "pending" },
-    { "step": 2, "name": "log-privacy", "status": "pending" },
-    { "step": 3, "name": "journald-ops", "status": "pending" }
-  ]
+    {
+      "step": 0,
+      "name": "common-split",
+      "status": "completed",
+      "started_at": "2026-10-27T00:22:04+0900",
+      "summary": "API 클래스 8개와 테스트 5개를 com.mogum.common.api, SeoulClock과 테스트를 com.mogum.common.time으로 이동하고 참조·문서 갱신; 테스트 전후 342→342개 모두 통과, backend build 성공.",
+      "completed_at": "2026-10-27T00:25:21+0900"
+    },
+    {
+      "step": 1,
+      "name": "request-log",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "log-privacy",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "journald-ops",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-10-27T00:22:04+0900"
 }
