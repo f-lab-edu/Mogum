@@ -23,8 +23,10 @@
 ```jsonc
 // GET /me
 { "email": "someone@gmail.com", "status": "ACTIVE", "waitlistPosition": null, "termsAgreed": true,
-  "role": "USER", "quota": { "usedRatio": 0.6, "resetsAt": "2026-12-15T00:00:00+09:00" } }   // 쿼터는 비율로만
+  "role": "USER", "quota": { "period": "DAILY", "usedRatio": 0.6, "resetsAt": "2026-12-15T00:00:00+09:00" } }   // 쿼터는 비율로만
 ```
+
+`quota` 는 월 · 일일 쿼터([04 §7.1](./04-jobs-and-cost.md)) 중 **남은 금액이 더 적은 쪽 하나**다(같으면 `MONTHLY`). `period` 는 `DAILY`(`resetsAt` = 다음 한국 자정) 또는 `MONTHLY`(`resetsAt` = 다음 달 1일 0시 · 한국 시간). 금액은 싣지 않는다.
 
 `1-auth` 응답 범위는 `email` · `status` · `role` · `termsAgreed` · `waitlistPosition` 이다 — `quota` 는 `10-cost-control` 부터, `waitlistPosition` 은 `13-account-public` 전까지 `null` 이다.
 
@@ -59,7 +61,7 @@
 ### 1.2 에러
 
 ```json
-{ "code": "USER_QUOTA_EXCEEDED", "message": "일일 한도를 모두 사용했습니다", "retryAfterSeconds": 32400 }
+{ "code": "USER_DAILY_QUOTA_EXCEEDED", "message": "오늘 생성 한도를 모두 사용했습니다", "retryAfterSeconds": 32400 }
 ```
 
 포맷보다 **`code` 가 고정돼 있는 것**이 중요하다. RFC 9457 은 쓰지 않는다(`type` URI 를 운영할 클라이언트가 하나뿐이다).
@@ -77,9 +79,10 @@ MVC 표준 예외와 서블릿 컨테이너의 ERROR 디스패치도 원래 HTTP
 | `INVALID_REQUEST` | 4xx(404 · 405 제외) | MVC/컨테이너의 요청 오류 — 잘못된 JSON · 필수 매개변수 누락(400) · 응답 형식 불일치(406) · 지원하지 않는 본문 형식(415) 등. 인증 · CSRF · 도메인 오류는 각 전용 code 사용 |
 | `INTERNAL_ERROR` | 5xx | 처리되지 않은 예외(500) 등 MVC/컨테이너 서버 오류. 도메인 오류는 각 전용 code 사용 |
 | `STRUCTURAL_LIMIT` | 400 | 입력 길이(주제 100 · 목적 200 · 피드백 500자) 위반. 생성 목록의 총 1~40강 위반은 수정 요청 후에도 잘못되면 잡 `LLM_OUTPUT_INVALID`([03 §2](./03-generation.md)) |
-| `USER_QUOTA_EXCEEDED` | 429 | 일일 생성 비용 한도 · `Retry-After` = 한국 시간 자정까지 |
+| `USER_MONTHLY_QUOTA_EXCEEDED` | 429 | 월 생성 비용 한도(이번 달) · `Retry-After` = 다음 달 1일 0시(한국 시간)까지 |
+| `USER_DAILY_QUOTA_EXCEEDED` | 429 | 일일 생성 비용 한도 · `Retry-After` = 한국 시간 자정까지 |
 | `ACTIVE_JOB_LIMIT` | 429 | 진행 중 생성이 이미 2개. 하나 끝나면 풀린다 |
-| `GLOBAL_BUDGET_EXHAUSTED` | 503 | 전역 킬스위치 · `Retry-After` |
+| `GLOBAL_BUDGET_EXHAUSTED` | 503 | 전역 월 킬스위치 · `Retry-After` = 다음 달 1일 0시(한국 시간)까지 |
 | `REGENERATION_LIMIT` | 409 | 이 커리큘럼의 오늘 다시 짜기 3회를 다 썼다 · `Retry-After` = 한국 시간 자정까지 |
 | `CURRICULUM_NOT_DRAFT` · `CURRICULUM_GENERATING` · `CURRICULUM_NOT_ACTIVE` | 409 | 승인 · 다시 짜기 · 학습 상태 충돌. 커리큘럼 삭제는 생성 중에도 허용 |
 | `CURRICULUM_NOT_READY` | 409 | 승인 요청에 검증을 통과해 저장된 강의 목록이 없음 — 단계 상세 생성 실패의 빈 초안 포함. 초기 생성 실패에는 커리큘럼 자체가 없음 |
@@ -109,7 +112,7 @@ MVC 표준 예외와 서블릿 컨테이너의 ERROR 디스패치도 원래 HTTP
 
 ### 1.5 새 잡을 만드는 요청의 공통 검사
 
-`POST /curriculum-requests` · `POST /curriculums/{id}/regenerate` · `POST /lessons/{id}/materials`(신규 · 처음부터 다시 만들기) · `POST /jobs/{id}/retry` 는 적재 전에 **킬스위치 → 쿼터 → 진행 중 2개** 순서로 검사한다([04 §7.1](./04-jobs-and-cost.md)).
+`POST /curriculum-requests` · `POST /curriculums/{id}/regenerate` · `POST /lessons/{id}/materials`(신규 · 처음부터 다시 만들기) · `POST /jobs/{id}/retry` 는 적재 전에 **월 킬스위치 → 월 쿼터 → 일일 쿼터 → 진행 중 2개** 순서로 검사한다([04 §7.1](./04-jobs-and-cost.md)).
 
 ---
 
@@ -244,7 +247,7 @@ GET /jobs/{jobId}          Cache-Control: no-store       — 화면은 2초마�
 
 커리큘럼 삭제 시 연결 잡도 삭제되므로 조회/재시도는 `404` 다. `TOPIC_REJECTED` 잡에 `POST /jobs/{id}/retry` 를 부르면 `409 JOB_NOT_RETRYABLE` — 같은 주제는 다시 돌려도 같은 거절에 돈만 쓴다. `PROVIDER_SPEND_CAP` 은 화면에 버튼이 없을 뿐 API 는 막지 않는다 — 크레딧을 채운 뒤 강의를 다시 열면 그 잡이 재시도된다(§3.1).
 
-위 표의 ✅는 재시도를 받는다는 뜻이고, 누적 몫이 모자라면 재시도된 잡이 첫 호출 등록에서 외부 전송 없이 `JOB_CALL_LIMIT_EXCEEDED` 로 끝난다. 일일 쿼터가 새 날짜에 초기화되어도 작업 전체 호출 상한은 유지된다.
+위 표의 ✅는 재시도를 받는다는 뜻이고, 누적 몫이 모자라면 재시도된 잡이 첫 호출 등록에서 외부 전송 없이 `JOB_CALL_LIMIT_EXCEEDED` 로 끝난다. 쿼터가 새 날짜 · 새 달에 초기화되어도 작업 전체 호출 상한은 유지된다.
 `INPUT_TOO_LARGE` 도 재시도 API · 강의 다시 열기의 자동 재시도에서 `409 JOB_NOT_RETRYABLE` 이다. 이전 단계 산출물과 실패한 다시 짜기의 이전 커리큘럼을 보존한다. 설정 오류는 `LLM_REQUEST_REJECTED` 로 분류해 운영자가 구성 수정 후 재시도할 수 있다.
 
 ---
@@ -287,7 +290,8 @@ GET /system/status          관리자 아니면 404 · 화면은 진입 시 1회
 ```jsonc
 { "asOf": "2026-10-11T05:32:05Z",                // 이 응답의 모든 시간창에 사용하는 DB 기준 시각
   "jobs":        { "queued": 3, "running": 2, "executors": 4, "oldestQueuedSeconds": 40 },
-  "cost":        { "todayTokens": 84000, "todayCost": 620, "killSwitchRemaining": 9380, "unknownCalls": 2 },
+  "cost":        { "todayTokens": 84000, "todayCost": 620, "monthCost": 12400, "monthTarget": 30000,
+                   "killSwitchRemaining": 14600, "unknownCalls": 2 },                    // killSwitchRemaining 은 이번 달 기준
   "reliability": { "rate429": 0.02, "retries": 5, "failureRate": 0.01, "reclaimed": 0,     // 최근 24시간
                    "succeededAttempts": 99, "failedAttempts": 1,                         // failureRate의 분모는 둘의 합
                    "stuckLessons": 0 },                                                    // 실패한 채 남은 강의 — 날짜 제한 없음
@@ -314,7 +318,7 @@ GET /system/status          관리자 아니면 404 · 화면은 진입 시 1회
 
 성공/실패/회수의 저장 원자성 · 삭제 후 연결 해제는 [02 §6.9](./02-domain-data.md)에 따른다. 일반 사용자 API에는 이 운영 이력을 노출하지 않는다.
 `stuckLessons` 는 자료 없이 최근 잡이 `JOB_CALL_LIMIT_EXCEEDED` · `INPUT_TOO_LARGE` 로 실패한 채 남은 강의 수다([04 §4.9](./04-jobs-and-cost.md)). 사용자는 처음부터 다시 만들기(강의당 하루 2번)로 풀 수 있지만, 이 수가 계속 남아 있으면 장애 · 입력 초과가 이어지고 있다는 신호다 — 사용자가 알릴 경로가 없으니 관리자가 여기서 본다.
-`todayCost` 는 확인된 사용량을 설정 단가로 환산한 오늘 합계다. `unknownCalls` 는 날짜 제한 없이 남아 있는 `UNKNOWN` + 시한 지난 `PENDING` 건수로, 오늘 비용에 들어 있지 않은 과금 가능성을 함께 보여 준다. 실제 청구액과의 일치를 뜻하지 않는다.
+`todayCost` · `monthCost` 는 확인된 사용량을 설정 단가로 환산한 오늘 · 이번 달(한국 날짜의 달력 월) 합계이고, `killSwitchRemaining` 은 월 킬스위치 금액에서 `monthCost` 를 뺀 값이다. `monthTarget` 은 LLM 월 목표(설정 — [04 §7](./04-jobs-and-cost.md))다. `unknownCalls` 는 날짜 제한 없이 남아 있는 `UNKNOWN` + 시한 지난 `PENDING` 건수로, 오늘 비용에 들어 있지 않은 과금 가능성을 함께 보여 준다. 실제 청구액과의 일치를 뜻하지 않는다.
 둘 다 `concept_match_logs` 에서 읽고 방향이 반대다([02 §6.4](./02-domain-data.md)). `borderline` 은 임계값 **위** +0.05 안에서 연결한 판정 — 잘못 합쳤을 수 있는 것이다. 들어온 이름 · 정의와 연결된 개념의 정의를 나란히 보고 판단하고, 되돌리기 SQL 에는 `logId` 를 쓴다([02 §5.3](./02-domain-data.md)). `mergeCandidates` 는 이름 다름 분기에서 임계값 **아래** −0.05 안으로 새로 만든 쌍 — 놓친 동의어다. **임계값을 옮길지, 이 쌍만 고칠지**를 같은 자리에서 판단한다. 개념 사전이 사용자별이라 쌍은 늘 같은 사용자의 개념이고, `userId` 는 병합 SQL 의 사용자 락에 쓴다.
 
 ---

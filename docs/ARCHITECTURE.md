@@ -23,7 +23,7 @@
 │   │   │   └── dto/                 # MeResponse — HTTP 요청 · 응답만
 │   │   ├── <도메인>/                 # curriculum · material · concept · review … — account 와 같은 다섯 하위 패키지. MasteryPolicy 등은 domain/
 │   │   ├── job/                     # 적재 · 재시도 · 잡 조회 API · jobs/job_events 네이티브 SQL(repository/) — 같은 다섯 하위 패키지 · generation 참조 금지
-│   │   ├── usage/                   # llm_calls 원장 · 일일 합계(쿼터 · 킬스위치 근거) — 생성과 적재가 함께 쓴다 · 같은 다섯 하위 패키지
+│   │   ├── usage/                   # llm_calls 원장 · 일일 · 월 합계(쿼터 · 킬스위치 근거) — 생성과 적재가 함께 쓴다 · 같은 다섯 하위 패키지
 │   │   ├── generation/              # 생성 유스케이스(잡 I · A · B ①②③ · resolveConcepts) + 유료 호출(LlmClient · EmbeddingClient · GuardedLlmClient · InputBudget) — worker · config 만 참조. 계층이 아니라 용도로 나눈다
 │   │   │   └── llm/                 # OpenAI 어댑터 — OpenAI SDK 는 여기에만
 │   │   └── worker/                  # 수령 루프 · 실행기 N 개 · 단계 실행 — config 만 참조
@@ -92,7 +92,7 @@
 
 ```
 화면 → POST(커리큘럼 · 자료 · 재시도)
-     → job(컨트롤러 → 서비스, @Transactional): 킬스위치 → 비용 쿼터 → 진행 중 2개(사용자 advisory lock) → jobs INSERT → 202 { jobId }
+     → job(컨트롤러 → 서비스, @Transactional): 월 킬스위치 → 월 · 일일 비용 쿼터 → 진행 중 2개(사용자 advisory lock) → jobs INSERT → 202 { jobId }
      → 화면: GET /jobs/{id} 2초 폴링(TanStack Query)
 worker 실행기(빈손일 때만 1개 수령)
      → 단계마다: 짧은 트랜잭션으로 읽기 → LLM 호출(커넥션 없음 · 시도마다 리스 갱신) → 짧은 트랜잭션으로 산출물 저장
