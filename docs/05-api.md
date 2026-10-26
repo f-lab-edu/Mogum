@@ -80,10 +80,10 @@ MVC 표준 예외와 서블릿 컨테이너의 ERROR 디스패치도 원래 HTTP
 - **`message` 는 개발 · 디버깅용이다.** 화면은 `message` 를 띄우지 않고 `code` 로 [06 §2.6 · §15](./06-screens.md) 의 문구를 고른다. 모르는 `code` 는 일반 실패(「불러오지 못했어요.」)로 다룬다.
 - **code 는 `common.ErrorCode` 한 곳**에 HTTP 상태 · 기본 `message` 와 함께 둔다. 도메인 오류는 `ApiException(ErrorCode)` 를 던지고, MVC 표준 예외 · 컨테이너 ERROR 디스패치 · Spring Security 의 401 · 403 도 `common` 의 같은 변환 · 직렬화를 거친다 — 오류 JSON 을 따로 쓰지 않는다(AGENTS 금지 목록 29). enum 에는 구현된 code 만 있다. 아래 표의 code 를 처음 만드는 TASK 가 enum 에 더하고, 표에 없는 code 를 새로 만들면 표에도 행을 더한다.
 - **입력 검증** — 요청 DTO 에 Bean Validation 을 붙이고 컨트롤러의 `@RequestBody` 매개변수에 `@Valid` 를 단다(ArchUnit 이 누락을 막는다).
-    - **사람이 입력하는 칸의 제약에는 `payload = UserInput.class`(`common.UserInput`) 를 붙인다**(예: `@NotBlank(payload = UserInput.class) @Size(max = 100, payload = UserInput.class) String topic`). 화면이 만드는 값(요청 ID · 카드 ID · 버전 · 버튼으로 고른 enum 등)의 제약에는 붙이지 않는다. 사용자 오류인지는 이 표시로만 가르고 제약 종류로 추론하지 않는다 — 같은 `@Size` 라도 화면이 만드는 값이면 화면 버그다.
-    - 위반이 **모두** 표시된 제약이고 모두 아래 `reason` 으로 바뀌면 `400 FIELD_INVALID` + `fields` 다. 표시 없는 위반 · `reason` 으로 바뀌지 않는 위반 · 특정 칸이 없는 객체 단위 위반이 하나라도 섞이면 `400 INVALID_REQUEST` 이고 `fields` 를 싣지 않는다 — 사용자가 칸을 고쳐도 요청이 통과하지 않으므로 칸 안내는 오해를 낳는다. 형식 오류(잘못된 JSON · 타입 불일치 · UUID · enum 값)도 `INVALID_REQUEST` 다.
+    - 위반이 **모두** 칸의 위반이고 모두 아래 `reason` 으로 바뀌면 `400 FIELD_INVALID` + `fields` 다. `reason` 으로 바뀌지 않는 위반이나 특정 칸이 없는 객체 단위 위반이 하나라도 있으면 `400 INVALID_REQUEST` 이고 `fields` 를 싣지 않는다. 형식 오류(잘못된 JSON · 타입 불일치 · UUID · enum 값)도 `INVALID_REQUEST` 다.
+    - **서버는 그 칸이 사람이 입력하는 칸인지 따지지 않는다** — 그건 폼을 가진 화면이 안다. 화면은 지금 폼에 있는 칸이면 그 칸 아래에 문구를 보이고, 폼에 없는 칸(요청 ID · 카드 ID · 버전처럼 화면이 만드는 값)이 하나라도 있으면 화면 버그이므로 일반 실패로 다룬다([06 §15.1](./06-screens.md)).
     - `fields` 의 원소는 `{ field, reason }` 이다. `field` 는 요청 본문의 필드 경로(지금은 최상위 이름 — `"topic"`)다. 같은 원소는 한 번만 싣고 `field` → `reason` 순으로 정렬한다. 한 칸에 위반이 여럿이면 원소도 여럿이다.
-    - `reason` 은 닫힌 목록이다. 지금 값은 `TOO_LONG`(`@Size` 의 `max` 초과) · `REQUIRED`(`@NotBlank` · `@NotNull` 위반) 둘이다. `@Size` 의 `min` 위반은 `TOO_LONG` 이 아니다 — 대응하는 `reason` 이 없으므로 `INVALID_REQUEST` 다. 새 종류의 제약을 사람 칸에 붙이는 TASK 가 `reason` 값(예: 범위 `OUT_OF_RANGE` · 하한 `TOO_SHORT` · 형식 `INVALID_FORMAT`)을 enum 과 이 문단에 함께 더하고, 06 §15.1 에 문구를 더한다. 화면은 모르는 `reason` 을 그 칸 아래 일반 문구로 보여 준다.
+    - `reason` 은 닫힌 목록이다. 지금 값은 `TOO_LONG`(`@Size` 의 `max` 초과) · `REQUIRED`(`@NotBlank` · `@NotNull` 위반) 둘이다. `@Size` 의 `min` 위반은 `TOO_LONG` 이 아니다 — 대응하는 `reason` 이 없으므로 `INVALID_REQUEST` 다. 새 종류의 제약을 쓰는 TASK 가 `reason` 값(예: 범위 `OUT_OF_RANGE` · 하한 `TOO_SHORT` · 형식 `INVALID_FORMAT`)을 enum 과 이 문단에 함께 더하고, 사람이 입력하는 칸이면 06 §15.1 에 문구를 더한다. 화면은 모르는 `reason` 을 그 칸 아래 일반 문구로 보여 준다.
     - 응답에 입력 원문 · 상한 값(`max` 등)을 싣지 않는다 — 화면은 상한을 글자 수 표시로 이미 안다. 필요해지면 원소에 키를 더한다(깨지지 않는 변경).
     - 글자 수는 Java `String.length()` · JS `string.length`(UTF-16 단위)로 센다 — 한글은 1자, 일부 이모지는 2자이며 화면의 글자 수 표시도 같은 방식으로 센다.
 
@@ -96,9 +96,9 @@ MVC 표준 예외와 서블릿 컨테이너의 ERROR 디스패치도 원래 HTTP
 | `RATE_LIMITED` | 429 | 우리 API 레이트리밋 · `Retry-After` |
 | `NOT_FOUND` | 404 | 없거나 **남의 것**(§1.3) |
 | `METHOD_NOT_ALLOWED` | 405 | 해당 경로가 지원하지 않는 HTTP 메서드. `Allow` 헤더 유지 |
-| `INVALID_REQUEST` | 4xx(404 · 405 제외) | MVC/컨테이너의 요청 오류 — 잘못된 JSON · 필수 매개변수 누락(400) · 응답 형식 불일치(406) · 지원하지 않는 본문 형식(415) 등과 `FIELD_INVALID` 가 아닌 입력 검증 위반(400 — 표시 없는 칸 · 섞인 위반). 인증 · CSRF · 도메인 오류는 각 전용 code 사용 |
+| `INVALID_REQUEST` | 4xx(404 · 405 제외) | MVC/컨테이너의 요청 오류 — 잘못된 JSON · 필수 매개변수 누락(400) · 응답 형식 불일치(406) · 지원하지 않는 본문 형식(415) 등과 `reason` 으로 바뀌지 않는 입력 검증 위반(400 — 대응하는 `reason` 이 없는 제약 · 객체 단위 위반). 인증 · CSRF · 도메인 오류는 각 전용 code 사용 |
 | `INTERNAL_ERROR` | 5xx | 처리되지 않은 예외(500) 등 MVC/컨테이너 서버 오류. 도메인 오류는 각 전용 code 사용 |
-| `FIELD_INVALID` | 400 | 사람이 입력하는 칸의 위반 — 길이(주제 100 · 목적 200 · 피드백 500자) 초과 · 필수 칸 비움. `fields` 에 칸과 `reason`(위 입력 검증). 생성 목록의 총 1~40강 위반은 입력 오류가 아니라 수정 요청 후에도 잘못되면 잡 `LLM_OUTPUT_INVALID`([03 §2](./03-generation.md)) |
+| `FIELD_INVALID` | 400 | 요청 본문 칸의 검증 위반 — 길이(주제 100 · 목적 200 · 피드백 500자) 초과 · 필수 칸 비움. `fields` 에 칸과 `reason`(위 입력 검증). 사람이 입력하는 칸인지는 화면이 가른다. 생성 목록의 총 1~40강 위반은 입력 오류가 아니라 수정 요청 후에도 잘못되면 잡 `LLM_OUTPUT_INVALID`([03 §2](./03-generation.md)) |
 | `USER_MONTHLY_QUOTA_EXCEEDED` | 429 | 월 생성 비용 한도(이번 달) · `Retry-After` = 다음 달 1일 0시(한국 시간)까지 |
 | `USER_DAILY_QUOTA_EXCEEDED` | 429 | 일일 생성 비용 한도 · `Retry-After` = 한국 시간 자정까지 |
 | `ACTIVE_JOB_LIMIT` | 429 | 진행 중 생성이 이미 2개. 하나 끝나면 풀린다 |
