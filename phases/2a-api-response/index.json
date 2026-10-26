@@ -57,6 +57,11 @@
       "summary": "ApiErrorCode를 FIELD_INVALID로 바꾸고 FieldViolation·FieldViolationReason 타입과 객체 목록 파싱을 도입; 모르는 reason·code 보존, 추가 키 제외 및 잘못된 원소가 하나라도 있으면 fields 전체 폐기를 TDD로 검증; ADR-074 화면 클라이언트 검증 갱신, 화면 테스트 123개·lint·build 통과.",
       "started_at": "2026-10-26T22:13:05+0900",
       "completed_at": "2026-10-26T22:15:51+0900"
+    },
+    {
+      "step": 7,
+      "name": "sonar-record-array",
+      "status": "pending"
     }
   ],
   "created_at": "2026-10-26T14:16:23+0900",
