@@ -165,7 +165,7 @@ step 하나의 흐름:
 2. **Claude 리뷰** — Codex 가 `completed` 로 끝내면 `claude -p --permission-mode dontAsk` 가 읽기 전용으로 리뷰한다. 볼 수 있는 것은 이 step 시작 커밋 이후의 diff 와 untracked 파일이다. AC 를 다시 돌리고 `approve` / `request_changes` 를 JSON 으로 판정한다. 결과는 `phases/{task}/step{N}-review.json` 에 남는다.
 3. **승인** → 코드(`feat`)와 메타데이터(`chore`)를 나눠 커밋한다.
    **반려** → 지적 사항(findings)을 다음 Codex 시도의 프롬프트에 넣는다. 이전 시도의 변경은 작업 트리에 남긴 채로 고치게 한다. Codex 실패와 리뷰 반려를 합쳐 최대 3회 시도한다.
-   **판정 없음**(리뷰 출력 파싱 실패 · 시간 초과) → Codex 를 다시 돌리지 않고 리뷰만 한 번 더 한다. 그래도 없으면 `error`.
+   **판정 없음**(리뷰 출력 파싱 실패 · 시간 초과) → Codex 를 다시 돌리지 않고 리뷰만 한 번 더 한다. 그래도 없으면 `error`. 리뷰가 사용 한도에 걸린 것은 판정 없음으로 세지 않는다(아래 「사용 한도」).
 
 execute.py가 자동으로 처리하는 것:
 
@@ -173,7 +173,7 @@ execute.py가 자동으로 처리하는 것:
 - 컨텍스트 누적 — 완료된 step의 summary를 다음 step 프롬프트에 전달
 - 자가 교정 — Codex 에러 메시지나 Claude 리뷰 지적을 다음 시도에 피드백. 마지막 리뷰 반려 지적은 뒤이은 다른 실패(status 미갱신 · 시간 초과)에 덮이지 않고 다음 시도와 최종 `error_message` 에 함께 남는다
 - 시간 초과 — Codex · 리뷰 각각 1800초. 넘으면 하네스가 죽지 않고 실패한 시도로 처리한다(Codex 는 다음 시도에 "시간 초과" 를 알린다)
-- 사용 한도 — Codex 출력에서 사용 한도 오류(`usage limit`)를 알아보면 시도로 세지 않고 `blocked` 로 멈춘다. 사유에 오류 문구(다시 쓸 수 있는 시각)와 직전 리뷰 지적을 남긴다 — 한도가 풀린 뒤 `status` 만 `pending` 으로 바꿔 재실행한다
+- 사용 한도 — Codex 출력에서 사용 한도 오류(`usage limit`)를 알아보면 시도로 세지 않고 `blocked` 로 멈춘다. 사유에 오류 문구(다시 쓸 수 있는 시각)와 직전 리뷰 지적을 남긴다 — 한도가 풀린 뒤 `status` 만 `pending` 으로 바꿔 재실행한다. 리뷰(`claude -p`) 출력에서 사용 한도(`usage_limit_reached` · 429)를 알아보면 리뷰를 다시 하지 않고 다시 쓸 수 있는 시각을 찍은 뒤 멈춘다(종료 코드 2 · 상위 `phases/index.json` 은 `blocked`). step 은 `completed` · `completed_at` 없음 그대로라 **index 를 고치지 않고** 한도가 풀린 뒤 재실행하면 리뷰부터 한다 — `pending` 으로 바꾸면 끝난 Codex 를 다시 돌린다
 - 리뷰 전 중단 복구 — `completed` 인데 `completed_at`(리뷰 승인 기록)이 없는 step 은 건너뛰지 않고 다음 실행에서 리뷰부터 다시 한다. Codex 가 `completed_at` 을 쓰면 Codex 가 끝나자마자 지운다
 - 타임스탬프 — started_at, completed_at, failed_at, blocked_at 자동 기록
 
@@ -188,6 +188,7 @@ touch "$(git rev-parse --git-path harness-stop)"
 에러 복구:
 
 - **error 발생 시** — 실패한 step 의 변경은 **커밋하지 않고** 작업 트리에 남는다. `step{N}-review.json` · `step{N}-output.json` 으로 원인을 본다. 그다음 `phases/{task-name}/index.json` 에서 해당 step의 `status` 만 `"pending"` 으로 바꾸고 재실행한다. **`error_message` 는 지우지 않는다** — execute.py 가 재개한 첫 시도의 프롬프트에 넣고 지운다. 남은 변경을 그대로 두면 다음 시도의 리뷰 범위에 포함된다. 버리려면 사용자가 직접 정리한다.
+- **리뷰만 실패한 error**(`error_message` 가 "Claude 리뷰 판정을 얻지 못했다") — Codex 는 끝났다. `pending` 이 아니라 `status` 를 `"completed"` 로 바꾸고 `error_message` · `failed_at` 을 지운 뒤 재실행하면 리뷰부터 한다(`completed_at` 이 없어야 한다). 사유를 지우는 이유: 남기면 리뷰가 반려했을 때 다음 Codex 프롬프트에 리뷰 실패 사유가 "이전 실행에서 멈췄다" 로 들어간다.
 - **blocked 발생 시** — `blocked_reason` 에 적힌 사유를 해결한 뒤(결정은 step 파일 · 문서에 반영한다), `status` 만 `"pending"` 으로 바꾸고 재실행한다. **`blocked_reason` 은 지우지 않는다** — 위와 같이 전달된다.
 - 리뷰 지적이 step 설계 자체의 문제라면(지시가 모호함 · 문서와 충돌) Codex 를 다시 돌리지 말고 step 파일부터 고친다.
 
