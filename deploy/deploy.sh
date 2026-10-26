@@ -127,6 +127,11 @@ if [[ $units_changed == true ]]; then
     systemctl daemon-reload
     systemctl enable --now mogum-backup.timer
 fi
+if ! cmp -s "$release/deploy/journald/mogum.conf" /etc/systemd/journald.conf.d/mogum.conf; then
+    install -d -m 755 /etc/systemd/journald.conf.d
+    install -m 644 "$release/deploy/journald/mogum.conf" /etc/systemd/journald.conf.d/mogum.conf
+    systemctl restart systemd-journald
+fi
 
 cleanup() {
     local kept=1 timestamp name directory image_id active_id previous_id=''

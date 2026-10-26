@@ -581,6 +581,7 @@ U6 는 들어가 봐야 보인다. **사람이 바로 움직여야 하는 일**�
 ### 9.2 로그
 
 앱은 표준 출력에 평문 한 줄씩 내고, Docker journald 드라이버가 서버의 journald 에 넣는다. 보관은 **총 14일과 500MB 중 먼저 닿는 쪽**까지다(ADR-075). 보는 법은 [절차서 「로그 보기」](../deploy/README.md#로그-보기). 중앙 로그 수집은 넣지 않는다([01 §6](./01-overview.md)).
+실제 설정은 `deploy/journald/mogum.conf`의 `Storage=persistent` · `MaxRetentionSec=13day` · `MaxFileSec=1day`(13일 + 파일 회전 1일 = 총 14일) · `SystemMaxUse=500M`이다.
 
 - **구현 위치** — `common.logging.RequestLogFilter`가 필터와 요청 종료 리스너를 맡고 MDC 키는 이 클래스의 `REQUEST_ID` · `USER_ID` 상수다. `SecurityConfiguration`이 같은 인스턴스를 REQUEST/ERROR 필터(순서 `Ordered.HIGHEST_PRECEDENCE`, -2147483648)와 종료 리스너로 등록한다. 요청 속성에만 ID · 시작 시각 · 회원 ID · 응답을 보관하고, ERROR 디스패치까지 끝난 `requestDestroyed`에서 최종 상태로 접근 줄을 남긴다. 각 디스패치와 종료 리스너의 `finally`에서 두 MDC 키를 지운다.
 - **요청 ID 형식** — `UUID.randomUUID()`의 소문자 UUID v4 문자열(하이픈 포함 36자)이다. 클라이언트는 형식에 기대지 않는다.

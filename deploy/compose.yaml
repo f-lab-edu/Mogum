@@ -4,6 +4,8 @@ services:
   caddy:
     image: caddy:2
     restart: always
+    logging:
+      driver: journald
     mem_limit: 128m
     environment:
       API_DOMAIN: ${API_DOMAIN:?API_DOMAIN is required}
@@ -18,6 +20,8 @@ services:
   backend:
     image: ${APP_IMAGE:?APP_IMAGE digest is required}
     restart: always
+    logging:
+      driver: journald
     mem_limit: 1024m
     stop_grace_period: 150s
     environment:
@@ -40,6 +44,9 @@ services:
   postgres:
     image: pgvector/pgvector:pg17
     restart: always
+    logging:
+      driver: journald
+    command: ["postgres", "-c", "log_error_verbosity=terse"]
     mem_limit: 512m
     environment:
       POSTGRES_DB: mogum

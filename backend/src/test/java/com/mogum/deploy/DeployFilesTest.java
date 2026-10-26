@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,6 +58,41 @@ class DeployFilesTest {
         var environment = map(service("backend").get("environment"));
         assertEquals("aws", environment.get("SPRING_PROFILES_ACTIVE"));
         assertEquals("jdbc:postgresql://postgres:5432/mogum", environment.get("DB_URL"));
+    }
+
+    @Test
+    void 세_서비스는_journald에_기록하고_Postgres는_오류_상세를_뺀다() throws Exception {
+        for (var name : services().keySet()) {
+            assertEquals(Map.of("driver", "journald"), map(service(name).get("logging")));
+        }
+        assertEquals(List.of("postgres", "-c", "log_error_verbosity=terse"), service("postgres").get("command"));
+    }
+
+    @Test
+    void 저널은_디스크에_보존하고_파일_회전까지_총_14일과_500MB_이하다() throws Exception {
+        var settings = new HashMap<String, String>();
+        String section = "";
+        for (var raw : Files.readAllLines(DEPLOY.resolve("journald/mogum.conf"))) {
+            var line = raw.strip();
+            if (line.isEmpty() || line.startsWith("#") || line.startsWith(";")) continue;
+            if (line.startsWith("[")) {
+                assertEquals("[Journal]", line);
+                section = line;
+                continue;
+            }
+            assertEquals("[Journal]", section);
+            var parts = line.split("=", 2);
+            assertEquals(2, parts.length);
+            assertNull(settings.put(parts[0].strip(), parts[1].strip()), "중복 설정: " + parts[0]);
+        }
+        assertEquals(Set.of("Storage", "SystemMaxUse", "MaxRetentionSec", "MaxFileSec"), settings.keySet());
+        assertEquals("persistent", settings.get("Storage"));
+        long maximumBytes = journalBytes(settings.get("SystemMaxUse"));
+        assertTrue(maximumBytes > 0 && maximumBytes <= 500L * 1024 * 1024);
+        long retention = journalSeconds(settings.get("MaxRetentionSec"));
+        long fileDuration = journalSeconds(settings.get("MaxFileSec"));
+        assertTrue(retention > 0 && fileDuration > 0, "0은 기간 제한을 끈다");
+        assertTrue(retention + fileDuration <= 14L * 24 * 60 * 60, "파일 회전 기간도 보관 상한에 포함한다");
     }
 
     @Test
@@ -144,7 +180,7 @@ class DeployFilesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"success", "unchanged-units", "changed-unit", "unhealthy", "up-failure", "pull-failure", "first-failure",
+    @ValueSource(strings = {"success", "unchanged-units", "changed-unit", "unchanged-journal", "changed-journal", "unhealthy", "up-failure", "pull-failure", "first-failure",
             "rollback-failure", "link-failure", "invalid-sha", "invalid-reference"})
     @Timeout(20)
     void 배포_실패는_직전으로_복귀하고_성공만_링크와_보존_대상을_바꾼다(String scenario, @TempDir Path root) throws Exception {
@@ -165,11 +201,18 @@ class DeployFilesTest {
         Files.writeString(envFile, "GOOGLE_CLIENT_SECRET=must-never-be-printed\n");
 
         var systemd = Files.createDirectory(root.resolve("systemd"));
-        if (List.of("unchanged-units", "changed-unit").contains(scenario)) {
+        if (List.of("unchanged-units", "changed-unit", "changed-journal").contains(scenario)) {
             for (var unit : List.of("mogum-backup.service", "mogum-backup.timer")) {
                 Files.copy(DEPLOY.resolve("systemd/" + unit), systemd.resolve(unit));
             }
             if (scenario.equals("changed-unit")) Files.writeString(systemd.resolve("mogum-backup.timer"), "# old\n");
+        }
+        var journalDirectory = root.resolve("journald.conf.d");
+        var journalConfig = journalDirectory.resolve("mogum.conf");
+        if (List.of("unchanged-units", "changed-unit", "unchanged-journal", "changed-journal").contains(scenario)) {
+            Files.createDirectory(journalDirectory);
+            Files.copy(DEPLOY.resolve("journald/mogum.conf"), journalConfig);
+            if (scenario.equals("changed-journal")) Files.writeString(journalConfig, "# old\n");
         }
 
         // 실제 서버 경로와 GNU 전용 명령을 임시 경로/명령으로 대체한다. Docker/AWS에는 접속하지 않는다.
@@ -179,6 +222,7 @@ class DeployFilesTest {
                 .replace("/etc/mogum/mogum.env", envFile.toString())
                 .replace("/etc/mogum/caddy", root.resolve("caddy").toString())
                 .replace("/etc/systemd/system", systemd.toString())
+                .replace("/etc/systemd/journald.conf.d", journalDirectory.toString())
                 .replace("health_timeout=180", "health_timeout=1");
         var scriptPath = root.resolve("deploy.sh");
         Files.writeString(scriptPath, script);
@@ -191,9 +235,13 @@ class DeployFilesTest {
                   stat) printf '0:600' ;;
                   aws) printf 'test-login-token\n' ;;
                   systemctl) printf 'systemctl %s\\n' "$*" >> "$TEST_ROOT/commands" ;;
+                  install)
+                    printf 'install %s\\n' "$*" >> "$TEST_ROOT/commands"
+                    /usr/bin/install "$@" ;;
                   curl)
                     active=$(cat "$TEST_ROOT/active" 2>/dev/null || true)
-                    if [[ $SCENARIO == success || $SCENARIO == unchanged-units || $SCENARIO == changed-unit || $SCENARIO == link-failure ||
+                    if [[ $SCENARIO == success || $SCENARIO == unchanged-units || $SCENARIO == changed-unit ||
+                          $SCENARIO == unchanged-journal || $SCENARIO == changed-journal || $SCENARIO == link-failure ||
                           ( $active == "$PREVIOUS_IMAGE" && $SCENARIO != rollback-failure ) ]]; then
                       printf 200
                     else printf 503; fi ;;
@@ -228,7 +276,7 @@ class DeployFilesTest {
                     esac ;;
                 esac
                 """;
-        for (var command : List.of("stat", "aws", "curl", "sleep", "mv", "find", "docker", "systemctl")) {
+        for (var command : List.of("stat", "aws", "curl", "sleep", "mv", "find", "docker", "systemctl", "install")) {
             var path = bin.resolve(command);
             Files.writeString(path, fakeCommand);
             assertTrue(path.toFile().setExecutable(true));
@@ -239,7 +287,7 @@ class DeployFilesTest {
                 "PREVIOUS_IMAGE", previousImage, "PATH", bin + ":" + System.getenv("PATH")));
         var process = builder.start();
         var output = new String(process.getInputStream().readAllBytes());
-        boolean success = List.of("success", "unchanged-units", "changed-unit").contains(scenario);
+        boolean success = List.of("success", "unchanged-units", "changed-unit", "unchanged-journal", "changed-journal").contains(scenario);
         assertEquals(success ? 0 : 1, process.waitFor(), output);
         assertFalse(output.contains("must-never-be-printed"));
         assertFalse(output.contains("test-login-token"));
@@ -253,17 +301,30 @@ class DeployFilesTest {
             assertFalse(commands.contains("image rm previous-id"));
             assertFalse(commands.contains("image rm current-id"));
             assertTrue(output.contains("Deployment healthy"));
-            if (scenario.equals("unchanged-units")) {
-                assertFalse(commands.contains("systemctl"));
+            if (List.of("unchanged-units", "changed-journal").contains(scenario)) {
+                assertFalse(commands.contains("systemctl daemon-reload"));
+                assertFalse(commands.contains("systemctl enable"));
             } else {
                 assertTrue(commands.contains("systemctl daemon-reload\nsystemctl enable --now mogum-backup.timer"), commands);
             }
+            boolean journalChanged = List.of("success", "changed-journal").contains(scenario);
+            assertEquals(journalChanged ? 1 : 0,
+                    commands.lines().filter(line -> line.equals("systemctl restart systemd-journald")).count(), commands);
+            assertEquals(journalChanged ? 1 : 0,
+                    commands.lines().filter(line -> line.startsWith("install -m 644 ")
+                            && line.endsWith(" " + journalConfig)).count(), commands);
+            assertEquals(journalChanged ? 1 : 0,
+                    commands.lines().filter(line -> line.startsWith("install -d ")
+                            && line.endsWith(" " + journalDirectory)).count(), commands);
+            assertEquals(Files.readString(release.resolve("deploy/journald/mogum.conf")), Files.readString(journalConfig));
             for (var unit : List.of("mogum-backup.service", "mogum-backup.timer")) {
                 assertEquals(Files.readString(release.resolve("deploy/systemd/" + unit)),
                         Files.readString(systemd.resolve(unit)));
             }
         } else {
             assertFalse(commands.contains("systemctl"), "헬스 실패나 링크 갱신 실패에서는 설치하지 않는다");
+            assertFalse(Files.exists(journalDirectory), "실패 경로에서는 journald 디렉터리도 만들지 않는다");
+            assertFalse(commands.lines().anyMatch(line -> line.startsWith("install ") && line.contains(journalDirectory.toString())));
             try (var units = Files.list(systemd)) { assertEquals(0, units.count()); }
             assertTrue(Files.exists(oldest), "실패 시에는 릴리스/이미지를 정리하지 않는다");
             assertFalse(commands.contains("image rm"));
@@ -296,6 +357,8 @@ class DeployFilesTest {
         for (var unit : List.of("mogum-backup.service", "mogum-backup.timer")) {
             Files.copy(DEPLOY.resolve("systemd/" + unit), systemd.resolve(unit));
         }
+        var journal = Files.createDirectory(deploy.resolve("journald"));
+        Files.copy(DEPLOY.resolve("journald/mogum.conf"), journal.resolve("mogum.conf"));
         Files.writeString(directory.resolve("app-image.ref"), image + "\n");
         return directory;
     }
@@ -330,5 +393,31 @@ class DeployFilesTest {
         var text = value.toString().toLowerCase();
         assertTrue(text.matches("[0-9]+m"));
         return Long.parseLong(text.substring(0, text.length() - 1));
+    }
+
+    private static long journalSeconds(String value) {
+        var matcher = Pattern.compile("([0-9]+)\\s*([a-z]+)?").matcher(value);
+        assertTrue(matcher.matches(), "기간 값: " + value);
+        long multiplier = switch (matcher.group(2) == null ? "s" : matcher.group(2)) {
+            case "d", "day", "days" -> 24 * 60 * 60;
+            case "h", "hr", "hour", "hours" -> 60 * 60;
+            case "m", "min", "minute", "minutes" -> 60;
+            case "s", "sec", "second", "seconds" -> 1;
+            default -> throw new AssertionError("지원하지 않는 기간 단위: " + value);
+        };
+        return Math.multiplyExact(Long.parseLong(matcher.group(1)), multiplier);
+    }
+
+    private static long journalBytes(String value) {
+        var matcher = Pattern.compile("([0-9]+)\\s*([KMGT]?)").matcher(value);
+        assertTrue(matcher.matches(), "크기 값: " + value);
+        long multiplier = switch (matcher.group(2)) {
+            case "K" -> 1024L;
+            case "M" -> 1024L * 1024;
+            case "G" -> 1024L * 1024 * 1024;
+            case "T" -> 1024L * 1024 * 1024 * 1024;
+            default -> 1;
+        };
+        return Math.multiplyExact(Long.parseLong(matcher.group(1)), multiplier);
     }
 }
