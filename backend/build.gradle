@@ -50,6 +50,8 @@ def fakeGoogleCredentials = [
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
+    // 운영 컨테이너와 같은 UTC로 두어 한국 시간 머신에서도 기본 시간대에 기대는 코드 · 설정을 드러낸다.
+    systemProperty 'user.timezone', 'UTC'
     // 모든 SpringBootTest는 실제 Google 비밀 없이 main 설정을 그대로 읽는다.
     systemProperties fakeGoogleCredentials
 }

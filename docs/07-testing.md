@@ -10,6 +10,7 @@
 ### 1.0 로컬 서버 테스트 실행
 
 - Docker를 실행한 뒤 `cd backend && ./gradlew test`(저장소 루트에서는 `./backend/gradlew -p backend test`)로 전체 서버 테스트를 실행한다. DB 테스트는 Testcontainers가 별도 PostgreSQL을 띄우며, 실제 Google 인증 대신 가짜 설정과 HTTP 서버를 사용한다.
+- Gradle의 모든 `Test` 작업은 `user.timezone=UTC`로 실행한다. 운영 컨테이너와 기본 시간대를 맞춰 한국 시간 머신에서도 기본 시간대에 기대는 코드 · 설정을 드러내며, 요청 로그 테스트는 JVM 기본 시간대 UTC와 로그의 `+09:00`을 함께 확인한다.
 - `./backend/gradlew -p backend imageTest`는 서버 이미지(`mogum-app:image-test`)를 빌드해 기동 · 헬스 · 비루트 · SIGTERM 정상 종료(코드 143)를 확인한다(Docker 필요 · 기본 `test` 제외). `-PappImage=<이미지 이름>`을 주면 빌드 없이 이미 만든 이미지를 검사한다.
 - Gradle `test` 작업은 테스트용 `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` 시스템 속성을 주입한다. VS Code의 Test Runner for Java에서 직접 실행할 때는 Gradle 작업을 거치지 않으므로, 로컬 `.vscode/settings.json`에 같은 값을 지정한다. `.vscode/`는 Git 추적 대상이 아니다. 아래 항목을 기존 설정에 추가한다([VS Code 공식 문서](https://code.visualstudio.com/docs/java/java-testing#_customize-test-configurations)).
 

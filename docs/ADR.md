@@ -451,6 +451,8 @@
 
 - `2b-ops-logging` step 3(2026-10-27): `DeployFilesTest`로 운영 Compose 세 서비스의 journald 드라이버 · Postgres `log_error_verbosity=terse`, 저널의 `Storage=persistent` · `SystemMaxUse=500M` · `MaxRetentionSec=13day` + `MaxFileSec=1day` ≤ 총 14일을 검사했다. 명령 대체 시나리오로 설정 없음/변경 때 설치 · restart 각 1회, 동일 파일 때 생략, 헬스 실패 복귀 · 링크 갱신 실패 때 설치/restart 없음과 기존 systemd 단위 설치 동작을 확인했다. `./backend/gradlew -p backend test` 전체 서버 테스트 **376개 통과**(실패 · 건너뜀 0). **서버에서의 실제 동작은 아직 확인하지 않았다** — 절차서 「운영 확인 목록」의 journald 항목은 미체크로 남긴다.
 
+- `2b-ops-logging` step 4(2026-10-27): 변경 전 실제 HTTP 필터 예외의 Tomcat `Servlet.service() … threw exception` ERROR 줄에 `requestId` · `userId`가 없어 새 테스트가 실패함을 확인했다. 등록을 `config.RequestLogConfiguration`으로 옮겨 순서 · REQUEST/ERROR · 필터/리스너 인스턴스를 유지하고, 예외 디스패치의 MDC를 종료 리스너까지 유지해 컨테이너 ERROR/스택과 500 접근 줄의 같은 ID · 회원 ID, 같은 스레드의 다음 비로그인 요청에 회원 ID 잔류 없음을 확인했다. 테스트 JVM 기본 시간대가 UTC임을 단언한 상태에서 로그 `+09:00`을 확인했고, 지정 AC 테스트 **78개**와 `./backend/gradlew -p backend build`의 전체 서버 테스트 **377개 통과**(실패 · 오류 · 건너뜀 0).
+
 ## 설계 묶음 정리 때 확정한 것 (Q220~Q231)
 
 옛 서사(v1 → v2 → v3)를 위한 장치를 걷어내며 잠정으로 정했던 것을 2026-10-07 확정했다.

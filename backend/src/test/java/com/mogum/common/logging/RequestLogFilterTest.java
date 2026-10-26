@@ -24,7 +24,7 @@ class RequestLogFilterTest {
     }
 
     @Test
-    void 필터_밖으로_나가는_예외는_그대로_던지고_500_한_줄과_MDC_정리를_보장한다(CapturedOutput output) {
+    void 필터_밖_예외는_MDC를_유지하고_요청_종료에서_500_한_줄과_MDC_정리를_보장한다(CapturedOutput output) {
         var request = new MockHttpServletRequest("GET", "/api/failure");
         var response = new MockHttpServletResponse();
         var failure = new ServletException("test failure");
@@ -34,8 +34,8 @@ class RequestLogFilterTest {
                     MDC.put(RequestLogFilter.USER_ID, "42");
                     throw failure;
                 })));
-        assertNull(MDC.get(RequestLogFilter.REQUEST_ID));
-        assertNull(MDC.get(RequestLogFilter.USER_ID));
+        assertEquals(response.getHeader("X-Request-Id"), MDC.get(RequestLogFilter.REQUEST_ID));
+        assertEquals("42", MDC.get(RequestLogFilter.USER_ID));
         filter.requestDestroyed(new ServletRequestEvent(request.getServletContext(), request));
         var lines = output.getOut().lines().filter(line -> line.contains("access method=GET path=/api/failure")).toList();
         assertEquals(1, lines.size());

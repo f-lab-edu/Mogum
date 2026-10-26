@@ -39,14 +39,17 @@ public final class RequestLogFilter implements Filter, ServletRequestListener {
         MDC.remove(USER_ID);
         if (state.userId != null) MDC.put(USER_ID, state.userId);
         response.setHeader(HEADER, state.id);
+        boolean dispatchFailed = false;
         try {
             chain.doFilter(request, response);
         } catch (IOException | ServletException | RuntimeException | Error exception) {
+            dispatchFailed = true;
             state.failed = true;
             throw exception;
         } finally {
             state.userId = MDC.get(USER_ID);
-            clearRequestMdc();
+            // 체인 밖에서 컨테이너가 찍는 ERROR까지 ID를 유지하고 종료 리스너에서 지운다.
+            if (!dispatchFailed) clearRequestMdc();
         }
     }
 

@@ -69,7 +69,7 @@ class DeployFilesTest {
     }
 
     @Test
-    void 저널은_디스크에_보존하고_파일_회전까지_총_14일과_500MB_이하다() throws Exception {
+    void 저널은_디스크에_보존하고_파일_회전까지_총_14일과_500MiB_이하다() throws Exception {
         var settings = new HashMap<String, String>();
         String section = "";
         for (var raw : Files.readAllLines(DEPLOY.resolve("journald/mogum.conf"))) {

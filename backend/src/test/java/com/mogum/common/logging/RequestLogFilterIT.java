@@ -9,6 +9,7 @@ import com.mogum.support.TestSessions;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.Filter;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -40,13 +42,15 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {"server.tomcat.threads.max=1", "server.tomcat.threads.min-spare=1"})
-@Import({RequestLogFilterIT.FailureController.class, RequestLogFilterIT.ErrorDispatchProbe.class})
+@Import({RequestLogFilterIT.FailureController.class, RequestLogFilterIT.ErrorDispatchProbe.class,
+        RequestLogFilterIT.FilterFailure.class})
 @ExtendWith(OutputCaptureExtension.class)
 class RequestLogFilterIT extends PostgresTestConfiguration {
     @Autowired private UserRepository users;
@@ -86,6 +90,22 @@ class RequestLogFilterIT extends PostgresTestConfiguration {
                 .map(value -> value.substring("XSRF-TOKEN=".length(), value.indexOf(';')))
                 .findFirst().orElseThrow();
         assertAccess(send("POST", "/api/me", true, token), 405, "POST", "/api/me", true, output);
+    }
+
+    @Test
+    void 필터_예외의_컨테이너_ERROR에_ID를_남기고_다음_요청에_회원_ID가_남지_않는다(CapturedOutput output) throws Exception {
+        var response = send("GET", "/api/test-request-log-filter-failure", true, null);
+        var failed = assertAccess(response, 500, "GET", "/api/test-request-log-filter-failure", true, output);
+        var errors = output.getOut().lines().filter(line -> line.contains(" ERROR ")
+                && line.contains("Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception")
+                && line.contains("requestId=" + requestId(response))).toList();
+        assertEquals(1, errors.size(), output.getAll());
+        assertTrue(errors.getFirst().contains("userId=" + user.getId()), errors.getFirst());
+        assertTrue(output.getOut().contains("java.lang.RuntimeException: request log filter failure marker"));
+        var next = send("GET", "/api/me", false, null);
+        var anonymous = assertAccess(next, 401, "GET", "/api/me", false, output);
+        assertEquals(thread(failed), thread(anonymous));
+        assertNotEquals(requestId(response), requestId(next));
     }
 
     @Test
@@ -183,6 +203,7 @@ class RequestLogFilterIT extends PostgresTestConfiguration {
         assertTrue(line.contains(" INFO "), line);
         assertTrue(line.contains("access method=" + method + " path=" + path + " status=" + status + " durationMs="), line);
         assertTrue(line.matches(".*durationMs=\\d+$"), line);
+        assertEquals("UTC", TimeZone.getDefault().getID());
         assertTrue(line.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\+09:00 .*"), line);
         if (authenticated) assertTrue(line.contains("userId=" + user.getId()), line);
         else assertFalse(line.contains("userId="), line);
@@ -214,6 +235,24 @@ class RequestLogFilterIT extends PostgresTestConfiguration {
     }
 
     record FailureResponse(String value) { }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class FilterFailure {
+        @Bean
+        FilterRegistrationBean<Filter> filterFailure(
+                @Qualifier("securityFilterChainRegistration") AbstractFilterRegistrationBean<?> security) {
+            Filter failure = (request, response, chain) -> {
+                if ("/api/test-request-log-filter-failure".equals(((HttpServletRequest) request).getRequestURI())) {
+                    throw new RuntimeException("request log filter failure marker");
+                }
+                chain.doFilter(request, response);
+            };
+            var registration = new FilterRegistrationBean<>(failure);
+            registration.setOrder(security.getOrder() + 1);
+            registration.setDispatcherTypes(DispatcherType.REQUEST);
+            return registration;
+        }
+    }
 
     @TestConfiguration(proxyBeanMethods = false)
     static class ErrorDispatchProbe {

@@ -4,14 +4,10 @@ import com.mogum.account.repository.UserRepository;
 import com.mogum.account.service.LoginService;
 import com.mogum.common.api.ApiErrorResponses;
 import com.mogum.common.api.ErrorCode;
-import com.mogum.common.logging.RequestLogFilter;
 import com.mogum.config.WebProperties;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.session.autoconfigure.DefaultCookieSerializerCustomizer;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
-import org.springframework.boot.web.servlet.ServletListenerRegistrationBean;
-import org.springframework.core.Ordered;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -43,20 +39,6 @@ import java.util.List;
 
 @Configuration(proxyBeanMethods = false)
 public class SecurityConfiguration {
-    @Bean
-    public FilterRegistrationBean<RequestLogFilter> requestLogFilter() {
-        var registration = new FilterRegistrationBean<>(new RequestLogFilter());
-        registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
-        registration.setDispatcherTypes(DispatcherType.REQUEST, DispatcherType.ERROR);
-        return registration;
-    }
-
-    @Bean
-    public ServletListenerRegistrationBean<RequestLogFilter> requestLogCompletion(
-            FilterRegistrationBean<RequestLogFilter> requestLogFilter) {
-        return new ServletListenerRegistrationBean<>(requestLogFilter.getFilter());
-    }
-
     @Bean
     public DiscardingOAuth2AuthorizedClients discardedGoogleTokens(ClientRegistrationRepository registrations) {
         var google = registrations.findByRegistrationId("google");
