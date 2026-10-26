@@ -580,7 +580,7 @@ U6 는 들어가 봐야 보인다. **사람이 바로 움직여야 하는 일**�
 
 ### 9.2 로그
 
-앱은 표준 출력에 평문 한 줄씩 내고, Docker journald 드라이버가 서버의 journald 에 넣는다. 보관은 **총 14일과 500MB 중 먼저 닿는 쪽**까지다(ADR-075). 보는 법은 [절차서 「로그 보기」](../deploy/README.md#로그-보기). 중앙 로그 수집은 넣지 않는다([01 §6](./01-overview.md)).
+앱은 표준 출력에 평문 한 줄씩 내고, Docker journald 드라이버가 서버의 journald 에 넣는다. 보관은 **총 14일과 500MiB 중 먼저 닿는 쪽**까지다(ADR-075). 보는 법은 [절차서 「로그 보기」](../deploy/README.md#로그-보기). 중앙 로그 수집은 넣지 않는다([01 §6](./01-overview.md)).
 실제 설정은 `deploy/journald/mogum.conf`의 `Storage=persistent` · `MaxRetentionSec=13day` · `MaxFileSec=1day`(13일 + 파일 회전 1일 = 총 14일) · `SystemMaxUse=500M`이다.
 
 - **구현 위치** — `common.logging.RequestLogFilter`가 필터와 요청 종료 리스너를 맡고 MDC 키는 이 클래스의 `REQUEST_ID` · `USER_ID` 상수다. `SecurityConfiguration`이 같은 인스턴스를 REQUEST/ERROR 필터(순서 `Ordered.HIGHEST_PRECEDENCE`, -2147483648)와 종료 리스너로 등록한다. 요청 속성에만 ID · 시작 시각 · 회원 ID · 응답을 보관하고, ERROR 디스패치까지 끝난 `requestDestroyed`에서 최종 상태로 접근 줄을 남긴다. 각 디스패치와 종료 리스너의 `finally`에서 두 MDC 키를 지운다.
@@ -619,7 +619,6 @@ U6 는 들어가 봐야 보인다. **사람이 바로 움직여야 하는 일**�
     `not_allowed` 거절 외의 실패는 모두 화면의 `login_failed`다. 프레임워크/프로바이더가 전달한 코드로 분류하므로 구별할 수 없는 세부 원인을 추가 추정하지 않는다.
 - **남기지 않는 것** — AGENTS 금지 목록 30. 예외 메시지에 값이 실리는 경로는 설정으로 막는다 — 앱은 PgJDBC `logServerErrorDetail=false`(중복 키 오류의 `Key (…)=(…)` 등), Postgres 서버 로그는 `log_error_verbosity=terse`(`DETAIL` · `HINT` · `QUERY` · `CONTEXT` 를 뺀다 — [PostgreSQL 문서](https://www.postgresql.org/docs/17/runtime-config-logging.html)). 바인드 값은 Postgres 기본값(`log_parameter_max_length_on_error=0`)이라 오류 로그에 실리지 않는다.
     - 앱 설정은 `spring.datasource.hikari.data-source-properties.logServerErrorDetail=false`다. DB URL은 바꾸지 않는다. Boot 4.1.1 BOM의 런타임 의존성은 PgJDBC **42.7.13**(`./backend/gradlew -p backend dependencyInsight --dependency org.postgresql:postgresql --configuration runtimeClasspath`로 확인)이며, 해당 버전 source jar의 `org.postgresql.PGProperty.LOG_SERVER_ERROR_DETAIL`에서 속성 이름과 지원을 확인했다. `UserRepositoryIT`는 실제 중복키 예외 사슬과 전체 캡처 로그에 제약 이름은 있고 표식 subject는 없는지 검사한다. `OAuthLoginHandlerIT` · `RequestValidationIT`도 응답 상태와 요청 ID별 접근 줄을 기다린 뒤 전체 출력에서 매 요청의 고유 표식이 없는지 검사한다.
-    - `2b-ops-logging` step 2(2026-10-27): 위 테스트를 먼저 추가해 로그인 줄 누락 · 중복키 상세 노출 · 405 WARN의 실패를 확인하고 구현했다. `./backend/gradlew -p backend test`로 전체 **372개 통과**(실패 · 건너뜀 0). 기존 로그인 리다이렉트/쿠키/세션 · ArchUnit · 처리되지 않은 예외의 ERROR/스택 테스트도 통과했다. Postgres 서버 로그 설정은 step 3 범위다.
 - **뒤 TASK 가 남길 줄**
     - 잡(`4`) — 적재 · 수령 · 단계 시작/끝 · 종결 · 회수 · 반납 · 펜싱을 `INFO` 한 줄씩(리스 상실 · 펜싱으로 막힌 쓰기는 `WARN`). 수령 루프와 실행기는 잡 하나가 끝날 때 MDC 를 지운다.
     - 외부 호출(`5`) — 시도마다 한 줄: `llm_calls` ID · 종류 · 단계 · 결과 분류(`reason`) · 걸린 시간 · 토큰 수. 프롬프트 · 응답 · 프로바이더 오류 메시지 원문은 남기지 않는다.

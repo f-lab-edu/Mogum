@@ -255,7 +255,7 @@
 환경 변수는 Compose의 `--env-file /etc/mogum/mogum.env`로 읽고 서비스마다 필요한 이름만 전달한다. `API_DOMAIN`은 Caddy에만, Google 비밀은 앱에만, DB 비밀번호는 앱과 Postgres에만 전달한다. `APP_IMAGE`는 `deploy.sh`가 지문 파일을 검증한 뒤 지정한다. DB와 인증서는 이름 있는 볼륨에 보존하며, 고정된 프로젝트 이름과 Caddy 설정 경로 덕분에 릴리스 디렉터리가 바뀌어도 정의가 같은 Postgres와 Caddy는 재생성되지 않는다.
 이 변경을 처음 배포할 때는 세 서비스의 정의가 바뀌어 한 번 다시 만들어진다. 데이터 · 인증서는 볼륨에 남고, 그 직전까지의 json-file 로그는 그때 사라진다.
 
-세 서비스의 로그는 Docker journald 드라이버로 서버 journald에 모은다. `deploy/journald/mogum.conf`를 `/etc/systemd/journald.conf.d/mogum.conf`에 설치하며, `Storage=persistent`로 디렉터리 존재와 무관하게 디스크에 보관한다. 보관 상한은 **총 14일 · 500MB 중 먼저 닿는 쪽**이다: `MaxRetentionSec=13day` + 파일 하나의 최대 기간 `MaxFileSec=1day` = **14일**, 크기는 `SystemMaxUse=500M`이다. 서버 전체 저널(백업 서비스 등)에도 적용된다. 헬스 통과 · `current` 갱신 뒤 파일이 바뀌었을 때만 설치하고 `systemctl restart systemd-journald`한다. systemd 258 미만은 SIGHUP으로 설정을 다시 읽지 못하므로 restart를 사용하며 기존 스트림 연결은 유지된다([journald 설정](https://www.freedesktop.org/software/systemd/man/latest/journald.conf.html) · [서비스 문서](https://www.freedesktop.org/software/systemd/man/latest/systemd-journald.service.html)). Postgres는 `log_error_verbosity=terse`로 실행해 오류의 `DETAIL` · `HINT` · `QUERY` · `CONTEXT`에 이메일 등 실제 값이 남지 않게 한다([Postgres 17 문서](https://www.postgresql.org/docs/17/runtime-config-logging.html)). Caddy 접근 로그는 켜지 않는다.
+세 서비스의 로그는 Docker journald 드라이버로 서버 journald에 모은다. `deploy/journald/mogum.conf`를 `/etc/systemd/journald.conf.d/mogum.conf`에 설치하며, `Storage=persistent`로 디렉터리 존재와 무관하게 디스크에 보관한다. 보관 상한은 **총 14일 · 500MiB 중 먼저 닿는 쪽**이다: `MaxRetentionSec=13day` + 파일 하나의 최대 기간 `MaxFileSec=1day` = **14일**, 크기는 `SystemMaxUse=500M`이다. 서버 전체 저널(백업 서비스 등)에도 적용된다. 헬스 통과 · `current` 갱신 뒤 파일이 바뀌었을 때만 설치하고 `systemctl restart systemd-journald`한다. systemd 258 미만은 SIGHUP으로 설정을 다시 읽지 못하므로 restart를 사용하며 기존 스트림 연결은 유지된다([journald 설정](https://www.freedesktop.org/software/systemd/man/latest/journald.conf.html) · [서비스 문서](https://www.freedesktop.org/software/systemd/man/latest/systemd-journald.service.html)). Postgres는 `log_error_verbosity=terse`로 실행해 오류의 `DETAIL` · `HINT` · `QUERY` · `CONTEXT`에 이메일 등 실제 값이 남지 않게 한다([Postgres 17 문서](https://www.postgresql.org/docs/17/runtime-config-logging.html)). Caddy 접근 로그는 켜지 않는다.
 
 SSM은 릴리스 묶음을 푼 뒤 root로 해당 릴리스의 `deploy/deploy.sh {SHA}`를 실행한다. 스크립트는 다음 순서로 동작한다.
 
@@ -528,7 +528,7 @@ systemctl start mogum-backup.timer
 
 ### 백업 실패 확인
 
-현재는 운영자가 systemd 상태와 저널을 확인한다. 별도 로그 파일은 만들지 않고 journald가 파일 회전 기간을 포함해 총 14일 · 500MB 중 먼저 닿는 쪽까지 보관한다([로그 보기](#로그-보기)). 슬랙 알림은 `10-cost-control`에서 연결한다.
+현재는 운영자가 systemd 상태와 저널을 확인한다. 별도 로그 파일은 만들지 않고 journald가 파일 회전 기간을 포함해 총 14일 · 500MiB 중 먼저 닿는 쪽까지 보관한다([로그 보기](#로그-보기)). 슬랙 알림은 `10-cost-control`에서 연결한다.
 
 ```bash
 sudo systemctl status mogum-backup.service mogum-backup.timer
