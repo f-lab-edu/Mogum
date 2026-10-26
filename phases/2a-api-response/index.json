@@ -61,7 +61,10 @@
     {
       "step": 7,
       "name": "sonar-record-array",
-      "status": "pending"
+      "status": "completed",
+      "summary": "SizedValues를 final 필드·동일 @Size 제약과 생성자 순서를 유지한 static final class로 변경; 테스트 입력·기대 JSON·단언과 운영 코드 변경 없음, backend/src에 배열 컴포넌트 record 없음 확인, 전체 서버 테스트 342개 통과.",
+      "started_at": "2026-10-26T23:27:28+0900",
+      "completed_at": "2026-10-26T23:29:58+0900"
     }
   ],
   "created_at": "2026-10-26T14:16:23+0900",
