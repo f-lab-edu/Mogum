@@ -1,0 +1,10 @@
+{
+  "project": "Mogum",
+  "phase": "2a-api-response",
+  "steps": [
+    { "step": 0, "name": "error-path", "status": "pending" },
+    { "step": 1, "name": "success-envelope", "status": "pending" },
+    { "step": 2, "name": "request-validation", "status": "pending" },
+    { "step": 3, "name": "api-client", "status": "pending" }
+  ]
+}
