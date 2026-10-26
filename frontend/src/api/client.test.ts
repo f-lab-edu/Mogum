@@ -92,14 +92,59 @@ test.each([
   expect(fetch).toHaveBeenCalledTimes(1)
 })
 
-test('오류 본문의 retryAfterSeconds와 fields를 보존한다', async () => {
-  const body = { code: 'STRUCTURAL_LIMIT', message: '서버 문구', retryAfterSeconds: 0, fields: ['topic', 'purpose'] }
+test('FIELD_INVALID와 retryAfterSeconds, 모르는 reason을 포함한 fields를 보존한다', async () => {
+  const body = {
+    code: 'FIELD_INVALID',
+    message: '서버 문구',
+    retryAfterSeconds: 0,
+    fields: [
+      { field: 'topic', reason: 'TOO_LONG' },
+      { field: 'purpose', reason: 'REQUIRED' },
+      { field: 'topic', reason: 'FUTURE_REASON' },
+    ],
+  }
   vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(body), { status: 400 }))
   await expect(apiFetch('/example')).rejects.toMatchObject({ status: 400, ...body })
 })
 
+test('fields 원소의 모르는 키는 무시하고 field와 reason만 옮긴다', async () => {
+  const fields = [{ field: 'topic', reason: 'TOO_LONG', futureKey: { value: 100 } }]
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 'FIELD_INVALID', message: '서버 문구', fields }), { status: 400 }))
+  const error = await apiFetch('/example').catch((error: unknown) => error)
+  expect(error).toBeInstanceOf(ApiError)
+  expect(error).toHaveProperty('fields', [{ field: 'topic', reason: 'TOO_LONG' }])
+})
+
+test('빈 fields 배열을 보존한다', async () => {
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 'FIELD_INVALID', message: '서버 문구', fields: [] }), { status: 400 }))
+  await expect(apiFetch('/example')).rejects.toMatchObject({ code: 'FIELD_INVALID', fields: [] })
+})
+
 test.each([
   {},
+  { field: 'topic' },
+  { reason: 'TOO_LONG' },
+  { field: 1, reason: 'TOO_LONG' },
+  { field: null, reason: 'TOO_LONG' },
+  { field: 'topic', reason: 1 },
+  { field: 'topic', reason: null },
+  'topic',
+  1,
+  null,
+  true,
+  [],
+])('잘못된 원소가 하나라도 있으면 fields 전체를 버린다: %j', async (invalid) => {
+  const fields = [{ field: 'topic', reason: 'TOO_LONG' }, invalid, { field: 'purpose', reason: 'REQUIRED' }]
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 'FIELD_INVALID', message: '서버 문구', fields }), { status: 400 }))
+  const error = await apiFetch('/example').catch((error: unknown) => error)
+  expect(error).toBeInstanceOf(ApiError)
+  expect(error).toMatchObject({ status: 400, code: 'FIELD_INVALID', message: '서버 문구' })
+  expect(error).toHaveProperty('fields', undefined)
+})
+
+test.each([
+  {},
+  { fields: ['topic', 'purpose'] },
   { retryAfterSeconds: '30', fields: [1, 2] },
   { retryAfterSeconds: null, fields: 'topic' },
   { retryAfterSeconds: {}, fields: ['topic', 1] },

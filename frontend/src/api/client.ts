@@ -4,7 +4,7 @@ export type ApiErrorCode =
   | 'NOT_FOUND'
   | 'METHOD_NOT_ALLOWED'
   | 'INVALID_REQUEST'
-  | 'STRUCTURAL_LIMIT'
+  | 'FIELD_INVALID'
   | 'INTERNAL_ERROR'
   | 'RATE_LIMITED'
   | 'TERMS_REQUIRED'
@@ -12,13 +12,20 @@ export type ApiErrorCode =
   // Preserve unknown server codes while keeping known codes available for completion.
   | (string & Record<never, never>)
 
+export type FieldViolationReason = 'TOO_LONG' | 'REQUIRED' | (string & Record<never, never>)
+
+export interface FieldViolation {
+  field: string
+  reason: FieldViolationReason
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly code: ApiErrorCode,
     message: string,
     public readonly retryAfterSeconds?: number,
-    public readonly fields?: string[],
+    public readonly fields?: FieldViolation[],
   ) {
     super(message)
     this.name = 'ApiError'
@@ -69,8 +76,10 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
       ? body.message : 'Request failed'
     const retryAfterSeconds = isObject(body) && typeof body.retryAfterSeconds === 'number'
       ? body.retryAfterSeconds : undefined
-    const fields = isObject(body) && Array.isArray(body.fields) && body.fields.every((field) => typeof field === 'string')
-      ? body.fields : undefined
+    const fields = isObject(body) && Array.isArray(body.fields) && body.fields.every(
+      (violation): violation is FieldViolation => isObject(violation)
+        && typeof violation.field === 'string' && typeof violation.reason === 'string',
+    ) ? body.fields.map(({ field, reason }) => ({ field, reason })) : undefined
     throw new ApiError(response.status, code, message, retryAfterSeconds, fields)
   }
 
