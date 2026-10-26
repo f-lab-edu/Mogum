@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "log-timezone",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-27T06:53:52+0900",
+      "summary": "Postgres 로그에 log_timezone=Asia/Seoul 추가; deploy.sh는 필수 명령에 timedatectl을 검사하고 헬스 통과/current 갱신 뒤 성공 배포마다 한국 시간대 설정 1회(실패·복귀 경로 미호출); 절차서·ADR-075 검증 기록 갱신, TDD 변경 전 7개 실패 확인 후 DeployFilesTest 22개와 build 전체 377개 통과(실패·오류·건너뜀 0), 컨테이너·앱·Postgres 세션 UTC 유지, 서버 실제 동작 미확인.",
+      "completed_at": "2026-10-27T06:57:39+0900"
     }
   ],
   "created_at": "2026-10-27T00:22:04+0900",
