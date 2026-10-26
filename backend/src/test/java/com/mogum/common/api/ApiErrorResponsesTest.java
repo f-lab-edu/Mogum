@@ -1,4 +1,4 @@
-package com.mogum.common;
+package com.mogum.common.api;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -10,7 +10,7 @@ import org.springframework.test.json.JsonCompareMode;
 import tools.jackson.databind.json.JsonMapper;
 import java.util.List;
 
-import static com.mogum.common.FieldViolation.Reason.*;
+import static com.mogum.common.api.FieldViolation.Reason.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ApiErrorResponsesTest {

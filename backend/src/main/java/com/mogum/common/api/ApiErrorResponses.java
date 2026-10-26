@@ -1,4 +1,4 @@
-package com.mogum.common;
+package com.mogum.common.api;
 
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;

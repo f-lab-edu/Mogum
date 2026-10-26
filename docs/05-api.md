@@ -79,7 +79,7 @@ MVC 표준 예외와 서블릿 컨테이너의 ERROR 디스패치도 원래 HTTP
 
 - **필드** — `code` · `message` 는 늘 있다. `retryAfterSeconds` 는 시간이 지나면 풀리는 오류(아래 표에서 `Retry-After` 가 적힌 code)에만 있고, 같은 값(초)을 `Retry-After` 헤더에도 싣는다. `fields` 는 `FIELD_INVALID` 에만 있고 칸별 위반의 객체 목록이다(`"fields": [{ "field": "topic", "reason": "TOO_LONG" }]` — 아래 입력 검증). 해당하지 않으면 키를 싣지 않는다. 오류 본문은 `data` 로 감싸지 않는다(§1 응답 형식).
 - **`message` 는 개발 · 디버깅용이다.** 화면은 `message` 를 띄우지 않고 `code` 로 [06 §2.6 · §15](./06-screens.md) 의 문구를 고른다. 모르는 `code` 는 일반 실패(「불러오지 못했어요.」)로 다룬다.
-- **code 는 `common.ErrorCode` 한 곳**에 HTTP 상태 · 기본 `message` 와 함께 둔다. 도메인 오류는 `ApiException(ErrorCode)` 를 던지고, MVC 표준 예외 · 컨테이너 ERROR 디스패치 · Spring Security 의 401 · 403 도 `common` 의 같은 변환 · 직렬화를 거친다 — 오류 JSON 을 따로 쓰지 않는다(AGENTS 금지 목록 29). enum 에는 구현된 code 만 있다. 아래 표의 code 를 처음 만드는 TASK 가 enum 에 더하고, 표에 없는 code 를 새로 만들면 표에도 행을 더한다.
+- **code 는 `common.api.ErrorCode` 한 곳**에 HTTP 상태 · 기본 `message` 와 함께 둔다. 도메인 오류는 `ApiException(ErrorCode)` 를 던지고, MVC 표준 예외 · 컨테이너 ERROR 디스패치 · Spring Security 의 401 · 403 도 `common.api` 의 같은 변환 · 직렬화를 거친다 — 오류 JSON 을 따로 쓰지 않는다(AGENTS 금지 목록 29). enum 에는 구현된 code 만 있다. 아래 표의 code 를 처음 만드는 TASK 가 enum 에 더하고, 표에 없는 code 를 새로 만들면 표에도 행을 더한다.
 - **입력 검증** — 요청 DTO 에 Bean Validation 을 붙이고 컨트롤러의 `@RequestBody` 매개변수에 `@Valid` 를 단다(ArchUnit 이 누락을 막는다).
     - 위반이 **모두** 칸의 위반이고 모두 아래 `reason` 으로 바뀌면 `400 FIELD_INVALID` + `fields` 다. `reason` 으로 바뀌지 않는 위반이나 특정 칸이 없는 객체 단위 위반이 하나라도 있으면 `400 INVALID_REQUEST` 이고 `fields` 를 싣지 않는다. 형식 오류(잘못된 JSON · 타입 불일치 · UUID · enum 값)도 `INVALID_REQUEST` 다.
     - **서버는 그 칸이 사람이 입력하는 칸인지 따지지 않는다** — 그건 폼을 가진 화면이 안다. 화면은 지금 폼에 있는 칸이면 그 칸 아래에 문구를 보이고, 폼에 없는 칸(요청 ID · 카드 ID · 버전처럼 화면이 만드는 값)이 하나라도 있으면 화면 버그이므로 일반 실패로 다룬다([06 §15.1](./06-screens.md)).

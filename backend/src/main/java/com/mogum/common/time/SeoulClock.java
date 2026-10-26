@@ -1,4 +1,4 @@
-package com.mogum.common;
+package com.mogum.common.time;
 
 import java.time.Clock;
 import java.time.Instant;

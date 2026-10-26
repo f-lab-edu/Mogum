@@ -1,4 +1,4 @@
-package com.mogum.common;
+package com.mogum.common.api;
 
 import java.util.Objects;
 

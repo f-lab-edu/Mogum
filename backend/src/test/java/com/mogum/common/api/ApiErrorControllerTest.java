@@ -1,4 +1,4 @@
-package com.mogum.common;
+package com.mogum.common.api;
 
 import jakarta.servlet.RequestDispatcher;
 import org.junit.jupiter.api.Test;
