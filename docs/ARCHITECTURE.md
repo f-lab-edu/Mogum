@@ -13,7 +13,7 @@
 │   ├── src/main/java/…/mogum/
 │   │   ├── MogumApplication.java    # 진입점 · @ConfigurationPropertiesScan
 │   │   ├── config/                  # 설정 값(WebProperties · AuthProperties) · 시계 빈 · app.role 별 빈 등록 — worker · generation 을 조립하는 유일한 곳
-│   │   ├── common/                  # 공통 오류 응답(ApiError · ApiExceptionHandler · NotFoundException → 404) · SeoulClock
+│   │   ├── common/                  # 공통 오류 응답(ErrorCode · ApiException · ApiError · ApiErrorResponses · ApiExceptionHandler · ApiErrorController) · SeoulClock
 │   │   ├── auth/                    # Spring Security · 구글 OAuth 로그인 처리 · 세션 → 회원 필터 · API 레이트리밋 필터
 │   │   ├── account/                 # 회원 · 로그인 — 도메인 패키지는 항상 아래 다섯 하위 패키지로 나눈다
 │   │   │   ├── controller/          # MeController
