@@ -2,9 +2,29 @@
   "project": "Mogum",
   "phase": "2a-api-response",
   "steps": [
-    { "step": 0, "name": "error-path", "status": "pending" },
-    { "step": 1, "name": "success-envelope", "status": "pending" },
-    { "step": 2, "name": "request-validation", "status": "pending" },
-    { "step": 3, "name": "api-client", "status": "pending" }
-  ]
+    {
+      "step": 0,
+      "name": "error-path",
+      "status": "completed",
+      "summary": "ErrorCode 6종과 ApiException(ErrorCode[, Integer retryAfterSeconds])을 도입하고 NotFoundException을 제거; ApiErrorResponses.of(code, retryAfterSeconds)·forStatus(status, headers)·write(response, mapper, code, retryAfterSeconds)로 오류 응답을 통일했으며 보안 핸들러는 주입된 ObjectMapper와 ErrorCode로 write를 호출; 전체 서버 테스트 303개 통과.",
+      "started_at": "2026-10-26T14:16:23+0900",
+      "completed_at": "2026-10-26T14:22:04+0900"
+    },
+    {
+      "step": 1,
+      "name": "success-envelope",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "request-validation",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "api-client",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-10-26T14:16:23+0900"
 }
