@@ -23,7 +23,8 @@
     },
     {
       "dir": "2b-ops-logging",
-      "status": "pending"
+      "status": "error",
+      "failed_at": "2026-10-27T00:38:45+0900"
     }
   ]
 }

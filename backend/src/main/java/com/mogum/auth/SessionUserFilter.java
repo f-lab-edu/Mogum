@@ -1,6 +1,8 @@
 package com.mogum.auth;
 
 import com.mogum.account.repository.UserRepository;
+import com.mogum.common.logging.RequestLogFilter;
+import org.slf4j.MDC;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,6 +44,7 @@ public final class SessionUserFilter extends OncePerRequestFilter {
             context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(user, null,
                     List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))));
             SecurityContextHolder.setContext(context);
+            MDC.put(RequestLogFilter.USER_ID, user.getId().toString());
         }
         chain.doFilter(request, response);
     }

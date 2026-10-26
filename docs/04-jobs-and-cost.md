@@ -48,7 +48,7 @@
 |---|---|
 | 루트 `MogumApplication` | 진입점 · `@ConfigurationPropertiesScan` |
 | `config` | 설정 값(`WebProperties` · `AuthProperties`) · 시계 빈 · `app.role` 별 빈 등록(§3.1). `worker` · `generation` 을 조립하는 유일한 곳 |
-| `common` | `common.api` — `ApiResponse`(성공 응답 감싸기) · 공통 오류 응답(`ErrorCode` · `ApiException` · `ApiError` · `FieldViolation` · `ApiErrorResponses` · `ApiExceptionHandler` · `ApiErrorController`). `common.time` — `SeoulClock`. `common.logging` — 요청 ID · 접근 줄 필터 · MDC 키(§9.2) |
+| `common` | `common.api` — `ApiResponse`(성공 응답 감싸기) · 공통 오류 응답(`ErrorCode` · `ApiException` · `ApiError` · `FieldViolation` · `ApiErrorResponses` · `ApiExceptionHandler` · `ApiErrorController`). `common.time` — `SeoulClock`. `common.logging` — `RequestLogFilter`(요청 ID · 접근 줄 · MDC 키 상수, §9.2) |
 | `auth` | Spring Security 설정 · 구글 OAuth 로그인 처리 · 세션 → 회원 필터 |
 | `account` | 회원 엔티티 · 리포지토리 · 로그인 서비스 · `/api/me` |
 | `curriculum` · `material` · `concept` · `review` … | 도메인마다 위 다섯 하위 패키지. `MasteryPolicy` 같은 도메인 규칙은 `domain` 에 둔다 |
@@ -581,6 +581,11 @@ U6 는 들어가 봐야 보인다. **사람이 바로 움직여야 하는 일**�
 ### 9.2 로그
 
 앱은 표준 출력에 평문 한 줄씩 내고, Docker journald 드라이버가 서버의 journald 에 넣는다. 보관은 **총 14일과 500MB 중 먼저 닿는 쪽**까지다(ADR-075). 보는 법은 [절차서 「로그 보기」](../deploy/README.md#로그-보기). 중앙 로그 수집은 넣지 않는다([01 §6](./01-overview.md)).
+
+- **구현 위치** — `common.logging.RequestLogFilter`가 필터와 요청 종료 리스너를 맡고 MDC 키는 이 클래스의 `REQUEST_ID` · `USER_ID` 상수다. `SecurityConfiguration`이 같은 인스턴스를 REQUEST/ERROR 필터(순서 `Ordered.HIGHEST_PRECEDENCE`, -2147483648)와 종료 리스너로 등록한다. 요청 속성에만 ID · 시작 시각 · 회원 ID · 응답을 보관하고, ERROR 디스패치까지 끝난 `requestDestroyed`에서 최종 상태로 접근 줄을 남긴다. 각 디스패치와 종료 리스너의 `finally`에서 두 MDC 키를 지운다.
+- **요청 ID 형식** — `UUID.randomUUID()`의 소문자 UUID v4 문자열(하이픈 포함 36자)이다. 클라이언트는 형식에 기대지 않는다.
+- **설정 근거** — Spring Boot 4.1.1 `spring-boot` jar의 `org/springframework/boot/logging/logback/defaults.xml`은 날짜에 `LOG_DATEFORMAT_PATTERN`, 수준에 `LOG_LEVEL_PATTERN`을 쓰고 `LoggingSystemProperty`가 각각 `logging.pattern.dateformat` · `logging.pattern.level`에 연결한다. 두 키만 `yyyy-MM-dd'T'HH:mm:ss.SSSXXX,Asia/Seoul` · `%5p %X`로 바꿔 기본 콘솔 패턴을 유지한다.
+- **접근 줄 예시**(꾸민 값) — `2026-10-27T09:25:21.123+09:00  INFO userId=42, requestId=123e4567-e89b-42d3-a456-426614174000 1234 --- [mogum] [nio-8080-exec-1] c.mogum.common.logging.RequestLogFilter  : access method=GET path=/api/me status=200 durationMs=12` MDC 키 순서는 정해져 있지 않다 — 줄을 찾거나 검사할 때는 `requestId=<값>`처럼 키별로 본다.
 
 | 수준 | 언제 | 예 |
 |---|---|---|

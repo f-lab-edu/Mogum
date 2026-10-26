@@ -16,7 +16,7 @@
 │   │   ├── common/                  # 주제별 공통 코드
 │   │   │   ├── api/                 # ApiResponse(성공 응답 감싸기) · 공통 오류 응답(ErrorCode · ApiException · ApiError · FieldViolation · ApiErrorResponses · ApiExceptionHandler · ApiErrorController)
 │   │   │   ├── time/                # SeoulClock
-│   │   │   └── logging/             # 요청 ID · 접근 줄(2b-ops-logging step 1 에서 만든다)
+│   │   │   └── logging/             # RequestLogFilter — 요청 ID · 접근 줄 · MDC 키 상수
 │   │   ├── auth/                    # Spring Security · 구글 OAuth 로그인 처리 · 세션 → 회원 필터 · API 레이트리밋 필터
 │   │   ├── account/                 # 회원 · 로그인 — 도메인 패키지는 항상 아래 다섯 하위 패키지로 나눈다
 │   │   │   ├── controller/          # MeController
