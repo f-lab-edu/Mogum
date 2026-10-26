@@ -993,6 +993,39 @@ class TestProgressIndicator:
             time.sleep(0.2)
         assert pi.elapsed > 0
 
+    def test_not_a_tty_writes_start_and_end_lines_only(self, capsys):
+        """로그 파일로 돌리면 \\r 이 줄을 덮어쓰지 못해 프레임마다 줄이 쌓인다(H16).
+        결과 줄(print)과 같은 stdout 에 써야 로그에서 순서가 맞는다."""
+        import io, time
+        print("  ✓ Step 1: api")  # 앞 step 의 결과 줄
+        err = io.StringIO()
+        with patch.object(ex.sys, "stderr", err):
+            with ex.progress_indicator("Step 2: Claude 리뷰"):
+                time.sleep(0.3)
+
+        out = capsys.readouterr().out
+        lines = out.splitlines()
+        assert err.getvalue() == ""
+        assert "\r" not in out
+        assert lines[0] == "  ✓ Step 1: api"
+        assert len(lines) == 3
+        assert all("Step 2: Claude 리뷰" in line for line in lines[1:])
+        assert lines[2].endswith("[0s]")
+
+    def test_tty_animates_frames(self):
+        import io, time
+
+        class FakeTty(io.StringIO):
+            def isatty(self):
+                return True
+
+        err = FakeTty()
+        with patch.object(ex.sys, "stderr", err):
+            with ex.progress_indicator("Step 2: Claude 리뷰"):
+                time.sleep(0.3)
+
+        assert err.getvalue().count("\r◐ Step 2: Claude 리뷰") >= 1
+
 
 # ---------------------------------------------------------------------------
 # main() CLI 파싱 (mocked)

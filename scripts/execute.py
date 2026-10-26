@@ -25,10 +25,22 @@ ROOT = Path(__file__).resolve().parent.parent
 
 @contextlib.contextmanager
 def progress_indicator(label: str):
-    """터미널 진행 표시기. with 문으로 사용하며 .elapsed 로 경과 시간을 읽는다."""
+    """진행 표시기. with 문으로 사용하며 .elapsed 로 경과 시간을 읽는다.
+    터미널이 아니면(로그 파일로 돌린 실행) 프레임 대신 시작 · 끝 줄만 쓴다 — \\r 이 줄을 덮어쓰지 못해 프레임마다 줄이 쌓인다.
+    이 줄은 결과 줄과 같은 stdout 에 flush 해서 쓴다 — stderr 에 쓰면 모였다 나가는 stdout 보다 앞서 찍혀 순서가 뒤섞인다."""
+    t0 = time.monotonic()
+    info = types.SimpleNamespace(elapsed=0.0)
+    if not sys.stderr.isatty():
+        print(f"◐ {label} — 시작", flush=True)
+        try:
+            yield info
+        finally:
+            info.elapsed = time.monotonic() - t0
+            print(f"◐ {label} — 끝 [{int(info.elapsed)}s]", flush=True)
+        return
+
     frames = "◐◓◑◒"
     stop = threading.Event()
-    t0 = time.monotonic()
 
     def _animate():
         idx = 0
@@ -42,7 +54,6 @@ def progress_indicator(label: str):
 
     th = threading.Thread(target=_animate, daemon=True)
     th.start()
-    info = types.SimpleNamespace(elapsed=0.0)
     try:
         yield info
     finally:
