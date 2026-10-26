@@ -6,11 +6,14 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
@@ -28,6 +31,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.Set;
@@ -42,6 +46,7 @@ import static org.junit.jupiter.api.Assertions.*;
         "app.web.origin=https://mogum.example",
         "app.auth.admin-emails=admin@example.com,changed@example.com"
 })
+@ExtendWith(OutputCaptureExtension.class)
 class OAuthLoginHandlerIT extends PostgresTestConfiguration {
     private static final AtomicInteger TOKEN_CALLS = new AtomicInteger();
     private static final AtomicReference<String> CODE_CHALLENGE = new AtomicReference<>();
@@ -50,6 +55,8 @@ class OAuthLoginHandlerIT extends PostgresTestConfiguration {
     private static String sub;
     private static String email;
     private static boolean verified;
+    private static boolean tokenFailure;
+    private static boolean userInfoFailure;
     @Value("${local.server.port}") private int port;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private JdbcIndexedSessionRepository sessions;
@@ -69,6 +76,8 @@ class OAuthLoginHandlerIT extends PostgresTestConfiguration {
         sub = "google-sub-" + UUID.randomUUID();
         email = "admin@example.com";
         verified = true;
+        tokenFailure = false;
+        userInfoFailure = false;
         TOKEN_CALLS.set(0);
         CODE_CHALLENGE.set(null);
         usersBefore = count("users");
@@ -109,7 +118,8 @@ class OAuthLoginHandlerIT extends PostgresTestConfiguration {
     }
 
     @Test
-    void 관리자_콜백은_사용자와_ID만_담은_세션을_만들고_me로_이어진다() throws Exception {
+    void 관리자_콜백은_사용자와_ID만_담은_세션을_만들고_me로_이어진다(CapturedOutput output) throws Exception {
+        sub = "LEAKCHECK-" + UUID.randomUUID();
         var start = start(null);
         var response = callback(start, "ok", null);
         assertRedirect(response, "https://mogum.example/");
@@ -128,6 +138,105 @@ class OAuthLoginHandlerIT extends PostgresTestConfiguration {
         assertEquals(usersBefore + 1, count("users"));
         assertEquals(sessionsBefore + 1, count("spring_session"));
         assertEquals(1, TOKEN_CALLS.get());
+        var line = loginLine(response, output);
+        assertTrue(line.contains(" INFO "), line);
+        assertTrue(line.contains("login result=success userId=" + row.get("id")), line);
+        assertPrivate(output, email, sub, "fake-access-token", "fake-id-token", sessionCookie,
+                start.state(), start.cookie(), verifier(start));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"not-allowed", "unverified", "state", "no-cookie", "corrupt-cookie", "expired-cookie",
+            "cancel", "missing-code", "token", "userinfo", "unknown"})
+    void 로그인_실패는_고정된_분류만_남기고_원문을_남기지_않는다(String condition, CapturedOutput output) throws Exception {
+        String marker = "LEAKCHECK-" + UUID.randomUUID();
+        var start = start(null);
+        HttpResponse<String> response;
+        String reason;
+        String level = "INFO";
+        String result = "login_failed";
+        switch (condition) {
+            case "not-allowed" -> {
+                email = marker + "@example.com";
+                response = callback(start, "ok", null);
+                result = "not_allowed";
+                reason = "not_allowed";
+            }
+            case "unverified" -> {
+                email = marker + "@example.com";
+                verified = false;
+                response = callback(start, "ok", null);
+                reason = "email_not_verified";
+            }
+            case "state", "no-cookie", "corrupt-cookie", "expired-cookie" -> {
+                String cookie = switch (condition) {
+                    case "no-cookie" -> null;
+                    case "corrupt-cookie" -> "MOGUM_OAUTH_REQUEST=" + marker;
+                    case "expired-cookie" -> expiredCookie(start);
+                    default -> start.cookie();
+                };
+                response = get("/auth/google/callback?code=" + marker + "&state="
+                        + (condition.equals("state") ? marker : start.state()), cookie);
+                reason = "authorization_request_not_found";
+            }
+            case "cancel", "unknown" -> {
+                response = get("/auth/google/callback?error=" + (condition.equals("cancel") ? "access_denied" : marker)
+                        + "&error_description=" + marker + "&error_uri=https://example.com/" + marker
+                        + "&state=" + start.state(), start.cookie());
+                reason = condition.equals("cancel") ? "access_denied" : "unknown";
+            }
+            case "missing-code" -> {
+                response = get("/auth/google/callback?state=" + start.state() + "&error_description=" + marker, start.cookie());
+                reason = "invalid_request";
+            }
+            case "token", "userinfo" -> {
+                tokenFailure = condition.equals("token");
+                userInfoFailure = condition.equals("userinfo");
+                sub = marker;
+                response = callback(start, marker, null);
+                reason = tokenFailure ? "invalid_grant" : "invalid_user_info_response";
+                level = "WARN";
+            }
+            default -> throw new AssertionError(condition);
+        }
+        assertFailure(response, result);
+        assertEquals(condition.equals("not-allowed") || condition.equals("unverified")
+                || condition.equals("token") || condition.equals("userinfo") ? 1 : 0, TOKEN_CALLS.get());
+        var line = loginLine(response, output);
+        assertTrue(line.contains(" " + level + " "), line);
+        assertTrue(line.endsWith("login result=" + result + " reason=" + reason), line);
+        assertPrivate(output, marker, email, sub, start.state(), start.cookie(), verifier(start),
+                "fake-access-token", "fake-id-token");
+    }
+
+    private static String loginLine(HttpResponse<?> response, CapturedOutput output) throws InterruptedException {
+        String id = response.headers().firstValue("X-Request-Id").orElseThrow();
+        long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
+        while (output.getOut().lines().noneMatch(line -> line.contains("requestId=" + id)
+                && line.contains("access method=")) && System.nanoTime() < deadline) Thread.sleep(10);
+        assertEquals(1, output.getOut().lines().filter(line -> line.contains("requestId=" + id)
+                && line.contains("access method=")).count(), output.getAll());
+        var lines = output.getOut().lines().filter(line -> line.contains("requestId=" + id)
+                && line.contains("login result=")).toList();
+        assertEquals(1, lines.size(), output.getAll());
+        return lines.getFirst();
+    }
+
+    private static void assertPrivate(CapturedOutput output, String... forbidden) {
+        for (String value : forbidden) assertFalse(output.getAll().contains(value), output.getAll());
+    }
+
+    private static String verifier(Start start) {
+        return new ObjectMapper().readTree(Base64.getUrlDecoder().decode(
+                start.cookie().substring("MOGUM_OAUTH_REQUEST=".length()))).get("code_verifier").asString();
+    }
+
+    private static String expiredCookie(Start start) {
+        var mapper = new ObjectMapper();
+        var saved = (tools.jackson.databind.node.ObjectNode) mapper.readTree(Base64.getUrlDecoder().decode(
+                start.cookie().substring("MOGUM_OAUTH_REQUEST=".length())));
+        saved.put("issuedAt", java.time.Instant.now().minusSeconds(601).getEpochSecond());
+        return "MOGUM_OAUTH_REQUEST=" + Base64.getUrlEncoder().withoutPadding().encodeToString(mapper.writeValueAsBytes(saved));
     }
 
     @Test
@@ -326,9 +435,9 @@ class OAuthLoginHandlerIT extends PostgresTestConfiguration {
                 var form = UriComponentsBuilder.fromUriString("http://localhost/?" + body).build().getQueryParams();
                 String verifier = form.getFirst("code_verifier");
                 if (verifier != null) verifier = java.net.URLDecoder.decode(verifier, StandardCharsets.UTF_8);
-                boolean bad = "bad-token".equals(form.getFirst("code")) || verifier == null
+                boolean bad = tokenFailure || "bad-token".equals(form.getFirst("code")) || verifier == null
                         || CODE_CHALLENGE.get() == null || !CODE_CHALLENGE.get().equals(challenge(verifier));
-                String response = bad ? "{\"error\":\"invalid_grant\"}" : "{\"access_token\":\"fake-access-token\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"id_token\":\"fake-id-token\"}";
+                String response = bad ? "{\"error\":\"invalid_grant\",\"error_description\":\"" + form.getFirst("code") + "\"}" : "{\"access_token\":\"fake-access-token\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"id_token\":\"fake-id-token\"}";
                 byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().set("Content-Type", "application/json");
                 exchange.sendResponseHeaders(bad ? 400 : 200, bytes.length);
@@ -336,10 +445,11 @@ class OAuthLoginHandlerIT extends PostgresTestConfiguration {
                 exchange.close();
             });
             server.createContext("/userinfo", exchange -> {
-                String response = "{\"sub\":\"" + sub + "\",\"email\":\"" + email + "\",\"email_verified\":" + verified + "}";
+                String response = userInfoFailure ? "{\"error\":\"invalid_token\",\"error_description\":\"" + sub + "\"}"
+                        : "{\"sub\":\"" + sub + "\",\"email\":\"" + email + "\",\"email_verified\":" + verified + "}";
                 byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().set("Content-Type", "application/json");
-                exchange.sendResponseHeaders(200, bytes.length);
+                exchange.sendResponseHeaders(userInfoFailure ? 400 : 200, bytes.length);
                 exchange.getResponseBody().write(bytes);
                 exchange.close();
             });

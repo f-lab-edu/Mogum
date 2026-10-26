@@ -597,8 +597,28 @@ U6 는 들어가 봐야 보인다. **사람이 바로 움직여야 하는 일**�
 - **줄 모양** — 시각은 한국 시간 + `+09:00` 이다. 줄마다 MDC 값을 모두 `키=값` 으로 싣는다 — 키를 이름으로 나열하지 않으므로 키를 더해도 패턴을 고치지 않는다. 지금 키는 `requestId`(요청마다 서버가 만든다) · `userId`(로그인한 요청의 `users.id`)이고, `4` 가 `jobId` · `step` 을 더한다. 키 이름은 `common.logging` 의 상수다.
 - **요청 ID · 접근 줄** — `common.logging` 의 필터가 모든 필터의 가장 바깥에서 요청 ID 를 만들어 MDC 와 응답 헤더 `X-Request-Id` 에 싣고([05 §1](./05-api.md)), 요청이 끝나면 `INFO` 한 줄(메서드 · 쿼리를 뺀 경로 · 최종 상태 · 걸린 시간 ms)을 남긴다. 보안 필터보다 바깥이라 401 · 403 도 남고, 컨테이너 ERROR 디스패치를 거친 요청도 한 줄이다. 들어온 `X-Request-Id` 는 쓰지 않는다. `GET /actuator/health` 는 남기지 않는다(배포 · 외부 헬스체크가 자주 부른다). 쿼리를 빼는 이유는 OAuth 콜백의 `code` · `state` 가 쿼리로 오기 때문이다. 오류 `code` 는 싣지 않는다 — 같은 상태에 code 가 여럿인 오류(쿼터 계열)를 만드는 `10` 이 필요하면 더한다. 요청마다 따로 로그를 찍는 코드를 다른 곳에 두지 않는다. Caddy 접근 로그는 켜지 않는다 — 쿼리를 그대로 싣는다.
 - **예외** — 4xx(도메인 오류 · 입력 검증 · 인증 · CSRF · 없는 경로)는 접근 줄만 남기고 스택을 찍지 않는다. 프레임워크가 4xx 에 `WARN` 을 찍으면 끈다. 처리되지 않은 예외만 `ERROR` + 스택이다.
+    - `logging.level.org.springframework.web.servlet.PageNotFound=OFF` — Spring Framework 7.0.9의 `ResponseEntityExceptionHandler.handleHttpRequestMethodNotSupported`가 405에서 예외 메시지를 `WARN`으로 찍으므로 이 로거만 끈다. 401 · CSRF 403 · 404 · 405 · JSON/검증/타입 오류 400은 접근 줄만 남는지 실제 HTTP로 검사한다. `ApiExceptionHandler.unexpected`의 `ERROR` + 전체 스택은 유지한다.
 - **로그인** — 성공은 `userId`, 실패는 화면으로 보내는 분류(`not_allowed` · `login_failed`)와 원인 분류만 남긴다. 사용자 행동(허용 목록 밖 · 이메일 미인증 · 취소 · 요청 쿠키 없음/만료/`state` 불일치)은 `INFO`, 구글과의 통신 실패(토큰 교환 · 사용자 정보 조회)는 `WARN` 이다. 예외 메시지 · 프레임워크 오류 설명 · 요청 주소는 싣지 않는다.
+    - `auth.OAuthLoginHandler`가 성공은 `INFO login result=success userId=<users.id>`, 실패는 `login result=<화면 분류> reason=<원인 분류>` 한 줄을 남긴다. `LoginResult.RejectionReason` 또는 `OAuth2AuthenticationException.getError().getErrorCode()`만 보고 아래 고정 문자열로 바꾼다. 코드 자체도 콜백 입력일 수 있으므로 모르는 코드는 그대로 찍지 않는다. 검사 순서 · 쿠키 · 리다이렉트 · 세션 처리는 그대로다.
+
+    | 원인 분류 | 수준 | 현재 정보로 알 수 있는 범위 |
+    |---|---|---|
+    | `not_allowed` | `INFO` | `NOT_ALLOWED` 거절, 화면도 `not_allowed` |
+    | `email_not_verified` | `INFO` | `EMAIL_NOT_VERIFIED` 거절, 화면은 `login_failed` |
+    | `authorization_request_not_found` | `INFO` | 요청 쿠키 없음/손상/만료 · verifier 오류 · `state` 불일치가 저장소에서 모두 null로 합쳐짐 — 더 나누지 않는다 |
+    | `invalid_state_parameter` | `INFO` | 프레임워크의 state 검증 실패 코드 |
+    | `access_denied` | `INFO` | 사용자 취소 코드 |
+    | `invalid_request` | `INFO` | code/error 누락 등 유효하지 않은 콜백 코드 |
+    | `invalid_user_info` | `INFO` | `GoogleAccountMapper`의 필수 계정 정보 검증 실패 |
+    | `invalid_grant` | `WARN` | 토큰 교환 거절 코드 |
+    | `invalid_token_response` | `WARN` | 토큰 응답/통신 실패 코드 |
+    | `invalid_user_info_response` | `WARN` | 사용자 정보 조회 응답/통신 실패 코드 |
+    | `unknown` | `INFO` | 그 밖의 OAuth 코드 · OAuth 코드가 없는 인증 실패, 원문은 버린다 |
+
+    `not_allowed` 거절 외의 실패는 모두 화면의 `login_failed`다. 프레임워크/프로바이더가 전달한 코드로 분류하므로 구별할 수 없는 세부 원인을 추가 추정하지 않는다.
 - **남기지 않는 것** — AGENTS 금지 목록 30. 예외 메시지에 값이 실리는 경로는 설정으로 막는다 — 앱은 PgJDBC `logServerErrorDetail=false`(중복 키 오류의 `Key (…)=(…)` 등), Postgres 서버 로그는 `log_error_verbosity=terse`(`DETAIL` · `HINT` · `QUERY` · `CONTEXT` 를 뺀다 — [PostgreSQL 문서](https://www.postgresql.org/docs/17/runtime-config-logging.html)). 바인드 값은 Postgres 기본값(`log_parameter_max_length_on_error=0`)이라 오류 로그에 실리지 않는다.
+    - 앱 설정은 `spring.datasource.hikari.data-source-properties.logServerErrorDetail=false`다. DB URL은 바꾸지 않는다. Boot 4.1.1 BOM의 런타임 의존성은 PgJDBC **42.7.13**(`./backend/gradlew -p backend dependencyInsight --dependency org.postgresql:postgresql --configuration runtimeClasspath`로 확인)이며, 해당 버전 source jar의 `org.postgresql.PGProperty.LOG_SERVER_ERROR_DETAIL`에서 속성 이름과 지원을 확인했다. `UserRepositoryIT`는 실제 중복키 예외 사슬과 전체 캡처 로그에 제약 이름은 있고 표식 subject는 없는지 검사한다. `OAuthLoginHandlerIT` · `RequestValidationIT`도 응답 상태와 요청 ID별 접근 줄을 기다린 뒤 전체 출력에서 매 요청의 고유 표식이 없는지 검사한다.
+    - `2b-ops-logging` step 2(2026-10-27): 위 테스트를 먼저 추가해 로그인 줄 누락 · 중복키 상세 노출 · 405 WARN의 실패를 확인하고 구현했다. `./backend/gradlew -p backend test`로 전체 **372개 통과**(실패 · 건너뜀 0). 기존 로그인 리다이렉트/쿠키/세션 · ArchUnit · 처리되지 않은 예외의 ERROR/스택 테스트도 통과했다. Postgres 서버 로그 설정은 step 3 범위다.
 - **뒤 TASK 가 남길 줄**
     - 잡(`4`) — 적재 · 수령 · 단계 시작/끝 · 종결 · 회수 · 반납 · 펜싱을 `INFO` 한 줄씩(리스 상실 · 펜싱으로 막힌 쓰기는 `WARN`). 수령 루프와 실행기는 잡 하나가 끝날 때 MDC 를 지운다.
     - 외부 호출(`5`) — 시도마다 한 줄: `llm_calls` ID · 종류 · 단계 · 결과 분류(`reason`) · 걸린 시간 · 토큰 수. 프롬프트 · 응답 · 프로바이더 오류 메시지 원문은 남기지 않는다.
