@@ -88,9 +88,20 @@ class ApiExceptionHandlerTest {
 
     record ValidationRequest(@NotBlank @Size(max = 5) String topic, @NotNull String purpose) { }
 
-    record SizedValues(@Size(min = 1, max = 1) List<String> list,
-                       @Size(min = 1, max = 1) Map<String, String> map,
-                       @Size(min = 1, max = 1) String[] array) { }
+    static final class SizedValues {
+        @Size(min = 1, max = 1)
+        private final List<String> list;
+        @Size(min = 1, max = 1)
+        private final Map<String, String> map;
+        @Size(min = 1, max = 1)
+        private final String[] array;
+
+        SizedValues(List<String> list, Map<String, String> map, String[] array) {
+            this.list = list;
+            this.map = map;
+            this.array = array;
+        }
+    }
 
     private static FieldError fieldError(String field, String code) {
         return new FieldError("request", field, "private rejected input", false,
