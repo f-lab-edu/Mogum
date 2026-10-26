@@ -41,6 +41,11 @@
       "summary": "변경 전 실제 Tomcat Servlet.service() ERROR 줄에 requestId·userId가 없어 새 테스트 실패 확인; 요청 로그 빈을 config.RequestLogConfiguration으로 이동하고 예외 디스패치 MDC는 requestDestroyed까지 유지해 컨테이너 ERROR/스택·500 접근 줄의 ID와 같은 스레드 후속 비로그인 요청의 잔류 없음을 검증; 테스트 JVM UTC·로그 +09:00 단언, 500MiB 테스트명·관련 문서 갱신; AC 지정 78개 및 build 전체 377개 통과(실패·오류·건너뜀 0), 운영 서버 실제 동작은 미확인.",
       "started_at": "2026-10-27T06:30:00+0900",
       "completed_at": "2026-10-27T06:34:44+0900"
+    },
+    {
+      "step": 5,
+      "name": "log-timezone",
+      "status": "pending"
     }
   ],
   "created_at": "2026-10-27T00:22:04+0900",
