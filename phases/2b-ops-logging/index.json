@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "request-log",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-27T00:25:21+0900",
+      "summary": "common.logging.RequestLogFilter(필터·종료 리스너·MDC REQUEST_ID/USER_ID 상수)를 Ordered.HIGHEST_PRECEDENCE(-2147483648)로 등록하고 UUID v4 요청 ID·접근 줄·회원 MDC와 logging.pattern.dateformat/level(Asia/Seoul·%5p %X)을 적용; backend/src/test/java/com/mogum/common/logging/RequestLogFilterIT.java의 OutputCaptureExtension은 응답 X-Request-Id로 줄을 골라 최대 3초간 10ms 간격으로 기다리며 키별 검사, 실제 접근 줄 예시와 MDC 키 순서 비보장 설명 수정, test --rerun 353개 통과(실패·건너뜀 0).",
+      "completed_at": "2026-10-27T02:26:56+0900"
     },
     {
       "step": 2,
