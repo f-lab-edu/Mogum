@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "field-errors",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T22:08:22+0900",
+      "summary": "STRUCTURAL_LIMIT를 FIELD_INVALID로 대체하고 fields를 FieldViolation(field, reason) 객체 목록으로 변경; REQUIRED·실제 @Size max 초과의 TOO_LONG만 변환하며 하한·미지원 제약·객체 위반 혼합은 INVALID_REQUEST; 공통 응답의 중복 제거·field/reason 이름순 정렬·선택적 fields 생략을 HTTP/단위 테스트로 확인하고 ADR-074 검증 갱신, 전체 서버 테스트 342개 통과.",
+      "completed_at": "2026-10-26T22:13:05+0900"
     },
     {
       "step": 6,
