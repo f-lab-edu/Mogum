@@ -78,7 +78,7 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 
 **API**
 
-29. **성공 응답은 컨트롤러가 `ApiResponse` 로 감싸고, 오류는 `ApiException(ErrorCode)` 를 던진다. 오류 JSON 을 직접 쓰지 않는다** — 보안 핸들러 · 필터도 `common` 의 공통 오류 응답 경로를 쓴다. 새 code 는 `ErrorCode` 와 05 §1.2 표에 함께 넣고, 요청 본문은 `@Valid` 로 검증한다([05 §1 · §1.2](docs/05-api.md) · ADR-074). → 경로가 둘이면 같은 오류가 다른 code · 모양으로 나가 화면의 code 분기(06 §2.6)가 조용히 틀어진다. 자동으로 감싸는 응답 advice 는 오류 · 헬스 · `204` 까지 감싼다. ArchUnit 이 컨트롤러 반환 타입과 `@Valid` 누락을 막는다.
+29. **성공 응답은 컨트롤러가 `ApiResponse` 로 감싸고, 오류는 `ApiException(ErrorCode)` 를 던진다. 오류 JSON 을 직접 쓰지 않는다** — 보안 핸들러 · 필터도 `common` 의 공통 오류 응답 경로(`ApiErrorResponses.write`)를 쓴다. 필터에서 `ApiException` 을 던지면 MVC 핸들러를 거치지 않아 컨테이너 ERROR 디스패치의 `500 INTERNAL_ERROR` 가 된다. 새 code 는 `ErrorCode` 와 05 §1.2 표에 함께 넣고, 요청 본문은 `@Valid` 로 검증한다([05 §1 · §1.2](docs/05-api.md) · ADR-074). → 경로가 둘이면 같은 오류가 다른 code · 모양으로 나가 화면의 code 분기(06 §2.6)가 조용히 틀어진다. 자동으로 감싸는 응답 advice 는 오류 · 헬스 · `204` 까지 감싼다. ArchUnit 이 컨트롤러 반환 타입과 `@Valid` 누락을 막는다.
 
 ## 작업 방식
 
