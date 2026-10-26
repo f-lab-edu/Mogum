@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "api-client",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T14:32:23+0900",
+      "summary": "apiFetch는 성공 {data}의 객체만 반환하고 204·HEAD는 undefined, 잘못된 성공 본문은 원래 HTTP 상태의 INTERNAL_ERROR로 처리; ApiError는 status·code·message와 타입이 맞는 retryAfterSeconds·fields 및 모르는 code를 보존; frontend/src/api/client.ts의 ApiErrorCode 유니온에 백엔드·기존 화면 code를 명시; 로그인 분기는 UNAUTHORIZED, 조회 재시도는 네트워크 실패·INTERNAL_ERROR만 최대 2회이며 다른 code·변경 요청은 재시도하지 않음; 화면 테스트 108개·lint·build 통과.",
+      "completed_at": "2026-10-26T14:35:10+0900"
     }
   ],
   "created_at": "2026-10-26T14:16:23+0900"
