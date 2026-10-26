@@ -41,6 +41,16 @@
       "summary": "ApiError의 인자 3개 보조 생성자를 제거하고 세 테스트 파일의 호출 7곳을 fields=null인 정식 생성자로 변경; 모든 생성자 호출이 인자 4개임을 확인하고 전체 서버 테스트 335개 통과.",
       "started_at": "2026-10-26T15:00:50+0900",
       "completed_at": "2026-10-26T15:02:52+0900"
+    },
+    {
+      "step": 5,
+      "name": "field-errors",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "field-errors-client",
+      "status": "pending"
     }
   ],
   "created_at": "2026-10-26T14:16:23+0900",
