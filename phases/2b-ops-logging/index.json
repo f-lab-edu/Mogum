@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "journald-ops",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-27T02:35:21+0900",
+      "summary": "운영 Compose 세 서비스 journald 드라이버·Postgres log_error_verbosity=terse 적용; deploy/journald/mogum.conf는 Storage=persistent·SystemMaxUse=500M·MaxRetentionSec=13day+MaxFileSec=1day=총 14일로 설정하고 deploy.sh는 헬스 통과/current 갱신 뒤 cmp가 다를 때만 644 설치·journald restart(동일/실패·복귀 경로 생략); 절차서 서버 구성·로그 보기·미체크 운영 확인 항목·롤백/백업 안내와 04 §9.2·ADR-075 갱신; 불변식·명령 대체 시나리오 포함 전체 서버 테스트 376개 통과(실패·건너뜀 0), 서버 실제 동작은 미확인.",
+      "completed_at": "2026-10-27T02:41:54+0900"
     }
   ],
   "created_at": "2026-10-27T00:22:04+0900"
