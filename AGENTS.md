@@ -18,7 +18,7 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 
 **스택** — Java 21 · Spring Boot 4(MVC, 플랫폼 스레드) · Bean Validation(`spring-boot-starter-validation` — 요청 DTO 검증) · Spring Security(구글 OAuth) + Spring Session JDBC · PostgreSQL + pgvector · Spring Data JPA(엔티티 · 리포지토리는 각 도메인 패키지 · Postgres 고유 기능은 `EntityManager` 네이티브 쿼리) · Flyway · OpenAI SDK(`gpt-5.6-terra` · `gpt-5.6-luna` · `text-embedding-3-large`) · FSRS 라이브러리 · ArchUnit · Testcontainers · Micrometer · Lombok(엔티티의 `@Getter` · `@NoArgsConstructor(access = PROTECTED)` 만. `@Data` · `@Setter` · `@EqualsAndHashCode` · `@ToString` · `@Builder` 는 엔티티에 쓰지 않는다 — [ADR-070](docs/ADR.md)).
 **화면** — `frontend/` · React + TypeScript(strict) · Vite · React Router · TanStack Query · Tailwind CSS · react-markdown + KaTeX + mermaid · Vitest + Testing Library. 빌드 결과는 **Vercel** 에 정적 파일로 배포하고 jar 에는 넣지 않는다. 화면 `{도메인}` · API `api.{도메인}`(EC2) — 같은 사이트 · 다른 출처라 쿠키 세션은 그대로 쓰고 CORS · `XSRF-TOKEN` 쿠키 도메인을 맞춘다([05 §1.1](docs/05-api.md)).
-**패키지** — 도메인별 패키지(`account` · `curriculum` · `job` … — 각자 `controller` · `service` · `repository` · `domain` · `dto` 하위 패키지로 항상 나눈다) + `generation`(생성 · 유료 호출) · `worker`(수령 루프 · 실행기) · `config`(설정 · 역할별 빈 등록) · `common`(오류 응답 · 시계) · `auth`(로그인). 단일 Gradle 모듈([ADR-067](docs/ADR.md)).
+**패키지** — 도메인별 패키지(`account` · `curriculum` · `job` … — 각자 `controller` · `service` · `repository` · `domain` · `dto` 하위 패키지로 항상 나눈다) + `generation`(생성 · 유료 호출) · `worker`(수령 루프 · 실행기) · `config`(설정 · 역할별 빈 등록) · `common`(`api` 응답 · 오류 · `time` 시계 · `logging` 요청 ID · 접근 줄 — 주제별 하위 패키지) · `auth`(로그인). 단일 Gradle 모듈([ADR-067](docs/ADR.md)).
 **운영** — EC2 한 대 · 프로세스 하나(`app.role=all` — API + 워커 실행기 `N` 개) · 화면은 Vercel. 필요하면 실행 인자만으로 `api` / `worker` 로 나눈다. 무중단 배포는 공개 후(ADR-061). 정원제 실사용자.
 
 **작업 분담** — 큰 흐름의 기획 · 리뷰는 Claude Code, TASK별 세부 설계 · 구현은 Codex가 한다. `scripts/execute.py` 가 `phases/{task}/step{N}.md` 를 하나씩 `codex exec` 로 구현시키고, step 이 끝날 때마다 Claude 가 읽기 전용으로 리뷰한다. 반려되면 지적 사항이 다음 구현 시도에 그대로 전달되고, 승인된 step 만 커밋된다.
@@ -78,7 +78,11 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 
 **API**
 
-29. **성공 응답은 컨트롤러가 `ApiResponse` 로 감싸고, 오류는 `ApiException(ErrorCode)` 를 던진다. 오류 JSON 을 직접 쓰지 않는다** — 보안 핸들러 · 필터도 `common` 의 공통 오류 응답 경로(`ApiErrorResponses.write`)를 쓴다. 필터에서 `ApiException` 을 던지면 MVC 핸들러를 거치지 않아 컨테이너 ERROR 디스패치의 `500 INTERNAL_ERROR` 가 된다. 새 code 는 `ErrorCode` 와 05 §1.2 표에 함께 넣고, 요청 본문은 `@Valid` 로 검증한다. 칸 제약을 새 종류로 쓰면(`@Min` · `@Pattern` 등) `FieldViolation.Reason` 과 05 §1.2 에 `reason` 을 함께 더한다([05 §1 · §1.2](docs/05-api.md) · ADR-074). → 경로가 둘이면 같은 오류가 다른 code · 모양으로 나가 화면의 code 분기(06 §2.6)가 조용히 틀어진다. `reason` 이 없는 위반은 `INVALID_REQUEST` 로 나가 사용자가 어느 칸을 고칠지 모른다. 자동으로 감싸는 응답 advice 는 오류 · 헬스 · `204` 까지 감싼다. ArchUnit 이 컨트롤러 반환 타입과 `@Valid` 누락을 막는다.
+29. **성공 응답은 컨트롤러가 `ApiResponse` 로 감싸고, 오류는 `ApiException(ErrorCode)` 를 던진다. 오류 JSON 을 직접 쓰지 않는다** — 보안 핸들러 · 필터도 `common.api` 의 공통 오류 응답 경로(`ApiErrorResponses.write`)를 쓴다. 필터에서 `ApiException` 을 던지면 MVC 핸들러를 거치지 않아 컨테이너 ERROR 디스패치의 `500 INTERNAL_ERROR` 가 된다. 새 code 는 `ErrorCode` 와 05 §1.2 표에 함께 넣고, 요청 본문은 `@Valid` 로 검증한다. 칸 제약을 새 종류로 쓰면(`@Min` · `@Pattern` 등) `FieldViolation.Reason` 과 05 §1.2 에 `reason` 을 함께 더한다([05 §1 · §1.2](docs/05-api.md) · ADR-074). → 경로가 둘이면 같은 오류가 다른 code · 모양으로 나가 화면의 code 분기(06 §2.6)가 조용히 틀어진다. `reason` 이 없는 위반은 `INVALID_REQUEST` 로 나가 사용자가 어느 칸을 고칠지 모른다. 자동으로 감싸는 응답 advice 는 오류 · 헬스 · `204` 까지 감싼다. ArchUnit 이 컨트롤러 반환 타입과 `@Valid` 누락을 막는다.
+
+**로그**
+
+30. **로그는 평문 한 줄 + MDC 로 표준 출력에만 낸다. 비밀 · 토큰 · 쿠키 · 세션 ID · CSRF 토큰 · OAuth `code`/`state`/verifier · 이메일 · IP · 요청/응답 본문 · 사용자 입력 · 생성 원문 · 프롬프트 · 프로바이더 응답 원문을 남기지 않는다** — 회원은 내부 ID(`userId`)로만 남긴다. 요청 ID 와 접근 줄은 `common.logging` 의 필터 한 곳이 만들고, 다른 코드는 요청마다 로그를 따로 찍지 않는다. MDC 에 키를 넣은 작업(요청 · 잡)은 끝날 때 지운다. 4xx 는 접근 줄만 남기고, 처리되지 않은 예외만 `ERROR` + 스택이다. 메트릭 태그에도 회원 ID · 요청 ID · 잡 ID · 원문을 넣지 않는다([04 §9 · §9.2](docs/04-jobs-and-cost.md) · ADR-075). → 로그는 서버에 14일 남고 탈퇴해도 지우지 않는다 — 원문이 들어가면 개인정보처리방침에 적은 범위를 넘는다. 스레드를 재사용하므로 MDC 를 지우지 않으면 다음 요청 · 잡의 줄에 앞 사람의 ID 가 붙는다. 예외 메시지 · 프레임워크 로그에는 입력값이 섞이기 쉽다(JSON 파싱 오류 · DB 오류 상세) — 입력을 받거나 예외를 만드는 새 경로는 표식 문자열을 넣은 테스트로 로그에 남지 않는지 확인한다. 마스킹(정규식으로 가리기)으로 대신하지 않는다 — 새 형식을 놓친다.
 
 ## 작업 방식
 

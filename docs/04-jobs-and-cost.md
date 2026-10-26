@@ -18,7 +18,7 @@
 | 마이그레이션 | Flyway | Liquibase | — |
 | 화면 | **React SPA**(TypeScript · Vite · React Router · TanStack Query · Tailwind) — 빌드 결과를 **Vercel** 에 정적 파일로. API 는 `api.` 서브도메인의 EC2 — 같은 사이트 · 다른 출처(ADR-060) | Spring Boot `static/` 에 넣어 jar 하나(ADR-007 — 대체) · Vercel rewrites 프록시 · Next.js(Node 서버 별도) · Thymeleaf | 검색 노출(SSR)이 필요해진다 · 화면과 API 를 같은 등록 도메인에 둘 수 없다 |
 | 경계 강제 | **단일 Gradle 모듈 + ArchUnit** | 멀티모듈 | 규칙이 버거워지거나 배포 단위가 갈릴 때 |
-| 관측 | Micrometer · Prometheus · Grafana(**로컬**) · 운영은 관리자 화면 U6 | OpenTelemetry 트레이싱 | 메트릭 + 로그로 *"왜 오래 걸렸나"* 에 답하지 못할 때 |
+| 관측 | Micrometer · Prometheus · Grafana(**로컬**) · 운영은 관리자 화면 U6 + 서버 로그(journald 14일 — §9.2) | OpenTelemetry 트레이싱 | 메트릭 + 로그로 *"왜 오래 걸렸나"* 에 답하지 못할 때 |
 | 부하 · 장애 테스트 | k6 + LLM 스텁 서버 · Testcontainers(Postgres) | 실제 API 부하 | — |
 | 배포 | AWS EC2 한 대 · 앱 프로세스 하나 · 화면은 Vercel · 무중단 배포는 공개 후(ADR-061) | 2대 · 쿠버네티스 | 예산이 늘거나 워커가 API 를 방해할 때 |
 
@@ -42,13 +42,13 @@
 | `domain` | `@Entity` · enum · 값 타입 · 도메인 규칙(`MasteryPolicy` 등). 엔티티는 생성 흐름마다 이름 있는 정적 팩토리로만 만든다 — public 생성자 · `@Builder` 없음, 처음 상태는 팩토리 안에 고정(ADR-071) |
 | `dto` | HTTP 요청 · 응답 타입만 |
 
-`generation` 은 계층이 아니라 용도로 나눈다(`generation.llm` · 잡 종류별 — 해당 TASK 에서 정한다). `auth` · `config` · `common` · `worker` 는 계층 구분이 맞지 않는 기술 코드라 평평하게 둔다. 하위 패키지끼리 참조하므로 클래스와 그 생성자 · 메서드는 `public` 이다.
+`generation` 은 계층이 아니라 용도로 나눈다(`generation.llm` · 잡 종류별 — 해당 TASK 에서 정한다). `auth` · `config` · `worker` 는 계층 구분이 맞지 않는 기술 코드라 평평하게 둔다. `common` 은 계층이 아니라 **주제로 나눈다** — `common.api`(성공 응답 · 공통 오류 응답) · `common.time`(시계) · `common.logging`(요청 ID · 접근 줄 — §9.2). 새 공통 코드는 이 셋 중 맞는 곳에 두고, 맞는 곳이 없을 때만 주제 하위 패키지를 새로 만든다. `common` 바로 아래에는 클래스를 두지 않는다(ADR-075). 하위 패키지끼리 참조하므로 클래스와 그 생성자 · 메서드는 `public` 이다.
 
 | 패키지 | 책임 |
 |---|---|
 | 루트 `MogumApplication` | 진입점 · `@ConfigurationPropertiesScan` |
 | `config` | 설정 값(`WebProperties` · `AuthProperties`) · 시계 빈 · `app.role` 별 빈 등록(§3.1). `worker` · `generation` 을 조립하는 유일한 곳 |
-| `common` | `ApiResponse`(성공 응답 감싸기) · 공통 오류 응답(`ErrorCode` · `ApiException` · `ApiError` · `FieldViolation` · `ApiErrorResponses` · `ApiExceptionHandler` · `ApiErrorController`) · `SeoulClock` |
+| `common` | `common.api` — `ApiResponse`(성공 응답 감싸기) · 공통 오류 응답(`ErrorCode` · `ApiException` · `ApiError` · `FieldViolation` · `ApiErrorResponses` · `ApiExceptionHandler` · `ApiErrorController`). `common.time` — `SeoulClock`. `common.logging` — 요청 ID · 접근 줄 필터 · MDC 키(§9.2) |
 | `auth` | Spring Security 설정 · 구글 OAuth 로그인 처리 · 세션 → 회원 필터 |
 | `account` | 회원 엔티티 · 리포지토리 · 로그인 서비스 · `/api/me` |
 | `curriculum` · `material` · `concept` · `review` … | 도메인마다 위 다섯 하위 패키지. `MasteryPolicy` 같은 도메인 규칙은 `domain` 에 둔다 |
@@ -557,7 +557,8 @@ SELECT count(*) FROM jobs WHERE user_id = :userId AND status IN ('QUEUED', 'RUNN
 | 커넥션 풀 | 활성 · 대기 — §5 규칙이 지켜지는 증거 |
 | 호출 · 생성 | [03 §9](./03-generation.md) |
 
-- **로그 상관은 `jobId`** — 적재 직후와 수령 직후 MDC 에 `jobId` · `step` 을 넣는다. *"왜 오래 걸렸나"* 는 `job.step.duration` 으로 단계를 찾고 `jobId` 로 로그를 긁는다.
+- **로그 상관은 `jobId`** — 적재 직후와 수령 직후 MDC 에 `jobId` · `step` 을 넣는다. *"왜 오래 걸렸나"* 는 `job.step.duration` 으로 단계를 찾고 `jobId` 로 로그를 긁는다. 요청은 `requestId` 로 긁는다 — 로그 규약은 §9.2.
+- **메트릭 이름 · 태그** — 이름은 점으로 잇는 소문자다(`job.step.duration`). 태그 값은 정해진 몇 가지(단계 · 결과 · 이유 · `code`)만 쓰고, 회원 ID · 요청 ID · 잡 ID · 원문은 태그에 넣지 않는다 — 값마다 시계열이 생기고 사용자 정보가 샌다(AGENTS 금지 목록 30). 운영 서버는 메트릭을 모으지 않는다(액추에이터는 헬스만 공개) — 위 표의 메트릭은 로컬 · 용량 측정(`16`)의 Prometheus · Grafana 에서 본다. 수집 의존성(`micrometer-registry-prometheus` 등)은 처음 쓰는 TASK 가 더한다. API 지연은 액추에이터가 기본으로 만드는 `http.server.requests` 다.
 - 운영 서버에는 Prometheus 가 없다 → **U6 는 DB 만 읽는다**(`jobs` · `job_events` · `llm_calls` · `concept_match_logs` · `users`). 현재 작업 상태는 `jobs`, 최근 24시간의 성공/실패/회수는 `job_events`, 외부 호출 재시도 등록 · 429 · 비용 합계는 `llm_calls`이 출처다. 메모리 메트릭을 최근 24시간의 영속 집계로 대신하지 않는다.
 - 실패율은 창 안의 `FAILED / (SUCCEEDED + FAILED)`이며 실패 후 재시도 성공은 두 종결 이벤트로 센다. 회수는 별도 건수다. 분모 0은 NULL로 제공하고 관리자 화면에는 표본 없음으로 표시한다. 모든 집계에 공통 DB 조회 기준 시각을 사용한다([02 §6.9](./02-domain-data.md) · [05 §7](./05-api.md)).
 - 운영 기록은 **주 1회 스냅숏**으로 남긴다 — 포트폴리오의 실사용 증거([01 §8](./01-overview.md)).
@@ -576,6 +577,29 @@ U6 는 들어가 봐야 보인다. **사람이 바로 움직여야 하는 일**�
 - 같은 이벤트는 **하루 한 번** — `alert_logs` 에 `INSERT … ON CONFLICT DO NOTHING` 이 성공했을 때만 보낸다([02 §6.7](./02-domain-data.md)). 프로세스를 나눠도 DB 라 한 번이다.
 - 전송은 잡 · 요청 경로를 막지 않는다 — 짧은 타임아웃(3초) · 실패는 로그와 `alert.send.failure` 만. 알림 실패로 잡이 실패하지 않는다.
 - 웹훅 URL 은 설정(환경 변수)이다. `.env` · 키는 읽거나 출력하지 않는다.
+
+### 9.2 로그
+
+앱은 표준 출력에 평문 한 줄씩 내고, Docker journald 드라이버가 서버의 journald 에 넣는다. 보관은 **총 14일과 500MB 중 먼저 닿는 쪽**까지다(ADR-075). 보는 법은 [절차서 「로그 보기」](../deploy/README.md#로그-보기). 중앙 로그 수집은 넣지 않는다([01 §6](./01-overview.md)).
+
+| 수준 | 언제 | 예 |
+|---|---|---|
+| `ERROR` | 사람이 원인을 봐야 하는 우리 쪽 실패 — 스택과 함께 | 처리되지 않은 예외(5xx) · 결과 저장 실패 · 불변식 위반 |
+| `WARN` | 외부 실패 · 이상 징후 — 시스템은 계속 돈다 | 구글 토큰 교환 실패 · 프로바이더 재시도 소진 · 알림 전송 실패 · 리스 상실 |
+| `INFO` | 흐름 한 줄 | 접근 줄 · 로그인 결과 · 기동/종료 · 잡 적재/수령/종결 |
+| `DEBUG` 이하 | 운영에서 끈다 | — |
+
+- **줄 모양** — 시각은 한국 시간 + `+09:00` 이다. 줄마다 MDC 값을 모두 `키=값` 으로 싣는다 — 키를 이름으로 나열하지 않으므로 키를 더해도 패턴을 고치지 않는다. 지금 키는 `requestId`(요청마다 서버가 만든다) · `userId`(로그인한 요청의 `users.id`)이고, `4` 가 `jobId` · `step` 을 더한다. 키 이름은 `common.logging` 의 상수다.
+- **요청 ID · 접근 줄** — `common.logging` 의 필터가 모든 필터의 가장 바깥에서 요청 ID 를 만들어 MDC 와 응답 헤더 `X-Request-Id` 에 싣고([05 §1](./05-api.md)), 요청이 끝나면 `INFO` 한 줄(메서드 · 쿼리를 뺀 경로 · 최종 상태 · 걸린 시간 ms)을 남긴다. 보안 필터보다 바깥이라 401 · 403 도 남고, 컨테이너 ERROR 디스패치를 거친 요청도 한 줄이다. 들어온 `X-Request-Id` 는 쓰지 않는다. `GET /actuator/health` 는 남기지 않는다(배포 · 외부 헬스체크가 자주 부른다). 쿼리를 빼는 이유는 OAuth 콜백의 `code` · `state` 가 쿼리로 오기 때문이다. 오류 `code` 는 싣지 않는다 — 같은 상태에 code 가 여럿인 오류(쿼터 계열)를 만드는 `10` 이 필요하면 더한다. 요청마다 따로 로그를 찍는 코드를 다른 곳에 두지 않는다. Caddy 접근 로그는 켜지 않는다 — 쿼리를 그대로 싣는다.
+- **예외** — 4xx(도메인 오류 · 입력 검증 · 인증 · CSRF · 없는 경로)는 접근 줄만 남기고 스택을 찍지 않는다. 프레임워크가 4xx 에 `WARN` 을 찍으면 끈다. 처리되지 않은 예외만 `ERROR` + 스택이다.
+- **로그인** — 성공은 `userId`, 실패는 화면으로 보내는 분류(`not_allowed` · `login_failed`)와 원인 분류만 남긴다. 사용자 행동(허용 목록 밖 · 이메일 미인증 · 취소 · 요청 쿠키 없음/만료/`state` 불일치)은 `INFO`, 구글과의 통신 실패(토큰 교환 · 사용자 정보 조회)는 `WARN` 이다. 예외 메시지 · 프레임워크 오류 설명 · 요청 주소는 싣지 않는다.
+- **남기지 않는 것** — AGENTS 금지 목록 30. 예외 메시지에 값이 실리는 경로는 설정으로 막는다 — 앱은 PgJDBC `logServerErrorDetail=false`(중복 키 오류의 `Key (…)=(…)` 등), Postgres 서버 로그는 `log_error_verbosity=terse`(`DETAIL` · `HINT` · `QUERY` · `CONTEXT` 를 뺀다 — [PostgreSQL 문서](https://www.postgresql.org/docs/17/runtime-config-logging.html)). 바인드 값은 Postgres 기본값(`log_parameter_max_length_on_error=0`)이라 오류 로그에 실리지 않는다.
+- **뒤 TASK 가 남길 줄**
+    - 잡(`4`) — 적재 · 수령 · 단계 시작/끝 · 종결 · 회수 · 반납 · 펜싱을 `INFO` 한 줄씩(리스 상실 · 펜싱으로 막힌 쓰기는 `WARN`). 수령 루프와 실행기는 잡 하나가 끝날 때 MDC 를 지운다.
+    - 외부 호출(`5`) — 시도마다 한 줄: `llm_calls` ID · 종류 · 단계 · 결과 분류(`reason`) · 걸린 시간 · 토큰 수. 프롬프트 · 응답 · 프로바이더 오류 메시지 원문은 남기지 않는다.
+    - 알림(`10`) — 슬랙으로 보낸 이벤트도 한 줄 남기고, 전송 실패는 `WARN` 이다.
+- **로그와 슬랙** — 슬랙은 §9.1 의 *"사람이 바로 움직여야 하는 일"* 만 보낸다. `ERROR` 로그가 곧 알림은 아니다 — 로그는 원인을 찾을 때 읽는 기록이고, 바로 움직일 일인지는 이벤트로 정한다.
+- **탈퇴** — 로그는 지우지 않는다. 회원 ID 만 남고 보관 상한으로 사라진다([02 §7](./02-domain-data.md)).
 
 ---
 

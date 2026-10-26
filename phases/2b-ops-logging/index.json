@@ -1,0 +1,10 @@
+{
+  "project": "Mogum",
+  "phase": "2b-ops-logging",
+  "steps": [
+    { "step": 0, "name": "common-split", "status": "pending" },
+    { "step": 1, "name": "request-log", "status": "pending" },
+    { "step": 2, "name": "log-privacy", "status": "pending" },
+    { "step": 3, "name": "journald-ops", "status": "pending" }
+  ]
+}
