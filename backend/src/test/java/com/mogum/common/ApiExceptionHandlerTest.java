@@ -1,6 +1,9 @@
 package com.mogum.common;
 
 import com.mogum.account.controller.MeController;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
@@ -16,10 +19,12 @@ import org.springframework.core.MethodParameter;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -28,37 +33,64 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class ApiExceptionHandlerTest {
     @Test
-    void 길이_위반만이면_넘친_필드_하나를_싣는다() throws Exception {
+    void 길이_위반만이면_넘친_칸과_reason을_싣는다() throws Exception {
+        assertValidationError(validate(new ValidationRequest("private-topic", "학습")), """
+                {"code":"FIELD_INVALID","message":"입력을 확인해 주십시오",
+                 "fields":[{"field":"topic","reason":"TOO_LONG"}]}
+                """);
+    }
+
+    @Test
+    void 필수값_위반과_길이_위반을_함께_싣는다() throws Exception {
+        assertValidationError(validate(new ValidationRequest("private-topic", null)), """
+                {"code":"FIELD_INVALID","message":"입력을 확인해 주십시오",
+                 "fields":[{"field":"purpose","reason":"REQUIRED"},{"field":"topic","reason":"TOO_LONG"}]}
+                """);
+    }
+
+    @Test
+    void 제약_선언을_확인할_수_없는_Size는_fields를_생략한다() throws Exception {
         assertValidationError(List.of(fieldError("topic", "Size")), """
-                {"code":"STRUCTURAL_LIMIT","message":"입력 길이를 확인해 주십시오","fields":["topic"]}
-                """);
-    }
-
-    @Test
-    void 길이_위반_필드는_중복_없이_이름순으로_싣는다() throws Exception {
-        assertValidationError(List.of(fieldError("topic", "Size"), fieldError("purpose", "Size"),
-                fieldError("topic", "Size")), """
-                {"code":"STRUCTURAL_LIMIT","message":"입력 길이를 확인해 주십시오","fields":["purpose","topic"]}
-                """);
-    }
-
-    @Test
-    void 필수값_위반이_섞이면_fields를_생략한다() throws Exception {
-        assertValidationError(List.of(fieldError("topic", "Size"), fieldError("purpose", "NotBlank")), """
-                {"code":"INVALID_REQUEST","message":"요청을 확인할 수 없습니다"}
-                """);
-        assertValidationError(List.of(fieldError("purpose", "NotNull")), """
                 {"code":"INVALID_REQUEST","message":"요청을 확인할 수 없습니다"}
                 """);
     }
 
     @Test
     void 객체_위반이_섞이면_fields를_생략한다() throws Exception {
-        assertValidationError(List.of(fieldError("topic", "Size"),
-                new ObjectError("request", new String[]{"Consistency"}, null, "private constraint message")), """
+        var errors = new java.util.ArrayList<>(validate(new ValidationRequest("private-topic", "학습")));
+        errors.add(new ObjectError("request", new String[]{"Consistency"}, null, "private constraint message"));
+        assertValidationError(errors, """
                 {"code":"INVALID_REQUEST","message":"요청을 확인할 수 없습니다"}
                 """);
     }
+
+    @Test
+    void Size는_문자열뿐_아니라_컬렉션과_맵과_배열의_상한도_확인한다() throws Exception {
+        assertValidationError(validate(new SizedValues(List.of("private", "input"),
+                Map.of("private", "value", "input", "value"), new String[]{"private", "input"})), """
+                {"code":"FIELD_INVALID","message":"입력을 확인해 주십시오","fields":[
+                 {"field":"array","reason":"TOO_LONG"},{"field":"list","reason":"TOO_LONG"},
+                 {"field":"map","reason":"TOO_LONG"}]}
+                """);
+        assertValidationError(validate(new SizedValues(List.of(), Map.of(), new String[]{})), """
+                {"code":"INVALID_REQUEST","message":"요청을 확인할 수 없습니다"}
+                """);
+    }
+
+    private static List<ObjectError> validate(Object target) {
+        var binding = new BeanPropertyBindingResult(target, "request");
+        try (var validator = new LocalValidatorFactoryBean()) {
+            validator.afterPropertiesSet();
+            validator.validate(target, binding);
+        }
+        return binding.getAllErrors();
+    }
+
+    record ValidationRequest(@NotBlank @Size(max = 5) String topic, @NotNull String purpose) { }
+
+    record SizedValues(@Size(min = 1, max = 1) List<String> list,
+                       @Size(min = 1, max = 1) Map<String, String> map,
+                       @Size(min = 1, max = 1) String[] array) { }
 
     private static FieldError fieldError(String field, String code) {
         return new FieldError("request", field, "private rejected input", false,

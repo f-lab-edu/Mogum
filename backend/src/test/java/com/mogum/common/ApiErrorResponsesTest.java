@@ -10,52 +10,70 @@ import org.springframework.test.json.JsonCompareMode;
 import tools.jackson.databind.json.JsonMapper;
 import java.util.List;
 
+import static com.mogum.common.FieldViolation.Reason.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ApiErrorResponsesTest {
     @Test
-    void 구조_상한의_fields는_중복_없이_이름순으로_직렬화한다() {
-        var response = ApiErrorResponses.of(ErrorCode.STRUCTURAL_LIMIT, null,
-                List.of("topic", "purpose", "topic"));
+    void 칸별_위반은_중복_없이_칸과_reason_이름순으로_직렬화한다() {
+        var response = ApiErrorResponses.of(ErrorCode.FIELD_INVALID, null, violations());
         assertEquals(400, response.getStatusCode().value());
         JsonAssert.comparator(JsonCompareMode.STRICT).assertIsMatch("""
-                {"code":"STRUCTURAL_LIMIT","message":"입력 길이를 확인해 주십시오","fields":["purpose","topic"]}
+                {"code":"FIELD_INVALID","message":"입력을 확인해 주십시오","fields":[
+                  {"field":"purpose","reason":"TOO_LONG"},
+                  {"field":"topic","reason":"REQUIRED"},{"field":"topic","reason":"TOO_LONG"}]}
                 """, JsonMapper.builder().build().writeValueAsString(response.getBody()));
     }
 
     @Test
-    void fields가_없거나_구조_상한이_아니면_키를_생략한다() {
-        for (var fields : List.of(List.<String>of(), List.of("topic"))) {
-            var response = ApiErrorResponses.of(ErrorCode.INVALID_REQUEST, null, fields);
+    void 다른_code에_넘긴_fields는_버린다() {
+        for (var code : ErrorCode.values()) {
+            if (code == ErrorCode.FIELD_INVALID) continue;
+            var response = ApiErrorResponses.of(code, null, violations());
             JsonAssert.comparator(JsonCompareMode.STRICT).assertIsMatch("""
-                    {"code":"INVALID_REQUEST","message":"요청을 확인할 수 없습니다"}
-                    """, JsonMapper.builder().build().writeValueAsString(response.getBody()));
+                    {"code":"%s","message":"%s"}
+                    """.formatted(code.name(), code.message()),
+                    JsonMapper.builder().build().writeValueAsString(response.getBody()));
         }
-        for (var fields : java.util.Arrays.asList(null, List.<String>of())) {
-            var response = ApiErrorResponses.of(ErrorCode.STRUCTURAL_LIMIT, null, fields);
+    }
+
+    @Test
+    void fields가_null이나_빈_목록이면_키를_생략한다() {
+        for (var fields : java.util.Arrays.asList(null, List.<FieldViolation>of())) {
+            var response = ApiErrorResponses.of(ErrorCode.FIELD_INVALID, null, fields);
             JsonAssert.comparator(JsonCompareMode.STRICT).assertIsMatch("""
-                    {"code":"STRUCTURAL_LIMIT","message":"입력 길이를 확인해 주십시오"}
+                    {"code":"FIELD_INVALID","message":"입력을 확인해 주십시오"}
                     """, JsonMapper.builder().build().writeValueAsString(response.getBody()));
         }
     }
 
     @Test
     void 서블릿_응답도_fields_규칙을_공유한다() throws Exception {
-        var response = new MockHttpServletResponse();
-        ApiErrorResponses.write(response, JsonMapper.builder().build(), ErrorCode.STRUCTURAL_LIMIT,
-                null, List.of("topic"));
-        assertEquals(400, response.getStatus());
-        assertNull(response.getHeader("Retry-After"));
-        JsonAssert.comparator(JsonCompareMode.STRICT).assertIsMatch("""
-                {"code":"STRUCTURAL_LIMIT","message":"입력 길이를 확인해 주십시오","fields":["topic"]}
-                """, response.getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+        var mapper = JsonMapper.builder().build();
+        for (var code : ErrorCode.values()) {
+            for (var fields : java.util.Arrays.asList(null, List.<FieldViolation>of(), violations())) {
+                var response = new MockHttpServletResponse();
+                ApiErrorResponses.write(response, mapper, code, null, fields);
+                assertEquals(code.status().value(), response.getStatus());
+                assertNull(response.getHeader("Retry-After"));
+                JsonAssert.comparator(JsonCompareMode.STRICT).assertIsMatch(
+                        mapper.writeValueAsString(ApiErrorResponses.of(code, null, fields).getBody()),
+                        response.getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+            }
+        }
+    }
+
+    private static List<FieldViolation> violations() {
+        return List.of(new FieldViolation("topic", TOO_LONG), new FieldViolation("topic", REQUIRED),
+                new FieldViolation("purpose", TOO_LONG), new FieldViolation("topic", TOO_LONG));
     }
 
     @ParameterizedTest
     @CsvSource({
             "UNAUTHORIZED,401,로그인이 필요합니다", "CSRF_INVALID,403,요청을 확인할 수 없습니다",
             "NOT_FOUND,404,찾을 수 없습니다", "METHOD_NOT_ALLOWED,405,지원하지 않는 요청 방식입니다",
-            "INVALID_REQUEST,400,요청을 확인할 수 없습니다", "INTERNAL_ERROR,500,요청을 처리할 수 없습니다"
+            "INVALID_REQUEST,400,요청을 확인할 수 없습니다", "INTERNAL_ERROR,500,요청을 처리할 수 없습니다",
+            "FIELD_INVALID,400,입력을 확인해 주십시오"
     })
     void 도메인_code의_상태와_기본_문구를_쓴다(ErrorCode code, int status, String message) {
         var response = ApiErrorResponses.of(code, null);

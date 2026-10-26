@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.List;
 
 /** MVC와 보안 필터가 공유하는 오류 본문 · 상태 · 헤더 변환. */
@@ -18,7 +19,7 @@ public final class ApiErrorResponses {
         return of(code, retryAfterSeconds, null);
     }
 
-    public static ResponseEntity<ApiError> of(ErrorCode code, Integer retryAfterSeconds, List<String> fields) {
+    public static ResponseEntity<ApiError> of(ErrorCode code, Integer retryAfterSeconds, List<FieldViolation> fields) {
         return create(code.status().value(), HttpHeaders.EMPTY, code, retryAfterSeconds, fields);
     }
 
@@ -37,7 +38,7 @@ public final class ApiErrorResponses {
     }
 
     public static void write(HttpServletResponse response, ObjectMapper mapper,
-                             ErrorCode code, Integer retryAfterSeconds, List<String> fields) throws IOException {
+                             ErrorCode code, Integer retryAfterSeconds, List<FieldViolation> fields) throws IOException {
         var error = of(code, retryAfterSeconds, fields);
         response.setStatus(error.getStatusCode().value());
         error.getHeaders().forEach((name, values) -> {
@@ -48,7 +49,7 @@ public final class ApiErrorResponses {
     }
 
     private static ResponseEntity<ApiError> create(int status, HttpHeaders headers,
-                                                    ErrorCode code, Integer retryAfterSeconds, List<String> fields) {
+                                                    ErrorCode code, Integer retryAfterSeconds, List<FieldViolation> fields) {
         if (retryAfterSeconds != null && retryAfterSeconds <= 0) {
             throw new IllegalArgumentException("retryAfterSeconds must be positive");
         }
@@ -56,8 +57,9 @@ public final class ApiErrorResponses {
         if (retryAfterSeconds != null) {
             response.header(HttpHeaders.RETRY_AFTER, retryAfterSeconds.toString());
         }
-        var structuralFields = code == ErrorCode.STRUCTURAL_LIMIT && fields != null && !fields.isEmpty()
-                ? fields.stream().distinct().sorted().toList() : null;
-        return response.body(new ApiError(code.name(), code.message(), retryAfterSeconds, structuralFields));
+        var violations = code == ErrorCode.FIELD_INVALID && fields != null && !fields.isEmpty()
+                ? fields.stream().distinct().sorted(Comparator.comparing(FieldViolation::field)
+                        .thenComparing(violation -> violation.reason().name())).toList() : null;
+        return response.body(new ApiError(code.name(), code.message(), retryAfterSeconds, violations));
     }
 }

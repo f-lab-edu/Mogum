@@ -8,6 +8,8 @@ import com.mogum.support.TestSessions;
 import jakarta.servlet.http.Cookie;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,7 +85,7 @@ class RequestValidationIT extends PostgresTestConfiguration {
     void 한_칸_초과는_세_키와_해당_필드만_싣는다() throws Exception {
         assertError(post("""
                 {"topic":"private-topic","purpose":"학습"}
-                """), "STRUCTURAL_LIMIT", ",\"fields\":[\"topic\"]", "private-topic");
+                """), "FIELD_INVALID", ",\"fields\":[{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]", "private-topic");
     }
 
     @Test
@@ -91,7 +93,7 @@ class RequestValidationIT extends PostgresTestConfiguration {
         for (int i = 0; i < 3; i++) {
             assertError(post("""
                     {"topic":"private-topic","purpose":"private-purpose"}
-                    """), "STRUCTURAL_LIMIT", ",\"fields\":[\"purpose\",\"topic\"]",
+                    """), "FIELD_INVALID", ",\"fields\":[{\"field\":\"purpose\",\"reason\":\"TOO_LONG\"},{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]",
                     "private-topic", "private-purpose");
         }
     }
@@ -103,7 +105,7 @@ class RequestValidationIT extends PostgresTestConfiguration {
                 """).statusCode());
         assertError(post("""
                 {"topic":"가나다라마바","purpose":"학습"}
-                """), "STRUCTURAL_LIMIT", ",\"fields\":[\"topic\"]", "가나다라마바", "학습");
+                """), "FIELD_INVALID", ",\"fields\":[{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]", "가나다라마바", "학습");
     }
 
     @Test
@@ -113,24 +115,59 @@ class RequestValidationIT extends PostgresTestConfiguration {
                 """).statusCode());
         assertError(post("""
                 {"topic":"😀😀😀","purpose":"학습"}
-                """), "STRUCTURAL_LIMIT", ",\"fields\":[\"topic\"]", "😀😀😀", "학습");
+                """), "FIELD_INVALID", ",\"fields\":[{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]", "😀😀😀", "학습");
     }
 
     @Test
-    void 빈_값은_fields_없는_INVALID_REQUEST다() throws Exception {
-        assertError(post("""
-                {"topic":"","purpose":"private"}
-                """), "INVALID_REQUEST", "", "private");
-        assertError(post("""
-                {"topic":"   ","purpose":"private"}
-                """), "INVALID_REQUEST", "", "private");
+    void 빈_문자열과_공백과_키_누락은_REQUIRED다() throws Exception {
+        for (var body : java.util.List.of(
+                "{\"topic\":\"\",\"purpose\":\"private\"}",
+                "{\"topic\":\"   \",\"purpose\":\"private\"}",
+                "{\"purpose\":\"private\"}")) {
+            assertError(post(body), "FIELD_INVALID",
+                    ",\"fields\":[{\"field\":\"topic\",\"reason\":\"REQUIRED\"}]", "private");
+        }
     }
 
     @Test
-    void 초과와_다른_칸_누락이_섞이면_fields를_생략한다() throws Exception {
+    void 초과와_다른_칸_누락을_함께_싣는다() throws Exception {
         assertError(post("""
                 {"topic":"private-topic"}
-                """), "INVALID_REQUEST", "", "private-topic");
+                """), "FIELD_INVALID",
+                ",\"fields\":[{\"field\":\"purpose\",\"reason\":\"REQUIRED\"},{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]",
+                "private-topic");
+    }
+
+    @Test
+    void 상한을_넘는_공백은_같은_칸의_두_reason을_이름순으로_싣는다() throws Exception {
+        for (int i = 0; i < 3; i++) {
+            assertError(post("""
+                    {"topic":"      ","purpose":"private"}
+                    """), "FIELD_INVALID",
+                    ",\"fields\":[{\"field\":\"topic\",\"reason\":\"REQUIRED\"},{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]",
+                    "      ", "private");
+        }
+    }
+
+    @Test
+    void NotNull_위반도_REQUIRED다() throws Exception {
+        assertError(post("/api/test-request-validation-other", """
+                {"topic":"학습","purpose":"학습"}
+                """), "FIELD_INVALID", ",\"fields\":[{\"field\":\"requestId\",\"reason\":\"REQUIRED\"}]", "학습");
+    }
+
+    @Test
+    void Size_하한_위반은_fields_없는_INVALID_REQUEST다() throws Exception {
+        assertError(post("/api/test-request-validation-other", """
+                {"topic":"가","purpose":"학습","requestId":"id"}
+                """), "INVALID_REQUEST", "", "가", "학습", "id");
+    }
+
+    @Test
+    void 대응하는_reason이_없는_Pattern_위반이_섞이면_fields를_생략한다() throws Exception {
+        assertError(post("/api/test-request-validation-other", """
+                {"topic":"private-topic","purpose":"private-purpose","requestId":"id"}
+                """), "INVALID_REQUEST", "", "private-topic", "private-purpose", "id");
     }
 
     @Test
@@ -146,7 +183,11 @@ class RequestValidationIT extends PostgresTestConfiguration {
     }
 
     private HttpResponse<String> post(String body) throws Exception {
-        return client.send(HttpRequest.newBuilder(uri("/api/test-request-validation"))
+        return post("/api/test-request-validation", body);
+    }
+
+    private HttpResponse<String> post(String path, String body) throws Exception {
+        return client.send(HttpRequest.newBuilder(uri(path))
                 .header("Cookie", "SESSION=" + session.getValue() + "; XSRF-TOKEN=" + token)
                 .header("X-XSRF-TOKEN", token).header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
@@ -160,7 +201,7 @@ class RequestValidationIT extends PostgresTestConfiguration {
         assertEquals(400, response.statusCode(), response.body());
         assertTrue(response.headers().firstValue("Content-Type").orElseThrow().startsWith("application/json"));
         assertTrue(response.headers().firstValue("Retry-After").isEmpty());
-        var message = code.equals("STRUCTURAL_LIMIT") ? "입력 길이를 확인해 주십시오" : "요청을 확인할 수 없습니다";
+        var message = code.equals("FIELD_INVALID") ? "입력을 확인해 주십시오" : "요청을 확인할 수 없습니다";
         JsonAssert.comparator(JsonCompareMode.STRICT).assertIsMatch(
                 "{\"code\":\"" + code + "\",\"message\":\"" + message + "\"" + fields + "}", response.body());
         for (var input : inputs) assertFalse(response.body().contains(input), response.body());
@@ -172,8 +213,17 @@ class RequestValidationIT extends PostgresTestConfiguration {
         public ApiResponse<ValidationRequest> validate(@Valid @RequestBody ValidationRequest request) {
             return ApiResponse.of(request);
         }
+
+        @PostMapping("/api/test-request-validation-other")
+        public ApiResponse<OtherValidationRequest> validateOther(@Valid @RequestBody OtherValidationRequest request) {
+            return ApiResponse.of(request);
+        }
     }
 
     record ValidationRequest(@NotBlank @Size(max = 5) String topic,
                              @NotBlank @Size(max = 10) String purpose) { }
+
+    record OtherValidationRequest(@Size(min = 2, max = 5) String topic,
+                                  @Pattern(regexp = "학습") String purpose,
+                                  @NotNull String requestId) { }
 }
