@@ -45,7 +45,7 @@ function renderAt(path: string) {
 
 beforeEach(() => {
   sessionStorage.clear()
-  vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify(me)))))
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: me })))))
 })
 
 afterEach(() => vi.unstubAllGlobals())
@@ -56,7 +56,7 @@ test('첫 로그인 확인 동안 회색 줄을 보여 준다', async () => {
   renderAt('/')
   expect(screen.getByRole('status', { name: '로그인 확인 중' })).toHaveAttribute('aria-busy', 'true')
   expect(screen.queryByRole('heading', { name: '보호된 화면' })).not.toBeInTheDocument()
-  await act(async () => resolve(new Response(JSON.stringify(me))))
+  await act(async () => resolve(new Response(JSON.stringify({ data: me }))))
   expect(await screen.findByRole('heading', { name: '보호된 화면' })).toBeVisible()
 })
 
@@ -70,7 +70,7 @@ test('처음 연 주소의 401은 안내 없이 로그인으로, 로그인 성�
   expect(fetch).toHaveBeenCalledTimes(1)
   first.unmount()
 
-  vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify(me))))
+  vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: me }))))
   renderAt('/')
   await waitFor(() => expect(window.location.pathname + window.location.search + window.location.hash).toBe('/curriculums/12?tab=1#lesson'))
   expect(takeReturnPath()).toBeNull()
@@ -103,9 +103,35 @@ test('로그인 확인의 RATE_LIMITED는 요청이 잦다는 안내를 표시�
   expect(screen.queryByText('서버 내부 문구')).not.toBeInTheDocument()
   expect(screen.queryByText('불러오지 못했어요.')).not.toBeInTheDocument()
   expect(window.location.pathname).toBe('/')
-  vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify(me))))
+  vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: me }))))
   fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
   expect(await screen.findByRole('heading', { name: '보호된 화면' })).toBeVisible()
+})
+
+test.each([401, 503])('로그인 확인의 %s 모르는 code는 일반 실패로 표시하고 서버 문구를 숨긴다', async (status) => {
+  vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ code: 'FUTURE_ERROR', message: '서버 내부 문구' }), { status })))
+  renderAt('/')
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('불러오지 못했어요.'))
+  expect(screen.queryByRole('status', { name: '로그인 확인 중' })).not.toBeInTheDocument()
+  expect(screen.queryByText('서버 내부 문구')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '다시 시도' })).toBeEnabled()
+  expect(window.location.pathname).toBe('/')
+  expect(fetch).toHaveBeenCalledTimes(1)
+})
+
+test('UNAUTHORIZED는 HTTP 상태와 관계없이 이동 전 로그인 확인 표시를 유지한다', async () => {
+  vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ code: 'UNAUTHORIZED', message: '서버 내부 문구' }), { status: 403 })))
+  const unauthorized = vi.fn()
+  const client = createAuthQueryClient(unauthorized)
+  window.history.replaceState(null, '', '/')
+  const view = render(<BrowserRouter><QueryClientProvider client={client}>
+    <Routes><Route element={<RequireAuth />}><Route path="/" element={<ProtectedContent />} /></Route></Routes>
+  </QueryClientProvider></BrowserRouter>)
+  await waitFor(() => expect(unauthorized).toHaveBeenCalledTimes(1))
+  expect(screen.getByRole('status', { name: '로그인 확인 중' })).toHaveAttribute('aria-busy', 'true')
+  expect(screen.queryByText('불러오지 못했어요.')).not.toBeInTheDocument()
+  view.unmount()
+  client.clear()
 })
 
 test('다시 시도는 응답을 기다리는 동안 잠겨 추가 요청을 보내지 않는다', async () => {
@@ -126,7 +152,7 @@ test('다시 시도는 응답을 기다리는 동안 잠겨 추가 요청을 보
 
   await act(async () => resolve(new Response(JSON.stringify({ code: 'RATE_LIMITED', message: '서버 문구' }), { status: 429 })))
   await waitFor(() => expect(button).toBeEnabled())
-  vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify(me))))
+  vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: me }))))
   fireEvent.click(button)
   expect(await screen.findByRole('heading', { name: '보호된 화면' })).toBeVisible()
 })
@@ -143,7 +169,7 @@ test.each(['네트워크', '서버'])('로그인 확인의 %s 실패는 불러�
   expect(screen.queryByText('서버 내부 문구')).not.toBeInTheDocument()
   expect(screen.queryByText('Failed to fetch')).not.toBeInTheDocument()
   expect(window.location.pathname).toBe('/')
-  vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify(me))))
+  vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: me }))))
   fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
   expect(await screen.findByRole('heading', { name: '보호된 화면' })).toBeVisible()
 })
