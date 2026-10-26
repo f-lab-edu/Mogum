@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "request-validation",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T14:27:24+0900",
+      "summary": "Boot BOM 관리 spring-boot-starter-validation 추가; @Size 위반만 400 STRUCTURAL_LIMIT + fields(요청 JSON 필드명, 중복 제거·이름순), 다른 필드/객체 위반 혼합은 INVALID_REQUEST 및 fields 생략; ApiErrorResponses.of/write에 fields 지원; ArchUnit REQUEST_BODY_REQUIRES_VALID로 @RequestBody의 @Valid 누락 검출; 테스트 전용 컨트롤러는 backend/src/test/java/com/mogum/common/RequestValidationIT.java의 중첩 static ValidationController이며 해당 IT에서만 @Import; 로그인·CSRF 실제 HTTP 및 전체 서버 테스트 335개 통과.",
+      "completed_at": "2026-10-26T14:32:23+0900"
     },
     {
       "step": 3,
