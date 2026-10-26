@@ -116,7 +116,7 @@ class ApiExceptionHandlerTest {
         var response = new ApiExceptionHandler().handleException(
                 new HttpMediaTypeNotSupportedException("private content type"), request);
         assertEquals(415, response.getStatusCode().value());
-        assertEquals(new ApiError("INVALID_REQUEST", "요청을 확인할 수 없습니다", null), response.getBody());
+        assertEquals(new ApiError("INVALID_REQUEST", "요청을 확인할 수 없습니다", null, null), response.getBody());
     }
 
     @Test
@@ -126,7 +126,7 @@ class ApiExceptionHandlerTest {
                 new HttpRequestMethodNotSupportedException("POST", List.of("GET")), request);
         assertEquals(405, response.getStatusCode().value());
         assertEquals("GET", response.getHeaders().getFirst("Allow"));
-        assertEquals(new ApiError("METHOD_NOT_ALLOWED", "지원하지 않는 요청 방식입니다", null), response.getBody());
+        assertEquals(new ApiError("METHOD_NOT_ALLOWED", "지원하지 않는 요청 방식입니다", null, null), response.getBody());
     }
 
     @Test
@@ -135,7 +135,7 @@ class ApiExceptionHandlerTest {
         var response = new ApiExceptionHandler().handleException(
                 new HttpMessageNotReadableException("private JSON input", new MockHttpInputMessage(new byte[0])), request);
         assertEquals(400, response.getStatusCode().value());
-        assertEquals(new ApiError("INVALID_REQUEST", "요청을 확인할 수 없습니다", null), response.getBody());
+        assertEquals(new ApiError("INVALID_REQUEST", "요청을 확인할 수 없습니다", null, null), response.getBody());
     }
 
     @Test

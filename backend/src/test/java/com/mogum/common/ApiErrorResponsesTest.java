@@ -62,7 +62,7 @@ class ApiErrorResponsesTest {
         assertEquals(status, response.getStatusCode().value());
         assertEquals("application/json", response.getHeaders().getFirst("Content-Type"));
         assertNull(response.getHeaders().getFirst("Retry-After"));
-        assertEquals(new ApiError(code.name(), message, null), response.getBody());
+        assertEquals(new ApiError(code.name(), message, null, null), response.getBody());
     }
 
     @ParameterizedTest
