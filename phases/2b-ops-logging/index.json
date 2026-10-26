@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "log-privacy",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-27T02:26:56+0900",
+      "summary": "OAuthLoginHandler 로그인 결과 줄 추가(성공 INFO users.id; 실패 INFO not_allowed/email_not_verified/authorization_request_not_found/invalid_state_parameter/access_denied/invalid_request/invalid_user_info/unknown, WARN invalid_grant/invalid_token_response/invalid_user_info_response); Boot 4.1.1 BOM PgJDBC 42.7.13의 PGProperty.LOG_SERVER_ERROR_DETAIL 소스 확인 후 spring.datasource.hikari.data-source-properties.logServerErrorDetail=false 적용; 405 WARN의 org.springframework.web.servlet.PageNotFound 로거 OFF; 표식 테스트 backend/src/test/java/com/mogum/auth/OAuthLoginHandlerIT.java · common/api/RequestValidationIT.java · account/repository/UserRepositoryIT.java와 docs/04-jobs-and-cost.md §9.2 갱신, 전체 서버 테스트 372개 통과(실패·건너뜀 0), 로그인 보안 흐름·미처리 예외 ERROR/스택·의존성 유지.",
+      "completed_at": "2026-10-27T02:35:21+0900"
     },
     {
       "step": 3,
