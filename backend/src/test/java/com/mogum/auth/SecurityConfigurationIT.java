@@ -157,6 +157,13 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
     }
 
     @Test
+    void 요청_검증_IT의_컨트롤러는_다른_앱_컨텍스트에_등록되지_않는다() {
+        assertTrue(Arrays.stream(context.getBeanNamesForAnnotation(RestController.class))
+                .map(context::getType)
+                .noneMatch(type -> type.getName().startsWith("com.mogum.common.RequestValidationIT$")));
+    }
+
+    @Test
     void 현재_사용자_응답은_data_하나_안에_정해진_다섯_필드만_포함한다() throws Exception {
         var cookie = session();
         mvc.perform(get("/api/me").cookie(cookie)).andExpect(status().isOk())

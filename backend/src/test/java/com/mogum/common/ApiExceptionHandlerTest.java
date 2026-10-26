@@ -12,6 +12,12 @@ import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.core.MethodParameter;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 
@@ -21,6 +27,60 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class ApiExceptionHandlerTest {
+    @Test
+    void 길이_위반만이면_넘친_필드_하나를_싣는다() throws Exception {
+        assertValidationError(List.of(fieldError("topic", "Size")), """
+                {"code":"STRUCTURAL_LIMIT","message":"입력 길이를 확인해 주십시오","fields":["topic"]}
+                """);
+    }
+
+    @Test
+    void 길이_위반_필드는_중복_없이_이름순으로_싣는다() throws Exception {
+        assertValidationError(List.of(fieldError("topic", "Size"), fieldError("purpose", "Size"),
+                fieldError("topic", "Size")), """
+                {"code":"STRUCTURAL_LIMIT","message":"입력 길이를 확인해 주십시오","fields":["purpose","topic"]}
+                """);
+    }
+
+    @Test
+    void 필수값_위반이_섞이면_fields를_생략한다() throws Exception {
+        assertValidationError(List.of(fieldError("topic", "Size"), fieldError("purpose", "NotBlank")), """
+                {"code":"INVALID_REQUEST","message":"요청을 확인할 수 없습니다"}
+                """);
+        assertValidationError(List.of(fieldError("purpose", "NotNull")), """
+                {"code":"INVALID_REQUEST","message":"요청을 확인할 수 없습니다"}
+                """);
+    }
+
+    @Test
+    void 객체_위반이_섞이면_fields를_생략한다() throws Exception {
+        assertValidationError(List.of(fieldError("topic", "Size"),
+                new ObjectError("request", new String[]{"Consistency"}, null, "private constraint message")), """
+                {"code":"INVALID_REQUEST","message":"요청을 확인할 수 없습니다"}
+                """);
+    }
+
+    private static FieldError fieldError(String field, String code) {
+        return new FieldError("request", field, "private rejected input", false,
+                new String[]{code}, null, "private constraint message");
+    }
+
+    private static void assertValidationError(List<ObjectError> errors, String expected) throws Exception {
+        var binding = new BeanPropertyBindingResult(new Object(), "request");
+        errors.forEach(binding::addError);
+        var parameter = new MethodParameter(ApiExceptionHandlerTest.class
+                .getDeclaredMethod("validationTarget", Object.class), 0);
+        var request = new ServletWebRequest(new MockHttpServletRequest(), new MockHttpServletResponse());
+        var response = new ApiExceptionHandler().handleException(
+                new MethodArgumentNotValidException(parameter, binding), request);
+        assertEquals(400, response.getStatusCode().value());
+        var json = JsonMapper.builder().build().writeValueAsString(response.getBody());
+        org.springframework.test.json.JsonAssert.comparator(JsonCompareMode.STRICT).assertIsMatch(expected, json);
+        assertFalse(json.contains("private"));
+    }
+
+    private void validationTarget(Object request) { }
+
     @Test
     void 없거나_남의_리소스는_공통_404로_변환한다() {
         var response = new ApiExceptionHandler().apiException(new ApiException(ErrorCode.NOT_FOUND));

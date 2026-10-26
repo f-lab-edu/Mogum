@@ -8,6 +8,7 @@ public enum ErrorCode {
     NOT_FOUND(HttpStatus.NOT_FOUND, "찾을 수 없습니다"),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식입니다"),
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "요청을 확인할 수 없습니다"),
+    STRUCTURAL_LIMIT(HttpStatus.BAD_REQUEST, "입력 길이를 확인해 주십시오"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "요청을 처리할 수 없습니다");
 
     private final HttpStatus status;

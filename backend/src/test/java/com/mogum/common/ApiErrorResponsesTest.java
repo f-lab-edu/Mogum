@@ -8,10 +8,49 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.json.JsonAssert;
 import org.springframework.test.json.JsonCompareMode;
 import tools.jackson.databind.json.JsonMapper;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class ApiErrorResponsesTest {
+    @Test
+    void 구조_상한의_fields는_중복_없이_이름순으로_직렬화한다() {
+        var response = ApiErrorResponses.of(ErrorCode.STRUCTURAL_LIMIT, null,
+                List.of("topic", "purpose", "topic"));
+        assertEquals(400, response.getStatusCode().value());
+        JsonAssert.comparator(JsonCompareMode.STRICT).assertIsMatch("""
+                {"code":"STRUCTURAL_LIMIT","message":"입력 길이를 확인해 주십시오","fields":["purpose","topic"]}
+                """, JsonMapper.builder().build().writeValueAsString(response.getBody()));
+    }
+
+    @Test
+    void fields가_없거나_구조_상한이_아니면_키를_생략한다() {
+        for (var fields : List.of(List.<String>of(), List.of("topic"))) {
+            var response = ApiErrorResponses.of(ErrorCode.INVALID_REQUEST, null, fields);
+            JsonAssert.comparator(JsonCompareMode.STRICT).assertIsMatch("""
+                    {"code":"INVALID_REQUEST","message":"요청을 확인할 수 없습니다"}
+                    """, JsonMapper.builder().build().writeValueAsString(response.getBody()));
+        }
+        for (var fields : java.util.Arrays.asList(null, List.<String>of())) {
+            var response = ApiErrorResponses.of(ErrorCode.STRUCTURAL_LIMIT, null, fields);
+            JsonAssert.comparator(JsonCompareMode.STRICT).assertIsMatch("""
+                    {"code":"STRUCTURAL_LIMIT","message":"입력 길이를 확인해 주십시오"}
+                    """, JsonMapper.builder().build().writeValueAsString(response.getBody()));
+        }
+    }
+
+    @Test
+    void 서블릿_응답도_fields_규칙을_공유한다() throws Exception {
+        var response = new MockHttpServletResponse();
+        ApiErrorResponses.write(response, JsonMapper.builder().build(), ErrorCode.STRUCTURAL_LIMIT,
+                null, List.of("topic"));
+        assertEquals(400, response.getStatus());
+        assertNull(response.getHeader("Retry-After"));
+        JsonAssert.comparator(JsonCompareMode.STRICT).assertIsMatch("""
+                {"code":"STRUCTURAL_LIMIT","message":"입력 길이를 확인해 주십시오","fields":["topic"]}
+                """, response.getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     @ParameterizedTest
     @CsvSource({
             "UNAUTHORIZED,401,로그인이 필요합니다", "CSRF_INVALID,403,요청을 확인할 수 없습니다",

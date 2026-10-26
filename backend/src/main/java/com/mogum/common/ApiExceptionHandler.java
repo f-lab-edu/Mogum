@@ -4,6 +4,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.ErrorResponse;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
@@ -14,6 +16,19 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> apiException(ApiException exception) {
         return ApiErrorResponses.of(exception.errorCode(), exception.retryAfterSeconds());
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException exception,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        var errors = exception.getBindingResult().getAllErrors();
+        boolean sizeOnly = !errors.isEmpty() && errors.stream()
+                .allMatch(error -> error instanceof FieldError && "Size".equals(error.getCode()));
+        var response = sizeOnly
+                ? ApiErrorResponses.of(ErrorCode.STRUCTURAL_LIMIT, null,
+                        exception.getBindingResult().getFieldErrors().stream().map(FieldError::getField).toList())
+                : ApiErrorResponses.of(ErrorCode.INVALID_REQUEST, null);
+        return new ResponseEntity<>(response.getBody(), response.getHeaders(), response.getStatusCode());
     }
 
     @Override

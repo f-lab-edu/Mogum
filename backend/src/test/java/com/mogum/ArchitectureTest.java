@@ -33,6 +33,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.validation.Valid;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
@@ -64,7 +66,7 @@ class ArchitectureTest {
     private static final ArchRule OPENAI_SDK_ONLY_IN_LLM_ADAPTER = noClasses().that()
             .resideOutsideOfPackage("..generation.llm..")
             .should().dependOnClassesThat().resideInAPackage("com.openai..");
-    private static final ArchRule CONTROLLER_RESPONSE_TYPES = methods().that(new DescribedPredicate<JavaMethod>(
+    private static final DescribedPredicate<JavaMethod> REST_REQUEST_MAPPINGS = new DescribedPredicate<JavaMethod>(
             "are request mappings in REST controllers except ApiErrorController") {
         @Override
         public boolean test(JavaMethod method) {
@@ -72,7 +74,9 @@ class ArchitectureTest {
                     && !method.getOwner().isEquivalentTo(ApiErrorController.class)
                     && (method.isAnnotatedWith(RequestMapping.class) || method.isMetaAnnotatedWith(RequestMapping.class));
         }
-    }).should(new ArchCondition<JavaMethod>(
+    };
+    private static final ArchRule CONTROLLER_RESPONSE_TYPES = methods().that(REST_REQUEST_MAPPINGS)
+            .should(new ArchCondition<JavaMethod>(
             "return ApiResponse<?>, ResponseEntity<ApiResponse<?>>, ResponseEntity<Void>, or void") {
         @Override
         public void check(JavaMethod method, ConditionEvents events) {
@@ -80,6 +84,19 @@ class ArchitectureTest {
                     method.getFullName() + " returns " + method.getReturnType().getName()));
         }
     });
+    private static final ArchRule REQUEST_BODY_REQUIRES_VALID = methods().that(REST_REQUEST_MAPPINGS)
+            .should(new ArchCondition<JavaMethod>("annotate each @RequestBody parameter with @Valid") {
+                @Override
+                public void check(JavaMethod method, ConditionEvents events) {
+                    for (var parameter : method.getParameters()) {
+                        if (parameter.isAnnotatedWith(RequestBody.class)) {
+                            events.add(new SimpleConditionEvent(parameter, parameter.isAnnotatedWith(Valid.class),
+                                    method.getFullName() + " has @RequestBody without @Valid at parameter "
+                                            + parameter.getIndex()));
+                        }
+                    }
+                }
+            });
 
     private static boolean isAllowedResponseType(JavaType type) {
         if (type.toErasure().isEquivalentTo(void.class)) {
@@ -128,6 +145,21 @@ class ArchitectureTest {
         CONTROLLER_RESPONSE_TYPES.check(CLASSES);
     }
 
+    @Test
+    void REST_요청_본문은_Valid로_검증한다() {
+        REQUEST_BODY_REQUIRES_VALID.allowEmptyShould(true).check(CLASSES);
+    }
+
+    @Test
+    void Valid_없는_요청_본문을_거부한다() {
+        assertViolation(REQUEST_BODY_REQUIRES_VALID, UnvalidatedBodyController.class);
+    }
+
+    @Test
+    void Valid_요청_본문을_허용하고_매핑_없는_메서드와_다른_매개변수는_검사하지_않는다() {
+        REQUEST_BODY_REQUIRES_VALID.check(new ClassFileImporter().importClasses(ValidatedBodyController.class));
+    }
+
     @ParameterizedTest
     @ValueSource(classes = {UnwrappedController.class, UnwrappedEntityController.class,
             RawEntityController.class, RawResponseController.class})
@@ -167,6 +199,8 @@ class ArchitectureTest {
         assertTrue(CLASSES.contain(MogumApplication.class));
         assertFalse(CLASSES.contain(ArchitectureTest.class));
         assertFalse(CLASSES.contain(AllowedController.class));
+        assertFalse(CLASSES.contain(UnvalidatedBodyController.class));
+        assertFalse(CLASSES.contain(ValidatedBodyController.class));
         assertTrue(CLASSES.stream().noneMatch(type -> type.getPackageName().startsWith("com.mogum.archfixture")));
     }
 
@@ -174,6 +208,20 @@ class ArchitectureTest {
         JavaClasses classes = new ClassFileImporter().importClasses(fixture);
         AssertionError violation = assertThrows(AssertionError.class, () -> rule.check(classes));
         assertTrue(violation.getMessage().contains(fixture.getName()), violation::getMessage);
+    }
+
+    @RestController
+    static class UnvalidatedBodyController {
+        @PostMapping("/architecture/unvalidated")
+        public ApiResponse<MeResponse> response(String other, @RequestBody MeResponse body) { return null; }
+    }
+
+    @RestController
+    static class ValidatedBodyController {
+        @PostMapping("/architecture/validated")
+        public ApiResponse<MeResponse> response(String other, @Valid @RequestBody MeResponse body) { return null; }
+
+        public void helper(@RequestBody MeResponse body) { }
     }
 
     @RestController

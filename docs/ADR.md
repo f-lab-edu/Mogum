@@ -428,6 +428,7 @@
 **검증**: 아직 수행하지 않았다(`2a-api-response`).
 - 백엔드 오류 경로: 2026-10-26 실제 HTTP로 `ApiException`의 선택적 `retryAfterSeconds`·`Retry-After` 일치/생략, 401·CSRF 403·404·400·405·500의 엄격한 JSON 본문, 405 `Allow` 및 컨테이너 ERROR 디스패치를 확인했다. `./backend/gradlew -p backend test`로 전체 서버 테스트 303개 통과(실패·건너뜀 0).
 - 백엔드 성공 응답: `ApiResponse.of(DTO)`로 `/api/me`를 한 겹 감싸고 최상위 `data` 하나와 내부 다섯 필드를 STRICT로 확인했다. ArchUnit `CONTROLLER_RESPONSE_TYPES`는 `ApiErrorController`를 제외한 REST 요청 매핑의 제네릭 반환 타입까지 검사하며 `ApiResponse<…>` · `ResponseEntity<ApiResponse<…>>` · `ResponseEntity<Void>` · `void`만 허용한다. `ArchitectureTest`의 중첩 static fixture로 위반 검출/허용과 앱 컨텍스트 제외를 확인했다. 앱의 `ObjectMapper` 빈으로 Jackson 3 · Boot 4.1.1 기본값이 null 필드 보존 · ISO-8601 UTC `Instant` 문자열 · 대문자 enum을 만족함을 확인했으며 별도 설정은 추가하지 않았다. 오류 선택 필드 생략도 유지된다. `./backend/gradlew -p backend test`로 전체 서버 테스트 315개 통과(실패·건너뜀 0).
+- 백엔드 요청 검증: Boot BOM이 관리하는 `spring-boot-starter-validation`을 추가했다. `RequestValidationIT`의 중첩 static `ValidationController`를 해당 컨텍스트에만 `@Import`하고 로그인 세션·CSRF를 거친 실제 HTTP로 정상 `{data}`, 한 칸/두 칸 길이 초과의 `400 STRUCTURAL_LIMIT`과 중복 없는 이름순 `fields`, 한글 경계·이모지의 UTF-16 길이 계산, 빈 값·초과와 누락의 혼합·잘못된 JSON·타입 불일치의 `400 INVALID_REQUEST` 및 `fields` 생략을 STRICT로 확인했다. 오류 응답에는 입력 원문이 없다. 단위 테스트로 객체 단위 위반 혼합과 필드 중복 제거도 확인했다. ArchUnit `REQUEST_BODY_REQUIRES_VALID`는 `@RequestBody`의 `@Valid` 누락을 중첩 static fixture로 검출하며, fixture와 HTTP 테스트 컨트롤러가 다른 앱 컨텍스트에 등록되지 않음을 확인했다. `./backend/gradlew -p backend test`로 전체 서버 테스트 335개 통과(실패·건너뜀 0).
 
 ## 설계 묶음 정리 때 확정한 것 (Q220~Q231)
 
