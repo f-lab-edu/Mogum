@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "success-envelope",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T14:22:04+0900",
+      "summary": "ApiResponse.of(DTO)로 MeController의 성공 응답을 {data}로 감싸고 null data를 거부; ArchUnit CONTROLLER_RESPONSE_TYPES는 ApiErrorController를 제외한 REST 요청 매핑의 ApiResponse<…>·ResponseEntity<ApiResponse<…>>·ResponseEntity<Void>·void만 허용하며 제네릭까지 검사; ArchitectureTest 중첩 static fixture로 위반 검출·허용 및 Spring 컨텍스트 제외 확인; 앱 ObjectMapper에서 Jackson 3·Boot 4.1.1 기본값의 null 필드 보존·Instant ISO-8601 UTC 문자열·대문자 enum과 오류 선택 필드 생략 확인(추가 설정 없음); 전체 서버 테스트 315개 통과.",
+      "completed_at": "2026-10-26T14:27:23+0900"
     },
     {
       "step": 2,
