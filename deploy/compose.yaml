@@ -46,7 +46,7 @@ services:
     restart: always
     logging:
       driver: journald
-    command: ["postgres", "-c", "log_error_verbosity=terse"]
+    command: ["postgres", "-c", "log_error_verbosity=terse", "-c", "log_timezone=Asia/Seoul"]
     mem_limit: 512m
     environment:
       POSTGRES_DB: mogum

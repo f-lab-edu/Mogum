@@ -6,7 +6,7 @@ set -euo pipefail
 fail() { printf '%s\n' "$1"; exit 1; }
 
 [[ $# == 1 && $1 =~ ^[0-9a-f]{40}$ ]] || fail 'Invalid release SHA.'
-for command in docker aws curl cat stat install readlink ln mv find sort rm sleep cmp systemctl; do
+for command in docker aws curl cat stat install readlink ln mv find sort rm sleep cmp systemctl timedatectl; do
     command -v "$command" >/dev/null 2>&1 || fail "Missing command: $command"
 done
 docker compose version >/dev/null 2>&1 || fail 'Missing command: docker compose'
@@ -114,6 +114,9 @@ if ! { ln -sfn "$release" "$current.next" && mv -Tf "$current.next" "$current"; 
     exit 1
 fi
 printf '%s\n' 'Deployment healthy; current release updated.'
+
+# 사람이 읽는 서버 시각을 맞춘다. 컨테이너와 DB 세션의 시간대는 바꾸지 않는다.
+timedatectl set-timezone Asia/Seoul
 
 # 실패한 릴리스/복귀 경로에서는 설치하지 않는다. current를 먼저 바꿔 새 스크립트를 실행한다.
 units_changed=false

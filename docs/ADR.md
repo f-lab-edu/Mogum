@@ -454,6 +454,8 @@
 
 - `2b-ops-logging` step 4(2026-10-27): 변경 전 실제 HTTP 필터 예외의 Tomcat `Servlet.service() … threw exception` ERROR 줄에 `requestId` · `userId`가 없어 새 테스트가 실패함을 확인했다. 등록을 `config.RequestLogConfiguration`으로 옮겨 순서 · REQUEST/ERROR · 필터/리스너 인스턴스를 유지하고, 예외 디스패치의 MDC를 종료 리스너까지 유지해 컨테이너 ERROR/스택과 500 접근 줄의 같은 ID · 회원 ID, 같은 스레드의 다음 비로그인 요청에 회원 ID 잔류 없음을 확인했다. 테스트 JVM 기본 시간대가 UTC임을 단언한 상태에서 로그 `+09:00`을 확인했고, 지정 AC 테스트 **78개**와 `./backend/gradlew -p backend build`의 전체 서버 테스트 **377개 통과**(실패 · 오류 · 건너뜀 0).
 
+- `2b-ops-logging` step 5(2026-10-27): 테스트를 먼저 고쳐 변경 전 7개 실패를 확인한 뒤, `DeployFilesTest`로 Postgres의 `log_error_verbosity=terse` · `log_timezone=Asia/Seoul` 명령 목록과 필수 명령 검사에 `timedatectl` 포함을 확인했다. 명령 대체 시나리오에서 성공 배포마다 `timedatectl set-timezone Asia/Seoul` 정확히 1회, 헬스 실패 · 링크 갱신 실패 등 실패 경로에서는 호출 없음을 검증했다. 컨테이너의 `TZ` · `/etc/localtime` 마운트 · Postgres 세션 `timezone` 설정은 추가하지 않았고, 기존 UTC 테스트 JVM 설정과 백업의 명시적 시간대를 유지했다. 지정 AC `DeployFilesTest` **22개**와 `./backend/gradlew -p backend build`의 전체 서버 테스트 **377개 통과**(실패 · 오류 · 건너뜀 0). **서버에서의 실제 동작과 같은 시간대 재설정은 아직 확인하지 않았다** — 절차서의 운영 확인 항목은 미체크로 남긴다.
+
 ## 설계 묶음 정리 때 확정한 것 (Q220~Q231)
 
 옛 서사(v1 → v2 → v3)를 위한 장치를 걷어내며 잠정으로 정했던 것을 2026-10-07 확정했다.

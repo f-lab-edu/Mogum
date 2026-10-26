@@ -61,11 +61,12 @@ class DeployFilesTest {
     }
 
     @Test
-    void 세_서비스는_journald에_기록하고_Postgres는_오류_상세를_뺀다() throws Exception {
+    void 세_서비스는_journald에_기록하고_Postgres는_오류_상세를_빼고_로그는_한국_시간이다() throws Exception {
         for (var name : services().keySet()) {
             assertEquals(Map.of("driver", "journald"), map(service(name).get("logging")));
         }
-        assertEquals(List.of("postgres", "-c", "log_error_verbosity=terse"), service("postgres").get("command"));
+        assertEquals(List.of("postgres", "-c", "log_error_verbosity=terse", "-c", "log_timezone=Asia/Seoul"),
+                service("postgres").get("command"));
     }
 
     @Test
@@ -173,6 +174,8 @@ class DeployFilesTest {
         var content = Files.readString(script);
         assertTrue(content.startsWith("#!/usr/bin/env bash\n"));
         assertTrue(content.contains("set -euo pipefail"));
+        assertTrue(Pattern.compile("(?m)^for command in [^\\n]*\\btimedatectl\\b[^\\n]*; do$")
+                .matcher(content).find(), "필수 명령 검사에 timedatectl을 포함한다");
         assertFalse(Pattern.compile("(?m)^\\s*set\\s+[^\\n]*[+-]x").matcher(content).find());
         var process = new ProcessBuilder("bash", "-n", script.toString()).redirectErrorStream(true).start();
         var output = new String(process.getInputStream().readAllBytes());
@@ -234,7 +237,7 @@ class DeployFilesTest {
                 case "$tool" in
                   stat) printf '0:600' ;;
                   aws) printf 'test-login-token\n' ;;
-                  systemctl) printf 'systemctl %s\\n' "$*" >> "$TEST_ROOT/commands" ;;
+                  systemctl|timedatectl) printf '%s %s\\n' "$tool" "$*" >> "$TEST_ROOT/commands" ;;
                   install)
                     printf 'install %s\\n' "$*" >> "$TEST_ROOT/commands"
                     /usr/bin/install "$@" ;;
@@ -276,7 +279,7 @@ class DeployFilesTest {
                     esac ;;
                 esac
                 """;
-        for (var command : List.of("stat", "aws", "curl", "sleep", "mv", "find", "docker", "systemctl", "install")) {
+        for (var command : List.of("stat", "aws", "curl", "sleep", "mv", "find", "docker", "systemctl", "timedatectl", "install")) {
             var path = bin.resolve(command);
             Files.writeString(path, fakeCommand);
             assertTrue(path.toFile().setExecutable(true));
@@ -292,6 +295,8 @@ class DeployFilesTest {
         assertFalse(output.contains("must-never-be-printed"));
         assertFalse(output.contains("test-login-token"));
         var commands = Files.exists(root.resolve("commands")) ? Files.readString(root.resolve("commands")) : "";
+        assertEquals(success ? List.of("timedatectl set-timezone Asia/Seoul") : List.of(),
+                commands.lines().filter(line -> line.startsWith("timedatectl ")).toList(), commands);
         if (success) {
             assertEquals(release, Files.readSymbolicLink(current));
             assertTrue(Files.exists(previous));
