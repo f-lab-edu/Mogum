@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class MeControllerTest {
     @Test
     void 현재_사용자의_공개_필드와_약관_동의를_변환한다() {
-        var user = User.join("google", "sub", "me@example.com", UserRole.ADMIN, Instant.now());
+        var user = User.join("google", "sub", "me@example.com", UserRole.ADMIN);
         ReflectionTestUtils.setField(user, "termsAgreedAt", Instant.now());
         var response = new MeController().me(user).data();
         assertEquals("me@example.com", response.email());

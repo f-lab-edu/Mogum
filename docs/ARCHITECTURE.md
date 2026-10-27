@@ -12,11 +12,12 @@
 │   ├── Dockerfile · .dockerignore   # 서버 이미지(빌드 → JRE 실행, exec 형식 ENTRYPOINT) — 로컬 compose 가 쓰고 운영도 쓸 수 있다(ADR-069)
 │   ├── src/main/java/…/mogum/
 │   │   ├── MogumApplication.java    # 진입점 · @ConfigurationPropertiesScan
-│   │   ├── config/                  # 설정 값(WebProperties · AuthProperties) · 시계 빈 · 요청 로그 필터 등록 · app.role 별 빈 등록 — worker · generation 을 조립하는 유일한 곳
+│   │   ├── config/                  # 설정 값(WebProperties · AuthProperties) · 시계 빈 · JpaAuditingConfiguration(Auditing · Clock 시각 공급자) · 요청 로그 필터 등록 · app.role 별 빈 등록 — worker · generation 을 조립하는 유일한 곳
 │   │   ├── common/                  # 주제별 공통 코드
 │   │   │   ├── api/                 # ApiResponse(성공 응답 감싸기) · 공통 오류 응답(ErrorCode · ApiException · ApiError · FieldViolation · ApiErrorResponses · ApiExceptionHandler · ApiErrorController)
 │   │   │   ├── time/                # SeoulClock
-│   │   │   └── logging/             # RequestLogFilter — 요청 ID · 접근 줄 · MDC 키 상수
+│   │   │   ├── logging/             # RequestLogFilter — 요청 ID · 접근 줄 · MDC 키 상수
+│   │   │   └── persistence/         # AuditedEntity — 엔티티 공통 생성 · 수정 시각 · Auditing 리스너
 │   │   ├── auth/                    # Spring Security · 구글 OAuth 로그인 처리 · 세션 → 회원 필터 · API 레이트리밋 필터
 │   │   ├── account/                 # 회원 · 로그인 — 도메인 패키지는 항상 아래 다섯 하위 패키지로 나눈다
 │   │   │   ├── controller/          # MeController

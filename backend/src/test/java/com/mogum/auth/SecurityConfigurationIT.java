@@ -50,7 +50,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -89,7 +88,7 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
                 .addFilters(context.getBean("springSessionRepositoryFilter", jakarta.servlet.Filter.class))
                 .apply(springSecurity()).build();
         testSessions = new TestSessions(sessions);
-        user = users.save(User.join("google", "session-" + UUID.randomUUID(), "session@example.com", UserRole.ADMIN, Instant.now()));
+        user = users.save(User.join("google", "session-" + UUID.randomUUID(), "session@example.com", UserRole.ADMIN));
     }
 
     @AfterEach

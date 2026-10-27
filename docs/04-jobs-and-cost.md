@@ -42,13 +42,13 @@
 | `domain` | `@Entity` · enum · 값 타입 · 도메인 규칙(`MasteryPolicy` 등). 엔티티는 생성 흐름마다 이름 있는 정적 팩토리로만 만든다 — public 생성자 · `@Builder` 없음, 처음 상태는 팩토리 안에 고정(ADR-071). 엔티티는 `created_at` · `updated_at` 을 매핑한 공통 상위 클래스를 상속하고 팩토리는 시각을 받지 않는다(ADR-078). 같은 도메인의 부모는 `@ManyToOne(fetch = LAZY)` 단방향, 다른 도메인의 엔티티는 ID 값 — 컬렉션 · cascade 없음(ADR-077) |
 | `dto` | HTTP 요청 · 응답 타입만 |
 
-`generation` 은 계층이 아니라 용도로 나눈다(`generation.llm` · 잡 종류별 — 해당 TASK 에서 정한다). `auth` · `config` · `worker` 는 계층 구분이 맞지 않는 기술 코드라 평평하게 둔다. `common` 은 계층이 아니라 **주제로 나눈다** — `common.api`(성공 응답 · 공통 오류 응답) · `common.time`(시계) · `common.logging`(요청 ID · 접근 줄 — §9.2). 새 공통 코드는 이 셋 중 맞는 곳에 두고, 맞는 곳이 없을 때만 주제 하위 패키지를 새로 만든다. `common` 바로 아래에는 클래스를 두지 않는다(ADR-075). 하위 패키지끼리 참조하므로 클래스와 그 생성자 · 메서드는 `public` 이다.
+`generation` 은 계층이 아니라 용도로 나눈다(`generation.llm` · 잡 종류별 — 해당 TASK 에서 정한다). `auth` · `config` · `worker` 는 계층 구분이 맞지 않는 기술 코드라 평평하게 둔다. `common` 은 계층이 아니라 **주제로 나눈다** — `common.api`(성공 응답 · 공통 오류 응답) · `common.time`(시계) · `common.logging`(요청 ID · 접근 줄 — §9.2) · `common.persistence`(엔티티 공통 시각). 새 공통 코드는 이 넷 중 맞는 곳에 두고, 맞는 곳이 없을 때만 주제 하위 패키지를 새로 만든다. `common` 바로 아래에는 클래스를 두지 않는다(ADR-075). 하위 패키지끼리 참조하므로 클래스와 그 생성자 · 메서드는 `public` 이다.
 
 | 패키지 | 책임 |
 |---|---|
 | 루트 `MogumApplication` | 진입점 · `@ConfigurationPropertiesScan` |
-| `config` | 설정 값(`WebProperties` · `AuthProperties`) · 시계 빈 · `app.role` 별 빈 등록(§3.1). `worker` · `generation` 을 조립하는 유일한 곳 |
-| `common` | `common.api` — `ApiResponse`(성공 응답 감싸기) · 공통 오류 응답(`ErrorCode` · `ApiException` · `ApiError` · `FieldViolation` · `ApiErrorResponses` · `ApiExceptionHandler` · `ApiErrorController`). `common.time` — `SeoulClock`. `common.logging` — `RequestLogFilter`(요청 ID · 접근 줄 · MDC 키 상수, §9.2) |
+| `config` | 설정 값(`WebProperties` · `AuthProperties`) · 시계 빈 · `JpaAuditingConfiguration`(JPA Auditing · `Clock` 기반 시각 공급자) · `app.role` 별 빈 등록(§3.1). `worker` · `generation` 을 조립하는 유일한 곳 |
+| `common` | `common.api` — `ApiResponse`(성공 응답 감싸기) · 공통 오류 응답(`ErrorCode` · `ApiException` · `ApiError` · `FieldViolation` · `ApiErrorResponses` · `ApiExceptionHandler` · `ApiErrorController`). `common.time` — `SeoulClock`. `common.logging` — `RequestLogFilter`(요청 ID · 접근 줄 · MDC 키 상수, §9.2). `common.persistence` — `AuditedEntity`(`@MappedSuperclass` · `created_at` · `updated_at` · Auditing 리스너) |
 | `auth` | Spring Security 설정 · 구글 OAuth 로그인 처리 · 세션 → 회원 필터 |
 | `account` | 회원 엔티티 · 리포지토리 · 로그인 서비스 · `/api/me` |
 | `curriculum` · `material` · `concept` · `review` … | 도메인마다 위 다섯 하위 패키지. `MasteryPolicy` 같은 도메인 규칙은 `domain` 에 둔다 |

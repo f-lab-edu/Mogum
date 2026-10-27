@@ -76,6 +76,12 @@ class LoginIdentityMigrationIT extends PostgresTestConfiguration {
                     WHERE table_schema = ? AND table_name = 'user_identities'
                     """, Integer.class, schema));
             assertEquals(users, jdbc.queryForList("SELECT id, email, status, role, terms_agreed_at, terms_version, created_at FROM users ORDER BY id"));
+            assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM users WHERE updated_at = created_at", Integer.class));
+            assertEquals(0, jdbc.queryForObject("""
+                    SELECT count(*) FROM information_schema.columns
+                    WHERE table_schema = ? AND table_name = 'users' AND column_name = 'updated_at'
+                        AND (is_nullable <> 'NO' OR column_default IS NOT NULL)
+                    """, Integer.class, schema));
             assertEquals(java.util.List.of("Original-Sub", "other-sub"),
                     jdbc.queryForList("SELECT subject FROM users ORDER BY id", String.class));
             assertEquals(java.util.List.of("google", "google"),

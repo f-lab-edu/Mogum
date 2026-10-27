@@ -294,7 +294,7 @@ COMMIT;
 | `role` | `text` **NOT NULL** | CHECK: `USER` / `ADMIN` — 신규 가입 시 관리자 이메일 목록으로 초기값을 정하고 재로그인에서는 저장된 값 유지 |
 | `terms_agreed_at` · `terms_version` | `timestamptz` · `text` | 약관 버전이 바뀌면 다시 동의 |
 | `created_at` | `timestamptz` **NOT NULL** | 대기 명단 순서. 가입 때 Auditing 이 채운다(ADR-078) |
-| `updated_at` | `timestamptz` **NOT NULL** | 마지막 변경 시각 — `3-curriculum-model` 에서 더한다. 기존 행은 `created_at` 으로 채운다. 대기자 승인 같은 관리자 SQL 은 `updated_at = now()` 를 함께 쓴다(§7) |
+| `updated_at` | `timestamptz` **NOT NULL** | 마지막 변경 시각 — `V7__add_users_updated_at.sql` 로 더했다. 기존 행은 `created_at` 으로 채운다. 대기자 승인 같은 관리자 SQL 은 `updated_at = now()` 를 함께 쓴다(§7) |
 
 **`UNIQUE(provider, subject)`**로 외부 계정 하나당 회원 하나를 보장한다. 서로 다른 제공자의 같은 `subject`는 서로 다른 계정이다. 회원당 로그인 수단은 하나이며 별도 연결 테이블은 두지 않는다. 현재 활성 제공자는 구글 하나다. 추가 제공자의 인증 설정·응답 변환·이메일 신뢰 정책은 해당 기능에서 구현하며, 저장 모델의 제공자 구분 테스트가 실제 로그인을 활성화하는 것은 아니다. 복수 로그인 연결·해제·계정 병합은 범위 밖이다.
 
@@ -314,7 +314,7 @@ COMMIT;
 
 #### 6.1.2 기존 데이터 이전
 
-- 기존 V1~V5는 수정하지 않는다. V4에서 분리했던 연결은 V5가 회원 행으로 통합했고 V6가 구글 전용 컬럼을 일반화한다. 새 DB도 V1~V6를 순서대로 적용한다.
+- 기존 V1~V5는 수정하지 않는다. V4에서 분리했던 연결은 V5가 회원 행으로 통합했고 V6가 구글 전용 컬럼을 일반화한다. 새 DB도 V1~V7을 순서대로 적용한다.
 - V5의 회원당 구글 연결 하나 검사와 잘못된 연결의 이전 거절 계약은 유지한다. V6는 기존 `google_sub`를 `subject`로 이름 변경하고 기존 회원의 `provider`를 `google`로 채운다. provider의 이전용 기본값은 제거해 이후 생성에서 제공자를 명시하게 한다.
 - 구글 전용 unique 제약은 `UNIQUE(provider, subject)`로 교체하고 각 컬럼의 NOT NULL·빈 값 금지 제약을 유지한다. 단일 마이그레이션 트랜잭션으로 적용한다.
 - 회원 ID·전체 회원 정보·식별자 원문·ID 세션을 보존한다. `LoginIdentityMigrationIT`에서 V3/V4/V5부터 최신 스키마까지의 이전, 기존 세션의 실제 `/api/me`, 정보 보존 재로그인, 구글 전용 컬럼과 연결 테이블 제거를 검증한다. 지원하지 않는 V4 연결의 이전 거절·롤백도 유지한다.
