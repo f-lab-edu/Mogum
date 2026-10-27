@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "curriculum-schema",
-      "status": "pending"
+      "status": "completed",
+      "summary": "V8__create_curriculum_model.sql · AuditedEntity 상속 CurriculumGroup/CurriculumStep/Curriculum/Lesson · CurriculumStatus/LessonStatus · 팩토리 5개 · CurriculumGroupRepository/CurriculumStepRepository/CurriculumRepository/LessonRepository 구현; keywords는 List<String> + @JdbcTypeCode(SqlTypes.ARRAY) + @Column(columnDefinition = \"text[]\")로 ddl-auto validate 및 순서/값 보존 확인; CurriculumRepositoryIT는 중첩 @TestConfiguration을 @Import하고 기존 clock과 다른 이름의 @Bean @Primary curriculumTestClock(Clock.fixed)을 주입하며 각 테스트가 만든 회원 ID로 한정해 강의 → 커리큘럼 → 단계 → 묶음 → 회원 순서의 명시적 정리 SQL 사용; DB 제약·FK 삭제 동작·LAZY·Auditing 검증 및 사실 문서 반영; ./backend/gradlew -p backend build 서버 테스트 383개 → 477개 통과(실패·오류·건너뜀 0).",
+      "started_at": "2026-10-28T08:34:52+0900",
+      "completed_at": "2026-10-28T08:39:52+0900"
     },
     {
       "step": 2,
