@@ -542,6 +542,14 @@ def _claude_json(structured):
     return json.dumps({"type": "result", "is_error": False, "structured_output": structured})
 
 
+# 2b-ops-logging step 1 의 리뷰 출력에서 옮긴 형태 — 한도에 걸리면 0.5초 만에 이것만 내고 끝난다.
+REVIEW_LIMIT_STDOUT = json.dumps({
+    "type": "result", "subtype": "success", "is_error": True, "num_turns": 1,
+    "api_error_status": 429, "api_error_origin": "first_party", "api_error": "usage_limit_reached",
+    "result": "You've hit your session limit · resets 2:20am (Asia/Seoul)", "duration_ms": 555,
+})
+
+
 class TestReviewStep:
     APPROVE = {"verdict": "approve", "summary": "좋다", "findings": []}
 
@@ -619,6 +627,24 @@ class TestReviewStep:
         saved = json.loads((executor._phase_dir / "step2-review.json").read_text())
         assert saved["timedOut"] is True
         assert saved["review"] is None
+
+    @pytest.mark.parametrize("stdout", [
+        REVIEW_LIMIT_STDOUT,
+        json.dumps({"type": "result", "is_error": True, "api_error_status": 429,
+                    "result": "You've hit your session limit · resets 2:20am (Asia/Seoul)"}),
+    ])
+    def test_usage_limit_raises_with_reset_time(self, executor, stdout):
+        """한도는 바로 다시 해도 같다 — 판정 없음(None)과 구분해 알린다(H21)."""
+        mock_result = MagicMock(returncode=1, stdout=stdout, stderr="")
+        step = {"step": 2, "name": "ui"}
+
+        with patch("subprocess.run", return_value=mock_result):
+            with pytest.raises(ex.ReviewUsageLimit) as exc_info:
+                executor._review_step(step, "abc123")
+
+        assert "resets 2:20am (Asia/Seoul)" in str(exc_info.value)
+        saved = json.loads((executor._phase_dir / "step2-review.json").read_text())
+        assert saved["stdout"] == stdout
 
 
 # ---------------------------------------------------------------------------
@@ -813,6 +839,32 @@ class TestExecuteSingleStep:
         assert "usage limit" in reason
         assert "FooTest 추가" in reason
 
+    def test_review_usage_limit_pauses_for_review_only_resume(self, executor, capsys):
+        """리뷰 한도 — 리뷰를 다시 하거나 Codex 를 다시 돌리지 않고 멈춘다.
+        step 은 completed · completed_at 없음으로 남아 다시 실행하면 리뷰부터 한다(H21)."""
+        preambles, commits = self._wire(executor, [])
+        reviews = []
+
+        def review_hits_limit(step, base):
+            reviews.append(base)
+            raise ex.ReviewUsageLimit("You've hit your session limit · resets 2:20am (Asia/Seoul)")
+
+        executor._review_step = review_hits_limit
+
+        with pytest.raises(SystemExit) as exc_info:
+            executor._execute_single_step(self._step2(executor))
+
+        assert exc_info.value.code == 2
+        assert len(preambles) == 1
+        assert len(reviews) == 1
+        assert commits == []
+        step = self._step2(executor)
+        assert step["status"] == "completed"
+        for gone in ("completed_at", "error_message", "blocked_reason"):
+            assert gone not in step
+        assert ex.StepExecutor._next_step(json.loads(executor._index_file.read_text()))["step"] == 2
+        assert "resets 2:20am (Asia/Seoul)" in capsys.readouterr().out
+
     def test_review_findings_survive_a_later_failure(self, executor):
         """반려 뒤 다음 시도가 다른 이유로 실패해도 그다음 시도에 지적이 남는다(H15)."""
         preambles, commits = self._wire(executor, [self.REJECT, self.APPROVE])
@@ -992,6 +1044,39 @@ class TestProgressIndicator:
         with ex.progress_indicator("test") as pi:
             time.sleep(0.2)
         assert pi.elapsed > 0
+
+    def test_not_a_tty_writes_start_and_end_lines_only(self, capsys):
+        """로그 파일로 돌리면 \\r 이 줄을 덮어쓰지 못해 프레임마다 줄이 쌓인다(H16).
+        결과 줄(print)과 같은 stdout 에 써야 로그에서 순서가 맞는다."""
+        import io, time
+        print("  ✓ Step 1: api")  # 앞 step 의 결과 줄
+        err = io.StringIO()
+        with patch.object(ex.sys, "stderr", err):
+            with ex.progress_indicator("Step 2: Claude 리뷰"):
+                time.sleep(0.3)
+
+        out = capsys.readouterr().out
+        lines = out.splitlines()
+        assert err.getvalue() == ""
+        assert "\r" not in out
+        assert lines[0] == "  ✓ Step 1: api"
+        assert len(lines) == 3
+        assert all("Step 2: Claude 리뷰" in line for line in lines[1:])
+        assert lines[2].endswith("[0s]")
+
+    def test_tty_animates_frames(self):
+        import io, time
+
+        class FakeTty(io.StringIO):
+            def isatty(self):
+                return True
+
+        err = FakeTty()
+        with patch.object(ex.sys, "stderr", err):
+            with ex.progress_indicator("Step 2: Claude 리뷰"):
+                time.sleep(0.3)
+
+        assert err.getvalue().count("\r◐ Step 2: Claude 리뷰") >= 1
 
 
 # ---------------------------------------------------------------------------

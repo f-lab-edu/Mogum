@@ -23,12 +23,28 @@ from typing import Optional
 ROOT = Path(__file__).resolve().parent.parent
 
 
+class ReviewUsageLimit(Exception):
+    """리뷰(claude -p)가 Claude 사용 한도로 멈췄다. 메시지는 다시 쓸 수 있는 시각을 담는다."""
+
+
 @contextlib.contextmanager
 def progress_indicator(label: str):
-    """터미널 진행 표시기. with 문으로 사용하며 .elapsed 로 경과 시간을 읽는다."""
+    """진행 표시기. with 문으로 사용하며 .elapsed 로 경과 시간을 읽는다.
+    터미널이 아니면(로그 파일로 돌린 실행) 프레임 대신 시작 · 끝 줄만 쓴다 — \\r 이 줄을 덮어쓰지 못해 프레임마다 줄이 쌓인다.
+    이 줄은 결과 줄과 같은 stdout 에 flush 해서 쓴다 — stderr 에 쓰면 모였다 나가는 stdout 보다 앞서 찍혀 순서가 뒤섞인다."""
+    t0 = time.monotonic()
+    info = types.SimpleNamespace(elapsed=0.0)
+    if not sys.stderr.isatty():
+        print(f"◐ {label} — 시작", flush=True)
+        try:
+            yield info
+        finally:
+            info.elapsed = time.monotonic() - t0
+            print(f"◐ {label} — 끝 [{int(info.elapsed)}s]", flush=True)
+        return
+
     frames = "◐◓◑◒"
     stop = threading.Event()
-    t0 = time.monotonic()
 
     def _animate():
         idx = 0
@@ -42,7 +58,6 @@ def progress_indicator(label: str):
 
     th = threading.Thread(target=_animate, daemon=True)
     th.start()
-    info = types.SimpleNamespace(elapsed=0.0)
     try:
         yield info
     finally:
@@ -55,7 +70,7 @@ class StepExecutor:
     """Phase 디렉토리 안의 step들을 순차 실행하는 하네스."""
 
     MAX_RETRIES = 3
-    REVIEW_ATTEMPTS = 2  # 판정을 못 얻으면(파싱 실패 · 시간 초과) 리뷰만 한 번 더 — Codex 는 다시 돌리지 않는다
+    REVIEW_ATTEMPTS = 2  # 판정을 못 얻으면(파싱 실패 · 시간 초과) 리뷰만 한 번 더 — Codex 는 다시 돌리지 않는다. 사용 한도는 다시 하지 않는다
     CODEX_TIMEOUT = 1800
     REVIEW_TIMEOUT = 1800
     FEAT_MSG = "feat({phase}): step {num} — {name}"
@@ -333,8 +348,21 @@ class StepExecutor:
 
     # --- Claude 리뷰 ---
 
+    @staticmethod
+    def _review_usage_limit(stdout: str) -> Optional[str]:
+        """리뷰(claude -p)가 사용 한도로 멈췄으면 그 메시지(다시 쓸 수 있는 시각 포함). 아니면 None."""
+        try:
+            result = json.loads(stdout)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(result, dict) or not result.get("is_error"):
+            return None
+        if result.get("api_error") != "usage_limit_reached" and result.get("api_error_status") != 429:
+            return None
+        return str(result.get("result") or "usage_limit_reached")
+
     def _review_step(self, step: dict, base: str) -> Optional[dict]:
-        """step 변경을 Claude 가 읽기 전용으로 리뷰한다. 판정을 얻지 못하면 None."""
+        """step 변경을 Claude 가 읽기 전용으로 리뷰한다. 판정을 얻지 못하면 None, 사용 한도면 ReviewUsageLimit."""
         step_num = step["step"]
         step_file = self._phase_dir / f"step{step_num}.md"
         prompt = (
@@ -378,6 +406,9 @@ class StepExecutor:
             "step": step_num, "base": base, "exitCode": exit_code, "timedOut": timed_out,
             "review": review, "stdout": stdout, "stderr": stderr,
         })
+        limit = self._review_usage_limit(stdout)
+        if limit:
+            raise ReviewUsageLimit(limit)
         return review
 
     def _review_with_retry(self, step: dict, base: str) -> tuple:
@@ -493,7 +524,10 @@ class StepExecutor:
             status = next((s.get("status", "pending") for s in index["steps"] if s["step"] == step_num), "pending")
 
             if status == "completed":
-                review, review_elapsed = self._review_with_retry(step, base)
+                try:
+                    review, review_elapsed = self._review_with_retry(step, base)
+                except ReviewUsageLimit as e:
+                    self._pause_for_review(step_num, step_name, str(e))
                 if review is None:
                     self._fail_step(step_num, step_name,
                                     f"Claude 리뷰 판정을 얻지 못했다 — phases/{self._phase_dir_name}/step{step_num}-review.json 확인")
@@ -555,6 +589,14 @@ class StepExecutor:
         self._write_json(self._index_file, index)
         print(f"  ⏸ Step {step_num}: {step_name} blocked [{elapsed}s]")
         print(f"    Reason: {s.get('blocked_reason', '')}")
+        self._update_top_index("blocked")
+        sys.exit(2)
+
+    def _pause_for_review(self, step_num: int, step_name: str, message: str):
+        """리뷰가 사용 한도에 걸려 멈춘다. step 은 completed · completed_at 없음 그대로 둔다 —
+        다시 실행하면 리뷰부터 한다(_next_step). blocked → pending 으로 두면 끝난 Codex 를 다시 돌린다."""
+        print(f"  ⏸ Step {step_num}: {step_name} — Claude 리뷰 사용 한도: {message}")
+        print("    한도가 풀린 뒤 그대로 다시 실행하면 리뷰부터 한다 — index.json 은 고치지 않는다")
         self._update_top_index("blocked")
         sys.exit(2)
 

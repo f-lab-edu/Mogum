@@ -43,6 +43,7 @@
 17. **운영 장치의 요구는 원하는 단순함의 수준까지 적는다** — "크기 상한을 둔다" 만 적으면 Codex 가 가장 엄격하게 해석해 과설계한다. "로그 파일에 덧붙이고 시작할 때 크기를 보고 교체" 처럼 방식까지 적는다(2-deploy 1차 step 6 — FIFO · 수집기로 194 → 327줄).
 18. **사람이 붙여 넣어 실행할 명령 블록은 권한 전환과 나머지를 나눈다** — `sudo -i` 는 따로 두고, 나머지는 `bash -euo pipefail <<'EOF'` 스크립트 한 덩어리로 쓴다. 한 블록에 섞으면 `sudo -i` 뒤 줄이 새 셸로 가지 않고, 대화형 셸의 `set -e` 는 실패 한 번에 세션을 닫는다. 이런 블록은 테스트도 리뷰도 실행하지 못한다(2-deploy 절차서 4번).
 19. **워크플로의 서드파티 액션은 전체 커밋 SHA 로 고정하고 줄 끝에 릴리스를 주석으로 단다** — 태그는 옮겨질 수 있고 SonarCloud 게이트(`githubactions:S7637`)가 PR 에서 막는다. 자격을 받은 뒤 도는 공식 액션도 같이 고정한다. SHA 는 조회한 값을 step 에 적는다(원칙 11 · PR #11).
+20. **계약(API 응답 · 오류 형식 · ADR · `AGENTS.md` 금지 목록)을 바꾸는 phase 는 Claude 가 계약 문서를 step 전에 먼저 고쳐 커밋하고, step 은 그 절을 가리킨다** — step 에는 "어긋나면 코드를 계약에 맞추고, 못 맞추면 blocked 로 멈춰라. 문서를 고치지 마라" 를 적는다. Codex 가 계약을 스스로 해석해 문서와 코드를 함께 바꾸지 않고, step 은 "05 §1 을 따른다" 처럼 짧아진다. step 이 고치는 문서는 구현으로 확정된 사실(경로 · 클래스 이름 · 검증 줄)만 남는다(`2a-api-response` · 그 수정 step 5 · 6 · `2b-ops-logging` · 그 수정 step 5 — 모두 계약 해석으로 인한 반려 · blocked 0).
 
 ### D. 파일 생성
 
@@ -165,7 +166,7 @@ step 하나의 흐름:
 2. **Claude 리뷰** — Codex 가 `completed` 로 끝내면 `claude -p --permission-mode dontAsk` 가 읽기 전용으로 리뷰한다. 볼 수 있는 것은 이 step 시작 커밋 이후의 diff 와 untracked 파일이다. AC 를 다시 돌리고 `approve` / `request_changes` 를 JSON 으로 판정한다. 결과는 `phases/{task}/step{N}-review.json` 에 남는다.
 3. **승인** → 코드(`feat`)와 메타데이터(`chore`)를 나눠 커밋한다.
    **반려** → 지적 사항(findings)을 다음 Codex 시도의 프롬프트에 넣는다. 이전 시도의 변경은 작업 트리에 남긴 채로 고치게 한다. Codex 실패와 리뷰 반려를 합쳐 최대 3회 시도한다.
-   **판정 없음**(리뷰 출력 파싱 실패 · 시간 초과) → Codex 를 다시 돌리지 않고 리뷰만 한 번 더 한다. 그래도 없으면 `error`.
+   **판정 없음**(리뷰 출력 파싱 실패 · 시간 초과) → Codex 를 다시 돌리지 않고 리뷰만 한 번 더 한다. 그래도 없으면 `error`. 리뷰가 사용 한도에 걸린 것은 판정 없음으로 세지 않는다(아래 「사용 한도」).
 
 execute.py가 자동으로 처리하는 것:
 
@@ -173,11 +174,11 @@ execute.py가 자동으로 처리하는 것:
 - 컨텍스트 누적 — 완료된 step의 summary를 다음 step 프롬프트에 전달
 - 자가 교정 — Codex 에러 메시지나 Claude 리뷰 지적을 다음 시도에 피드백. 마지막 리뷰 반려 지적은 뒤이은 다른 실패(status 미갱신 · 시간 초과)에 덮이지 않고 다음 시도와 최종 `error_message` 에 함께 남는다
 - 시간 초과 — Codex · 리뷰 각각 1800초. 넘으면 하네스가 죽지 않고 실패한 시도로 처리한다(Codex 는 다음 시도에 "시간 초과" 를 알린다)
-- 사용 한도 — Codex 출력에서 사용 한도 오류(`usage limit`)를 알아보면 시도로 세지 않고 `blocked` 로 멈춘다. 사유에 오류 문구(다시 쓸 수 있는 시각)와 직전 리뷰 지적을 남긴다 — 한도가 풀린 뒤 `status` 만 `pending` 으로 바꿔 재실행한다
+- 사용 한도 — Codex 출력에서 사용 한도 오류(`usage limit`)를 알아보면 시도로 세지 않고 `blocked` 로 멈춘다. 사유에 오류 문구(다시 쓸 수 있는 시각)와 직전 리뷰 지적을 남긴다 — 한도가 풀린 뒤 `status` 만 `pending` 으로 바꿔 재실행한다. 리뷰(`claude -p`) 출력에서 사용 한도(`usage_limit_reached` · 429)를 알아보면 리뷰를 다시 하지 않고 다시 쓸 수 있는 시각을 찍은 뒤 멈춘다(종료 코드 2 · 상위 `phases/index.json` 은 `blocked`). step 은 `completed` · `completed_at` 없음 그대로라 **index 를 고치지 않고** 한도가 풀린 뒤 재실행하면 리뷰부터 한다 — `pending` 으로 바꾸면 끝난 Codex 를 다시 돌린다
 - 리뷰 전 중단 복구 — `completed` 인데 `completed_at`(리뷰 승인 기록)이 없는 step 은 건너뛰지 않고 다음 실행에서 리뷰부터 다시 한다. Codex 가 `completed_at` 을 쓰면 Codex 가 끝나자마자 지운다
 - 타임스탬프 — started_at, completed_at, failed_at, blocked_at 자동 기록
 
-실행을 감시할 때 — 재시도 · 반려 · blocked 와 그 원인, 사람이 끼어든 지점, 유난히 오래 걸린 step 을 메모해 둔다. F 의 하네스 회고에 쓴다.
+실행을 감시할 때 — 재시도 · 반려 · blocked 와 그 원인, 사람이 끼어든 지점, 유난히 오래 걸린 step 을 메모해 둔다. F 의 하네스 회고에 쓴다. 로그 파일로 돌리면(`> log 2>&1`) 진행 표시는 프레임 대신 `◐ {작업} — 시작` · `◐ {작업} — 끝 [N초]` 두 줄만 남고 결과 줄과 순서가 맞는다.
 
 중간에 멈추기 — 프로세스를 죽이지 않는다. 아래 파일을 만들면 **지금 step 이 리뷰 · 커밋까지 끝난 뒤** 다음 step 앞에서 멈추고 파일을 지운다(`.git` 안이라 커밋되지 않는다). 다시 실행하면 이어 한다. step 파일을 실행 중에 고쳐야 할 때 쓴다.
 
@@ -188,6 +189,7 @@ touch "$(git rev-parse --git-path harness-stop)"
 에러 복구:
 
 - **error 발생 시** — 실패한 step 의 변경은 **커밋하지 않고** 작업 트리에 남는다. `step{N}-review.json` · `step{N}-output.json` 으로 원인을 본다. 그다음 `phases/{task-name}/index.json` 에서 해당 step의 `status` 만 `"pending"` 으로 바꾸고 재실행한다. **`error_message` 는 지우지 않는다** — execute.py 가 재개한 첫 시도의 프롬프트에 넣고 지운다. 남은 변경을 그대로 두면 다음 시도의 리뷰 범위에 포함된다. 버리려면 사용자가 직접 정리한다.
+- **리뷰만 실패한 error**(`error_message` 가 "Claude 리뷰 판정을 얻지 못했다") — Codex 는 끝났다. `pending` 이 아니라 `status` 를 `"completed"` 로 바꾸고 `error_message` · `failed_at` 을 지운 뒤 재실행하면 리뷰부터 한다(`completed_at` 이 없어야 한다). 사유를 지우는 이유: 남기면 리뷰가 반려했을 때 다음 Codex 프롬프트에 리뷰 실패 사유가 "이전 실행에서 멈췄다" 로 들어간다.
 - **blocked 발생 시** — `blocked_reason` 에 적힌 사유를 해결한 뒤(결정은 step 파일 · 문서에 반영한다), `status` 만 `"pending"` 으로 바꾸고 재실행한다. **`blocked_reason` 은 지우지 않는다** — 위와 같이 전달된다.
 - 리뷰 지적이 step 설계 자체의 문제라면(지시가 모호함 · 문서와 충돌) Codex 를 다시 돌리지 말고 step 파일부터 고친다.
 
