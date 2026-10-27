@@ -5,6 +5,8 @@ import com.mogum.account.service.LoginResult;
 import com.mogum.account.service.LoginService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,6 +18,7 @@ import org.springframework.session.FindByIndexNameSessionRepository;
 import java.io.IOException;
 
 public final class OAuthLoginHandler implements AuthenticationSuccessHandler, AuthenticationFailureHandler {
+    private static final Logger log = LoggerFactory.getLogger(OAuthLoginHandler.class);
     private final LoginService login;
     private final GoogleAccountMapper accounts;
     private final String origin;
@@ -37,7 +40,7 @@ public final class OAuthLoginHandler implements AuthenticationSuccessHandler, Au
             try {
                 account = accounts.map(authentication);
             } catch (OAuth2AuthenticationException invalid) {
-                fail(request, response, "login_failed");
+                fail(request, response, "login_failed", failureReason(invalid));
                 return;
             }
             switch (login.login(account)) {
@@ -53,10 +56,14 @@ public final class OAuthLoginHandler implements AuthenticationSuccessHandler, Au
                     session.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME,
                             Long.toString(success.userId()));
                     response.sendRedirect(origin + "/");
+                    log.info("login result=success userId={}", success.userId());
                 }
                 case LoginResult.Rejected rejected ->
                         fail(request, response, rejected.reason() == LoginResult.RejectionReason.NOT_ALLOWED
-                                ? "not_allowed" : "login_failed");
+                                ? "not_allowed" : "login_failed", switch (rejected.reason()) {
+                                    case NOT_ALLOWED -> "not_allowed";
+                                    case EMAIL_NOT_VERIFIED -> "email_not_verified";
+                                });
             }
         } finally {
             SecurityContextHolder.clearContext();
@@ -66,12 +73,33 @@ public final class OAuthLoginHandler implements AuthenticationSuccessHandler, Au
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
                                         AuthenticationException exception) throws IOException {
-        fail(request, response, "login_failed");
+        fail(request, response, "login_failed", failureReason(exception));
     }
 
-    private void fail(HttpServletRequest request, HttpServletResponse response, String error) throws IOException {
+    // error code도 콜백/프로바이더가 보낸 원문일 수 있으므로 알려진 코드만 고정 문자열로 바꾼다.
+    private static String failureReason(AuthenticationException exception) {
+        if (!(exception instanceof OAuth2AuthenticationException oauth)) return "unknown";
+        return switch (oauth.getError().getErrorCode()) {
+            case "authorization_request_not_found" -> "authorization_request_not_found";
+            case "invalid_state_parameter" -> "invalid_state_parameter";
+            case "access_denied" -> "access_denied";
+            case "invalid_request" -> "invalid_request";
+            case "invalid_user_info" -> "invalid_user_info";
+            case "invalid_grant" -> "invalid_grant";
+            case "invalid_token_response" -> "invalid_token_response";
+            case "invalid_user_info_response" -> "invalid_user_info_response";
+            default -> "unknown";
+        };
+    }
+
+    private void fail(HttpServletRequest request, HttpServletResponse response, String error, String reason) throws IOException {
         requests.saveAuthorizationRequest(null, request, response);
         SecurityContextHolder.clearContext();
         response.sendRedirect(origin + "/login?error=" + error);
+        if (reason.equals("invalid_grant") || reason.equals("invalid_token_response") || reason.equals("invalid_user_info_response")) {
+            log.warn("login result={} reason={}", error, reason);
+        } else {
+            log.info("login result={} reason={}", error, reason);
+        }
     }
 }

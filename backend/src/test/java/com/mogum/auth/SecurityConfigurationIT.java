@@ -1,9 +1,9 @@
 package com.mogum.auth;
 
 import com.mogum.account.controller.MeController;
-import com.mogum.common.ApiErrorController;
-import com.mogum.common.ApiException;
-import com.mogum.common.ErrorCode;
+import com.mogum.common.api.ApiErrorController;
+import com.mogum.common.api.ApiException;
+import com.mogum.common.api.ErrorCode;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
@@ -160,7 +160,7 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
     void 요청_검증_IT의_컨트롤러는_다른_앱_컨텍스트에_등록되지_않는다() {
         assertTrue(Arrays.stream(context.getBeanNamesForAnnotation(RestController.class))
                 .map(context::getType)
-                .noneMatch(type -> type.getName().startsWith("com.mogum.common.RequestValidationIT$")));
+                .noneMatch(type -> type.getName().startsWith("com.mogum.common.api.RequestValidationIT$")));
     }
 
     @Test

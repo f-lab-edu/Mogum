@@ -2,7 +2,7 @@ package com.mogum.account.controller;
 
 import com.mogum.account.domain.User;
 import com.mogum.account.dto.MeResponse;
-import com.mogum.common.ApiResponse;
+import com.mogum.common.api.ApiResponse;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;

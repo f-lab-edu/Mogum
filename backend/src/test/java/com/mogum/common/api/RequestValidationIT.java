@@ -1,4 +1,4 @@
-package com.mogum.common;
+package com.mogum.common.api;
 
 import com.mogum.account.domain.User;
 import com.mogum.account.domain.UserRole;
@@ -14,9 +14,14 @@ import jakarta.validation.constraints.Size;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.test.json.JsonAssert;
@@ -30,12 +35,14 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.time.Duration;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(RequestValidationIT.ValidationController.class)
+@ExtendWith(OutputCaptureExtension.class)
 class RequestValidationIT extends PostgresTestConfiguration {
     @Autowired private UserRepository users;
     @Autowired private JdbcIndexedSessionRepository sessions;
@@ -180,6 +187,44 @@ class RequestValidationIT extends PostgresTestConfiguration {
         assertError(post("""
                 {"topic":["private-topic"],"purpose":"private"}
                 """), "INVALID_REQUEST", "", "private-topic", "private");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"json", "validation", "type", "401", "403", "404", "405"})
+    void 입력_원문과_4xx의_WARN_ERROR를_로그에_남기지_않는다(String condition, CapturedOutput output) throws Exception {
+        String marker = "LEAKCHECK-" + UUID.randomUUID();
+        int offset = output.getAll().length();
+        HttpResponse<String> response;
+        int expectedStatus = 400;
+        switch (condition) {
+            case "json" -> response = post("{\"topic\":\"" + marker + "\",");
+            case "validation" -> response = post("{\"topic\":\"" + marker + "\",\"purpose\":\"학습\"}");
+            case "type" -> response = post("{\"topic\":[\"" + marker + "\"],\"purpose\":\"학습\"}");
+            default -> {
+                expectedStatus = Integer.parseInt(condition);
+                String path = condition.equals("403") ? "/api/auth/logout"
+                        : condition.equals("404") ? "/api/test-missing" : "/api/me";
+                var request = HttpRequest.newBuilder(uri(path + "?private=" + marker));
+                if (!condition.equals("401")) request.header("Cookie", "SESSION=" + session.getValue()
+                        + (condition.equals("405") ? "; XSRF-TOKEN=" + token : ""));
+                if (condition.equals("405")) request.header("X-XSRF-TOKEN", token);
+                response = client.send(request.method(condition.equals("403") || condition.equals("405") ? "POST" : "GET",
+                        HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+            }
+        }
+        assertEquals(expectedStatus, response.statusCode(), response.body());
+        String id = response.headers().firstValue("X-Request-Id").orElseThrow();
+        long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
+        while (output.getOut().lines().noneMatch(line -> line.contains("requestId=" + id)
+                && line.contains("access method=")) && System.nanoTime() < deadline) Thread.sleep(10);
+        var requestLines = output.getOut().lines().filter(line -> line.contains("requestId=" + id)).toList();
+        assertEquals(1, requestLines.size(), output.getAll());
+        assertTrue(requestLines.getFirst().contains(" INFO ") && requestLines.getFirst().contains("access method="), output.getAll());
+        assertTrue(requestLines.getFirst().contains("status=" + expectedStatus), output.getAll());
+        assertFalse(output.getAll().contains(marker), output.getAll());
+        assertFalse(response.body().contains(marker), response.body());
+        assertTrue(output.getAll().substring(offset).lines().noneMatch(line -> line.contains(" WARN ") || line.contains(" ERROR ")),
+                output.getAll());
     }
 
     private HttpResponse<String> post(String body) throws Exception {

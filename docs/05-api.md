@@ -17,6 +17,7 @@
 - **응답에 필드나 enum 값을 더하는 것은 깨지지 않는 변경이다.** 화면은 모르는 필드를 무시하고, 모르는 enum 값에서 멈추지 않는다 — 타입은 `알려진 값 | string` 으로 두고 각 화면이 일반 처리로 받는다. enum 값을 더하는 TASK 는 그 값을 받는 화면의 처리도 함께 넣는다. 화면(Vercel)과 API(EC2)는 따로 배포되므로 있는 필드의 모양 · 뜻을 바꾸는 것은 깨지는 변경이다(AGENTS 작업 방식).
 - 시각은 ISO-8601 UTC(`2026-12-14T15:00:00Z`)다. 한국 시간으로 보여 주는 것은 화면이 한다.
 - 컨트롤러가 `ApiResponse` 로 직접 감싼다. 응답 advice 로 자동으로 감싸지 않는다 — 오류 · 헬스 · ERROR 디스패치 · `204` 를 걸러야 하고, 감싸는지가 코드에 보이지 않는다. ArchUnit 이 컨트롤러 반환 타입을 검사한다(AGENTS 금지 목록 29).
+- **요청 ID** — 모든 응답(오류 · ERROR 디스패치 · 헬스 포함)에 `X-Request-Id` 헤더를 싣는다. 서버 로그의 `requestId` 와 같은 값이라, 개발자 도구에서 본 응답의 서버 로그를 찾을 때 쓴다([04 §9.2](./04-jobs-and-cost.md)). 형식이 없는 문자열로 다룬다 — 길이 · 모양에 기대지 않는다. 서버가 요청마다 만들며, 요청에 실린 같은 이름의 헤더는 쓰지 않는다. 화면 스크립트는 읽지 않는다 — CORS 노출 헤더(`Access-Control-Expose-Headers`)에 넣지 않는다. 오류 본문(§1.2)에는 싣지 않는다 — 필요해지면 키를 더한다(깨지지 않는 변경).
 
 ### 1.1 인증 — 구글 OAuth + 쿠키 세션(DB 저장)
 
@@ -78,7 +79,7 @@ MVC 표준 예외와 서블릿 컨테이너의 ERROR 디스패치도 원래 HTTP
 
 - **필드** — `code` · `message` 는 늘 있다. `retryAfterSeconds` 는 시간이 지나면 풀리는 오류(아래 표에서 `Retry-After` 가 적힌 code)에만 있고, 같은 값(초)을 `Retry-After` 헤더에도 싣는다. `fields` 는 `FIELD_INVALID` 에만 있고 칸별 위반의 객체 목록이다(`"fields": [{ "field": "topic", "reason": "TOO_LONG" }]` — 아래 입력 검증). 해당하지 않으면 키를 싣지 않는다. 오류 본문은 `data` 로 감싸지 않는다(§1 응답 형식).
 - **`message` 는 개발 · 디버깅용이다.** 화면은 `message` 를 띄우지 않고 `code` 로 [06 §2.6 · §15](./06-screens.md) 의 문구를 고른다. 모르는 `code` 는 일반 실패(「불러오지 못했어요.」)로 다룬다.
-- **code 는 `common.ErrorCode` 한 곳**에 HTTP 상태 · 기본 `message` 와 함께 둔다. 도메인 오류는 `ApiException(ErrorCode)` 를 던지고, MVC 표준 예외 · 컨테이너 ERROR 디스패치 · Spring Security 의 401 · 403 도 `common` 의 같은 변환 · 직렬화를 거친다 — 오류 JSON 을 따로 쓰지 않는다(AGENTS 금지 목록 29). enum 에는 구현된 code 만 있다. 아래 표의 code 를 처음 만드는 TASK 가 enum 에 더하고, 표에 없는 code 를 새로 만들면 표에도 행을 더한다.
+- **code 는 `common.api.ErrorCode` 한 곳**에 HTTP 상태 · 기본 `message` 와 함께 둔다. 도메인 오류는 `ApiException(ErrorCode)` 를 던지고, MVC 표준 예외 · 컨테이너 ERROR 디스패치 · Spring Security 의 401 · 403 도 `common.api` 의 같은 변환 · 직렬화를 거친다 — 오류 JSON 을 따로 쓰지 않는다(AGENTS 금지 목록 29). enum 에는 구현된 code 만 있다. 아래 표의 code 를 처음 만드는 TASK 가 enum 에 더하고, 표에 없는 code 를 새로 만들면 표에도 행을 더한다.
 - **입력 검증** — 요청 DTO 에 Bean Validation 을 붙이고 컨트롤러의 `@RequestBody` 매개변수에 `@Valid` 를 단다(ArchUnit 이 누락을 막는다).
     - 위반이 **모두** 칸의 위반이고 모두 아래 `reason` 으로 바뀌면 `400 FIELD_INVALID` + `fields` 다. `reason` 으로 바뀌지 않는 위반이나 특정 칸이 없는 객체 단위 위반이 하나라도 있으면 `400 INVALID_REQUEST` 이고 `fields` 를 싣지 않는다. 형식 오류(잘못된 JSON · 타입 불일치 · UUID · enum 값)도 `INVALID_REQUEST` 다.
     - **서버는 그 칸이 사람이 입력하는 칸인지 따지지 않는다** — 그건 폼을 가진 화면이 안다. 화면은 지금 폼에 있는 칸이면 그 칸 아래에 문구를 보이고, 폼에 없는 칸(요청 ID · 카드 ID · 버전처럼 화면이 만드는 값)이 하나라도 있으면 화면 버그이므로 일반 실패로 다룬다([06 §15.1](./06-screens.md)).

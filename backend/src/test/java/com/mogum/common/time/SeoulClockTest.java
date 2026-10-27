@@ -1,4 +1,4 @@
-package com.mogum.common;
+package com.mogum.common.time;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;

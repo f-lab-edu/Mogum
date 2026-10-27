@@ -9,10 +9,13 @@ import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -27,6 +30,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
+@ExtendWith(OutputCaptureExtension.class)
 class UserRepositoryIT extends PostgresTestConfiguration {
     @Autowired private UserRepository repository;
     @Autowired private PlatformTransactionManager transactionManager;
@@ -81,6 +85,23 @@ class UserRepositoryIT extends PostgresTestConfiguration {
         var second = create();
         assertNotEquals(first.getId(), second.getId());
         assertEquals(first.getEmail(), second.getEmail());
+    }
+
+    @Test
+    void 중복키_오류는_제약_이름만_남기고_subject_원문을_남기지_않는다(CapturedOutput output) {
+        String marker = "LEAKCHECK-" + UUID.randomUUID();
+        save("google", marker, UserRole.ADMIN);
+        var failure = assertThrows(RuntimeException.class, () ->
+                repository.save(User.join("google", marker, email, UserRole.ADMIN, now)));
+        assertSqlState("23505", failure);
+        StringBuilder messages = new StringBuilder();
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            messages.append(cause.getMessage()).append('\n');
+        }
+        assertTrue(messages.toString().contains("users_provider_subject_key"), messages.toString());
+        assertFalse(messages.toString().contains(marker), messages.toString());
+        assertFalse(output.getAll().contains(marker), output.getAll());
+        assertTrue(output.getAll().contains("users_provider_subject_key"), output.getAll());
     }
 
     @Test

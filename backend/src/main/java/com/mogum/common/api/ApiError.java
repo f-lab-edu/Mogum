@@ -1,4 +1,4 @@
-package com.mogum.common;
+package com.mogum.common.api;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;

@@ -1,0 +1,56 @@
+{
+  "project": "Mogum",
+  "phase": "2b-ops-logging",
+  "steps": [
+    {
+      "step": 0,
+      "name": "common-split",
+      "status": "completed",
+      "started_at": "2026-10-27T00:22:04+0900",
+      "summary": "API 클래스 8개와 테스트 5개를 com.mogum.common.api, SeoulClock과 테스트를 com.mogum.common.time으로 이동하고 참조·문서 갱신; 테스트 전후 342→342개 모두 통과, backend build 성공.",
+      "completed_at": "2026-10-27T00:25:21+0900"
+    },
+    {
+      "step": 1,
+      "name": "request-log",
+      "status": "completed",
+      "started_at": "2026-10-27T00:25:21+0900",
+      "summary": "common.logging.RequestLogFilter(필터·종료 리스너·MDC REQUEST_ID/USER_ID 상수)를 Ordered.HIGHEST_PRECEDENCE(-2147483648)로 등록하고 UUID v4 요청 ID·접근 줄·회원 MDC와 logging.pattern.dateformat/level(Asia/Seoul·%5p %X)을 적용; backend/src/test/java/com/mogum/common/logging/RequestLogFilterIT.java의 OutputCaptureExtension은 응답 X-Request-Id로 줄을 골라 최대 3초간 10ms 간격으로 기다리며 키별 검사, 실제 접근 줄 예시와 MDC 키 순서 비보장 설명 수정, test --rerun 353개 통과(실패·건너뜀 0).",
+      "completed_at": "2026-10-27T02:26:56+0900"
+    },
+    {
+      "step": 2,
+      "name": "log-privacy",
+      "status": "completed",
+      "started_at": "2026-10-27T02:26:56+0900",
+      "summary": "OAuthLoginHandler 로그인 결과 줄 추가(성공 INFO users.id; 실패 INFO not_allowed/email_not_verified/authorization_request_not_found/invalid_state_parameter/access_denied/invalid_request/invalid_user_info/unknown, WARN invalid_grant/invalid_token_response/invalid_user_info_response); Boot 4.1.1 BOM PgJDBC 42.7.13의 PGProperty.LOG_SERVER_ERROR_DETAIL 소스 확인 후 spring.datasource.hikari.data-source-properties.logServerErrorDetail=false 적용; 405 WARN의 org.springframework.web.servlet.PageNotFound 로거 OFF; 표식 테스트 backend/src/test/java/com/mogum/auth/OAuthLoginHandlerIT.java · common/api/RequestValidationIT.java · account/repository/UserRepositoryIT.java와 docs/04-jobs-and-cost.md §9.2 갱신, 전체 서버 테스트 372개 통과(실패·건너뜀 0), 로그인 보안 흐름·미처리 예외 ERROR/스택·의존성 유지.",
+      "completed_at": "2026-10-27T02:35:21+0900"
+    },
+    {
+      "step": 3,
+      "name": "journald-ops",
+      "status": "completed",
+      "started_at": "2026-10-27T02:35:21+0900",
+      "summary": "운영 Compose 세 서비스 journald 드라이버·Postgres log_error_verbosity=terse 적용; deploy/journald/mogum.conf는 Storage=persistent·SystemMaxUse=500M·MaxRetentionSec=13day+MaxFileSec=1day=총 14일로 설정하고 deploy.sh는 헬스 통과/current 갱신 뒤 cmp가 다를 때만 644 설치·journald restart(동일/실패·복귀 경로 생략); 절차서 서버 구성·로그 보기·미체크 운영 확인 항목·롤백/백업 안내와 04 §9.2·ADR-075 갱신; 불변식·명령 대체 시나리오 포함 전체 서버 테스트 376개 통과(실패·건너뜀 0), 서버 실제 동작은 미확인.",
+      "completed_at": "2026-10-27T02:41:54+0900"
+    },
+    {
+      "step": 4,
+      "name": "log-wiring",
+      "status": "completed",
+      "summary": "변경 전 실제 Tomcat Servlet.service() ERROR 줄에 requestId·userId가 없어 새 테스트 실패 확인; 요청 로그 빈을 config.RequestLogConfiguration으로 이동하고 예외 디스패치 MDC는 requestDestroyed까지 유지해 컨테이너 ERROR/스택·500 접근 줄의 ID와 같은 스레드 후속 비로그인 요청의 잔류 없음을 검증; 테스트 JVM UTC·로그 +09:00 단언, 500MiB 테스트명·관련 문서 갱신; AC 지정 78개 및 build 전체 377개 통과(실패·오류·건너뜀 0), 운영 서버 실제 동작은 미확인.",
+      "started_at": "2026-10-27T06:30:00+0900",
+      "completed_at": "2026-10-27T06:34:44+0900"
+    },
+    {
+      "step": 5,
+      "name": "log-timezone",
+      "status": "completed",
+      "started_at": "2026-10-27T06:53:52+0900",
+      "summary": "Postgres 로그에 log_timezone=Asia/Seoul 추가; deploy.sh는 필수 명령에 timedatectl을 검사하고 헬스 통과/current 갱신 뒤 성공 배포마다 한국 시간대 설정 1회(실패·복귀 경로 미호출); 절차서·ADR-075 검증 기록 갱신, TDD 변경 전 7개 실패 확인 후 DeployFilesTest 22개와 build 전체 377개 통과(실패·오류·건너뜀 0), 컨테이너·앱·Postgres 세션 UTC 유지, 서버 실제 동작 미확인.",
+      "completed_at": "2026-10-27T06:57:39+0900"
+    }
+  ],
+  "created_at": "2026-10-27T00:22:04+0900",
+  "completed_at": "2026-10-27T06:57:39+0900"
+}

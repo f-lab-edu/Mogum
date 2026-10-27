@@ -1,6 +1,6 @@
 package com.mogum.config;
 
-import com.mogum.common.SeoulClock;
+import com.mogum.common.time.SeoulClock;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 

@@ -2,8 +2,8 @@ package com.mogum.auth;
 
 import com.mogum.account.repository.UserRepository;
 import com.mogum.account.service.LoginService;
-import com.mogum.common.ApiErrorResponses;
-import com.mogum.common.ErrorCode;
+import com.mogum.common.api.ApiErrorResponses;
+import com.mogum.common.api.ErrorCode;
 import com.mogum.config.WebProperties;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;

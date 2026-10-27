@@ -1,4 +1,4 @@
-package com.mogum.common;
+package com.mogum.common.api;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.constraints.NotBlank;

@@ -43,7 +43,7 @@
 
 4. **서버 준비 — Session Manager로 접속.** 쓸 파일: [mogum.env.example](./mogum.env.example), [compose.yaml](./compose.yaml), [deploy.sh](./deploy.sh), [systemd/](./systemd/). 아래 설치/확인을 마친 뒤 env를 채운다. 서버에서 앱을 빌드하지 않는다.
 
-   서버 명령은 Bash · Docker Engine/CLI · **Compose 플러그인(`docker compose`)** · AWS CLI **v2** · curl · systemd(`systemctl` · `journalctl` · `systemd-run` · `systemd-analyze`) · GNU coreutils(`cat` · `stat` · `install` · `readlink` · `ln` · `mv` · `sort` · `rm` · `sleep` · `id` · `mktemp` · `date` · `wc` · `chmod`) · diffutils(`cmp`) · findutils(`find`) · tar/gzip · grep다. 호스트 JDK · Gradle · Postgres 도구는 필요 없다.
+   서버 명령은 Bash · Docker Engine/CLI · **Compose 플러그인(`docker compose`)** · AWS CLI **v2** · curl · systemd(`systemctl` · `journalctl` · `systemd-run` · `systemd-analyze` · `timedatectl`) · GNU coreutils(`cat` · `stat` · `install` · `readlink` · `ln` · `mv` · `sort` · `rm` · `sleep` · `id` · `mktemp` · `date` · `wc` · `chmod`) · diffutils(`cmp`) · findutils(`find`) · tar/gzip · grep다. 호스트 JDK · Gradle · Postgres 도구는 필요 없다.
 
    SSM 셸에서 먼저 `sudo -i`만 실행해 root 프롬프트(`#`)를 연 뒤, 아래 블록을 **통째로** 붙여 넣는다. `sudo -i`와 나머지를 한 번에 붙이면 뒤 줄이 새 셸에 전달되지 않고 아무것도 실행되지 않는다(2026-10-26 확인). 블록은 Bash 스크립트 하나라서 실패한 줄에서 멈추고 세션은 닫히지 않는다. [AWS의 AL2023 Docker 설치](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-docker.html), [AL2023 DNF](https://docs.aws.amazon.com/linux/al2023/ug/package-management.html), [Compose 수동 설치](https://docs.docker.com/compose/install/linux/#install-the-plugin-manually)를 근거로 한 명령이다. Compose는 전 사용자 경로에 arm64 파일을 설치한다. 아래 버전은 [공식 릴리스 v2.40.3](https://github.com/docker/compose/releases/tag/v2.40.3)이며, 2026-10-26 AL2023 aarch64에서 Docker 25.0.18 · Compose v2.40.3 · aws-cli 2.38.0으로 설치 · 자동 시작을 확인했다. 수동 설치 플러그인은 자동 갱신되지 않는다.
 
@@ -90,7 +90,7 @@
    stat -c '%u:%a' /etc/mogum/mogum.env
    systemctl is-active docker
    systemctl is-enabled docker
-   for tool in bash docker aws curl systemctl journalctl systemd-run systemd-analyze \
+   for tool in bash docker aws curl systemctl journalctl systemd-run systemd-analyze timedatectl \
      cat stat install readlink ln mv sort rm sleep id mktemp date wc chmod cmp find tar gzip grep; do
      command -v "$tool" >/dev/null || exit 1
    done
@@ -190,6 +190,8 @@
 
 - [ ] **되돌리기 연습(선택):** 호환되는 직전 릴리스가 생기면 Actions `workflow_dispatch`에 **직전 전체 SHA**를 넣는다. 기대: 기존 이미지/묶음 지문 검사 후 **빌드/검사/push 없이 재배포**, SSM 성공 · HTTPS 200. 헬스 실패 릴리스를 일부러 만들 필요는 없다. Flyway는 되돌아가지 않는다([롤백 범위](#보관과-롤백-범위)).
 
+- [ ] **journald 로그 · 요청 추적:** 성공 배포 뒤 SSM에서 `timedatectl`이 `Time zone: Asia/Seoul`을 보이고 `docker logs --tail 20 mogum-postgres-1`의 로그 줄이 `KST`인지 확인한다. 이어 `systemd-analyze cat-config systemd/journald.conf`에 `Storage=persistent` · `SystemMaxUse=500M` · `MaxRetentionSec=13day` · `MaxFileSec=1day`가 보이는지 확인한다. journald 전환 후 다음 배포에서 `journalctl CONTAINER_NAME=mogum-backend-1`에 **배포 전 컨테이너의 로그가 남아 있고**, `docker logs --tail 100 mogum-backend-1`도 동작해야 한다. 브라우저 개발자 도구 Network에서 응답의 `X-Request-Id`를 읽고 그 값으로 해당 요청의 접근 줄을 찾는다. 줄 시각이 `+09:00`이며 이메일 · 쿼리가 없는지 확인한다([로그 보기](#로그-보기)). 최초 전환 직전의 json-file 로그는 보존되지 않는다. **서버에서의 실제 동작은 아직 확인하지 않았다.**
+
 ## 첫 배포 때 확인
 
 이전 step에서 남긴 **외부 환경 미검증 항목 18개**를 아래로 모았다. 공식 문서의 형식 대조와 실제 계정/서버 실행은 구분한다. 아직 수행하지 않은 항목은 체크하지 않으며, 실행 결과는 비공개 운영 기록에 남긴다. 파일 결함을 발견하면 이 문서 step에서 동작을 바꾸지 않고 별도 수정 작업으로 넘긴다.
@@ -251,6 +253,11 @@
 합계는 1664MiB이고 나머지 약 380MiB는 OS · Docker · SSM 에이전트 몫이다. 스왑 없이 측정하며 `16-capacity`가 같은 [compose.yaml](./compose.yaml)로 재서 상한을 확정한다. 앱 힙은 이미지의 `-XX:MaxRAMPercentage=75`로 컨테이너 상한의 75%를 사용한다. `backend`는 Postgres 준비 확인 후 `aws` 프로필로 기동하며, 종료 대기는 **150초**로 Spring의 130초보다 길다. 세 서비스 모두 `restart: always`로 재부팅과 비정상 종료에 대응한다.
 
 환경 변수는 Compose의 `--env-file /etc/mogum/mogum.env`로 읽고 서비스마다 필요한 이름만 전달한다. `API_DOMAIN`은 Caddy에만, Google 비밀은 앱에만, DB 비밀번호는 앱과 Postgres에만 전달한다. `APP_IMAGE`는 `deploy.sh`가 지문 파일을 검증한 뒤 지정한다. DB와 인증서는 이름 있는 볼륨에 보존하며, 고정된 프로젝트 이름과 Caddy 설정 경로 덕분에 릴리스 디렉터리가 바뀌어도 정의가 같은 Postgres와 Caddy는 재생성되지 않는다.
+이 변경을 처음 배포할 때는 세 서비스의 정의가 바뀌어 한 번 다시 만들어진다. 데이터 · 인증서는 볼륨에 남고, 그 직전까지의 json-file 로그는 그때 사라진다.
+
+서버 시간대는 `Asia/Seoul`이며 `deploy.sh`가 성공한 배포마다 맞춘다. 계산 · 저장 기준은 UTC이고, 타이머 · 스크립트는 시간대를 명시한다. 컨테이너의 기본 시간대와 Postgres 세션 시간대는 UTC로 유지한다.
+
+세 서비스의 로그는 Docker journald 드라이버로 서버 journald에 모은다. `deploy/journald/mogum.conf`를 `/etc/systemd/journald.conf.d/mogum.conf`에 설치하며, `Storage=persistent`로 디렉터리 존재와 무관하게 디스크에 보관한다. 보관 상한은 **총 14일 · 500MiB 중 먼저 닿는 쪽**이다: `MaxRetentionSec=13day` + 파일 하나의 최대 기간 `MaxFileSec=1day` = **14일**, 크기는 `SystemMaxUse=500M`이다. 서버 전체 저널(백업 서비스 등)에도 적용된다. 헬스 통과 · `current` 갱신 뒤 파일이 바뀌었을 때만 설치하고 `systemctl restart systemd-journald`한다. systemd 258 미만은 SIGHUP으로 설정을 다시 읽지 못하므로 restart를 사용하며 기존 스트림 연결은 유지된다([journald 설정](https://www.freedesktop.org/software/systemd/man/latest/journald.conf.html) · [서비스 문서](https://www.freedesktop.org/software/systemd/man/latest/systemd-journald.service.html)). Postgres는 `log_error_verbosity=terse`로 실행해 오류의 `DETAIL` · `HINT` · `QUERY` · `CONTEXT`에 이메일 등 실제 값이 남지 않게 한다([Postgres 17 문서](https://www.postgresql.org/docs/17/runtime-config-logging.html)). Caddy 접근 로그는 켜지 않는다.
 
 SSM은 릴리스 묶음을 푼 뒤 root로 해당 릴리스의 `deploy/deploy.sh {SHA}`를 실행한다. 스크립트는 다음 순서로 동작한다.
 
@@ -258,14 +265,49 @@ SSM은 릴리스 묶음을 푼 뒤 root로 해당 릴리스의 `deploy/deploy.sh
 2. 인스턴스 역할 자격으로 ECR에 로그인하고 지문으로 이미지를 받는다. 서버에서 빌드하지 않는다.
 3. 고정 경로에 Caddyfile을 복사하고 해당 릴리스의 Compose로 `up -d --no-build`한다. Caddy 설정을 reload하며 첫 기동 준비는 최대 10회(1초 간격) 재확인한다.
 4. DNS · HTTPS와 무관한 `http://127.0.0.1:8080/actuator/health`가 **200**이 될 때까지 최대 **180초** 기다린다.
-5. 성공하면 `current` 링크를 교체한다. 이 릴리스의 `deploy/systemd/mogum-backup.service` · `mogum-backup.timer`를 `/etc/systemd/system/`과 비교해 다른 파일만 권한 644로 복사하고, 변경이 있을 때만 `systemctl daemon-reload`와 `systemctl enable --now mogum-backup.timer`를 실행한다. 같으면 복사와 systemctl 호출을 생략한다. 헬스 실패로 복귀하는 경로에서는 설치하지 않는다. 이어서 릴리스를 현재 · 직전을 포함해 최근 **3개**로 정리한다. 현재 · 직전 이미지 ID를 보호하고 나머지 이미지는 강제 삭제 없이 정리한다. 정리 실패는 정상 기동한 앱을 되돌리지 않고 결과만 알린다.
+5. 성공하면 `current` 링크를 교체하고 `timedatectl set-timezone Asia/Seoul`을 한 번 실행한다. 이 릴리스의 `deploy/systemd/mogum-backup.service` · `mogum-backup.timer`를 `/etc/systemd/system/`과 비교해 다른 파일만 권한 644로 복사하고, 변경이 있을 때만 `systemctl daemon-reload`와 `systemctl enable --now mogum-backup.timer`를 실행한다. 이어 journald 설정을 `cmp`로 비교해 다를 때만 디렉터리를 만들고 권한 644로 설치한 뒤 journald를 restart한다. 각각 같으면 설치와 해당 systemctl 호출을 생략한다. 시간대 설정 · 설정 설치나 systemctl 실패는 오류로 종료하며 갱신된 `current`는 유지한다. 헬스 실패로 복귀하거나 링크 갱신에 실패한 경로에서는 시간대 설정과 두 설정 설치를 모두 생략한다. 이어서 릴리스를 현재 · 직전을 포함해 최근 **3개**로 정리한다. 현재 · 직전 이미지 ID를 보호하고 나머지 이미지는 강제 삭제 없이 정리한다. 정리 실패는 정상 기동한 앱을 되돌리지 않고 결과만 알린다.
 6. 실패하면 기존 `current`의 Compose · 지문 · Caddyfile로 복귀하고 같은 헬스 확인을 한다. 복귀에는 `--pull never`를 사용하므로 ECR 없이 로컬 이미지로 실행한다. 복귀 성공도 배포 자체는 **실패 코드**로 끝낸다. 첫 배포 실패는 링크를 만들지 않고 실패로 끝낸다.
 
 Flyway 마이그레이션은 되돌리지 않는다. 직전 앱이 새 스키마에서 기동할 수 있는지는 마이그레이션마다 확인해야 한다. 이 배포는 앱을 하나만 실행하므로 배포 중 중단이 있다(ADR-061). 단계 이름과 결과만 표준 출력으로 내보내며 비밀 · 환경 변수 · env 파일 내용 · 로그인 토큰을 출력하지 않는다. 별도의 배포 로그 파일은 만들지 않는다.
 
-서버에 필요한 명령은 **Bash**, **Docker Engine**, **Docker Compose 플러그인**(`docker compose`), **AWS CLI v2**(`aws`), **curl**, **systemd**(`systemctl`), 그리고 Amazon Linux 2023 기본 도구인 `cat` · `stat` · `install` · `readlink` · `ln` · `mv` · `sort` · `rm` · `sleep` · `id` · `mktemp` · `date` · `wc`(GNU coreutils), `cmp`(GNU diffutils), `find`(GNU findutils)다. Docker 데몬은 부팅 시 자동 시작하도록 활성화해야 한다. 설치와 초기화는 [처음 구축 순서](#처음-구축-순서)의 4번을 따른다. 스크립트는 AWS 키를 받지 않고 인스턴스 역할을 사용한다.
+서버에 필요한 명령은 **Bash**, **Docker Engine**, **Docker Compose 플러그인**(`docker compose`), **AWS CLI v2**(`aws`), **curl**, **systemd**(`systemctl` · `timedatectl`), 그리고 Amazon Linux 2023 기본 도구인 `cat` · `stat` · `install` · `readlink` · `ln` · `mv` · `sort` · `rm` · `sleep` · `id` · `mktemp` · `date` · `wc`(GNU coreutils), `cmp`(GNU diffutils), `find`(GNU findutils)다. Docker 데몬은 부팅 시 자동 시작하도록 활성화해야 한다. 설치와 초기화는 [처음 구축 순서](#처음-구축-순서)의 4번을 따른다. 스크립트는 AWS 키를 받지 않고 인스턴스 역할을 사용한다.
 
 배포 파일 불변식과 명령 대체를 통한 성공/실패 경로는 저장소 루트에서 `./backend/gradlew -p backend test`로 검사한다. 실제 EC2 · ECR · 운영 도메인에서의 기동은 2026-10-26 첫 배포로 확인했다. 헬스 실패 시 자동 복귀는 아직 수행하지 않았다.
+
+## 로그 보기
+
+Session Manager에서 먼저 root 셸을 연다. 다음 블록과 나머지 명령은 따로 실행한다.
+
+```bash
+sudo -i
+```
+
+현재 컨테이너의 최근 로그는 `docker logs`로 본다. journald 드라이버에서도 동작한다([Docker 문서](https://docs.docker.com/engine/logging/drivers/journald/)).
+
+```bash
+docker logs --tail 100 mogum-backend-1
+docker logs --tail 50 mogum-caddy-1
+docker logs --tail 50 mogum-postgres-1
+```
+
+지난 배포를 포함한 로그는 시작 때의 컨테이너 이름(`CONTAINER_NAME`)으로 조회한다. 서버 시간대가 한국 시간이므로 `journalctl`의 줄 앞 시각과 `--since`는 한국 시간이다. Postgres 로그 줄은 `… KST`로 찍힌다. 아래 날짜는 조회할 기간으로 바꾼다.
+
+```bash
+journalctl CONTAINER_NAME=mogum-backend-1 \
+  --since '2026-10-27 09:00:00' --output short-iso --no-pager
+```
+
+요청 하나는 응답 헤더 `X-Request-Id`의 값을 `requestId=…`에, 회원 하나는 내부 회원 ID를 `userId=…`에 넣어 찾는다. 아래 ID는 꾸민 예시이며 회원 ID 뒤의 경계까지 검사해 다른 회원과 섞이지 않게 한다.
+
+```bash
+journalctl CONTAINER_NAME=mogum-backend-1 --since '2 days ago' --no-pager \
+  | grep -F 'requestId=123e4567-e89b-42d3-a456-426614174000'
+journalctl CONTAINER_NAME=mogum-backend-1 --since '2 days ago' --no-pager \
+  | grep -E 'userId=42([,[:space:]]|$)'
+journalctl --disk-usage
+```
+
+출력에는 내부 회원 ID 등 운영 데이터가 있으므로 로그를 공개 저장소 · 이슈 · PR에 붙이지 않는다. 서버에서 필요한 범위만 확인한다.
 
 ## AWS 설정
 
@@ -389,6 +431,8 @@ docker logs --tail 50 mogum-caddy-1
 docker logs --tail 50 mogum-postgres-1
 ```
 
+지난 배포의 로그는 [로그 보기](#로그-보기)의 `journalctl`로 조회한다.
+
 `ECR login.` · `Pull image by digest.`에서 멈췄으면 인스턴스 역할과 외부 통신([첫 배포 때 확인](#첫-배포-때-확인) 6 · 11), `Apply release.`면 env 값과 Compose 해석(5), 헬스 대기면 위 backend 로그를 본다.
 
 ### 워크플로 검증 범위
@@ -486,7 +530,7 @@ systemctl start mogum-backup.timer
 
 ### 백업 실패 확인
 
-현재는 운영자가 systemd 상태와 저널을 확인한다. 별도 로그 파일/회전은 없으며 슬랙 알림은 `10-cost-control`에서 연결한다.
+현재는 운영자가 systemd 상태와 저널을 확인한다. 별도 로그 파일은 만들지 않고 journald가 파일 회전 기간을 포함해 총 14일 · 500MiB 중 먼저 닿는 쪽까지 보관한다([로그 보기](#로그-보기)). 슬랙 알림은 `10-cost-control`에서 연결한다.
 
 ```bash
 sudo systemctl status mogum-backup.service mogum-backup.timer
