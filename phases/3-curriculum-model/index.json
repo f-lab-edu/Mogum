@@ -2,8 +2,24 @@
   "project": "Mogum",
   "phase": "3-curriculum-model",
   "steps": [
-    { "step": 0, "name": "entity-audit", "status": "pending" },
-    { "step": 1, "name": "curriculum-schema", "status": "pending" },
-    { "step": 2, "name": "owner-lookup", "status": "pending" }
-  ]
+    {
+      "step": 0,
+      "name": "entity-audit",
+      "status": "completed",
+      "summary": "com.mogum.common.persistence.AuditedEntity · JpaAuditingConfiguration · User Auditing 전환 · 엔티티 상속 ArchUnit 규칙 · V7__add_users_updated_at.sql 구현; 테스트는 중첩 @TestConfiguration을 @Import하여 기존 clock과 다른 이름의 @Bean @Primary Clock을 주입(회원 IT는 Clock.fixed, AuditedEntityIT는 auditingTestClock Mockito 모형의 instant() 반환값을 저장/수정 시각으로 변경); ./backend/gradlew -p backend build 서버 테스트 377개 → 383개 통과(실패·오류·건너뜀 0).",
+      "started_at": "2026-10-28T08:29:46+0900",
+      "completed_at": "2026-10-28T08:34:51+0900"
+    },
+    {
+      "step": 1,
+      "name": "curriculum-schema",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "owner-lookup",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-10-28T08:29:46+0900"
 }
