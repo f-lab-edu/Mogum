@@ -15,6 +15,11 @@
       "status": "completed",
       "failed_at": "2026-10-25T16:13:11+0900",
       "completed_at": "2026-10-26T07:20:08+0900"
+    },
+    {
+      "dir": "2a-api-response",
+      "status": "completed",
+      "completed_at": "2026-10-26T23:29:58+0900"
     }
   ]
 }

@@ -9,7 +9,7 @@ afterEach(() => {
 
 test('/에서 실제 앱의 라우터와 QueryClientProvider를 거쳐 로그인 확인 뒤 머금 제목을 표시한다', async () => {
   window.history.replaceState(null, '', '/')
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ email: 'admin@example.com', status: 'ACTIVE', role: 'ADMIN', termsAgreed: false, waitlistPosition: null }))))
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { email: 'admin@example.com', status: 'ACTIVE', role: 'ADMIN', termsAgreed: false, waitlistPosition: null } }))))
 
   render(<App />)
 

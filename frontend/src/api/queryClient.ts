@@ -3,13 +3,13 @@ import { markLoginConfirmed } from '../lib/authNavigation'
 import { ApiError } from './client'
 
 export function retryApiQuery(failureCount: number, error: unknown) {
-  if (error instanceof ApiError && error.status < 500) return false
+  if (error instanceof ApiError && error.code !== 'INTERNAL_ERROR') return false
   return failureCount < 2
 }
 
 export function createAuthQueryClient(onUnauthorized: () => void) {
   const onError = (error: unknown) => {
-    if (error instanceof ApiError && error.status === 401) onUnauthorized()
+    if (error instanceof ApiError && error.code === 'UNAUTHORIZED') onUnauthorized()
   }
 
   return new QueryClient({

@@ -16,7 +16,7 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 | `docs/05-api.md` · `docs/06-screens.md` | API 계약 · 인증(쿠키 세션) · 화면 문구 |
 | `docs/07-testing.md` | 장애 주입 · 용량 측정 · LLM 스텁 |
 
-**스택** — Java 21 · Spring Boot 4(MVC, 플랫폼 스레드) · Spring Security(구글 OAuth) + Spring Session JDBC · PostgreSQL + pgvector · Spring Data JPA(엔티티 · 리포지토리는 각 도메인 패키지 · Postgres 고유 기능은 `EntityManager` 네이티브 쿼리) · Flyway · OpenAI SDK(`gpt-5.6-terra` · `gpt-5.6-luna` · `text-embedding-3-large`) · FSRS 라이브러리 · ArchUnit · Testcontainers · Micrometer · Lombok(엔티티의 `@Getter` · `@NoArgsConstructor(access = PROTECTED)` 만. `@Data` · `@Setter` · `@EqualsAndHashCode` · `@ToString` · `@Builder` 는 엔티티에 쓰지 않는다 — [ADR-070](docs/ADR.md)).
+**스택** — Java 21 · Spring Boot 4(MVC, 플랫폼 스레드) · Bean Validation(`spring-boot-starter-validation` — 요청 DTO 검증) · Spring Security(구글 OAuth) + Spring Session JDBC · PostgreSQL + pgvector · Spring Data JPA(엔티티 · 리포지토리는 각 도메인 패키지 · Postgres 고유 기능은 `EntityManager` 네이티브 쿼리) · Flyway · OpenAI SDK(`gpt-5.6-terra` · `gpt-5.6-luna` · `text-embedding-3-large`) · FSRS 라이브러리 · ArchUnit · Testcontainers · Micrometer · Lombok(엔티티의 `@Getter` · `@NoArgsConstructor(access = PROTECTED)` 만. `@Data` · `@Setter` · `@EqualsAndHashCode` · `@ToString` · `@Builder` 는 엔티티에 쓰지 않는다 — [ADR-070](docs/ADR.md)).
 **화면** — `frontend/` · React + TypeScript(strict) · Vite · React Router · TanStack Query · Tailwind CSS · react-markdown + KaTeX + mermaid · Vitest + Testing Library. 빌드 결과는 **Vercel** 에 정적 파일로 배포하고 jar 에는 넣지 않는다. 화면 `{도메인}` · API `api.{도메인}`(EC2) — 같은 사이트 · 다른 출처라 쿠키 세션은 그대로 쓰고 CORS · `XSRF-TOKEN` 쿠키 도메인을 맞춘다([05 §1.1](docs/05-api.md)).
 **패키지** — 도메인별 패키지(`account` · `curriculum` · `job` … — 각자 `controller` · `service` · `repository` · `domain` · `dto` 하위 패키지로 항상 나눈다) + `generation`(생성 · 유료 호출) · `worker`(수령 루프 · 실행기) · `config`(설정 · 역할별 빈 등록) · `common`(오류 응답 · 시계) · `auth`(로그인). 단일 Gradle 모듈([ADR-067](docs/ADR.md)).
 **운영** — EC2 한 대 · 프로세스 하나(`app.role=all` — API + 워커 실행기 `N` 개) · 화면은 Vercel. 필요하면 실행 인자만으로 `api` / `worker` 로 나눈다. 무중단 배포는 공개 후(ADR-061). 정원제 실사용자.
@@ -76,9 +76,15 @@ AI 가 커리큘럼 · 강의 자료 · 플래시카드를 만들고, 복습 결
 27. **세션에는 사용자 id 만 둔다. 상태 · 역할은 요청마다 `users` 에서 읽는다.** → 세션에 상태를 넣으면 대기자를 승인하거나 약관이 바뀌어도 로그인 중인 사람에게 반영되지 않는다.
 28. **엔티티는 생성 흐름마다 이름 있는 정적 팩토리 메서드로만 만든다(예: `User.join`).** public 생성자 · `@Builder` 를 두지 않는다 — JPA 용 기본 생성자만 `protected`(ADR-070 · ADR-071). 처음 상태처럼 엔티티 스스로 정할 수 있는 규칙은 팩토리 안에 고정하고, 바깥 정보가 필요한 값(관리자 목록으로 정하는 역할 등)은 서비스가 정해 인자로 넘긴다. 같은 타입 인자가 이어지면 팩토리가 채운 값을 getter 로 확인하는 테스트를 둔다. → 서비스마다 처음 상태를 채우면 TASK 마다 다르게 채워 잘못된 상태의 행이 생기고, 빌더는 필수 값을 빠뜨려도 컴파일된 뒤 INSERT 에서야 NOT NULL 로 터진다.
 
+**API**
+
+29. **성공 응답은 컨트롤러가 `ApiResponse` 로 감싸고, 오류는 `ApiException(ErrorCode)` 를 던진다. 오류 JSON 을 직접 쓰지 않는다** — 보안 핸들러 · 필터도 `common` 의 공통 오류 응답 경로(`ApiErrorResponses.write`)를 쓴다. 필터에서 `ApiException` 을 던지면 MVC 핸들러를 거치지 않아 컨테이너 ERROR 디스패치의 `500 INTERNAL_ERROR` 가 된다. 새 code 는 `ErrorCode` 와 05 §1.2 표에 함께 넣고, 요청 본문은 `@Valid` 로 검증한다. 칸 제약을 새 종류로 쓰면(`@Min` · `@Pattern` 등) `FieldViolation.Reason` 과 05 §1.2 에 `reason` 을 함께 더한다([05 §1 · §1.2](docs/05-api.md) · ADR-074). → 경로가 둘이면 같은 오류가 다른 code · 모양으로 나가 화면의 code 분기(06 §2.6)가 조용히 틀어진다. `reason` 이 없는 위반은 `INVALID_REQUEST` 로 나가 사용자가 어느 칸을 고칠지 모른다. 자동으로 감싸는 응답 advice 는 오류 · 헬스 · `204` 까지 감싼다. ArchUnit 이 컨트롤러 반환 타입과 `@Valid` 누락을 막는다.
+
 ## 작업 방식
 
 - **사전 기획은 MVP 범위와 주요 사용자 흐름 중심으로 마무리한다.** DB 컬럼/인덱스, API 세부, 경합/재전송 처리, 수치 설정 등은 관련 TASK를 시작할 때 Codex가 설계·문서화·검증한다. 문서의 ‘구현 전 확정’ 항목은 그 TASK에서 해결할 항목이며 전체 개발 착수를 막는 조건이 아니다. 이미 확정한 제약은 유지하고, MVP 범위나 주요 사용자 동작을 바꾸는 결정은 사용자에게 확인한다. 통상적인 구현 선택마다 확인을 요청하거나 사전 기획 질문을 계속 늘리지 않는다.
+
+- **바꾸면 깨지는 계약은 넓힐 수 있는 모양으로 두고, 후속 기능은 미리 만들지 않는다.** API 요청 · 응답 · 오류 형식과 DB 스키마를 정할 때 `docs/01-overview.md §6` 의 후속 기능 중 그 계약에 닿는 것이 들어온다고 가정하고, 키 · 값을 더하는 것만으로 담기는지 확인한다(객체 · 이름 있는 필드 · 받는 쪽의 모르는 값 처리 규칙). 담기지 않으면 지금 모양을 고친다. 그 기능이 쓸 필드 · enum 값 · 컬럼 · 검사 · 분기는 넣지 않는다(금지 5). 예: 오류 `fields` 는 객체 목록으로 두고 `reason` 은 지금 쓰는 값만 둔다(ADR-074). → 화면(Vercel)과 API(EC2)는 따로 배포되어 모양 변경이 깨지는 변경이다. 반대로 쓰이지 않는 값을 미리 넣으면 측정 근거 없이 복잡도만 는다.
 
 - CRITICAL: 새 기능은 **테스트를 먼저 쓰고**, 그 테스트가 통과하는 구현을 쓴다(TDD). 작업을 검증 가능한 목표로 바꾸고 통과할 때까지 반복한다.
     훅이 강제한다(`scripts/tdd_guard.py` — Claude · Codex 공통). 짝 테스트 없이 구현 파일을 쓰면 막히고, 구현만 바꾸고 끝내면 한 번 되돌려진다. 짝 테스트는 `backend/src/main/java/…/Foo.java` → 같은 패키지의 `backend/src/test/java/…/Foo*Test.java` 또는 `Foo*IT.java`, `frontend/src/…/foo.tsx` → 같은 폴더의 `foo.test.tsx` 또는 `__tests__/foo.test.tsx` 다. interface · record · enum · 예외 · `@Entity` · 타입 전용 파일은 검사하지 않는다.

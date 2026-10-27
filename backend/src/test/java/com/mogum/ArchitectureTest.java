@@ -6,14 +6,37 @@ import com.mogum.archfixture.generation.TransactionalGeneration;
 import com.mogum.archfixture.job.JobToGeneration;
 import com.mogum.archfixture.worker.JakartaTransactionalWorkerMethod;
 import com.mogum.archfixture.worker.TransactionalWorkerMethod;
+import com.mogum.account.controller.MeController;
+import com.mogum.account.dto.MeResponse;
+import com.mogum.common.ApiErrorController;
+import com.mogum.common.ApiResponse;
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaParameterizedType;
+import com.tngtech.archunit.core.domain.JavaType;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.ArchCondition;
+import com.tngtech.archunit.lang.ConditionEvents;
+import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.validation.Valid;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -43,6 +66,56 @@ class ArchitectureTest {
     private static final ArchRule OPENAI_SDK_ONLY_IN_LLM_ADAPTER = noClasses().that()
             .resideOutsideOfPackage("..generation.llm..")
             .should().dependOnClassesThat().resideInAPackage("com.openai..");
+    private static final DescribedPredicate<JavaMethod> REST_REQUEST_MAPPINGS = new DescribedPredicate<JavaMethod>(
+            "are request mappings in REST controllers except ApiErrorController") {
+        @Override
+        public boolean test(JavaMethod method) {
+            return method.getOwner().isAnnotatedWith(RestController.class)
+                    && !method.getOwner().isEquivalentTo(ApiErrorController.class)
+                    && (method.isAnnotatedWith(RequestMapping.class) || method.isMetaAnnotatedWith(RequestMapping.class));
+        }
+    };
+    private static final ArchRule CONTROLLER_RESPONSE_TYPES = methods().that(REST_REQUEST_MAPPINGS)
+            .should(new ArchCondition<JavaMethod>(
+            "return ApiResponse<?>, ResponseEntity<ApiResponse<?>>, ResponseEntity<Void>, or void") {
+        @Override
+        public void check(JavaMethod method, ConditionEvents events) {
+            events.add(new SimpleConditionEvent(method, isAllowedResponseType(method.getReturnType()),
+                    method.getFullName() + " returns " + method.getReturnType().getName()));
+        }
+    });
+    private static final ArchRule REQUEST_BODY_REQUIRES_VALID = methods().that(REST_REQUEST_MAPPINGS)
+            .should(new ArchCondition<JavaMethod>("annotate each @RequestBody parameter with @Valid") {
+                @Override
+                public void check(JavaMethod method, ConditionEvents events) {
+                    for (var parameter : method.getParameters()) {
+                        if (parameter.isAnnotatedWith(RequestBody.class)) {
+                            events.add(new SimpleConditionEvent(parameter, parameter.isAnnotatedWith(Valid.class),
+                                    method.getFullName() + " has @RequestBody without @Valid at parameter "
+                                            + parameter.getIndex()));
+                        }
+                    }
+                }
+            });
+
+    private static boolean isAllowedResponseType(JavaType type) {
+        if (type.toErasure().isEquivalentTo(void.class)) {
+            return true;
+        }
+        if (isApiResponse(type)) {
+            return true;
+        }
+        if (type instanceof JavaParameterizedType parameterized
+                && type.toErasure().isEquivalentTo(ResponseEntity.class)) {
+            JavaType body = parameterized.getActualTypeArguments().getFirst();
+            return body.getName().equals(Void.class.getName()) || isApiResponse(body);
+        }
+        return false;
+    }
+
+    private static boolean isApiResponse(JavaType type) {
+        return type instanceof JavaParameterizedType && type.toErasure().isEquivalentTo(ApiResponse.class);
+    }
 
     @Test
     void 생성은_worker만_부른다() {
@@ -63,6 +136,40 @@ class ArchitectureTest {
     @Test
     void OpenAI_SDK는_LLM_어댑터에만_둔다() {
         OPENAI_SDK_ONLY_IN_LLM_ADAPTER.allowEmptyShould(true).check(CLASSES);
+    }
+
+    @Test
+    void REST_컨트롤러의_성공_응답은_명시적으로_감싼다() {
+        assertTrue(CLASSES.contain(MeController.class));
+        assertTrue(CLASSES.contain(ApiErrorController.class));
+        CONTROLLER_RESPONSE_TYPES.check(CLASSES);
+    }
+
+    @Test
+    void REST_요청_본문은_Valid로_검증한다() {
+        REQUEST_BODY_REQUIRES_VALID.allowEmptyShould(true).check(CLASSES);
+    }
+
+    @Test
+    void Valid_없는_요청_본문을_거부한다() {
+        assertViolation(REQUEST_BODY_REQUIRES_VALID, UnvalidatedBodyController.class);
+    }
+
+    @Test
+    void Valid_요청_본문을_허용하고_매핑_없는_메서드와_다른_매개변수는_검사하지_않는다() {
+        REQUEST_BODY_REQUIRES_VALID.check(new ClassFileImporter().importClasses(ValidatedBodyController.class));
+    }
+
+    @ParameterizedTest
+    @ValueSource(classes = {UnwrappedController.class, UnwrappedEntityController.class,
+            RawEntityController.class, RawResponseController.class})
+    void DTO_직접_반환과_감싸지_않은_ResponseEntity와_원시_타입을_거부한다(Class<?> fixture) {
+        assertViolation(CONTROLLER_RESPONSE_TYPES, fixture);
+    }
+
+    @Test
+    void 성공_응답의_네_반환_모양을_허용하고_매핑_없는_메서드는_검사하지_않는다() {
+        CONTROLLER_RESPONSE_TYPES.check(new ClassFileImporter().importClasses(AllowedController.class));
     }
 
     @ParameterizedTest
@@ -91,6 +198,9 @@ class ArchitectureTest {
     void 운영_검사는_애플리케이션을_포함하고_테스트를_제외한다() {
         assertTrue(CLASSES.contain(MogumApplication.class));
         assertFalse(CLASSES.contain(ArchitectureTest.class));
+        assertFalse(CLASSES.contain(AllowedController.class));
+        assertFalse(CLASSES.contain(UnvalidatedBodyController.class));
+        assertFalse(CLASSES.contain(ValidatedBodyController.class));
         assertTrue(CLASSES.stream().noneMatch(type -> type.getPackageName().startsWith("com.mogum.archfixture")));
     }
 
@@ -98,5 +208,61 @@ class ArchitectureTest {
         JavaClasses classes = new ClassFileImporter().importClasses(fixture);
         AssertionError violation = assertThrows(AssertionError.class, () -> rule.check(classes));
         assertTrue(violation.getMessage().contains(fixture.getName()), violation::getMessage);
+    }
+
+    @RestController
+    static class UnvalidatedBodyController {
+        @PostMapping("/architecture/unvalidated")
+        public ApiResponse<MeResponse> response(String other, @RequestBody MeResponse body) { return null; }
+    }
+
+    @RestController
+    static class ValidatedBodyController {
+        @PostMapping("/architecture/validated")
+        public ApiResponse<MeResponse> response(String other, @Valid @RequestBody MeResponse body) { return null; }
+
+        public void helper(@RequestBody MeResponse body) { }
+    }
+
+    @RestController
+    static class UnwrappedController {
+        @RequestMapping("/architecture/unwrapped")
+        public MeResponse response() { return null; }
+    }
+
+    @RestController
+    static class UnwrappedEntityController {
+        @PostMapping("/architecture/unwrapped-entity")
+        public ResponseEntity<MeResponse> response() { return null; }
+    }
+
+    @RestController
+    static class RawEntityController {
+        @GetMapping("/architecture/raw-entity")
+        public ResponseEntity response() { return null; }
+    }
+
+    @RestController
+    static class RawResponseController {
+        @GetMapping("/architecture/raw-response")
+        public ApiResponse response() { return null; }
+    }
+
+    @RestController
+    static class AllowedController {
+        @GetMapping("/architecture/wrapped")
+        public ApiResponse<MeResponse> response() { return null; }
+
+        @PostMapping("/architecture/accepted")
+        public ResponseEntity<ApiResponse<MeResponse>> accepted() { return null; }
+
+        @DeleteMapping("/architecture/empty-entity")
+        public ResponseEntity<Void> emptyEntity() { return ResponseEntity.noContent().build(); }
+
+        @PatchMapping("/architecture/empty")
+        @ResponseStatus(HttpStatus.NO_CONTENT)
+        public void empty() { }
+
+        public MeResponse helper() { return null; }
     }
 }

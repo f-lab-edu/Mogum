@@ -17,7 +17,7 @@ export default function RequireAuth() {
     }
   }, [me.isSuccess, pathname, navigate])
 
-  if (me.isPending || (me.error instanceof ApiError && me.error.status === 401)) {
+  if (me.isPending || (me.error instanceof ApiError && me.error.code === 'UNAUTHORIZED')) {
     return (
       <main className="min-h-screen bg-paper px-4 py-8">
         <div role="status" aria-label="로그인 확인 중" aria-busy="true" className="mx-auto max-w-3xl space-y-4">

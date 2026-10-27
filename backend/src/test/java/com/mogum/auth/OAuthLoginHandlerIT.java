@@ -144,7 +144,7 @@ class OAuthLoginHandlerIT extends PostgresTestConfiguration {
         assertEquals(401, get("/api/me", oldCookie).statusCode());
         var me = get("/api/me", newCookie);
         assertEquals(200, me.statusCode());
-        var body = new tools.jackson.databind.ObjectMapper().readTree(me.body());
+        var body = new tools.jackson.databind.ObjectMapper().readTree(me.body()).get("data");
         assertEquals("admin@example.com", body.get("email").asString());
         assertEquals("USER", body.get("role").asString());
         assertEquals(id, jdbc.queryForObject("SELECT id FROM users WHERE provider = 'google' AND subject = ?", Long.class, sub));

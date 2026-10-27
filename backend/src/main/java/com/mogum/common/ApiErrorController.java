@@ -3,7 +3,7 @@ package com.mogum.common;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.webmvc.error.ErrorController;
-import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,6 +15,6 @@ public class ApiErrorController implements ErrorController {
     public ResponseEntity<ApiError> error(HttpServletRequest request) {
         var attribute = request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
         int status = attribute instanceof Integer value ? value : 500;
-        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(ApiError.forStatus(status));
+        return ApiErrorResponses.forStatus(status, HttpHeaders.EMPTY);
     }
 }

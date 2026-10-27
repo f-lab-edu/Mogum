@@ -2,7 +2,8 @@ package com.mogum.auth;
 
 import com.mogum.account.repository.UserRepository;
 import com.mogum.account.service.LoginService;
-import com.mogum.common.ApiError;
+import com.mogum.common.ApiErrorResponses;
+import com.mogum.common.ErrorCode;
 import com.mogum.config.WebProperties;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
@@ -10,7 +11,6 @@ import org.springframework.boot.session.autoconfigure.DefaultCookieSerializerCus
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -34,7 +34,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.util.Assert;
 import tools.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
 import java.time.Clock;
 import java.util.List;
 
@@ -69,7 +68,7 @@ public class SecurityConfiguration {
             if (match.isMatch() && registrations.findByRegistrationId(match.getVariables().get("registrationId")) == null) {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND);
             } else {
-                writeError(response, mapper, 401, "UNAUTHORIZED", "로그인이 필요합니다");
+                ApiErrorResponses.write(response, mapper, ErrorCode.UNAUTHORIZED, null);
             }
         };
         var tokens = CookieCsrfTokenRepository.withHttpOnlyFalse();
@@ -136,9 +135,9 @@ public class SecurityConfiguration {
                                 unauthorized.commence(request, response,
                                         new InsufficientAuthenticationException("Login required"));
                             } else if (exception instanceof CsrfException) {
-                                writeError(response, mapper, 403, "CSRF_INVALID", "요청을 확인할 수 없습니다");
+                                ApiErrorResponses.write(response, mapper, ErrorCode.CSRF_INVALID, null);
                             } else {
-                                writeError(response, mapper, 404, "NOT_FOUND", "찾을 수 없습니다");
+                                ApiErrorResponses.write(response, mapper, ErrorCode.NOT_FOUND, null);
                             }
                         }))
                 .authorizeHttpRequests(requests -> requests.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
@@ -151,10 +150,4 @@ public class SecurityConfiguration {
         return http.build();
     }
 
-    private static void writeError(HttpServletResponse response, ObjectMapper mapper, int status,
-                                    String code, String message) throws IOException {
-        response.setStatus(status);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        mapper.writeValue(response.getOutputStream(), new ApiError(code, message));
-    }
 }

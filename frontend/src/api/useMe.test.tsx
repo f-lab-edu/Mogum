@@ -12,7 +12,7 @@ afterEach(() => {
 
 test('서버가 돌려준 현재 사용자 필드를 Query에 보관한다', async () => {
   const me = { email: 'admin@example.com', status: 'ACTIVE', role: 'ADMIN', termsAgreed: false, waitlistPosition: null }
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(me))))
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: me }))))
   const client = createAuthQueryClient(vi.fn())
   const { result } = renderHook(useMe, { wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> })
   await waitFor(() => expect(result.current.data).toEqual(me))

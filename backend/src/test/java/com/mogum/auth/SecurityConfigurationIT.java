@@ -2,6 +2,8 @@ package com.mogum.auth;
 
 import com.mogum.account.controller.MeController;
 import com.mogum.common.ApiErrorController;
+import com.mogum.common.ApiException;
+import com.mogum.common.ErrorCode;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
@@ -38,9 +40,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.test.json.JsonAssert;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.bind.annotation.RestController;
 import org.slf4j.LoggerFactory;
-import tools.jackson.databind.ObjectMapper;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -71,7 +75,6 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
     @Autowired private UserRepository users;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private Flyway flyway;
-    @Autowired private ObjectMapper mapper;
     @MockitoSpyBean private MeController meController;
     @MockitoSpyBean private ApiErrorController errorController;
     @Value("${local.server.port}") private int port;
@@ -147,27 +150,41 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
     }
 
     @Test
-    void 현재_사용자_응답은_정해진_다섯_필드만_포함한다() throws Exception {
+    void 아키텍처_검사용_컨트롤러는_앱_컨텍스트에_등록되지_않는다() {
+        assertTrue(Arrays.stream(context.getBeanNamesForAnnotation(RestController.class))
+                .map(context::getType)
+                .noneMatch(type -> type.getName().startsWith("com.mogum.ArchitectureTest$")));
+    }
+
+    @Test
+    void 요청_검증_IT의_컨트롤러는_다른_앱_컨텍스트에_등록되지_않는다() {
+        assertTrue(Arrays.stream(context.getBeanNamesForAnnotation(RestController.class))
+                .map(context::getType)
+                .noneMatch(type -> type.getName().startsWith("com.mogum.common.RequestValidationIT$")));
+    }
+
+    @Test
+    void 현재_사용자_응답은_data_하나_안에_정해진_다섯_필드만_포함한다() throws Exception {
         var cookie = session();
         mvc.perform(get("/api/me").cookie(cookie)).andExpect(status().isOk())
                 .andExpect(content().json("""
-                        {"email":"session@example.com","status":"ACTIVE","role":"ADMIN",
-                         "termsAgreed":false,"waitlistPosition":null}
+                        {"data":{"email":"session@example.com","status":"ACTIVE","role":"ADMIN",
+                         "termsAgreed":false,"waitlistPosition":null}}
                         """, org.springframework.test.json.JsonCompareMode.STRICT));
         jdbc.update("UPDATE users SET terms_agreed_at = now(), terms_version = 'v1' WHERE id = ?", user.getId());
-        mvc.perform(get("/api/me").cookie(cookie)).andExpect(jsonPath("$.termsAgreed").value(true));
+        mvc.perform(get("/api/me").cookie(cookie)).andExpect(jsonPath("$.data.termsAgreed").value(true));
     }
 
     @Test
     void 역할과_상태를_DB에서_매번_읽는다() throws Exception {
         var cookie = session();
-        mvc.perform(get("/api/me").cookie(cookie)).andExpect(jsonPath("$.role").value("ADMIN"));
+        mvc.perform(get("/api/me").cookie(cookie)).andExpect(jsonPath("$.data.role").value("ADMIN"));
         jdbc.update("UPDATE users SET role = 'USER', status = 'WAITLISTED' WHERE id = ?", user.getId());
         mvc.perform(get("/api/me").cookie(cookie)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.role").value("USER"))
-                .andExpect(jsonPath("$.status").value("WAITLISTED"));
+                .andExpect(jsonPath("$.data.role").value("USER"))
+                .andExpect(jsonPath("$.data.status").value("WAITLISTED"));
         jdbc.update("UPDATE users SET status = 'ACTIVE' WHERE id = ?", user.getId());
-        mvc.perform(get("/api/me").cookie(cookie)).andExpect(jsonPath("$.status").value("ACTIVE"));
+        mvc.perform(get("/api/me").cookie(cookie)).andExpect(jsonPath("$.data.status").value("ACTIVE"));
     }
 
     @Test
@@ -193,9 +210,8 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
     @Test
     void 로그인한_사용자의_없는_API는_JSON_404다() throws Exception {
         mvc.perform(get("/api/does-not-exist").cookie(session())).andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("NOT_FOUND"))
-                .andExpect(jsonPath("$.message").isString())
-                .andExpect(jsonPath("$.retryAfterSeconds").doesNotExist());
+                .andExpect(content().json(expectedError("NOT_FOUND"), JsonCompareMode.STRICT))
+                .andExpect(header().doesNotExist("Retry-After"));
     }
 
     @Test
@@ -255,6 +271,30 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
         assertNotNull(sessions.findById(testSessions.id(cookie)));
     }
 
+    @Test
+    void 실제_HTTP의_도메인_오류는_재시도_초를_본문과_헤더에_함께_싣는다() throws Exception {
+        var cookie = session();
+        doThrow(new ApiException(ErrorCode.NOT_FOUND, 37)).when(meController).me(any(User.class));
+        var response = http("GET", "/api/me", cookie, null);
+        assertEquals(404, response.statusCode());
+        assertTrue(response.headers().firstValue("Location").isEmpty());
+        assertTrue(response.headers().firstValue("Content-Type").orElseThrow().startsWith("application/json"));
+        assertEquals("37", response.headers().firstValue("Retry-After").orElseThrow());
+        JsonAssert.comparator(JsonCompareMode.STRICT).assertIsMatch("""
+                {"code":"NOT_FOUND","message":"찾을 수 없습니다","retryAfterSeconds":37}
+                """, response.body());
+        doThrow(new ApiException(ErrorCode.NOT_FOUND)).when(meController).me(any(User.class));
+        assertError(http("GET", "/api/me", cookie, null), 404, "NOT_FOUND");
+    }
+
+    @Test
+    void 실제_HTTP의_CSRF_오류와_보안_거부도_두_필드_JSON이다() throws Exception {
+        var cookie = session();
+        assertError(http("POST", "/api/auth/logout", cookie, null), 403, "CSRF_INVALID");
+        assertError(http("GET", "/does-not-exist", cookie, null), 404, "NOT_FOUND");
+        assertNotNull(sessions.findById(testSessions.id(cookie)));
+    }
+
     private HttpResponse<String> http(String method, String path, Cookie session, String token) throws Exception {
         var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
                 .method(method, HttpRequest.BodyPublishers.noBody());
@@ -273,11 +313,21 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
         assertEquals(status, response.statusCode(), response.body());
         assertTrue(response.headers().firstValue("Location").isEmpty());
         assertTrue(response.headers().firstValue("Content-Type").orElseThrow().startsWith("application/json"));
-        var body = mapper.readTree(response.body());
-        assertEquals(2, body.size(), response.body());
-        assertEquals(code, body.get("code").asText());
-        assertTrue(body.get("message").isString());
+        assertTrue(response.headers().firstValue("Retry-After").isEmpty());
+        JsonAssert.comparator(JsonCompareMode.STRICT).assertIsMatch(expectedError(code), response.body());
         assertFalse(response.body().contains("private servlet failure"));
+    }
+
+    private static String expectedError(String code) {
+        var message = switch (code) {
+            case "UNAUTHORIZED" -> "로그인이 필요합니다";
+            case "CSRF_INVALID", "INVALID_REQUEST" -> "요청을 확인할 수 없습니다";
+            case "NOT_FOUND" -> "찾을 수 없습니다";
+            case "METHOD_NOT_ALLOWED" -> "지원하지 않는 요청 방식입니다";
+            case "INTERNAL_ERROR" -> "요청을 처리할 수 없습니다";
+            default -> throw new AssertionError("Unexpected code: " + code);
+        };
+        return "{\"code\":\"" + code + "\",\"message\":\"" + message + "\"}";
     }
 
     // 명시적으로 가져온 이 컨텍스트에서만 오류를 주입한다. 테스트 컨트롤러를 스캔에 넣지 않는다.
@@ -328,10 +378,10 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
         var cookie = session();
         var token = csrfCookie(cookie);
         mvc.perform(post("/api/auth/logout").cookie(cookie, token)).andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("CSRF_INVALID"))
-                .andExpect(jsonPath("$.message").isString());
+                .andExpect(content().json(expectedError("CSRF_INVALID"), JsonCompareMode.STRICT));
         mvc.perform(post("/api/auth/logout").cookie(cookie, token).header("X-XSRF-TOKEN", "different"))
-                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("CSRF_INVALID"));
+                .andExpect(status().isForbidden())
+                .andExpect(content().json(expectedError("CSRF_INVALID"), JsonCompareMode.STRICT));
         assertNotNull(sessions.findById(testSessions.id(cookie)));
         mvc.perform(get("/api/me").cookie(cookie)).andExpect(status().isOk());
     }
@@ -339,7 +389,7 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
     @Test
     void 세션_없는_로그아웃도_CSRF를_검사하고_유효하면_204다() throws Exception {
         mvc.perform(post("/api/auth/logout")).andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("CSRF_INVALID"));
+                .andExpect(content().json(expectedError("CSRF_INVALID"), JsonCompareMode.STRICT));
         var token = csrfCookie(null);
         mvc.perform(post("/api/auth/logout").cookie(token).header("X-XSRF-TOKEN", token.getValue()))
                 .andExpect(status().isNoContent()).andExpect(header().doesNotExist("Location"));
@@ -371,8 +421,7 @@ class SecurityConfigurationIT extends PostgresTestConfiguration {
         assertEquals(401, result.getResponse().getStatus());
         assertNull(result.getResponse().getHeader("Location"));
         content().contentTypeCompatibleWith("application/json").match(result);
-        jsonPath("$.code").value("UNAUTHORIZED").match(result);
-        jsonPath("$.message").isString().match(result);
-        jsonPath("$.retryAfterSeconds").doesNotExist().match(result);
+        content().json(expectedError("UNAUTHORIZED"), JsonCompareMode.STRICT).match(result);
+        header().doesNotExist("Retry-After").match(result);
     }
 }

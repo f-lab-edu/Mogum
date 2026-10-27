@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ApiError, apiFetch, googleLoginUrl } from './client'
 
 beforeEach(() => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}')))
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"data":{}}')))
   vi.stubEnv('VITE_API_BASE_URL', '')
   document.cookie = 'XSRF-TOKEN=; Max-Age=0; Path=/'
 })
@@ -58,7 +58,116 @@ test.each([[401, 'UNAUTHORIZED'], [403, 'CSRF_INVALID']])('실패 %s의 상태�
   expect(fetch).toHaveBeenCalledTimes(1)
 })
 
-test('JSON이 아닌 실패 응답도 HTTP 상태를 보존한다', async () => {
-  vi.mocked(fetch).mockResolvedValue(new Response('Bad gateway', { status: 502 }))
-  await expect(apiFetch('/me')).rejects.toMatchObject({ status: 502, code: 'INTERNAL_ERROR' })
+test.each([200, 202])('성공 %s는 data 객체를 반환한다', async (status) => {
+  const data = { email: 'admin@example.com', cards: [], waitlistPosition: null }
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ data }), { status }))
+  await expect(apiFetch<typeof data>('/example')).resolves.toEqual(data)
+})
+
+test.each([
+  [204, 'GET'],
+  [200, 'HEAD'],
+  [200, 'head'],
+])('%s %s는 본문 없이 undefined를 반환한다', async (status, method) => {
+  vi.mocked(fetch).mockResolvedValue(new Response(null, { status }))
+  await expect(apiFetch('/example', { method })).resolves.toBeUndefined()
+})
+
+test.each([
+  [200, '<html>index.html</html>'],
+  [202, '{}'],
+  [200, '{"email":"unwrapped@example.com"}'],
+  [200, '{"data":[]}'],
+  [200, '{"data":null}'],
+  [200, '{"data":"text"}'],
+  [200, '{"data":1}'],
+  [200, '{"data":true}'],
+  [200, 'null'],
+  [200, '[]'],
+])('성공 %s라도 계약에 맞지 않는 %s는 INTERNAL_ERROR다', async (status, body) => {
+  vi.mocked(fetch).mockResolvedValue(new Response(body, { status }))
+  const error = await apiFetch('/me').catch((error: unknown) => error)
+  expect(error).toBeInstanceOf(ApiError)
+  expect(error).toMatchObject({ status, code: 'INTERNAL_ERROR' })
+  expect(fetch).toHaveBeenCalledTimes(1)
+})
+
+test('FIELD_INVALID와 retryAfterSeconds, 모르는 reason을 포함한 fields를 보존한다', async () => {
+  const body = {
+    code: 'FIELD_INVALID',
+    message: '서버 문구',
+    retryAfterSeconds: 0,
+    fields: [
+      { field: 'topic', reason: 'TOO_LONG' },
+      { field: 'purpose', reason: 'REQUIRED' },
+      { field: 'topic', reason: 'FUTURE_REASON' },
+    ],
+  }
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(body), { status: 400 }))
+  await expect(apiFetch('/example')).rejects.toMatchObject({ status: 400, ...body })
+})
+
+test('fields 원소의 모르는 키는 무시하고 field와 reason만 옮긴다', async () => {
+  const fields = [{ field: 'topic', reason: 'TOO_LONG', futureKey: { value: 100 } }]
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 'FIELD_INVALID', message: '서버 문구', fields }), { status: 400 }))
+  const error = await apiFetch('/example').catch((error: unknown) => error)
+  expect(error).toBeInstanceOf(ApiError)
+  expect(error).toHaveProperty('fields', [{ field: 'topic', reason: 'TOO_LONG' }])
+})
+
+test('빈 fields 배열을 보존한다', async () => {
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 'FIELD_INVALID', message: '서버 문구', fields: [] }), { status: 400 }))
+  await expect(apiFetch('/example')).rejects.toMatchObject({ code: 'FIELD_INVALID', fields: [] })
+})
+
+test.each([
+  {},
+  { field: 'topic' },
+  { reason: 'TOO_LONG' },
+  { field: 1, reason: 'TOO_LONG' },
+  { field: null, reason: 'TOO_LONG' },
+  { field: 'topic', reason: 1 },
+  { field: 'topic', reason: null },
+  'topic',
+  1,
+  null,
+  true,
+  [],
+])('잘못된 원소가 하나라도 있으면 fields 전체를 버린다: %j', async (invalid) => {
+  const fields = [{ field: 'topic', reason: 'TOO_LONG' }, invalid, { field: 'purpose', reason: 'REQUIRED' }]
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 'FIELD_INVALID', message: '서버 문구', fields }), { status: 400 }))
+  const error = await apiFetch('/example').catch((error: unknown) => error)
+  expect(error).toBeInstanceOf(ApiError)
+  expect(error).toMatchObject({ status: 400, code: 'FIELD_INVALID', message: '서버 문구' })
+  expect(error).toHaveProperty('fields', undefined)
+})
+
+test.each([
+  {},
+  { fields: ['topic', 'purpose'] },
+  { retryAfterSeconds: '30', fields: [1, 2] },
+  { retryAfterSeconds: null, fields: 'topic' },
+  { retryAfterSeconds: {}, fields: ['topic', 1] },
+])('오류 선택 필드가 없거나 타입이 틀리면 담지 않는다: %j', async (optional) => {
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 'INVALID_REQUEST', message: '서버 문구', ...optional }), { status: 400 }))
+  const error = await apiFetch('/example').catch((error: unknown) => error)
+  expect(error).toBeInstanceOf(ApiError)
+  expect(error).toMatchObject({ status: 400, code: 'INVALID_REQUEST', message: '서버 문구' })
+  expect(error).toHaveProperty('retryAfterSeconds', undefined)
+  expect(error).toHaveProperty('fields', undefined)
+})
+
+test('모르는 오류 code도 원문대로 보존한다', async () => {
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 'FUTURE_ERROR', message: '서버 문구' }), { status: 503 }))
+  await expect(apiFetch('/example')).rejects.toMatchObject({ status: 503, code: 'FUTURE_ERROR', message: '서버 문구' })
+})
+
+test('code와 message 타입이 틀리면 대체값을 쓴다', async () => {
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 1, message: [] }), { status: 400 }))
+  await expect(apiFetch('/example')).rejects.toMatchObject({ status: 400, code: 'INVALID_REQUEST', message: 'Request failed' })
+})
+
+test.each([[401, 'UNAUTHORIZED'], [403, 'INVALID_REQUEST'], [404, 'INVALID_REQUEST'], [502, 'INTERNAL_ERROR']])('JSON이 아닌 실패 %s도 HTTP 상태를 보존한다', async (status, code) => {
+  vi.mocked(fetch).mockResolvedValue(new Response('Bad gateway', { status }))
+  await expect(apiFetch('/me')).rejects.toMatchObject({ status, code })
 })
