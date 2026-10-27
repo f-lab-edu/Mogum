@@ -557,7 +557,7 @@ SELECT count(*) FROM jobs WHERE user_id = :userId AND status IN ('QUEUED', 'RUNN
 | 커넥션 풀 | 활성 · 대기 — §5 규칙이 지켜지는 증거 |
 | 호출 · 생성 | [03 §9](./03-generation.md) |
 
-- **로그 상관은 `jobId`** — 적재 직후와 수령 직후 MDC 에 `jobId` · `step` 을 넣는다. *"왜 오래 걸렸나"* 는 `job.step.duration` 으로 단계를 찾고 `jobId` 로 로그를 긁는다. 요청은 `requestId` 로 긁는다 — 로그 규약은 §9.2.
+- **로그 상관은 `jobId`** — 수령 직후 MDC 에 `jobId` · `step` 을 넣고, 요청과 잡은 접수 줄 하나로 잇는다. *"왜 오래 걸렸나"* 는 `job.step.duration`(로컬) · 단계 끝 줄(운영)로 단계를 찾고 `jobId` 로 로그를 긁는다. 요청은 `requestId` 로 긁는다 — 로그 규약은 §9.2.
 - **메트릭 이름 · 태그** — 이름은 점으로 잇는 소문자다(`job.step.duration`). 태그 값은 정해진 몇 가지(단계 · 결과 · 이유 · `code`)만 쓰고, 회원 ID · 요청 ID · 잡 ID · 원문은 태그에 넣지 않는다 — 값마다 시계열이 생기고 사용자 정보가 샌다(AGENTS 금지 목록 30). 운영 서버는 메트릭을 모으지 않는다(액추에이터는 헬스만 공개) — 위 표의 메트릭은 로컬 · 용량 측정(`16`)의 Prometheus · Grafana 에서 본다. 수집 의존성(`micrometer-registry-prometheus` 등)은 처음 쓰는 TASK 가 더한다. API 지연은 액추에이터가 기본으로 만드는 `http.server.requests` 다.
 - 운영 서버에는 Prometheus 가 없다 → **U6 는 DB 만 읽는다**(`jobs` · `job_events` · `llm_calls` · `concept_match_logs` · `users`). 현재 작업 상태는 `jobs`, 최근 24시간의 성공/실패/회수는 `job_events`, 외부 호출 재시도 등록 · 429 · 비용 합계는 `llm_calls`이 출처다. 메모리 메트릭을 최근 24시간의 영속 집계로 대신하지 않는다.
 - 실패율은 창 안의 `FAILED / (SUCCEEDED + FAILED)`이며 실패 후 재시도 성공은 두 종결 이벤트로 센다. 회수는 별도 건수다. 분모 0은 NULL로 제공하고 관리자 화면에는 표본 없음으로 표시한다. 모든 집계에 공통 DB 조회 기준 시각을 사용한다([02 §6.9](./02-domain-data.md) · [05 §7](./05-api.md)).
@@ -591,8 +591,8 @@ U6 는 들어가 봐야 보인다. **사람이 바로 움직여야 하는 일**�
 | 수준 | 언제 | 예 |
 |---|---|---|
 | `ERROR` | 사람이 원인을 봐야 하는 우리 쪽 실패 — 스택과 함께 | 처리되지 않은 예외(5xx) · 결과 저장 실패 · 불변식 위반 |
-| `WARN` | 외부 실패 · 이상 징후 — 시스템은 계속 돈다 | 구글 토큰 교환 실패 · 프로바이더 재시도 소진 · 알림 전송 실패 · 리스 상실 |
-| `INFO` | 흐름 한 줄 | 접근 줄 · 로그인 결과 · 기동/종료 · 잡 적재/수령/종결 |
+| `WARN` | 외부 실패 · 이상 징후 — 시스템은 계속 돈다 | 구글 토큰 교환 실패 · 외부 호출 실패 · 알림 전송 실패 · 리스 상실 |
+| `INFO` | 흐름 한 줄 | 접근 줄 · 로그인 결과 · 기동/종료 · 잡 접수/단계 끝/종결 |
 | `DEBUG` 이하 | 운영에서 끈다 | — |
 
 - **시각 기준** — 사람이 읽는 시각은 모두 한국 시간이다. 앱 줄은 `+09:00`, Postgres 서버 로그는 `log_timezone=Asia/Seoul`(줄 앞 `2026-10-27 06:51:26.792 KST [72] ERROR: …` — `pgvector/pgvector:pg17` 일회용 컨테이너에서 확인), 서버(EC2) 시간대는 `Asia/Seoul`(`deploy.sh` 가 성공한 배포마다 `timedatectl set-timezone` 으로 맞춘다 — `journalctl` 의 줄 앞 시각 · `--since` 가 한국 시간). 이미지 기본값은 Postgres `log_timezone = 'Etc/UTC'` · EC2 UTC 다. 앱 · DB 컨테이너의 기본 시간대 · Postgres 세션 `timezone` · 저장 시각은 UTC 그대로다(금지 20 — 한국 날짜는 코드가 `Asia/Seoul` 을 명시해 계산한다). Caddy 자체 로그의 시각은 숫자(Unix 초)라 `journalctl` 의 줄 앞 시각으로 읽는다(ADR-075).
@@ -620,10 +620,25 @@ U6 는 들어가 봐야 보인다. **사람이 바로 움직여야 하는 일**�
     `not_allowed` 거절 외의 실패는 모두 화면의 `login_failed`다. 프레임워크/프로바이더가 전달한 코드로 분류하므로 구별할 수 없는 세부 원인을 추가 추정하지 않는다.
 - **남기지 않는 것** — AGENTS 금지 목록 30. 예외 메시지에 값이 실리는 경로는 설정으로 막는다 — 앱은 PgJDBC `logServerErrorDetail=false`(중복 키 오류의 `Key (…)=(…)` 등), Postgres 서버 로그는 `log_error_verbosity=terse`(`DETAIL` · `HINT` · `QUERY` · `CONTEXT` 를 뺀다 — [PostgreSQL 문서](https://www.postgresql.org/docs/17/runtime-config-logging.html)). 바인드 값은 Postgres 기본값(`log_parameter_max_length_on_error=0`)이라 오류 로그에 실리지 않는다.
     - 앱 설정은 `spring.datasource.hikari.data-source-properties.logServerErrorDetail=false`다. DB URL은 바꾸지 않는다. Boot 4.1.1 BOM의 런타임 의존성은 PgJDBC **42.7.13**(`./backend/gradlew -p backend dependencyInsight --dependency org.postgresql:postgresql --configuration runtimeClasspath`로 확인)이며, 해당 버전 source jar의 `org.postgresql.PGProperty.LOG_SERVER_ERROR_DETAIL`에서 속성 이름과 지원을 확인했다. `UserRepositoryIT`는 실제 중복키 예외 사슬과 전체 캡처 로그에 제약 이름은 있고 표식 subject는 없는지 검사한다. `OAuthLoginHandlerIT` · `RequestValidationIT`도 응답 상태와 요청 ID별 접근 줄을 기다린 뒤 전체 출력에서 매 요청의 고유 표식이 없는지 검사한다.
-- **뒤 TASK 가 남길 줄**
-    - 잡(`4`) — 적재 · 수령 · 단계 시작/끝 · 종결 · 회수 · 반납 · 펜싱을 `INFO` 한 줄씩(리스 상실 · 펜싱으로 막힌 쓰기는 `WARN`). 수령 루프와 실행기는 잡 하나가 끝날 때 MDC 를 지운다.
-    - 외부 호출(`5`) — 시도마다 한 줄: `llm_calls` ID · 종류 · 단계 · 결과 분류(`reason`) · 걸린 시간 · 토큰 수. 프롬프트 · 응답 · 프로바이더 오류 메시지 원문은 남기지 않는다.
-    - 알림(`10`) — 슬랙으로 보낸 이벤트도 한 줄 남기고, 전송 실패는 `WARN` 이다.
+- **새로 남기는 줄 — 아래 표에 있는 것만** — 기준은 *DB 에 남지 않는 것* 이다. DB 에 이미 남는 사실은 로그에 다시 쓰지 않는다 — 외부 호출 시도 · 사용량은 `llm_calls`, 잡의 성공 · 실패 · 회수는 `job_events`, 보낸 알림은 `alert_logs` 에서 본다. 삭제 · 탈퇴 · 관리자 조치는 경로에 대상 ID 가 있는 접근 줄로 충분하다. 표에 없는 줄(`INFO` 이상)이 필요하면 코드보다 이 표를 먼저 고친다.
+
+    | 줄 | 수준 | 담는 값 | 왜 필요한가 | TASK |
+    |---|---|---|---|---|
+    | 잡 접수 | `INFO` | `jobId` · 종류 — 요청 스레드에서 찍혀 `requestId` · `userId` 가 함께 붙는다 | 요청과 잡을 잇는 유일한 줄이다 | `4` |
+    | 잡 단계 끝 | `INFO` | 결과 · `durationMs`(단계 이름은 MDC `step`) | 운영 서버에는 메트릭이 없어 *"왜 오래 걸렸나"* 를 이 줄로 답한다 | `4` · 단계는 `6` · `7` |
+    | 잡 종결 | `INFO` | 결과 · 실패 코드(05 §5) · `waitMs`(적재 → 첫 수령) · `durationMs`(첫 수령 → 종결) | 문의 하나에 답이 바로 나온다 | `4` |
+    | 실행기 종료 | `INFO` | 반납한 잡 수 · `durationMs` | 반납은 `job_events` 에 남지 않는다 — 배포 때 잡이 어떻게 됐는지 본다 | `4` |
+    | 외부 호출 실패 | `WARN` | `llm_calls` ID · 종류 · 단계 · 결과 분류(`reason`) · HTTP 상태 · 몇 번째 시도 · 다시 할지 · `durationMs` | 우리 탓인지 상대 탓인지 가른다. 성공한 시도는 `llm_calls` 로 본다 | `5` |
+    | DB 에 흔적이 남지 않는 이상 | `WARN` — 우리 버그면 `ERROR` | 대상 ID · 무엇이 어긋났나(분류) | 리스 상실 · 수령 회차가 틀려 `0 rows` 로 막힌 쓰기 · 일어날 수 없는 분기는 남기지 않으면 기록이 없다 | `4` 부터 |
+    | 알림 전송 실패 | `WARN` | 이벤트 · 실패 분류 | `alert_logs` 에는 보낸 것으로 남는데 실제로는 가지 않았다 | `10` |
+
+    - 메시지는 `사건이름 키=값 …` 이다 — 이미 있는 `access …` · `login result=…` 처럼 첫 단어로 줄을 고른다. 이름은 줄을 만드는 TASK 가 정해 이 표에 적는다.
+    - 값은 ID · 정해진 분류 · 숫자만 싣는다. 예외 메시지 · 프로바이더 오류 메시지는 싣지 않는다(금지 30). 단위는 키 이름에 붙인다(`durationMs`).
+    - 잡의 `jobId` · `step` 은 수령 직후 MDC 에 넣고 잡이 끝나면 지운다. 접수 줄은 `jobId` 를 메시지에 싣고 요청 스레드의 MDC 에는 넣지 않는다 — 요청 필터는 자기 키(`requestId` · `userId`)만 지우므로 다음 요청의 줄에 남는다.
+- **무겁지 않게** — 평소 양은 어림으로 하루 10~15MB 다(정원 10명이 모두 쓰는 날 접근 줄 약 1만 — 대부분 2초 폴링 — 과 잡 줄 수백, 저장 항목 하나를 1KB 로 잡았다). 14일이면 200MB 안쪽이라 상한에서 멀다. 실제 크기는 운영에서 `journalctl --disk-usage` 로 잰다 — 아직 재지 않았다. 상한을 위협하는 것은 반복이다.
+    - 할 일이 없을 때(빈 수령) · 반복문 안 · 항목(카드 · 개념 · 임베딩)마다는 남기지 않는다. 1초마다 한 줄이면 하루 8.6만 줄로 보관이 14일에서 5일 안팎으로 준다.
+    - 반복 루프(수령 루프 · 주기 작업)에서 같은 실패가 이어지면 첫 번째만 스택과 함께 남기고, 이어지는 같은 실패는 남기지 않다가 회복하면 한 줄(연속 횟수)을 남긴다. Docker 는 표준 출력을 줄마다 항목 하나로 저장해 스택 하나가 항목 수십~수백 개다 — DB 가 죽은 동안 1초마다 스택을 찍으면 몇 시간 안에 500MiB 를 채워 지난 14일치가 밀려난다.
+    - 예외는 처리하는 곳에서 한 번만 남긴다 — 잡아서 찍고 다시 던지지 않는다. 다시 던질 때는 원래 예외를 원인(cause)으로 붙인다.
 - **로그와 슬랙** — 슬랙은 §9.1 의 *"사람이 바로 움직여야 하는 일"* 만 보낸다. `ERROR` 로그가 곧 알림은 아니다 — 로그는 원인을 찾을 때 읽는 기록이고, 바로 움직일 일인지는 이벤트로 정한다.
 - **탈퇴** — 로그는 지우지 않는다. 회원 ID 만 남고 보관 상한으로 사라진다([02 §7](./02-domain-data.md)).
 
