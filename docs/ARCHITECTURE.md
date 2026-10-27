@@ -25,7 +25,10 @@
 │   │   │   ├── repository/          # UserRepository(Spring Data) · 네이티브 쿼리 클래스
 │   │   │   ├── domain/              # User(@Entity · Lombok @Getter · @NoArgsConstructor(PROTECTED) · 생성은 정적 팩토리 User.join) · UserRole · UserStatus · 도메인 규칙
 │   │   │   └── dto/                 # MeResponse — HTTP 요청 · 응답만
-│   │   ├── <도메인>/                 # curriculum · material · concept · review … — account 와 같은 다섯 하위 패키지. MasteryPolicy 등은 domain/
+│   │   ├── curriculum/              # 묶음 · 단계 · 커리큘럼 · 강의 — controller/ · service/ · dto/ 는 6-curriculum-gen 에서 만든다
+│   │   │   ├── domain/              # CurriculumGroup · CurriculumStep · Curriculum · Lesson(AuditedEntity 상속 · 정적 팩토리) · CurriculumStatus · LessonStatus
+│   │   │   └── repository/          # CurriculumGroupRepository · CurriculumStepRepository · CurriculumRepository · LessonRepository(JpaRepository)
+│   │   ├── <도메인>/                 # material · concept · review … — account 와 같은 다섯 하위 패키지. MasteryPolicy 등은 domain/
 │   │   ├── job/                     # 적재 · 재시도 · 잡 조회 API · jobs/job_events 네이티브 SQL(repository/) — 같은 다섯 하위 패키지 · generation 참조 금지
 │   │   ├── usage/                   # llm_calls 원장 · 일일 · 월 합계(쿼터 · 킬스위치 근거) — 생성과 적재가 함께 쓴다 · 같은 다섯 하위 패키지
 │   │   ├── generation/              # 생성 유스케이스(잡 I · A · B ①②③ · resolveConcepts) + 유료 호출(LlmClient · EmbeddingClient · GuardedLlmClient · InputBudget) — worker · config 만 참조. 계층이 아니라 용도로 나눈다

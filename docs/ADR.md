@@ -488,7 +488,7 @@
 
 **검토한 대안**: 모두 ID 값(지연 로딩이 아예 없지만 주인 확인이 조인 쿼리로 드러나고 함께 저장할 때 부모 ID 를 먼저 받아야 한다) · 양방향 컬렉션(다시 짜기를 `replaceLessons` 하나로 표현하지만 위의 겹침) · 회원도 `@ManyToOne`(규칙이 하나지만 도메인 결합과 회원 대역 절차) · 묶음 · 단계를 별도 도메인(패키지가 작아지지만 위의 어긋남) · 강의 · 단계에 `ON DELETE CASCADE`(삭제 코드가 짧지만 자료 · 잡의 FK 와 `llm_calls` 연결 해제 순서를 건너뛰고, 지워지는 범위가 SQL 에 보이지 않는다).
 
-**트레이드오프**: `@ManyToOne` 의 기본값은 EAGER 라 `LAZY` 를 빠뜨리면 조용히 매번 같이 읽는다 — 테스트로 확인한다. 프록시는 하위 클래스라 엔티티 클래스 · getter 를 `final` 로 두지 않는다. 한 엔티티 안에 연관과 ID 가 섞여 규칙을 문장으로 지킨다. 다시 짜기의 강의 교체는 벌크 삭제(`@Modifying`)나 삭제 뒤 `flush()` 를 먼저 해야 새 강의 INSERT 가 순서 unique 와 부딪히지 않는다(`6`). 삭제 SQL 이 테이블마다 길어진다. 구현 · 검증은 아직 수행하지 않았다.
+**트레이드오프**: `@ManyToOne` 의 기본값은 EAGER 라 `LAZY` 를 빠뜨리면 조용히 매번 같이 읽는다 — 테스트로 확인한다. 프록시는 하위 클래스라 엔티티 클래스 · getter 를 `final` 로 두지 않는다. 한 엔티티 안에 연관과 ID 가 섞여 규칙을 문장으로 지킨다. 다시 짜기의 강의 교체는 벌크 삭제(`@Modifying`)나 삭제 뒤 `flush()` 를 먼저 해야 새 강의 INSERT 가 순서 unique 와 부딪히지 않는다(`6`). 삭제 SQL 이 테이블마다 길어진다. 2026-10-28 `3-curriculum-model` step 1에서 네 엔티티 · 세 LAZY 연관 · 회원 ID 참조와 `V8__create_curriculum_model.sql`의 FK를 구현하고 지연 로딩 · 부모 삭제 거절 · FK 삭제 동작을 DB 테스트로 확인했다. 운영 코드의 삭제 순서 · 강의 교체 검증은 `6-curriculum-gen` · `13-account-public`에 남아 있다.
 
 ### ADR-078: 모든 엔티티는 `created_at` · `updated_at` 을 갖고, JPA Auditing 이 `Clock` 빈으로 채운다
 **결정**: 사용자 결정(2026-10-27)에 따라 —
@@ -503,7 +503,7 @@
 
 **검토한 대안**: 쓰는 곳이 있는 테이블에만(컬럼마다 이유가 있지만 나중에 필요해지면 과거 행에 값이 없다) · `created_at` 만(`updated_at` 은 네이티브 갱신이 많아 낡기 쉽다 — 이 점을 알고 사용자가 `updated_at` 까지 골랐다) · 앱이 명시적으로 채우기(팩토리 · 변경 메서드마다 시각 인자 — 값은 정확하지만 경로마다 기억해야 한다) · DB `DEFAULT now()` + `BEFORE UPDATE` 트리거(모든 경로를 덮지만 DB 시계라 고정 시계로 단언할 수 없고 동작이 마이그레이션에 숨는다) · 같은 뜻 컬럼은 갈음(겹치는 컬럼이 없지만 엔티티마다 예외가 생겨 ArchUnit 으로 강제하기 어렵다) · `users` 는 `13-account-public` 에서(이번 범위가 작지만 W6 까지 예외가 남는다).
 
-**트레이드오프**: JPA 밖 갱신에서 `updated_at` 을 빠뜨리면 값이 조용히 낡는다 — 그런 갱신을 만드는 TASK 가 경로마다 테스트로 확인한다(AGENTS 금지 32). 공통 상위 클래스와 Auditing 설정이 생긴다. 한 번 쓰고 바뀌지 않는 테이블에도 `updated_at` 이 있고, `reviews` 는 `reviewed_at` 과 `created_at` 이 겹친다. ArchUnit 규칙의 위반 픽스처 `@Entity` 를 `com.mogum` 아래 두면 `@SpringBootTest` 가 엔티티로 읽어 모든 컨텍스트 테스트가 깨진다 — 스캔 밖에 둔다. 운영 DB 의 `users` 에 마이그레이션이 하나 더 나간다. `3-curriculum-model` step 0에서 `common.persistence.AuditedEntity` · `config.JpaAuditingConfiguration` · 엔티티 상속 ArchUnit 규칙과 스캔 밖 위반 픽스처 · `users`의 `V7__add_users_updated_at.sql`을 구현했다. 테스트 컨텍스트의 별도 이름 `@Primary` `Clock`으로 저장 · 수정 시각과 첫 로그인 Auditing을, 이전 DB에서 기존 행의 시각 채우기를 확인했다. `./backend/gradlew -p backend build` 전체 서버 테스트 377개 → 383개 통과(실패 · 오류 · 건너뜀 0). 커리큘럼 엔티티 적용 · 검증은 이 phase의 step 1에 남아 있다.
+**트레이드오프**: JPA 밖 갱신에서 `updated_at` 을 빠뜨리면 값이 조용히 낡는다 — 그런 갱신을 만드는 TASK 가 경로마다 테스트로 확인한다(AGENTS 금지 32). 공통 상위 클래스와 Auditing 설정이 생긴다. 한 번 쓰고 바뀌지 않는 테이블에도 `updated_at` 이 있고, `reviews` 는 `reviewed_at` 과 `created_at` 이 겹친다. ArchUnit 규칙의 위반 픽스처 `@Entity` 를 `com.mogum` 아래 두면 `@SpringBootTest` 가 엔티티로 읽어 모든 컨텍스트 테스트가 깨진다 — 스캔 밖에 둔다. 운영 DB 의 `users` 에 마이그레이션이 하나 더 나간다. `3-curriculum-model` step 0에서 `common.persistence.AuditedEntity` · `config.JpaAuditingConfiguration` · 엔티티 상속 ArchUnit 규칙과 스캔 밖 위반 픽스처 · `users`의 `V7__add_users_updated_at.sql`을 구현했다. 테스트 컨텍스트의 별도 이름 `@Primary` `Clock`으로 저장 · 수정 시각과 첫 로그인 Auditing을, 이전 DB에서 기존 행의 시각 채우기를 확인했다. `./backend/gradlew -p backend build` 전체 서버 테스트 377개 → 383개 통과(실패 · 오류 · 건너뜀 0). 2026-10-28 step 1에서 `CurriculumGroup` · `CurriculumStep` · `Curriculum` · `Lesson`에도 적용했고, 별도 이름의 `@Primary` 고정 `Clock`을 주입한 DB 테스트로 네 엔티티 저장 시 생성 · 수정 시각을 확인했다. 공통 상위 클래스 상속은 기존 ArchUnit 규칙으로 검사한다.
 
 ## 설계 묶음 정리 때 확정한 것 (Q220~Q231)
 

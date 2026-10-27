@@ -321,6 +321,8 @@ COMMIT;
 
 ### 6.2 `curriculums` · `lessons`
 
+> **2026-10-28 구현·검증 완료(`3-curriculum-model` step 1).** `V8__create_curriculum_model.sql`로 기본 스키마 · FK · CHECK · 인덱스를 만들고 엔티티 · 팩토리 · 기본 리포지토리를 구현했다. `keywords`는 `List<String>`에 `@JdbcTypeCode(SqlTypes.ARRAY)` · `columnDefinition = "text[]"`로 매핑해 스키마 검증과 순서/값 보존을 확인했다. 숙련도 근거 jsonb 두 컬럼과 제목류 길이 상한 CHECK 는 `6-curriculum-gen`에서 더한다.
+
 | `curriculums` | 비고 |
 |---|---|
 | `id` | `bigserial` PK |
@@ -360,6 +362,8 @@ COMMIT;
 워커 완료가 먼저 커밋됐으면 그 산출물까지 삭제한다. 삭제가 먼저 커밋됐으면 워커의 조건부 `UPDATE jobs` 는 `0 rows` 이므로 결과 저장/추가 호출을 중단한다. 비용은 독립 원장에 확정한다 — 사용자 · 전역 합계는 원장에서 더하므로 따로 반영할 것이 없다. 삭제 후 늦은 응답은 잡 연결이나 도메인 데이터를 복구하지 않는다([04 §4.4](./04-jobs-and-cost.md)).
 
 ### 6.2.1 `curriculum_groups` · `curriculum_steps`
+
+> **2026-10-28 구현·검증 완료(`3-curriculum-model` step 1).** `V8__create_curriculum_model.sql`로 묶음/단계 기본 스키마 · FK · CHECK · 인덱스를 만들고 엔티티 · 팩토리 · 기본 리포지토리를 구현했다. 순서/단계 연결 UNIQUE · 부모 삭제 거절 · LAZY · Auditing과 `Curriculum.forStep`의 단계 값/묶음 주인 복사를 DB 테스트로 확인했다. §6.2의 jsonb 두 컬럼과 제목/범위 등 제목류 길이 상한 CHECK 는 `6-curriculum-gen`에서 더한다.
 
 **묶음은 전체 목표, 단계는 분할안, 커리큘럼은 실제 학습 내용이다.** 미생성 단계가 존재해도 빈 `DRAFT`를 미리 만들지 않는다. `curriculums.step_id`를 통해 단계별 실제 커리큘럼을 조회하며, 단계 테이블에 반대 방향의 `curriculum_id`를 중복 저장하지 않는다.
 
