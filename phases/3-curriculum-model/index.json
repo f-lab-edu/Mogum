@@ -1,0 +1,9 @@
+{
+  "project": "Mogum",
+  "phase": "3-curriculum-model",
+  "steps": [
+    { "step": 0, "name": "entity-audit", "status": "pending" },
+    { "step": 1, "name": "curriculum-schema", "status": "pending" },
+    { "step": 2, "name": "owner-lookup", "status": "pending" }
+  ]
+}
