@@ -33,6 +33,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -78,6 +79,122 @@ class CurriculumRepositoryIT extends PostgresTestConfiguration {
             jdbc.update("DELETE FROM curriculum_groups WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM users WHERE id = ?", userId);
         }
+    }
+
+    @Test
+    void 내_독립_커리큘럼을_주인_ID로_조회한다() {
+        var single = curriculums.save(Curriculum.single(owner.getId(), "독립 주제", null, "독립 제목"));
+
+        var found = curriculums.findByIdAndUserId(single.getId(), owner.getId()).orElseThrow();
+
+        assertEquals(single.getId(), found.getId());
+        assertEquals(owner.getId(), found.getUserId());
+    }
+
+    @Test
+    void 남의_독립_커리큘럼은_조회하지_못한다() {
+        var single = curriculums.save(Curriculum.single(owner.getId(), "독립 주제", null, "독립 제목"));
+        var other = createUser();
+
+        assertEquals(Optional.empty(), curriculums.findByIdAndUserId(single.getId(), other.getId()));
+    }
+
+    @Test
+    void 없는_커리큘럼과_남의_커리큘럼은_같이_비어_있다() {
+        var single = curriculums.save(Curriculum.single(owner.getId(), "독립 주제", null, "독립 제목"));
+        var other = createUser();
+        var missing = curriculums.findByIdAndUserId(-1L, owner.getId());
+
+        assertEquals(Optional.empty(), missing);
+        assertEquals(missing, curriculums.findByIdAndUserId(single.getId(), other.getId()));
+    }
+
+    @Test
+    void 단계_커리큘럼도_묶음_주인_ID로_조회한다() {
+        var found = curriculums.findByIdAndUserId(curriculum.getId(), group.getUserId()).orElseThrow();
+
+        assertEquals(curriculum.getId(), found.getId());
+        assertEquals(group.getUserId(), found.getUserId());
+        assertEquals(step.getId(), found.getStep().getId());
+    }
+
+    @Test
+    void 남의_단계_커리큘럼은_같은_조회_메서드로_걸러진다() {
+        var other = createUser();
+
+        assertEquals(Optional.empty(), curriculums.findByIdAndUserId(curriculum.getId(), other.getId()));
+    }
+
+    @Test
+    void 내_묶음을_주인_ID로_조회한다() {
+        var found = groups.findByIdAndUserId(group.getId(), owner.getId()).orElseThrow();
+
+        assertEquals(group.getId(), found.getId());
+        assertEquals(owner.getId(), found.getUserId());
+    }
+
+    @Test
+    void 남의_묶음은_조회하지_못한다() {
+        var other = createUser();
+
+        assertEquals(Optional.empty(), groups.findByIdAndUserId(group.getId(), other.getId()));
+    }
+
+    @Test
+    void 없는_묶음과_남의_묶음은_같이_비어_있다() {
+        var other = createUser();
+        var missing = groups.findByIdAndUserId(-1L, owner.getId());
+
+        assertEquals(Optional.empty(), missing);
+        assertEquals(missing, groups.findByIdAndUserId(group.getId(), other.getId()));
+    }
+
+    @Test
+    void 내_강의를_커리큘럼_주인_ID로_조회한다() {
+        var found = lessons.findByIdAndCurriculum_UserId(lesson.getId(), owner.getId()).orElseThrow();
+
+        assertEquals(lesson.getId(), found.getId());
+        assertEquals(curriculum.getId(), found.getCurriculum().getId());
+    }
+
+    @Test
+    void 남의_강의는_조회하지_못한다() {
+        var other = createUser();
+
+        assertEquals(Optional.empty(), lessons.findByIdAndCurriculum_UserId(lesson.getId(), other.getId()));
+    }
+
+    @Test
+    void 없는_강의와_남의_강의는_같이_비어_있다() {
+        var other = createUser();
+        var missing = lessons.findByIdAndCurriculum_UserId(-1L, owner.getId());
+
+        assertEquals(Optional.empty(), missing);
+        assertEquals(missing, lessons.findByIdAndCurriculum_UserId(lesson.getId(), other.getId()));
+    }
+
+    @Test
+    void 내_단계를_묶음_주인_ID로_조회한다() {
+        var found = steps.findByIdAndGroup_UserId(step.getId(), owner.getId()).orElseThrow();
+
+        assertEquals(step.getId(), found.getId());
+        assertEquals(group.getId(), found.getGroup().getId());
+    }
+
+    @Test
+    void 남의_단계는_조회하지_못한다() {
+        var other = createUser();
+
+        assertEquals(Optional.empty(), steps.findByIdAndGroup_UserId(step.getId(), other.getId()));
+    }
+
+    @Test
+    void 없는_단계와_남의_단계는_같이_비어_있다() {
+        var other = createUser();
+        var missing = steps.findByIdAndGroup_UserId(-1L, owner.getId());
+
+        assertEquals(Optional.empty(), missing);
+        assertEquals(missing, steps.findByIdAndGroup_UserId(step.getId(), other.getId()));
     }
 
     @Test

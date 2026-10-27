@@ -323,6 +323,8 @@ COMMIT;
 
 > **2026-10-28 구현·검증 완료(`3-curriculum-model` step 1).** `V8__create_curriculum_model.sql`로 기본 스키마 · FK · CHECK · 인덱스를 만들고 엔티티 · 팩토리 · 기본 리포지토리를 구현했다. `keywords`는 `List<String>`에 `@JdbcTypeCode(SqlTypes.ARRAY)` · `columnDefinition = "text[]"`로 매핑해 스키마 검증과 순서/값 보존을 확인했다. 숙련도 근거 jsonb 두 컬럼과 제목류 길이 상한 CHECK 는 `6-curriculum-gen`에서 더한다.
 
+> **주인 확인 조회 구현·검증 완료(`3-curriculum-model` step 2).** `CurriculumRepository.findByIdAndUserId` · `LessonRepository.findByIdAndCurriculum_UserId`는 주인 조건을 포함한 파생 쿼리로 `Optional`을 반환한다. 하나짜리와 단계 커리큘럼은 같은 커리큘럼 조회를 쓰며, 내 것 반환 · 남의 것/없는 것의 `Optional.empty()`를 DB 테스트로 확인했다. 비면 서비스가 `404`(`6`)로 바꾼다.
+
 | `curriculums` | 비고 |
 |---|---|
 | `id` | `bigserial` PK |
@@ -364,6 +366,8 @@ COMMIT;
 ### 6.2.1 `curriculum_groups` · `curriculum_steps`
 
 > **2026-10-28 구현·검증 완료(`3-curriculum-model` step 1).** `V8__create_curriculum_model.sql`로 묶음/단계 기본 스키마 · FK · CHECK · 인덱스를 만들고 엔티티 · 팩토리 · 기본 리포지토리를 구현했다. 순서/단계 연결 UNIQUE · 부모 삭제 거절 · LAZY · Auditing과 `Curriculum.forStep`의 단계 값/묶음 주인 복사를 DB 테스트로 확인했다. §6.2의 jsonb 두 컬럼과 제목/범위 등 제목류 길이 상한 CHECK 는 `6-curriculum-gen`에서 더한다.
+
+> **주인 확인 조회 구현·검증 완료(`3-curriculum-model` step 2).** `CurriculumGroupRepository.findByIdAndUserId` · `CurriculumStepRepository.findByIdAndGroup_UserId`는 주인 조건을 포함한 파생 쿼리로 `Optional`을 반환하며, 내 것 반환 · 남의 것/없는 것의 `Optional.empty()`를 DB 테스트로 확인했다. `Curriculum.forStep`으로 저장한 단계 커리큘럼도 `CurriculumRepository.findByIdAndUserId`로 묶음 주인만 조회할 수 있다. 비면 서비스가 `404`(`6`)로 바꾼다.
 
 **묶음은 전체 목표, 단계는 분할안, 커리큘럼은 실제 학습 내용이다.** 미생성 단계가 존재해도 빈 `DRAFT`를 미리 만들지 않는다. `curriculums.step_id`를 통해 단계별 실제 커리큘럼을 조회하며, 단계 테이블에 반대 방향의 `curriculum_id`를 중복 저장하지 않는다.
 
