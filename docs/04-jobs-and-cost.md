@@ -39,7 +39,7 @@
 | `controller` | `@RestController` |
 | `service` | `@Service` · 서비스 메서드의 입력 · 결과 타입(예: `ExternalAccount` · `LoginResult`) |
 | `repository` | Spring Data 리포지토리 · `EntityManager` 네이티브 쿼리 클래스 |
-| `domain` | `@Entity` · enum · 값 타입 · 도메인 규칙(`MasteryPolicy` 등). 엔티티는 생성 흐름마다 이름 있는 정적 팩토리로만 만든다 — public 생성자 · `@Builder` 없음, 처음 상태는 팩토리 안에 고정(ADR-071) |
+| `domain` | `@Entity` · enum · 값 타입 · 도메인 규칙(`MasteryPolicy` 등). 엔티티는 생성 흐름마다 이름 있는 정적 팩토리로만 만든다 — public 생성자 · `@Builder` 없음, 처음 상태는 팩토리 안에 고정(ADR-071). 엔티티는 `created_at` · `updated_at` 을 매핑한 공통 상위 클래스를 상속하고 팩토리는 시각을 받지 않는다(ADR-078). 같은 도메인의 부모는 `@ManyToOne(fetch = LAZY)` 단방향, 다른 도메인의 엔티티는 ID 값 — 컬렉션 · cascade 없음(ADR-077) |
 | `dto` | HTTP 요청 · 응답 타입만 |
 
 `generation` 은 계층이 아니라 용도로 나눈다(`generation.llm` · 잡 종류별 — 해당 TASK 에서 정한다). `auth` · `config` · `worker` 는 계층 구분이 맞지 않는 기술 코드라 평평하게 둔다. `common` 은 계층이 아니라 **주제로 나눈다** — `common.api`(성공 응답 · 공통 오류 응답) · `common.time`(시계) · `common.logging`(요청 ID · 접근 줄 — §9.2). 새 공통 코드는 이 셋 중 맞는 곳에 두고, 맞는 곳이 없을 때만 주제 하위 패키지를 새로 만든다. `common` 바로 아래에는 클래스를 두지 않는다(ADR-075). 하위 패키지끼리 참조하므로 클래스와 그 생성자 · 메서드는 `public` 이다.
@@ -218,8 +218,8 @@ java -jar app.jar --app.role=worker \
 | 컬럼 | 타입 | 비고 |
 |---|---|---|
 | `id` · `user_id` | | |
-| `type` | `text` | `CURRICULUM_INITIAL`(초기 통합 생성) / `CURRICULUM`(단계 상세 목록 · 다시 짜기) / `MATERIAL`. 적재 후 종류는 불변 |
-| `curriculum_group_id` · `curriculum_id` · `lesson_id` | FK **nullable** | 잡 I는 성공 전 모두 NULL, 성공 시 단일 결과의 `curriculum_id` 또는 그룹 결과의 `curriculum_group_id` 하나만 연결한다. 잡 A는 `curriculum_id`, 잡 B는 `lesson_id` 하나만 필수. 종류/상태별 조합을 CHECK로 보장한다. polymorphic `target_id`는 쓰지 않는다 |
+| `type` | `text` | `CURRICULUM_INITIAL`(초기 통합 생성) / `CURRICULUM`(다시 짜기) / `MATERIAL`, 그리고 **단계 잡**(단계의 첫 상세 목록 — ADR-076). 단계 잡에 새 종류 이름을 둘지, `CURRICULUM` 에 단계 FK 로 구별할지는 `4-job-queue` 에서 정한다 — 다시 짜기 하루 횟수(02 §6.2)를 셀 때 둘을 구별할 수 있어야 한다. 적재 후 종류는 불변 |
+| `curriculum_group_id` · `curriculum_step_id` · `curriculum_id` · `lesson_id` | FK **nullable** | 잡 I는 성공 전 모두 NULL, 성공 시 단일 결과의 `curriculum_id` 또는 그룹 결과의 `curriculum_group_id` 하나만 연결한다. 단계 잡은 `curriculum_step_id` 가 늘 필수이고 성공 시 결과 `curriculum_id` 를 함께 연결한다. 잡 A는 `curriculum_id`, 잡 B는 `lesson_id` 하나만 필수. 종류/상태별 조합을 CHECK로 보장한다. polymorphic `target_id`는 쓰지 않는다. FK 는 기본 삭제 동작(NO ACTION) — 대상을 지우는 쪽이 잡을 먼저 지운다(ADR-077) |
 | `status` | `text` | `QUEUED` / `RUNNING` / `SUCCEEDED` / `FAILED` |
 | `enqueued_at` | `timestamptz` | **불변** — 큐 대기 시간 메트릭 |
 | **`available_at`** | `timestamptz` | *"이 시각 이후 수령 가능"* — `QUEUED` 면 적재 시각, `RUNNING` 이면 **리스 만료 시각** |
@@ -236,6 +236,7 @@ java -jar app.jar --app.role=worker \
 CREATE INDEX idx_jobs_claim ON jobs (available_at) WHERE status IN ('QUEUED', 'RUNNING');
 CREATE UNIQUE INDEX idx_jobs_one_active_per_lesson     ON jobs (lesson_id)     WHERE status IN ('QUEUED','RUNNING') AND lesson_id IS NOT NULL;
 CREATE UNIQUE INDEX idx_jobs_one_active_per_curriculum ON jobs (curriculum_id) WHERE status IN ('QUEUED','RUNNING') AND curriculum_id IS NOT NULL;
+-- 단계마다 단계 잡은 상태와 무관하게 0~1개 — curriculum_step_id 에 UNIQUE(NULL 은 여럿 허용). 이름 · 정확한 모양은 4 에서
 CREATE INDEX idx_jobs_user_active ON jobs (user_id) WHERE status IN ('QUEUED', 'RUNNING');
 ```
 
@@ -244,7 +245,7 @@ CREATE INDEX idx_jobs_user_active ON jobs (user_id) WHERE status IN ('QUEUED', '
 
 **잡 I의 생애** — 접수 시 `payload.request`와 예산을 확정하고 활성 잡 수에 포함한다. 대기/실행/실패에는 결과 FK가 모두 NULL이다. 성공은 단일 결과면 강의 1~40개가 있는 `Curriculum(DRAFT, step_id=NULL)`, 그룹 결과면 전체 `CurriculumGroup`/`CurriculumStep`를 만든다. 그룹의 첫 상세 커리큘럼도 자동으로 만들지 않는다. 성공 시 원래 주제/목적을 결과 리소스에 보존하고, 단일 결과는 선별/검증된 숙련도 반영 근거도 함께 남긴다. 잡의 해당 FK를 채운 뒤 `payload`를 비운다. 결과는 API에서 연결된 FK에 따라 유형과 ID로 반환한다. `jobs.type`/원장/예산은 처음부터 끝까지 그대로다.
 
-**종류/상태별 FK CHECK** — 잡 I는 `lesson_id IS NULL`이고 `SUCCEEDED`이면 `curriculum_id`/`curriculum_group_id` 중 정확히 하나가 NOT NULL, 그 외 상태이면 둘 다 NULL이다. 잡 A는 상태와 무관하게 `curriculum_id`만, 잡 B는 `lesson_id`만 NOT NULL이다. 각각의 FK는 실제 리소스를 참조한다. 초기 요청은 사용자/요청 식별자를 기준으로 중복 접수 시 기존 작업을 반환한다. 구체적인 저장/유일성/삭제 후 처리 방식은 해당 TASK에서 설계한다. 사용자당 활성 2개 검사와 동일 요청 중복 방지는 별개의 책임이다.
+**종류/상태별 FK CHECK** — 잡 I는 `lesson_id IS NULL`이고 `SUCCEEDED`이면 `curriculum_id`/`curriculum_group_id` 중 정확히 하나가 NOT NULL, 그 외 상태이면 둘 다 NULL이다. 단계 잡은 `curriculum_step_id` 가 늘 NOT NULL 이고 `SUCCEEDED`이면 `curriculum_id` 도 NOT NULL, 그 외 상태이면 `curriculum_id` 는 NULL이다. 잡 A는 상태와 무관하게 `curriculum_id`만, 잡 B는 `lesson_id`만 NOT NULL이다. 정확한 CHECK 모양은 단계 잡의 종류 이름과 함께 `4` 에서 정한다. 각각의 FK는 실제 리소스를 참조한다. 초기 요청은 사용자/요청 식별자를 기준으로 중복 접수 시 기존 작업을 반환한다. 구체적인 저장/유일성/삭제 후 처리 방식은 해당 TASK에서 설계한다. 사용자당 활성 2개 검사와 동일 요청 중복 방지는 별개의 책임이다.
 
 **초기 완료의 원자성** — 사용자 `usage-user` advisory lock을 얻어 계정 존재를 재확인한다. 아직 도메인 대상이 없으므로 묶음/커리큘럼 잠금 대신 조건부 잡 UPDATE로 실행 권한을 검사하며 이것이 첫 쓰기다. 아래 순서로 같은 트랜잭션을 커밋한다.
 
@@ -253,6 +254,8 @@ CREATE INDEX idx_jobs_user_active ON jobs (user_id) WHERE status IN ('QUEUED', '
 3. 해당 결과 FK · `status='SUCCEEDED'` · `payload='{}'` · `available_at=NULL`을 함께 갱신하고 `SUCCEEDED` 이벤트를 기록한다. 실패 시 첫 UPDATE/결과 삽입/연결/상태/이벤트 전체를 롤백한다
 
 성공 전 첫 UPDATE에서 상태만 `SUCCEEDED`로 바꾸면 필수 결과 FK CHECK를 위반하므로 그렇게 쓰지 않는다. 완료 응답 유실 후에는 같은 잡의 성공/연결 결과를 조회하며 새 결과를 만들지 않는다. 이미 검증된 응답이 체크포인트에 있으면 저장 재개에 LLM을 다시 호출하지 않는다. 탈퇴가 먼저면 잡이 없어 첫 쓰기 0행, 완료가 먼저면 탈퇴가 연결 결과까지 지운다. 원장 사용량은 독립 경로로 확정한다.
+
+**단계 잡의 생애**(ADR-076) — 묶음 화면의 단계 만들기가 그 단계를 가리키는 잡을 적재한다. 커리큘럼은 아직 없다. 단계마다 단계 잡은 0~1개라, 이미 있으면 새로 적재하지 않고 그 잡을 돌려준다(실패 잡도 자동으로 다시 돌리지 않는다). 완료는 묶음 advisory lock → 묶음 · 단계 존재 확인 → 위 1과 같은 조건부 잡 UPDATE(첫 쓰기) → 단계의 제목 · 주제 · 목적을 복사한 `Curriculum(DRAFT, step_id)` · 강의 삽입 → 결과 `curriculum_id` · `SUCCEEDED` · 이벤트를 한 트랜잭션으로 한다. 실패한 단계 잡은 사용자가 지울 수 있고(`llm_calls.job_id` 해제 뒤 삭제), 결과 커리큘럼 삭제 · 묶음 삭제 · 탈퇴도 단계 잡을 함께 지운다 — 그래야 그 단계가 다시 열린다([02 §6.2 · §6.2.1](./02-domain-data.md)). 생성 규약 · 호출 상한은 잡 A 와 같은 상세 생성이지만 정확한 값은 `6` 에서 정한다.
 
 ```mermaid
 stateDiagram-v2
@@ -327,13 +330,13 @@ DB 처리 최대 지연에는 원장 등록 · 결과 기록 · 리스 갱신의
 | 수령 | `SKIP LOCKED` · 회차 +1 | 빈 큐 |
 | 리스 갱신 · 단계 산출물 · 완료 · 실패 | `lease_epoch = :claimed` · 실행 중이며 리스 유효 | **추가 생성 작업 중단**(`LeaseLostException`). 완료면 트랜잭션 전체 롤백 |
 | 반납(정상 종료) | `worker_id = :me` · 회차 +1 | 들고 있던 잡이 없다 |
-| 삭제(커리큘럼) | 소유권 확인 · 단일 결과를 연결한 초기 잡 I와 연결 잡 A/B 전체 삭제 | 삭제 후 잡 조회/재시도는 `404` |
+| 삭제(커리큘럼 · 묶음 · 실패한 단계 잡) | 소유권 확인 · 결과로 연결한 초기 잡 I · 단계 잡과 연결 잡 A/B 전체 삭제. 묶음 삭제는 그 묶음을 결과로 가리키는 잡 I 와 단계 잡까지 | 삭제 후 잡 조회/재시도는 `404` |
 | 재시도(API) | `status = 'FAILED'` · 주제 거절 · 호출 상한 소진 · 입력 상한 초과 제외 | `409 JOB_NOT_FAILED` · `409 JOB_NOT_RETRYABLE` |
 
 커리큘럼 잡 A에는 추가로 **`curriculums.status='DRAFT'`** 를 적용한다. 승인 · 다시 짜기 적재 · 잡 A 재시도 · 결과 저장은 같은 커리큘럼의 트랜잭션 advisory lock을 먼저 잡아 직렬화한다. 사용자별 적재 검사 잠금도 필요한 API는 그 잠금 → 커리큘럼 advisory lock → 잡 행 잠금 순서로 처리한다. 이 잠금은 짧은 DB 트랜잭션에만 유지하며 외부 호출 중에는 잡지 않는다. 승인 시 활성 잡 확인과 상태 변경을 함께 수행하고, 재시도 시 `DRAFT` 와 활성 잡 없음을 함께 검사한다. 결과 저장도 잠금 안에서 `DRAFT` 를 확인해 승인된 목록을 덮어쓰지 않는다. 잡 A 완료는 이 advisory lock을 얻은 뒤 아래의 `jobs` UPDATE를 첫 쓰기로 수행하며, 도메인 상태가 맞지 않으면 트랜잭션 전체를 롤백한다.
 
 **완료 트랜잭션은 `jobs` 의 `UPDATE` 를 맨 앞에 둔다** — 회차가 틀렸으면 자료 · 카드 · 개념을 쓰기 전에 롤백된다. 펜싱이 탈퇴까지 덮는다(행이 지워지면 다음 쓰기가 `0 rows`).
-커리큘럼 삭제와의 경합을 막기 위해 잡 A/B 완료는 해당 커리큘럼 advisory lock을 먼저 잡고 존재를 다시 확인한 뒤, `jobs` UPDATE를 첫 쓰기로 수행한다. 자료 생성 적재/재시도 · 처음부터 다시 만들기와 학습 완료도 같은 잠금을 사용한다. 삭제는 사용자 사용량 → 복습 → (단계 연결이 있으면) 묶음 → 커리큘럼 잠금 후 연결 잡을 먼저 지우고 개념 잠금을 잡는다([02 §6.2](./02-domain-data.md)). 삭제 뒤 돌아온 외부 응답의 사용량은 원장에 남기지만 결과 저장 · 추가 호출 · 잡 복원은 하지 않는다.
+커리큘럼 삭제와의 경합을 막기 위해 잡 A/B 완료는 해당 커리큘럼 advisory lock을 먼저 잡고 존재를 다시 확인한 뒤, `jobs` UPDATE를 첫 쓰기로 수행한다. 아직 커리큘럼이 없는 단계 잡의 완료는 묶음 advisory lock을 먼저 잡고 묶음 · 단계 존재를 다시 확인한 뒤 같은 순서로 한다 — 묶음 삭제 · 단계 커리큘럼 삭제가 같은 묶음 잠금을 잡으므로, 삭제가 지울 커리큘럼을 정한 뒤에 완료가 새 커리큘럼을 끼워 넣지 못한다(§4.2 단계 잡의 생애). 자료 생성 적재/재시도 · 처음부터 다시 만들기와 학습 완료도 같은 잠금을 사용한다. 삭제는 사용자 사용량 → 복습 → (단계 연결이 있으면) 묶음 → 커리큘럼 잠금 후 연결 잡을 먼저 지우고 개념 잠금을 잡는다([02 §6.2](./02-domain-data.md)). 삭제 뒤 돌아온 외부 응답의 사용량은 원장에 남기지만 결과 저장 · 추가 호출 · 잡 복원은 하지 않는다.
 이 조건은 **작업 진행 권한**이다. 이미 나간 호출의 사용량 기록은 별도 `llm_calls` 경로로 허용하며 `lease_epoch` 로 거부하지 않는다. 비용 기록 트랜잭션은 잡과 도메인 테이블에 쓰지 않는다.
 
 **막는 것과 못 막는 것** — 회수된 옛 실행기는 다음 호출 전에 스스로 멈춘다. 못 막는 것은 **회수 시점에 이미 나간 호출 1회**다. `job.reclaimed` · `job.lease.lost` 로 실제 빈도를 본다. **정확히 한 번은 보장하지 않는다**(at-least-once).
@@ -385,6 +388,7 @@ DB 처리 최대 지연에는 원장 등록 · 결과 기록 · 리스 갱신의
 | 작업 | 채팅 상한 | 임베딩 상한 | 초기값의 근거 |
 |---|---|---|---|
 | A 커리큘럼 | 6 | 4 | 대화 진행 최대 2회 × 전송 시도 최대 3회, 숙련도 검색 임베딩 1건 × 전송 시도 최대 4회 |
+| 단계 잡(단계의 첫 상세 목록) | `6` 에서 확정 | `6` 에서 확정 | 잡 A 와 같은 상세 생성 규약(03 §2)이라 같은 값이 출발점이다. 다시 짜기 잡과 몫을 나눠 쓰지 않는다 |
 | B 강의 자료 | 24 | 40 | 대화 진행 최대 8회 × 전송 시도 최대 3회, 카드 최대 10개의 주된 개념 × 임베딩 시도 최대 4회 |
 | I 초기 통합 생성(`CURRICULUM_INITIAL`) | 구현 전 확정 | 구현 전 확정 | 단일/그룹 공통 입력 · 유형별 출력/수정 규약과 함께 정한다. 결과 유형에 따라 A/B의 몫으로 전환하지 않는다 |
 

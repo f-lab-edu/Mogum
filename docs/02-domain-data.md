@@ -15,7 +15,8 @@ erDiagram
     CURRICULUM_STEPS  |o--o| CURRICULUMS        : "생성 시 연결 · 단계당 최대 1개"
     USERS             ||--o{ JOBS               : "요청"
     CURRICULUM_GROUPS |o--o{ JOBS               : "초기 잡 I 의 그룹 결과"
-    CURRICULUMS       |o--o{ JOBS               : "초기 잡 I 의 단일 결과 · 잡 A 대상"
+    CURRICULUM_STEPS  |o--o| JOBS               : "단계 잡 대상 · 단계당 최대 1개"
+    CURRICULUMS       |o--o{ JOBS               : "초기 잡 I · 단계 잡의 결과 · 잡 A 대상"
     LESSONS           |o--o{ JOBS               : "잡 B 대상"
     USERS             ||--o{ CONCEPTS           : "개념 사전 · 사용자별"
     USERS             |o--o{ LLM_CALLS          : "비용 귀속 · 탈퇴 시 연결 해제"
@@ -68,7 +69,8 @@ stateDiagram-v2
 
 잡 상태는 [04 §4](./04-jobs-and-cost.md).
 
-- **승인은 `DRAFT` 이고 활성 생성 잡(`QUEUED` / `RUNNING`)이 없으며, 검증을 통과해 저장된 강의 목록이 있을 때만** 가능하다. 그룹 단계의 상세 생성이 최초에 실패해 강의가 0개면 `409 CURRICULUM_NOT_READY` 다(초기 잡 I 가 실패하면 커리큘럼 자체가 없다). 다시 짜기가 실패해도 이전에 성공한 목록이 남아 있으면 승인할 수 있다 — 최근 잡의 성공 여부만으로 승인 가능 여부를 판단하지 않는다.
+- **승인은 `DRAFT` 이고 활성 생성 잡(`QUEUED` / `RUNNING`)이 없을 때만** 가능하다. 커리큘럼은 초기 잡 I 또는 단계 잡이 **성공할 때** 검증된 강의 1~40개와 함께 생기므로(ADR-050 · ADR-076) 강의 없는 커리큘럼은 없다 — 그래서 "강의 목록 없음" 검사는 두지 않는다. 다시 짜기가 실패해도 이전에 성공한 목록이 남아 있으므로 승인할 수 있다 — 최근 잡의 성공 여부만으로 승인 가능 여부를 판단하지 않는다.
+- **`DRAFT` 강의에는 자료도 잡 B 도 없다** — 자료 생성 요청은 커리큘럼이 `DRAFT` 면 `409 CURRICULUM_NOT_ACTIVE` 로 거절한다([05 §3.1](./05-api.md)). 다시 짜기의 강의 교체(§6.2)가 이 불변식에 기댄다.
 - 승인 · 다시 짜기 적재 · 커리큘럼 잡 재시도 · 생성 결과 저장은 같은 커리큘럼의 advisory lock으로 직렬화하고, 잠금 안에서 상태와 활성 잡을 다시 확인한다. 승인 이후에는 이전 커리큘럼 잡을 재시도할 수 없고, 생성 결과도 `DRAFT` 에만 저장한다([04 §4.4 · §4.6](./04-jobs-and-cost.md)).
 - **그만두기 대신 완전 삭제를 제공한다.** `DRAFT` / `ACTIVE` / `COMPLETED` 모두 삭제할 수 있고 별도 보관 상태를 두지 않는다. 커리큘럼 · 강의 · 자료 · 플래시카드 · 해당 카드의 상태/복습 이력 · 해당 자료의 개념 판정 기록을 함께 지운다. 삭제된 카드는 오늘의 복습과 이후 숙련도 집계에서 제외되며, 다른 커리큘럼의 카드 · 기록은 유지한다.
 - **생성 중에도 삭제할 수 있다.** 대기 · 실행 중을 포함한 연결 잡을 먼저 삭제해 워커의 실행 권한을 없앤다. 이미 전송한 외부 요청 자체를 취소했다고 보장하지 않으며, 늦게 온 생성 결과는 버리되 사용량은 기록한다. 삭제 트랜잭션 · 잠금 순서는 §6.2를 따른다.
@@ -81,7 +83,7 @@ stateDiagram-v2
 - 최초에는 1단계만 생성한다. 같은 분할안의 다음 단계 생성 가능 여부는 직전 커리큘럼의 `COMPLETED`로 판단하며, 남은 복습 카드 수나 `R/S` 조건을 더하지 않는다. 독립적인 다른 주제의 커리큘럼 생성은 기존대로 가능하고, 단계 안의 강의 순서도 자유다
 - 다음 단계 생성 요청에서 소유권 · 직전 단계 완료 · 대상 단계의 기존 커리큘럼/활성 잡을 서버에서 다시 확인한다. 같은 분할안/단계에 동시 요청이 와도 새 커리큘럼/잡은 하나이며, 기존 것이 있으면 그 결과로 연결한다. 실패/새로고침으로 연결을 잃거나 같은 단계를 새로 생성하지 않는다
 - 다음 단계는 사용자 요청 시점의 관련 숙련도를 새로 선별한다. 분할안 작성 당시나 이전 단계의 스냅숏을 현재 숙련도로 재사용하지 않는다. 같은 생성 잡의 실패 재개는 기존 체크포인트 규칙을 따른다
-- **모델 확정** — `CurriculumGroup` → `CurriculumStep` → 필요할 때 생성하는 `Curriculum`으로 분리한다(§6.2.1). 독립 커리큘럼은 단계 연결 없이 생성할 수 있다. 이미 생성된 단계별 커리큘럼은 기존 승인 · 학습 완료 · 완전 삭제 계약을 따른다. 단계 커리큘럼을 지우면 그 단계는 미생성으로 돌아가 위의 생성 조건(1단계이거나 직전 단계 `COMPLETED`)으로 다시 만든다. 묶음 전체 삭제는 §6.2.1. 생성/조회 API · 분할안 출력/호출 예산은 후속 확정 항목이다
+- **모델 확정** — `CurriculumGroup` → `CurriculumStep` → 필요할 때 생성하는 `Curriculum`으로 분리한다(§6.2.1). 단계 커리큘럼은 단계 잡이 성공할 때 만들고, 제목 · 주제 · 목적을 단계에서 물려받는다(ADR-076). 독립 커리큘럼은 단계 연결 없이 생성할 수 있다. 이미 생성된 단계별 커리큘럼은 기존 승인 · 학습 완료 · 완전 삭제 계약을 따른다. 단계 커리큘럼을 지우면 그 단계는 미생성으로 돌아가 위의 생성 조건(1단계이거나 직전 단계 `COMPLETED`)으로 다시 만든다. 묶음 전체 삭제는 §6.2.1. 생성/조회 API · 분할안 출력/호출 예산은 후속 확정 항목이다
 
 ## 3. 학습 완료와 카드 상태
 
@@ -206,10 +208,10 @@ BEGIN;
 SELECT pg_advisory_xact_lock(hashtext('concept-write'), :u::int);   -- resolveConcepts 와 같은 사용자 락
 SELECT count(*) FROM jobs WHERE user_id = :u AND status IN ('QUEUED', 'RUNNING');   -- 0 이어야 한다 — 아래 jsonb 근거
 SELECT id FROM concepts WHERE id IN (:keep, :drop) AND user_id = :u;  -- 2행이어야 한다 — 둘 다 이 사용자의 개념
-UPDATE flashcards         SET concept_id   = :keep WHERE concept_id   = :drop;
-UPDATE concept_match_logs SET concept_id   = :keep, corrected_at = now()
+UPDATE flashcards         SET concept_id   = :keep, updated_at = now() WHERE concept_id   = :drop;
+UPDATE concept_match_logs SET concept_id   = :keep, corrected_at = now(), updated_at = now()
  WHERE concept_id = :drop;                                            -- 지우지 않고 옮긴다 · 사람이 고친 판정
-UPDATE concept_match_logs SET candidate_id = :keep WHERE candidate_id = :drop;
+UPDATE concept_match_logs SET candidate_id = :keep, updated_at = now() WHERE candidate_id = :drop;
 DELETE FROM concepts WHERE id = :drop AND user_id = :u;
 COMMIT;
 ```
@@ -231,14 +233,14 @@ SELECT f.id, f.question FROM flashcards f
 BEGIN;
 SELECT pg_advisory_xact_lock(hashtext('concept-write'), :u::int);
 SELECT count(*) FROM jobs WHERE user_id = :u AND status IN ('QUEUED', 'RUNNING');   -- 0 이어야 한다
-INSERT INTO concepts (user_id, name, name_normalized, definition, embedding, embedding_model)
-SELECT c.user_id, l.input_name, l.input_name_normalized, l.input_definition, l.input_embedding, c.embedding_model
+INSERT INTO concepts (user_id, name, name_normalized, definition, embedding, embedding_model, created_at, updated_at)
+SELECT c.user_id, l.input_name, l.input_name_normalized, l.input_definition, l.input_embedding, c.embedding_model, now(), now()
   FROM concept_match_logs l JOIN concepts c ON c.id = l.concept_id
  WHERE l.id = :logId AND l.action = 'LINKED' AND c.user_id = :u
 RETURNING id;                                                               -- :new
-UPDATE flashcards SET concept_id = :new
+UPDATE flashcards SET concept_id = :new, updated_at = now()
  WHERE id IN (:cardIds) AND material_id = :m AND concept_id = :wrong;       -- 0)에서 고른 카드만
-UPDATE concept_match_logs SET concept_id = :new, corrected_at = now()
+UPDATE concept_match_logs SET concept_id = :new, corrected_at = now(), updated_at = now()
  WHERE id = :logId;                                                         -- 잘못된 별칭이 사라진다
 COMMIT;
 ```
@@ -276,6 +278,8 @@ COMMIT;
 
 ## 6. 테이블
 
+**모든 엔티티 테이블은 `created_at` · `updated_at`(`timestamptz NOT NULL`)을 갖는다**(ADR-078). 엔티티는 공통 상위 클래스를 상속하고 JPA Auditing 이 `Clock` 빈의 시각으로 채운다. 벌크 JPQL · 네이티브 SQL 로 행을 바꾸면 `updated_at` 을 SQL 에 직접 쓰고, 사람이 치는 관리자 SQL 은 `now()` 를 쓴다(AGENTS 금지 32). 아래 표에는 이 두 컬럼을 따로 적지 않는다 — 표에 `created_at` 이 있으면 그 뜻(정렬 · 대기 순서 등)을 적은 것이다. 업무 시각(`reviewed_at` · `last_reviewed_at` 등)은 뜻이 겹쳐도 따로 둔다. 엔티티가 아닌 테이블(`jobs` · `llm_calls` · `job_events` · `alert_logs` · 세션)은 각자의 시각 컬럼을 쓴다.
+
 ### 6.1 `users`
 
 > **2026-10-20 구현·검증 완료(ADR-066).** 회원당 로그인 수단 하나를 `users(provider, subject)`에 저장한다. V1~V5 이력은 보존하고 `V6__generalize_user_login_identity.sql`로 구글 전용 컬럼을 일반화했다. V3/V4/V5 이전과 기존 세션 보존을 포함해 전체 서버 테스트 192개가 통과했다.
@@ -289,7 +293,8 @@ COMMIT;
 | `status` | `text` **NOT NULL** | CHECK: `PENDING`(약관 전) / `ACTIVE` / `WAITLISTED` |
 | `role` | `text` **NOT NULL** | CHECK: `USER` / `ADMIN` — 신규 가입 시 관리자 이메일 목록으로 초기값을 정하고 재로그인에서는 저장된 값 유지 |
 | `terms_agreed_at` · `terms_version` | `timestamptz` · `text` | 약관 버전이 바뀌면 다시 동의 |
-| `created_at` | `timestamptz` **NOT NULL** | 대기 명단 순서 |
+| `created_at` | `timestamptz` **NOT NULL** | 대기 명단 순서. 가입 때 Auditing 이 채운다(ADR-078) |
+| `updated_at` | `timestamptz` **NOT NULL** | 마지막 변경 시각 — `3-curriculum-model` 에서 더한다. 기존 행은 `created_at` 으로 채운다. 대기자 승인 같은 관리자 SQL 은 `updated_at = now()` 를 함께 쓴다(§7) |
 
 **`UNIQUE(provider, subject)`**로 외부 계정 하나당 회원 하나를 보장한다. 서로 다른 제공자의 같은 `subject`는 서로 다른 계정이다. 회원당 로그인 수단은 하나이며 별도 연결 테이블은 두지 않는다. 현재 활성 제공자는 구글 하나다. 추가 제공자의 인증 설정·응답 변환·이메일 신뢰 정책은 해당 기능에서 구현하며, 저장 모델의 제공자 구분 테스트가 실제 로그인을 활성화하는 것은 아니다. 복수 로그인 연결·해제·계정 병합은 범위 밖이다.
 
@@ -303,7 +308,7 @@ COMMIT;
 
 1. `auth.GoogleAccountMapper`가 검증된 Google 등록과 응답을 `ExternalAccount(provider, subject, email, emailVerified)`로 변환한다. `provider`는 요청 매개변수·원본 프로필에서 믿지 않고 검증된 서버 등록으로 정한다. 현재 매퍼는 구글만 수락한다. `account`는 Spring Security 타입·OAuth 토큰·원본 응답을 알지 않는다.
 2. 이메일 검증·관리자 허용 목록 검사는 DB 접근 전에 수행한다. 허용 여부는 이번 인증 이메일로 확인하며 기존 이메일을 바꾸지 않는다.
-3. `LoginService`가 `UserRepository.findByProviderAndSubject`로 조회한다. 있으면 기존 ID를 반환하고 회원을 쓰지 않는다. 없으면 `User.join`으로 식별자와 신규 이메일·초기 역할·가입 시각을 한 행에 저장한다(처음 상태 `ACTIVE`는 `join` 안에 고정 — ADR-071). 이메일이 같은 기존 회원을 자동 병합하지 않는다.
+3. `LoginService`가 `UserRepository.findByProviderAndSubject`로 조회한다. 있으면 기존 ID를 반환하고 회원을 쓰지 않는다. 없으면 `User.join`으로 식별자와 신규 이메일·초기 역할을 한 행에 저장하고 가입 시각은 Auditing 이 채운다(처음 상태 `ACTIVE`는 `join` 안에 고정 — ADR-071 · ADR-078). 이메일이 같은 기존 회원을 자동 병합하지 않는다.
 4. 같은 외부 식별자의 동시 첫 로그인은 복합 unique 제약으로 회원 하나만 남긴다. 충돌 요청은 실패해도 되며 다음 로그인은 기존 회원을 찾는다. 추가 잠금·자동 재시도는 넣지 않는다.
 5. 세션에는 `users.id`만 저장하고 상태·역할은 요청마다 DB에서 읽는다. 외부 식별자는 사용자 API 응답에 추가하지 않는다. 탈퇴 시 식별자도 회원 행과 함께 삭제한다.
 
@@ -318,31 +323,36 @@ COMMIT;
 
 | `curriculums` | 비고 |
 |---|---|
-| `user_id` · `topic` · `purpose` | 소유자 · 입력. 기간 · 주당 학습량은 받거나 저장하지 않는다 |
-| `step_id` | nullable FK → `curriculum_steps.id`, **unique**. NULL이면 독립 커리큘럼, 값이 있으면 해당 단계에서 생성한 실제 커리큘럼 |
-| `title` | LLM 이 지은 제목 |
-| `status` | `DRAFT` / `ACTIVE` / `COMPLETED` — 삭제는 행 제거 |
-| `mastery_reflection` | `jsonb` — 초기 단일 결과 또는 잡 A의 반영 내역을 백엔드 판정과 대조해 검증한 결과 + 생성 시점 수치 근거. U3 에서 *"이미 아셔서 별도 강의로 만들지 않았어요"* 로 보인다 |
-| `mastery_selection` | `jsonb` — 생성 당시 선별한 ID · 이름/정의 · 수치/판정 · 조회 시각 · 검색 순위/모드 · 후보 수 · 설정 버전 · 주입 바이트 수. 조회 근거이며 현재 숙련도 캐시가 아니다. 생성 성공 때 갱신, 실패한 다시 짜기는 이전 근거 유지 |
+| `id` | `bigserial` PK |
+| `user_id` | FK → `users.id` · 소유자. 인덱스 `(user_id)` — 홈 목록 · 탈퇴가 이 컬럼으로 읽는다. 단계 커리큘럼은 묶음의 주인과 같다(§6.2.1) |
+| `topic` · `purpose` | 생성 입력. 하나짜리는 요청 입력, 단계 커리큘럼은 단계의 값을 복사한다(ADR-076). `topic` 은 NOT NULL · 공백만 금지 · 100자 이하, `purpose` 는 선택 — **NULL 이거나 공백만이 아닌 200자 이하**(DB CHECK). 기간 · 주당 학습량은 받거나 저장하지 않는다 |
+| `step_id` | nullable FK → `curriculum_steps.id`, **unique** · `ON DELETE RESTRICT`. NULL이면 독립 커리큘럼(여럿 허용), 값이 있으면 해당 단계에서 생성한 실제 커리큘럼 |
+| `title` | NOT NULL · 공백만 금지. 하나짜리는 LLM 이 지은 제목(다시 짜기 성공 때 바뀔 수 있다), **단계 커리큘럼은 단계 제목**으로 고정 — 묶음 화면과 커리큘럼 화면이 같은 이름으로 부른다(ADR-076). 길이 상한은 `6` 에서 출력 규약과 함께 정하고 CHECK 를 더한다 |
+| `status` | `DRAFT` / `ACTIVE` / `COMPLETED` — `CHECK (status IN (…))`. 삭제는 행 제거 |
+| `created_at` | 홈의 「최근에 만든 순」 — 묶음의 `created_at` 과 섞어 정렬한다. 성공해서 만들어진 시각이다 |
+| `mastery_reflection` | `jsonb` — 초기 단일 결과 또는 잡 A · 단계 잡의 반영 내역을 백엔드 판정과 대조해 검증한 결과 + 생성 시점 수치 근거. U3 에서 *"이미 아셔서 별도 강의로 만들지 않았어요"* 로 보인다. **`6-curriculum-gen` 에서 더한다** — 값의 모양 · Java 타입을 쓰는 코드와 함께 정한다. 운영에 커리큘럼 행이 생기기 전이라 NOT NULL 로 바로 더할 수 있다 |
+| `mastery_selection` | `jsonb` — 생성 당시 선별한 ID · 이름/정의 · 수치/판정 · 조회 시각 · 검색 순위/모드 · 후보 수 · 설정 버전 · 주입 바이트 수. 조회 근거이며 현재 숙련도 캐시가 아니다. 생성 성공 때 갱신, 실패한 다시 짜기는 이전 근거 유지. **`6` 에서 더한다**(실제 선별은 `9`) |
 
 | `lessons` | 비고 |
 |---|---|
-| `curriculum_id` · `order_no` | 권장 학습 순서. 주차를 배정하지 않는다 |
-| `title` · `objective` | |
-| `keywords` | **`text[]`** — 배열이라 개념과 조인할 수 없다. 타입이 *"키워드는 개념이 아니다"* 를 강제한다 |
-| `status` | `NOT_STARTED` / `READY` / `COMPLETED` |
+| `id` | `bigserial` PK. 다시 짜기마다 새로 만들어져 바뀐다 — `DRAFT` 강의를 가리키는 것이 없어 안전하다(§2) |
+| `curriculum_id` · `order_no` | FK → `curriculums.id`. 권장 학습 순서 — 1부터, `UNIQUE(curriculum_id, order_no)` · `CHECK(order_no >= 1)`. `1..N` 이 빠짐없이 이어지는지는 워커가 검증한다. 주차를 배정하지 않는다 |
+| `title` · `objective` | NOT NULL · 공백만 금지. 길이 상한은 `6` 에서 출력 규약과 함께 정하고 CHECK 를 더한다 |
+| `keywords` | **`text[]`** NOT NULL — 배열이라 개념과 조인할 수 없다. 타입이 *"키워드는 개념이 아니다"* 를 강제한다. 개수 · 빈 원소 검사는 `6` 에서 출력 규약과 함께 정한다 |
+| `status` | `NOT_STARTED` / `READY` / `COMPLETED` — `CHECK (status IN (…))` |
 
-- 초기 주제/목적 요청은 `CURRICULUM_INITIAL` 잡에 입력을 저장하고, 단일 결과의 검증/저장 성공 시 강의가 있는 `DRAFT`를 만든다. 실패 시 빈 커리큘럼은 없고 초기 잡의 입력/체크포인트만 유지한다([04 §4.2](./04-jobs-and-cost.md)). 그룹의 단계 생성은 유형/대상이 이미 정해져 있으므로 기존대로 `DRAFT(step_id)`와 잡 A를 함께 적재한다(§6.2.1).
-- 다시 짜기는 검증을 통과한 새 목록을 저장하는 성공 트랜잭션에서 `lessons` 을 **지우고 새로 만든다**. 그 전에는 이전 강의 목록 · 제목 · 숙련도 반영/선별 근거를 보존한다. `DRAFT` 에는 자료가 없어 교체가 가능하며, 이전 버전을 별도로 보관하지 않는다.
-- **다시 짜기는 커리큘럼당 하루 3회**(한국 날짜)다. 평생 횟수로 묶으면 마음에 드는 안이 나올 때까지 커리큘럼을 지우고 새로 만들게 되는데, 그룹의 단계 커리큘럼은 지우면 단계 연결까지 흔들린다(ADR-053). 횟수는 컬럼에 저장하지 않고 그날 이 커리큘럼에 적재된 다시 짜기 잡 수로 센다 — 잡 행은 커리큘럼 삭제 · 탈퇴 때만 지워진다. 실패한 다시 짜기 잡의 재시도는 같은 행이라 횟수를 쓰지 않는다. 다시 짜기 잡을 최초 생성 잡과 구별하는 방법은 해당 TASK 에서 정한다.
+- 초기 주제/목적 요청은 `CURRICULUM_INITIAL` 잡에 입력을 저장하고, 단일 결과의 검증/저장 성공 시 강의가 있는 `DRAFT`를 만든다. 실패 시 빈 커리큘럼은 없고 초기 잡의 입력/체크포인트만 유지한다([04 §4.2](./04-jobs-and-cost.md)). 그룹의 단계 생성도 같다 — 단계 잡에 대상 단계를 두고, 성공할 때 단계의 값을 복사한 `DRAFT(step_id)` 와 강의를 만든다(§6.2.1 · ADR-076). 그래서 **강의 없는 커리큘럼은 없다.**
+- 다시 짜기는 검증을 통과한 새 목록을 저장하는 성공 트랜잭션에서 `lessons` 을 **지우고 새로 만든다**. 그 전에는 이전 강의 목록 · 제목 · 숙련도 반영/선별 근거를 보존한다. `DRAFT` 에는 자료도 잡 B 도 없어(§2) 교체가 가능하며, 이전 버전을 별도로 보관하지 않는다. **지우기를 먼저 DB 에 반영한다** — 벌크 삭제(`@Modifying` JPQL)나 삭제 뒤 `flush()`. Hibernate 는 새 엔티티를 저장하는 즉시(IDENTITY) INSERT 하고 엔티티 삭제는 flush 때 보내므로, 그러지 않으면 새 1강이 옛 1강과 `(curriculum_id, order_no)` 에서 부딪힌다(ADR-077).
+- **다시 짜기는 커리큘럼당 하루 3회**(한국 날짜)다. 평생 횟수로 묶으면 마음에 드는 안이 나올 때까지 커리큘럼을 지우고 새로 만들게 되는데, 그룹의 단계 커리큘럼은 지우면 단계 연결까지 흔들린다(ADR-053). 횟수는 컬럼에 저장하지 않고 그날 이 커리큘럼에 적재된 다시 짜기 잡 수로 센다 — 잡 행은 커리큘럼 삭제 · 탈퇴 때만 지워진다. 실패한 다시 짜기 잡의 재시도는 같은 행이라 횟수를 쓰지 않는다. 단계 잡도 성공하면 같은 `curriculum_id` 를 가리키므로 다시 짜기 잡과 구별해야 한다 — 잡 종류를 정하는 `4-job-queue` 에서 정한다.
 - 삭제(§2)는 아래 트랜잭션으로 처리한다. `llm_calls` 의 잡 연결만 해제하고 호출 기록은 남긴다 — 오늘 · 이번 달 쓴 비용은 원장 합계(§6.6)로 계속 쿼터 · 킬스위치에 잡힌다. 생성 비용 한도는 삭제로 초기화하지 않는다.
-- 입력 길이 — `topic` 100자 · `purpose` 200자 · 다시 짜기 피드백 500자. 넘으면 `400 FIELD_INVALID`(`reason: TOO_LONG` — [05 §1.2](./05-api.md)).
+- 입력 길이 — `topic` 100자 · `purpose` 200자 · 다시 짜기 피드백 500자. 넘으면 `400 FIELD_INVALID`(`reason: TOO_LONG` — [05 §1.2](./05-api.md)). 목적은 선택이고, 빈 칸으로 오면 NULL 로 저장한다(`6`). DB 도 같은 상한과 빈 값 금지를 CHECK 로 막는다(글자 수는 `char_length`) — 단계의 주제 · 목적은 다음 단계 생성의 입력이라, 상한이 깨지면 입력 예산의 정적 최댓값이 조용히 깨진다(AGENTS 금지 18).
+- FK 는 모두 기본 삭제 동작(NO ACTION)이고 `step_id` 만 `RESTRICT` 다. cascade 를 두지 않고 아래 순서대로 자식부터 지운다 — 빠뜨린 자식이 있으면 FK 오류로 드러난다(ADR-077).
 - 커리큘럼은 검증된 강의 1~40개로 구성한다. `weeks` · `week` · 예상 완료 기간/주당 학습량 필드는 MVP 스키마에 두지 않는다. 학습 플랜은 후속 기능이며, 권장 순서와 실제 학습 속도/시점은 분리한다.
 
 **커리큘럼 완전 삭제 — 한 트랜잭션**
 
 1. 해당 사용자의 `usage-user` advisory lock → `POST /reviews` 와 같은 사용자 복습 advisory lock → 단계 연결이 있으면 해당 묶음 advisory lock → 커리큘럼 advisory lock 순서로 얻고, 소유권과 존재 여부를 다시 확인한다. 없거나 남의 것이면 `404`. 묶음 잠금은 다음 단계 생성의 선행 완료 검사와 삭제를 직렬화한다(§6.2.1). 자료 생성/재시도 · 처음부터 다시 만들기 · 학습 완료 · 워커 완료도 기존 커리큘럼 잠금 안에서 존재를 다시 확인한다. 잠금은 외부 LLM 호출 중에는 유지하지 않는다.
-2. 대상 강의 · 자료 · 카드 ID를 확정하고, 단일 결과를 연결한 초기 잡 I · 커리큘럼 잡 A · 해당 강의들의 잡 B **모두**의 `llm_calls.job_id` 를 NULL로 해제한 뒤 잡 행을 삭제한다. 대기/실행/성공/실패 여부와 무관하다. `job_events.job_id`도 FK로 NULL이 되며 사용자/콘텐츠 필드 없는 운영 이벤트는 보존한다(§6.9). 계정은 남으므로 원장의 `user_id` · 날짜 · 단가 · 사용량 · 비용은 유지한다.
+2. 대상 강의 · 자료 · 카드 ID를 확정하고, 단일 결과를 연결한 초기 잡 I · 결과로 연결된 단계 잡 · 커리큘럼 잡 A · 해당 강의들의 잡 B **모두**의 `llm_calls.job_id` 를 NULL로 해제한 뒤 잡 행을 삭제한다. 단계 잡을 지워야 그 단계가 다시 열린다(§6.2.1 — 단계마다 단계 잡은 하나). 대기/실행/성공/실패 여부와 무관하다. `job_events.job_id`도 FK로 NULL이 되며 사용자/콘텐츠 필드 없는 운영 이벤트는 보존한다(§6.9). 계정은 남으므로 원장의 `user_id` · 날짜 · 단가 · 사용량 · 비용은 유지한다.
 3. 잡 행을 지운 뒤 사용자 `concept-write` lock을 얻는다. 대상 카드의 `reviews` · `card_states` → `flashcards` → 대상 자료의 `concept_match_logs` 순으로 삭제한다. 복습 이력에 함께 저장한 성공 요청/응답도 지우므로 삭제된 카드의 평가 재전송은 `404` 이며 이력을 다시 만들지 않는다.
 4. 삭제 대상에서 사용하던 개념 중 남은 카드나 판정 기록의 `concept_id` 로 참조되지 않는 개념만 정리한다. 남은 판정 기록의 `candidate_id` 가 그 개념을 참조하면 NULL로 해제하고 삭제한다. 다른 커리큘럼이 사용하는 개념과 판정 기록은 유지한다. 삭제한 자료만 제공하던 별칭은 함께 사라진다.
 5. `materials` → `lessons` → `curriculums` 순으로 삭제하고 커밋한다. 실패하면 잡/연결 해제를 포함해 전부 롤백한다. 세션과 계정은 유지한다.
@@ -355,27 +365,29 @@ COMMIT;
 
 | `curriculum_groups` | 비고 |
 |---|---|
-| `id` | PK |
-| `user_id` | FK → `users.id`. 전체 목표/분할안의 소유자 |
-| `topic` · `purpose` | 최초 전체 목표. 기존 입력 길이(100자 · 200자) 적용 |
-| `title` | 검증된 분할안의 묶음 제목. 초기 성공 시 전체 단계와 함께 저장하며 NOT NULL |
-| `created_at` | 생성 시각 |
+| `id` | `bigserial` PK |
+| `user_id` | FK → `users.id`. 전체 목표/분할안의 소유자. 인덱스 `(user_id)` |
+| `topic` · `purpose` | 최초 전체 목표. `curriculums` 와 같은 제약 — `topic` NOT NULL · 공백만 금지 · 100자 이하, `purpose` 는 NULL 이거나 공백만이 아닌 200자 이하 |
+| `title` | 검증된 분할안의 묶음 제목. 초기 성공 시 전체 단계와 함께 저장하며 NOT NULL · 공백만 금지 |
+| `created_at` | 홈의 「최근에 만든 순」 — 하나짜리 커리큘럼의 `created_at` 과 섞어 정렬한다 |
 
 | `curriculum_steps` | 비고 |
 |---|---|
-| `id` | PK. 단계 생성/조회에 사용하는 안정적인 식별자 |
+| `id` | `bigserial` PK. 단계 생성/조회에 사용하는 안정적인 식별자 |
 | `group_id` | FK → `curriculum_groups.id` |
 | `order_no` | 1부터 시작하는 단계 순서. `UNIQUE(group_id, order_no)` · `CHECK(order_no >= 1)` |
-| `title` · `scope` | 단계 제목 · 포함할 학습 범위. 전체 목표와 단계별 내용을 구별해 보여준다 |
-| `topic` · `purpose` | 이 단계의 상세 커리큘럼 생성 입력. 기존 100자 · 200자 제한 적용 |
+| `title` · `scope` | 단계 제목 · 포함할 학습 범위. 전체 목표와 단계별 내용을 구별해 보여준다. NOT NULL · 공백만 금지. 단계 제목은 단계 커리큘럼의 제목이 된다(ADR-076) |
+| `topic` · `purpose` | 이 단계의 상세 커리큘럼 생성 입력이자 단계 커리큘럼이 복사해 가는 값. `curriculums` 와 같은 제약(100자 · 200자 · `purpose` 는 NULL 가능). 단계의 목적을 꼭 채울지는 분할안 규약과 함께 `6` 에서 정해 CHECK 로 좁힌다 |
 
 - **직선 순서** — MVP의 선행 관계는 같은 묶음의 `order_no - 1` 단계다. 별도 의존 그래프/조인 테이블은 두지 않는다. 워커는 분할안의 순서가 `1..N`으로 연속이고 목표/범위가 있는지 검증한 뒤 저장한다. 단계 개수와 제목/범위 길이 상한은 분할안 생성 규약에서 구현 전에 확정한다
 - **분할안 저장** — 초기 잡 I에 주제/목적을 먼저 보존하고 그룹 결과의 검증/저장 성공 시 묶음 제목 · 전체 단계를 새로 만든다. 초기 성공 상태 · 그룹 결과 FK · 성공 이벤트까지 같은 트랜잭션으로 저장한다([04 §4.2](./04-jobs-and-cost.md)). 실패/거절/저장 오류에는 빈 묶음이나 일부 단계가 남지 않는다. 상세 커리큘럼이 하나라도 연결된 뒤에는 단계 순서/생성 입력을 자동으로 바꾸지 않는다. 묶음/단계 단위 편집과 분할안 다시 짜기는 이번 확정 범위에 포함하지 않는다
-- **상태는 조회** — 미생성은 연결된 커리큘럼 없음, 생성 중/실패는 연결 커리큘럼의 잡, 검토/학습/완료는 그 커리큘럼 상태로 판단한다. 묶음의 현재 단계/진도/완료 상태와 단계의 학습 상태는 저장하지 않는다. 초기 생성 중/실패는 묶음이 아직 없으므로 사용자 소유 초기 잡에서 조회한다. 전체 완료는 단계가 1개 이상 있고 모든 단계에 연결된 커리큘럼이 `COMPLETED`인 경우다
-- **단계 생성의 원자성** — 서버가 단계 → 묶음을 읽어 요청 사용자와 소유자가 같은지 확인한다. 이미 연결된 커리큘럼이 있으면 먼저 그것을 반환한다. 새 생성은 1단계 또는 직전 단계가 `COMPLETED`인지 확인한 뒤 `Curriculum(DRAFT, step_id)` 생성과 기존 잡 A 적재를 한 트랜잭션으로 처리한다. 주제/목적은 클라이언트가 대체하지 않고 단계의 저장값을 사용한다. 실제 커리큘럼 `user_id`도 묶음 소유자와 같아야 한다
-- **중복/잠금** — 신규 적재에 필요한 기존 사용자 락(진행 중 2개 · 비용/탈퇴 경합) → 묶음 advisory lock → 필요한 선행/대상 커리큘럼 잠금 순서로 재검사한다. 커리큘럼 잠금이 여러 개면 ID 오름차순으로 얻는다. 대상 단계에 이미 커리큘럼이 있으면 그것으로 연결하고, 새 유료 작업 없이 조회만 하는 요청은 신규 생성 쿼터로 막지 않는다. 유일성은 `UNIQUE(curriculums.step_id)`가 최종 방어선이며, 충돌 뒤에는 롤백하고 새 트랜잭션에서 기존 결과를 읽는다. 다른 사용자의 커리큘럼 연결은 허용하지 않는다
-- **연결의 수명** — 단계 연결은 해당 커리큘럼을 생성할 때 한 번 정하고 다시 짜기에서도 유지한다. 다른 묶음/단계로 옮기는 기능은 없다. 단계가 있는 기존 커리큘럼을 부모 삭제의 FK cascade로 지우지 않는다(`curriculums.step_id` FK는 `ON DELETE RESTRICT`). 개별 커리큘럼 삭제는 기존 범위만 제거하며 같은 묶음의 다른 커리큘럼을 지우지 않는다. 묶음/단계의 계획 정보는 남지만, 삭제한 학습 기록이나 완료 상태를 별도 사본으로 보존하지 않는다. 지운 단계는 미생성으로 보이고 기존 생성 조건(1단계이거나 직전 단계 `COMPLETED`)으로 다시 만든다. 이미 만들어진 뒤 단계는 그대로 둔다 — 지운 단계를 다시 완료할 때까지 그 다음의 미생성 단계만 만들 수 없다([06 §9](./06-screens.md))
-- **묶음 삭제** — 사용자가 묶음을 통째로 지울 수 있다. 연결된 단계 커리큘럼마다 커리큘럼 완전 삭제(§6.2)의 범위를 적용한 뒤 단계 → 묶음을 지운다 — 한 트랜잭션. `step_id` FK 가 `RESTRICT` 라 커리큘럼을 먼저 지운다. 잠금은 커리큘럼 삭제의 사용자 락들 → 묶음 lock → 커리큘럼 lock(ID 오름차순) 순서다. 생성 중인 단계가 있어도 지울 수 있고, 늦은 워커 응답은 묶음 · 단계 · 커리큘럼을 복원하지 않는다. 생성 비용 기록은 커리큘럼 삭제와 같이 남는다. 세부 트랜잭션과 API 는 해당 TASK 에서 설계한다([05 §2.1](./05-api.md))
+- **상태는 조회** — 미생성은 연결된 커리큘럼도 단계 잡도 없음, 짜는 중/짜기 실패는 그 단계의 단계 잡(아직 커리큘럼이 없다), 다시 짜는 중은 연결 커리큘럼의 잡 A, 검토/학습/완료는 그 커리큘럼 상태로 판단한다. 묶음의 현재 단계/진도/완료 상태와 단계의 학습 상태는 저장하지 않는다. 초기 생성 중/실패는 묶음이 아직 없으므로 사용자 소유 초기 잡에서 조회한다. 전체 완료는 단계가 1개 이상 있고 모든 단계에 연결된 커리큘럼이 `COMPLETED`인 경우다
+- **단계 생성 — 잡만 적재한다**(ADR-076) — 서버가 단계 → 묶음을 읽어 요청 사용자와 소유자가 같은지 확인한다. 이미 연결된 커리큘럼이 있으면 그것을, 그 단계의 단계 잡이 있으면 그 잡을 먼저 반환한다 — 실패한 잡이어도 자동으로 다시 돌리지 않는다(재시도는 별도 동작). 새 생성은 1단계 또는 직전 단계가 `COMPLETED`인지 확인한 뒤 **그 단계를 가리키는 단계 잡만** 적재한다(`202 { jobId }`). 커리큘럼은 만들지 않는다. 주제/목적은 클라이언트가 대체하지 않고 단계의 저장값을 사용한다
+- **단계 잡의 완료** — 묶음 advisory lock → 묶음 · 단계 존재 확인 → 조건부 `jobs` UPDATE(첫 쓰기 — AGENTS 금지 11) → `Curriculum.forStep`(단계의 제목 · 주제 · 목적과 묶음의 주인을 복사 · `DRAFT`) · 검증된 강의 삽입 → 결과 FK(`curriculum_id`) · `SUCCEEDED` · 성공 이벤트를 한 트랜잭션으로 커밋한다. 커리큘럼의 `user_id` 는 팩토리가 묶음에서 가져오므로 다른 사용자의 커리큘럼이 단계에 연결되지 않는다. 묶음 삭제가 먼저 커밋됐으면 잡이 없어 첫 쓰기가 `0 rows` 이고, 완료가 먼저면 묶음 삭제가 그 커리큘럼까지 지운다
+- **중복/잠금** — 신규 적재에 필요한 기존 사용자 락(진행 중 2개 · 비용/탈퇴 경합) → 묶음 advisory lock → 필요한 선행/대상 커리큘럼 잠금 순서로 재검사한다. 커리큘럼 잠금이 여러 개면 ID 오름차순으로 얻는다. 대상 단계에 이미 커리큘럼이나 단계 잡이 있으면 그것으로 연결하고, 새 유료 작업 없이 조회만 하는 요청은 신규 생성 쿼터로 막지 않는다. **단계마다 단계 잡은 0~1개** — `jobs` 의 단계 FK 에 UNIQUE([04 §4.2](./04-jobs-and-cost.md))가 연타 · 동시 요청의 최종 방어선이고, 단계당 커리큘럼 하나는 `UNIQUE(curriculums.step_id)` 가 지킨다. 충돌 뒤에는 롤백하고 새 트랜잭션에서 기존 결과를 읽는다. 단계 잡은 실패해도 남고 ① 실패한 단계 잡 지우기 ② 결과 커리큘럼 삭제(§6.2) ③ 묶음 삭제 ④ 탈퇴로만 사라진다
+- **실패한 단계 잡 지우기** — 사용자는 `FAILED` 인 단계 잡만 지울 수 있다(짜는 중은 지우지 않는다 — 초기 요청과 같다). 잡 행을 지우고 그 잡의 `llm_calls.job_id` 를 NULL 로 해제한다 — 쓴 비용은 원장에 남고 `job_events` 는 FK 로 연결만 풀린다. 그 단계는 미생성으로 돌아가 기존 생성 조건으로 다시 만든다. API 모양은 `6` 에서 정한다([05 §2.1](./05-api.md))
+- **연결의 수명** — 단계 연결은 해당 커리큘럼을 생성할 때 한 번 정하고 다시 짜기에서도 유지한다. 다른 묶음/단계로 옮기는 기능은 없다. 단계가 있는 기존 커리큘럼을 부모 삭제의 FK cascade로 지우지 않는다(`curriculums.step_id` FK는 `ON DELETE RESTRICT`). 개별 커리큘럼 삭제는 기존 범위만 제거하며 같은 묶음의 다른 커리큘럼을 지우지 않는다. 묶음/단계의 계획 정보는 남지만, 삭제한 학습 기록이나 완료 상태를 별도 사본으로 보존하지 않는다. 커리큘럼 삭제는 결과로 연결된 단계 잡도 함께 지우므로(§6.2) 지운 단계는 미생성으로 보이고 기존 생성 조건(1단계이거나 직전 단계 `COMPLETED`)으로 다시 만든다. 이미 만들어진 뒤 단계는 그대로 둔다 — 지운 단계를 다시 완료할 때까지 그 다음의 미생성 단계만 만들 수 없다([06 §9](./06-screens.md))
+- **묶음 삭제** — 사용자가 묶음을 통째로 지울 수 있다. 연결된 단계 커리큘럼마다 커리큘럼 완전 삭제(§6.2)의 범위를 적용하고, 남은 단계 잡(아직 커리큘럼이 없는 짜는 중 · 실패 잡)과 **그 묶음을 결과로 가리키는 초기 잡 I** 의 `llm_calls.job_id` 를 NULL 로 해제해 지운 뒤 단계 → 묶음을 지운다 — 한 트랜잭션. 성공한 잡 I 는 결과 FK 가 꼭 있어야 하므로(04 §4.2 CHECK) 연결만 풀 수 없고 지운다. `step_id` FK 가 `RESTRICT` 이고 잡의 단계 · 묶음 FK 가 기본 동작이라 커리큘럼 · 잡을 먼저 지운다. 잠금은 커리큘럼 삭제의 사용자 락들 → 묶음 lock → 커리큘럼 lock(ID 오름차순) 순서다. 생성 중인 단계가 있어도 지울 수 있고, 늦은 워커 응답은 묶음 · 단계 · 커리큘럼을 복원하지 않는다. 생성 비용 기록은 커리큘럼 삭제와 같이 남는다. 세부 트랜잭션과 API 는 해당 TASK 에서 설계한다([05 §2.1](./05-api.md))
 - **탈퇴** — 초기 잡을 포함한 사용자 잡 제거 → 기존 학습 데이터/커리큘럼 제거 → 단계 제거 → 묶음 제거 → 사용자 제거. 다른 사용자 데이터는 건드리지 않으며 늦은 워커 응답은 부모/단계를 복원하지 않는다(§7)
 
 ### 6.3 `materials` · `flashcards`
@@ -574,7 +586,7 @@ SELECT pg_advisory_xact_lock(hashtext('signup'));          -- 마지막 자리�
 SELECT count(*) FROM users WHERE status = 'ACTIVE';        -- < U_max 면 ACTIVE, 아니면 WAITLISTED
 ```
 
-- 대기 순번 = `count(*) WHERE status='WAITLISTED' AND created_at < :mine` + 1. 승인은 관리자 SQL `UPDATE users SET status='ACTIVE' WHERE id=?`.
+- 대기 순번 = `count(*) WHERE status='WAITLISTED' AND created_at < :mine` + 1. 승인은 관리자 SQL `UPDATE users SET status='ACTIVE', updated_at=now() WHERE id=?` — JPA 를 거치지 않으므로 `updated_at` 을 함께 쓴다(AGENTS 금지 32).
 - 이미 가입한 사람은 정원이 줄어도 밀려나지 않는다. 동의하지 않고 나가면 `PENDING` 행을 지운다.
 - **휴면 사용자도 밀려나지 않는다** — 오래 쓰지 않는 `ACTIVE` 를 내리거나 지우지 않는다. 대기 명단이 쌓이면 **관리자가 `U_max` 를 늘린다.** 휴면 사용자는 비용을 쓰지 않으므로, 늘릴 때 예산 쪽 계산은 *실제 활동 인원* 으로 다시 한다. 회수 조건은 [01 §6](./01-overview.md).
 

@@ -105,8 +105,7 @@ MVC 표준 예외와 서블릿 컨테이너의 ERROR 디스패치도 원래 HTTP
 | `ACTIVE_JOB_LIMIT` | 429 | 진행 중 생성이 이미 2개. 하나 끝나면 풀린다 |
 | `GLOBAL_BUDGET_EXHAUSTED` | 503 | 전역 월 킬스위치 · `Retry-After` = 다음 달 1일 0시(한국 시간)까지 |
 | `REGENERATION_LIMIT` | 409 | 이 커리큘럼의 오늘 다시 짜기 3회를 다 썼다 · `Retry-After` = 한국 시간 자정까지 |
-| `CURRICULUM_NOT_DRAFT` · `CURRICULUM_GENERATING` · `CURRICULUM_NOT_ACTIVE` | 409 | 승인 · 다시 짜기 · 학습 상태 충돌. 커리큘럼 삭제는 생성 중에도 허용 |
-| `CURRICULUM_NOT_READY` | 409 | 승인 요청에 검증을 통과해 저장된 강의 목록이 없음 — 단계 상세 생성 실패의 빈 초안 포함. 초기 생성 실패에는 커리큘럼 자체가 없음 |
+| `CURRICULUM_NOT_DRAFT` · `CURRICULUM_GENERATING` · `CURRICULUM_NOT_ACTIVE` | 409 | 승인 · 다시 짜기 · 학습 상태 충돌. `CURRICULUM_NOT_ACTIVE` 는 승인 전(`DRAFT`) 커리큘럼의 강의에 자료 요청 · 학습 완료도 포함. 커리큘럼 삭제는 생성 중에도 허용 |
 | `LESSON_NOT_READY` | 409 | 자료 없는 강의에 학습 완료 |
 | `JOB_NOT_FAILED` | 409 | 실패하지 않은 잡에 재시도 |
 | `JOB_NOT_RETRYABLE` | 409 | 거절된 주제(`TOPIC_REJECTED`) · 누적 호출 상한 소진 · 입력 상한 초과 잡, 또는 커리큘럼이 이미 `DRAFT` 를 벗어난 커리큘럼 생성 잡에 재시도. 강의 자료가 `JOB_CALL_LIMIT_EXCEEDED` · `INPUT_TOO_LARGE` 로 끝났으면 처음부터 다시 만들기(§3.1)로 |
@@ -147,7 +146,7 @@ MVC 표준 예외와 서블릿 컨테이너의 ERROR 디스패치도 원래 HTTP
 | 실패한 요청 지우기 | `DELETE /curriculum-requests/{jobId}` | `204`. `FAILED` 초기 잡만 — 잡 행을 지우고 그 잡의 `llm_calls.job_id` 를 NULL 로 해제한다(쓴 비용은 원장에 남고 `job_events` 는 FK 로 연결만 풀린다). `QUEUED` · `RUNNING` · `SUCCEEDED` 면 `409 JOB_NOT_FAILED`, 없거나 남의 것이면 `404`. 화면은 묻지 않고 지운다([06 §2.7](./06-screens.md)) |
 | 상세 | `GET /curriculums/{id}` | 강의 목록 · 키워드 · `masteryReflection` · `generation` |
 | 다시 짜기 | `POST /curriculums/{id}/regenerate` `{ feedback? }`(500자 이내) | `202 { jobId }` · 오늘 3회를 다 썼으면 `409 REGENERATION_LIMIT` |
-| 승인 | `POST /curriculums/{id}/approve` | `DRAFT → ACTIVE`. `DRAFT` 가 아니면 `409 CURRICULUM_NOT_DRAFT`, 활성 생성 잡이 있으면 `409 CURRICULUM_GENERATING`, 검증된 강의 목록이 없으면 `409 CURRICULUM_NOT_READY` |
+| 승인 | `POST /curriculums/{id}/approve` | `DRAFT → ACTIVE`. `DRAFT` 가 아니면 `409 CURRICULUM_NOT_DRAFT`, 활성 생성 잡이 있으면 `409 CURRICULUM_GENERATING`. 커리큘럼은 검증된 강의와 함께 생기므로 강의 목록 검사는 없다(ADR-076) |
 | 완전 삭제 | `DELETE /curriculums/{id}` | `204`. `DRAFT` / `ACTIVE` / `COMPLETED` 및 생성 중에도 허용. 단일 결과를 연결한 초기 잡 I와 연결 잡 A/B · 강의 · 자료 · 플래시카드 · 카드 상태/복습 이력 · 해당 자료의 판정 기록을 한 트랜잭션으로 삭제([02 §6.2](./02-domain-data.md)). 다른 커리큘럼의 기록과 생성 비용 합계는 유지. 없거나 남의 것이면 `404` |
 
 ```jsonc
@@ -177,16 +176,18 @@ MVC 표준 예외와 서블릿 컨테이너의 ERROR 디스패치도 원래 HTTP
 
 ### 2.1 분할안 · 다음 단계 생성 — 추가 계약 설계 필요
 
-단일/그룹 구분은 LLM이 주제/학습 목적의 의미를 판단하고 사용자가 결과를 검토한다. **최초 생성 호출에서 유형 판단과 해당 결과를 함께 반환한다** — 단일이면 강의 목록, 그룹이면 분할안이다([03 §2.1](./03-generation.md)). 판단만 한 뒤 목록/분할안을 생성하는 별도 호출은 두지 않는다. 초기 요청은 `POST /curriculum-requests`로 잡 I(`CURRICULUM_INITIAL`)에 먼저 접수하고 성공할 때 해당 리소스를 생성한다. 미완료 요청은 `GET /curriculum-requests`, 상태와 결과는 `GET /jobs/{jobId}`로 복귀한다. 화면은 묶음 화면 U11 과 기존 커리큘럼 화면 U3 이며, 화면이 쓰는 데이터는 [06 §6 · §9](./06-screens.md) 에 있다.
+단일/그룹 구분은 LLM이 주제/학습 목적의 의미를 판단하고 사용자가 결과를 검토한다. **최초 생성 호출에서 유형 판단과 해당 결과를 함께 반환한다** — 단일이면 강의 목록, 그룹이면 분할안이다([03 §2.1](./03-generation.md)). 판단만 한 뒤 목록/분할안을 생성하는 별도 호출은 두지 않는다. 초기 요청은 `POST /curriculum-requests`로 잡 I(`CURRICULUM_INITIAL`)에 먼저 접수하고 성공할 때 해당 리소스를 생성한다. 미완료 요청은 `GET /curriculum-requests`, 상태와 결과는 `GET /jobs/{jobId}`로 복귀한다. 화면은 묶음 화면 U11 과 기존 커리큘럼 화면 U3 이고, 단계를 짜는 동안 · 실패는 커리큘럼 만드는 중 화면 U10 이 보여 준다. 화면이 쓰는 데이터는 [06 §6 · §9](./06-screens.md) 에 있다.
 
-§2 표는 초기 접수/복귀와 실제 단일 커리큘럼을 다루는 API다. 초기 생성은 빈 `DRAFT` 없이 `202 { jobId }`를 반환한다. 그룹의 특정 단계 생성은 대상이 정해져 있으므로 기존 단계 초안/잡 A 적재 모델을 유지한다. 분할안은 `CurriculumGroup`/`CurriculumStep`에 저장하고 실제 커리큘럼은 `step_id`로 연결한다([02 §6.2.1](./02-domain-data.md)). 초기 분할안 생성의 접수 · 복귀는 위 `POST /curriculum-requests` · `GET /jobs/{jobId}` 로 이미 통합됐다. 추가 API 계약이 필요한 것은 그룹(분할안) 조회 · 단계 생성 · 묶음 삭제다. 엔드포인트 이름과 요청/응답 스키마는 구현 전에 확정한다. 현재 표만으로 분할안 화면의 API가 완성됐다고 볼 수 없다.
+§2 표는 초기 접수/복귀와 실제 단일 커리큘럼을 다루는 API다. 초기 생성은 빈 `DRAFT` 없이 `202 { jobId }`를 반환한다. **그룹의 단계 생성도 같다** — 그 단계를 가리키는 단계 잡만 적재하고(`202 { jobId }`), 성공할 때 단계의 제목 · 주제 · 목적을 복사한 커리큘럼을 만들어 잡 결과(`{ kind: "CURRICULUM", id }`)로 연결한다(ADR-076 · [02 §6.2.1](./02-domain-data.md)). 분할안은 `CurriculumGroup`/`CurriculumStep`에 저장하고 실제 커리큘럼은 `step_id`로 연결한다. 초기 분할안 생성의 접수 · 복귀는 위 `POST /curriculum-requests` · `GET /jobs/{jobId}` 로 이미 통합됐다. 추가 API 계약이 필요한 것은 그룹(분할안) 조회 · 단계 생성 · 실패한 단계 잡 지우기 · 묶음 삭제다. 엔드포인트 이름과 요청/응답 스키마는 `6-curriculum-gen` 에서 확정한다. 현재 표만으로 분할안 화면의 API가 완성됐다고 볼 수 없다.
 
-- 조회에는 묶음 ID와 전체 목표, 단계 ID와 제목/범위/목적/순서, 연결된 커리큘럼/잡과 생성 가능 여부가 필요하다. 미생성 단계를 `DRAFT` 커리큘럼으로 가장하지 않는다
+- 조회에는 묶음 ID와 전체 목표, 단계 ID와 제목/범위/목적/순서, 단계마다 연결된 커리큘럼 또는 단계 잡과 생성 가능 여부가 필요하다. 미생성 단계를 `DRAFT` 커리큘럼으로 가장하지 않는다
 - 생성 요청은 사용자가 클릭할 때만 보낸다. `curriculum_steps.id`로 저장된 주제/목적과 묶음 소유권을 확인하고, 다음 단계는 직전 커리큘럼 `COMPLETED`를 재확인한다. 다른 사용자/없는 분할안이나 단계는 기존 소유권 규칙에 따라 `404`
-- 유료 생성은 기존 비동기 워커 경로 · 킬스위치 · 비용 쿼터 · 진행 중 2개 검사를 받는다. 완료 이벤트만으로 요청을 적재하지 않는다
-- 같은 단계의 동시/응답 유실 재요청은 기존 커리큘럼/잡으로 연결하며, 이미 생성된 단계에는 새 초안을 만들지 않는다. 삭제/탈퇴와의 경합 및 실패 재시도도 확장 설계에서 다룬다
-- 홈은 묶음을 한 항목으로 보여 주므로 묶음 목록에는 단계마다 연결 커리큘럼의 상태 · 진도 · 다음 강의 · 활성 잡이 필요하다. 단계 커리큘럼은 `GET /curriculums` 에서 따로 항목이 되지 않게 구분할 수 있어야 한다
-- **묶음 삭제** — 묶음과 연결된 단계 커리큘럼 · 그 학습 기록 · 플래시카드를 한 번에 지운다(`204`, 남의 것 · 없는 것은 `404`, 생성 중에도 허용 — [02 §6.2.1](./02-domain-data.md)). 단계 커리큘럼 하나는 기존 `DELETE /curriculums/{id}` 로 지우고 그 단계는 미생성으로 돌아간다
+- 응답은 새로 적재한 단계 잡이거나, 그 단계에 이미 있는 커리큘럼 또는 단계 잡이다 — 화면은 커리큘럼이면 커리큘럼 화면(U3), 잡이면 커리큘럼 만드는 중 화면(U10)으로 간다. 두 경우를 한 응답 모양에 담는 방법(예: `{ kind, id }`)은 `6` 에서 정하고, 모르는 `kind` 를 받는 쪽의 처리 규칙(§1)을 따른다
+- 유료 생성은 기존 비동기 워커 경로 · 킬스위치 · 비용 쿼터 · 진행 중 2개 검사를 받는다. 완료 이벤트만으로 요청을 적재하지 않는다. 이미 있는 커리큘럼 · 잡을 돌려주기만 하는 요청은 이 검사로 막지 않는다
+- **단계마다 단계 잡은 0~1개다.** 같은 단계의 동시/응답 유실 재요청은 기존 커리큘럼/단계 잡으로 연결한다. 그 단계 잡이 실패했어도 자동으로 다시 돌리지 않는다 — 재시도는 `POST /jobs/{jobId}/retry`(§4)다
+- **실패한 단계 잡 지우기** — `FAILED` 단계 잡만 지운다(`204`). 잡 행을 지우고 그 잡의 `llm_calls.job_id` 를 NULL 로 해제한다. `QUEUED` · `RUNNING` · `SUCCEEDED` 면 `409 JOB_NOT_FAILED`, 없거나 남의 것이면 `404`. 그 단계는 미생성으로 돌아간다. `DELETE /curriculum-requests/{jobId}` 를 넓힐지 따로 둘지는 `6` 에서 정한다
+- 홈은 묶음을 한 항목으로 보여 주므로 묶음 목록에는 단계마다 연결 커리큘럼의 상태 · 진도 · 다음 강의 · 활성 잡, 또는 단계 잡의 상태가 필요하다. 단계 커리큘럼은 `GET /curriculums` 에서 따로 항목이 되지 않게 구분할 수 있어야 한다
+- **묶음 삭제** — 묶음과 연결된 단계 커리큘럼 · 그 학습 기록 · 플래시카드 · 단계 잡 · 그 묶음을 만든 초기 잡을 한 번에 지운다(`204`, 남의 것 · 없는 것은 `404`, 생성 중에도 허용 — [02 §6.2.1](./02-domain-data.md)). 단계 커리큘럼 하나는 기존 `DELETE /curriculums/{id}` 로 지우고 그 단계는 미생성으로 돌아간다
 
 ## 3. 강의 — U4
 
@@ -194,6 +195,7 @@ MVC 표준 예외와 서블릿 컨테이너의 ERROR 디스패치도 원래 HTTP
 
 | 상황 | 응답 |
 |---|---|
+| 커리큘럼이 아직 승인 전(`DRAFT`) | `409 CURRICULUM_NOT_ACTIVE` — 잡을 만들지 않는다. 다시 짜기가 강의를 지우고 새로 만들므로 `DRAFT` 강의에는 자료도 잡도 없어야 한다([02 §2](./02-domain-data.md)) |
 | 자료가 이미 있다 | `200 { materialId }` |
 | 신규 | `202 { jobId, aheadCount }` |
 | 이 강의에 진행 중인 잡이 있다 | `202` + **기존 `jobId`** — 에러가 아니다 |
@@ -248,7 +250,7 @@ GET /jobs/{jobId}          Cache-Control: no-store       — 화면은 2초마�
 
 **재시도** — `POST /jobs/{jobId}/retry` → `202 { jobId, aheadCount }`. 같은 행을 되살려 **실패한 단계부터** 재개한다. §1.5 검사를 똑같이 받는다.
 
-초기 잡 I의 재시도는 커리큘럼/그룹이 아직 없으므로 계정/잡 소유권과 실패 상태를 확인하고, 같은 입력/체크포인트/누적 호출 몫을 유지한다. 이미 성공한 초기 잡은 재시도로 새 결과를 만들지 않는다. 대상이 정해진 커리큘럼 잡 A는 해당 커리큘럼이 여전히 `DRAFT` 인지 잠금 안에서 확인한다. 승인 후에는 `409 JOB_NOT_RETRYABLE` 이며, 재적재 · 추가 외부 호출 · 강의 목록 변경을 하지 않는다. 같은 커리큘럼에 이미 활성 생성 잡이 있으면 `409 CURRICULUM_GENERATING` 이다.
+초기 잡 I의 재시도는 커리큘럼/그룹이 아직 없으므로 계정/잡 소유권과 실패 상태를 확인하고, 같은 입력/체크포인트/누적 호출 몫을 유지한다. 이미 성공한 초기 잡은 재시도로 새 결과를 만들지 않는다. 단계 잡의 재시도도 같은 행을 되살리며, 묶음 잠금 안에서 묶음 · 단계가 있고 그 단계에 연결된 커리큘럼이 없는지 확인한다. 직전 단계 완료를 재시도 때 다시 볼지는 `6` 에서 정한다. 대상이 정해진 커리큘럼 잡 A는 해당 커리큘럼이 여전히 `DRAFT` 인지 잠금 안에서 확인한다. 승인 후에는 `409 JOB_NOT_RETRYABLE` 이며, 재적재 · 추가 외부 호출 · 강의 목록 변경을 하지 않는다. 같은 커리큘럼에 이미 활성 생성 잡이 있으면 `409 CURRICULUM_GENERATING` 이다.
 
 누적 외부 호출 이력과 적재 시 확정한 상한을 유지한다. `JOB_CALL_LIMIT_EXCEEDED` 는 `409 JOB_NOT_RETRYABLE` 이며, 강의 다시 열기의 자동 재시도도 같은 규칙을 따른다. 소진한 실패 잡을 자동으로 새 행으로 바꿔 주지 않는다 — 강의 자료는 사용자가 처음부터 다시 만들기를 고를 때만 새 잡이다(§3.1). **재시도 거절은 실패 코드(주제 거절 · 호출 상한 소진 · 입력 초과)와 커리큘럼 상태로만 판단한다.** 다음 단계가 어떤 호출을 얼마나 쓸지는 API 가 따지지 않는다 — 그건 생성 단계의 지식이라 API 쪽(`job`)이 알면 패키지 경계가 깨진다([04 §2](./04-jobs-and-cost.md)). 다른 실패 코드의 재시도에서 몫이 모자라면 첫 호출 등록이 외부 전송 없이 `JOB_CALL_LIMIT_EXCEEDED` 로 끝내고, 그때 강의 자료는 처음부터 다시 만들기가 열린다. 모든 새 외부 전송은 등록 시 다시 검사한다([04 §4.8](./04-jobs-and-cost.md)).
 
@@ -350,14 +352,14 @@ GET /system/status          관리자 아니면 404 · 화면은 진입 시 1회
 |---|---|
 | U1 로그인 | `GET /auth/google` · `/callback` · `GET /me` |
 | U2 홈 | `GET /curriculums` · `GET /curriculum-requests` · `POST /curriculum-requests` · `DELETE /curriculum-requests/{jobId}` · `GET /jobs/{id}` · `GET /reviews/due` · `GET /me` · 묶음 목록 · 단계 생성(§2.1) |
-| U10 커리큘럼 만드는 중 | `GET /jobs/{id}` · `GET /curriculum-requests` · `POST /jobs/{id}/retry` · `DELETE /curriculum-requests/{jobId}` |
-| U3 커리큘럼 | `GET /curriculums/{id}` · `/approve` · `/regenerate` · `DELETE /curriculums/{id}` · `GET /jobs/{id}` · `POST /jobs/{id}/retry` · 단계 커리큘럼이면 묶음 · 단계 정보와 단계 생성(§2.1) |
+| U10 커리큘럼 만드는 중 | `GET /jobs/{id}` · `GET /curriculum-requests` · `POST /jobs/{id}/retry` · `DELETE /curriculum-requests/{jobId}` · 단계 잡이면 묶음 · 단계 정보와 실패한 단계 잡 지우기(§2.1) |
+| U3 커리큘럼 | `GET /curriculums/{id}` · `/approve` · `/regenerate` · `DELETE /curriculums/{id}` · `GET /jobs/{id}` · `POST /jobs/{id}/retry` · 단계 커리큘럼이면 묶음 · 단계 정보와 다음 단계 생성(§2.1) |
 | U11 커리큘럼 묶음 | 묶음 조회 · 단계 생성 · 묶음 삭제(§2.1) |
 | U4 강의 | `POST /lessons/{id}/materials` · `GET /jobs/{id}` · `POST /jobs/{id}/retry` · `GET /lessons/{id}/material` · `POST /lessons/{id}/complete` |
 | U5 복습 | `GET /reviews/due` · `POST /reviews` |
 | U6 시스템 상태 | `GET /system/status` |
 | U7 가입 · U8 대기 · U9 설정 | `POST /me/terms` · `GET /me` · `POST /auth/logout` · `DELETE /me` |
 
-**현재 계약 22개**(계정 6 · 초기 요청 3 · 커리큘럼 5 · 강의 3 · 잡 2 · 복습 2 · 상태 1, `/dev/session` 제외). 그룹 조회/단계 생성/묶음 삭제 API는 §2.1에서 추가 설계 중이며 전체 개수는 확정 후 갱신한다. U2 · U3 · U11 이 이 API 를 쓴다.
+**현재 계약 22개**(계정 6 · 초기 요청 3 · 커리큘럼 5 · 강의 3 · 잡 2 · 복습 2 · 상태 1, `/dev/session` 제외). 그룹 조회/단계 생성/실패한 단계 잡 지우기/묶음 삭제 API는 §2.1에서 추가 설계 중이며 전체 개수는 확정 후 갱신한다. U2 · U3 · U11 이 이 API 를 쓴다.
 
 **만들지 않는 것** — 커리큘럼 목록 페이징(사용자당 몇 개뿐) · `/v1/` 경로 버저닝 · 개념 병합 · 정원 · 대기 승인 관리 API(SQL 로) · SSE.
