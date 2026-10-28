@@ -45,6 +45,7 @@
 19. **워크플로의 서드파티 액션은 전체 커밋 SHA 로 고정하고 줄 끝에 릴리스를 주석으로 단다** — 태그는 옮겨질 수 있고 SonarCloud 게이트(`githubactions:S7637`)가 PR 에서 막는다. 자격을 받은 뒤 도는 공식 액션도 같이 고정한다. SHA 는 조회한 값을 step 에 적는다(원칙 11 · PR #11).
 20. **계약(API 응답 · 오류 형식 · ADR · `AGENTS.md` 금지 목록)을 바꾸는 phase 는 Claude 가 계약 문서를 step 전에 먼저 고쳐 커밋하고, step 은 그 절을 가리킨다** — step 에는 "어긋나면 코드를 계약에 맞추고, 못 맞추면 blocked 로 멈춰라. 문서를 고치지 마라" 를 적는다. Codex 가 계약을 스스로 해석해 문서와 코드를 함께 바꾸지 않고, step 은 "05 §1 을 따른다" 처럼 짧아진다. step 이 고치는 문서는 구현으로 확정된 사실(경로 · 클래스 이름 · 검증 줄)만 남는다(`2a-api-response` · 그 수정 step 5 · 6 · `2b-ops-logging` · 그 수정 step 5 — 모두 계약 해석으로 인한 반려 · blocked 0).
 21. **운영 로그 줄은 `docs/04-jobs-and-cost.md` §9.2 의 표에서 골라 적는다** — 잡 · 외부 호출 · 알림 · 반복 루프를 만드는 step 은 '읽어야 할 파일'에 §9.2 를 넣고, 표에서 해당 줄을 작업에 적고, 그 줄이 찍히는지 출력 캡처(`OutputCaptureExtension`) 테스트로 확인하게 한다. 줄 이름을 정하면 그 step 이 표에 적는다. 금지사항에는 "표에 없는 운영 로그 줄(`INFO` 이상)을 더하지 마라. 이유: 줄마다 14일 · 500MiB 보관을 나눠 쓰고, DB 에 남는 사실은 DB 에서 본다" 를 적는다.
+22. **테스트 전용 픽스처를 `@SpringBootTest` 의 스캔에 넣지 않는다** — 스캔은 `src/test` 의 `com.mogum` 아래 클래스까지 읽어, 픽스처 하나가 모든 컨텍스트 테스트에 섞인다. 컴포넌트(`@RestController` · `@Configuration` · `@Component`)는 그것을 쓰는 테스트 클래스의 중첩 static 클래스로 두고 `@Import` 로 그 컨텍스트에만 붙인다 — Spring Boot 4.1.1 의 `TestTypeExcludeFilter` 가 `@Test` 메서드가 있는 클래스의 중첩 클래스를 스캔에서 뺀다. `@Entity` · Spring Data `Repository` 픽스처는 `com.mogum` 밖 패키지에 둔다 — `ddl-auto: validate` 라 테이블 없는 엔티티 하나로 모든 컨텍스트가 뜨지 않고, 중첩으로 두면 빠지는지는 확인하지 않았다. 이런 픽스처를 만드는 step 은 둘 곳을 작업에 적는다(`2a-api-response` step 1 · 2 · `3-curriculum-model` step 0 — S3).
 
 ### D. 파일 생성
 
