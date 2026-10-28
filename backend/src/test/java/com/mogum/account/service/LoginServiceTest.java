@@ -12,9 +12,6 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,7 +21,6 @@ import static org.mockito.Mockito.*;
 
 class LoginServiceTest {
     private final UserRepository repository = mock(UserRepository.class);
-    private final Instant now = Instant.parse("2026-10-12T03:00:00Z");
     private LoginService login;
 
     @BeforeEach
@@ -56,7 +52,7 @@ class LoginServiceTest {
     }
 
     @Test
-    void 첫_로그인은_외부_식별자와_ACTIVE_ADMIN과_주입한_시각으로_생성한다() {
+    void 첫_로그인은_외부_식별자와_ACTIVE_ADMIN으로_생성한다() {
         String email = "  Admin@EXAMPLE.COM  ";
         when(repository.findByProviderAndSubject("google", "new-sub")).thenReturn(Optional.empty());
         when(repository.save(any(User.class))).thenAnswer(invocation -> {
@@ -75,13 +71,12 @@ class LoginServiceTest {
         assertEquals(email, saved.getValue().getEmail());
         assertEquals(UserStatus.ACTIVE, saved.getValue().getStatus());
         assertEquals(UserRole.ADMIN, saved.getValue().getRole());
-        assertEquals(now, saved.getValue().getCreatedAt());
     }
 
     @ParameterizedTest
     @EnumSource(UserStatus.class)
     void 재로그인은_외부_식별자로_찾고_기존_사용자_ID로_로그인하며_계정을_쓰지_않는다(UserStatus status) {
-        var existing = User.join("google", "stable-sub", "old@example.com", UserRole.USER, now.minusSeconds(200));
+        var existing = User.join("google", "stable-sub", "old@example.com", UserRole.USER);
         ReflectionTestUtils.setField(existing, "id", 12L);
         ReflectionTestUtils.setField(existing, "status", status);
         when(repository.findByProviderAndSubject("google", "stable-sub")).thenReturn(Optional.of(existing));
@@ -102,7 +97,7 @@ class LoginServiceTest {
     }
 
     private LoginService service(List<String> adminEmails) {
-        return new LoginService(repository, Clock.fixed(now, ZoneOffset.UTC), new AuthProperties(adminEmails));
+        return new LoginService(repository, new AuthProperties(adminEmails));
     }
 
     private static ExternalAccount account(String subject, String email, boolean verified) {

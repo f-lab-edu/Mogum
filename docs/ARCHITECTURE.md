@@ -12,11 +12,12 @@
 │   ├── Dockerfile · .dockerignore   # 서버 이미지(빌드 → JRE 실행, exec 형식 ENTRYPOINT) — 로컬 compose 가 쓰고 운영도 쓸 수 있다(ADR-069)
 │   ├── src/main/java/…/mogum/
 │   │   ├── MogumApplication.java    # 진입점 · @ConfigurationPropertiesScan
-│   │   ├── config/                  # 설정 값(WebProperties · AuthProperties) · 시계 빈 · 요청 로그 필터 등록 · app.role 별 빈 등록 — worker · generation 을 조립하는 유일한 곳
+│   │   ├── config/                  # 설정 값(WebProperties · AuthProperties) · 시계 빈 · JpaAuditingConfiguration(Auditing · Clock 시각 공급자) · 요청 로그 필터 등록 · app.role 별 빈 등록 — worker · generation 을 조립하는 유일한 곳
 │   │   ├── common/                  # 주제별 공통 코드
 │   │   │   ├── api/                 # ApiResponse(성공 응답 감싸기) · 공통 오류 응답(ErrorCode · ApiException · ApiError · FieldViolation · ApiErrorResponses · ApiExceptionHandler · ApiErrorController)
 │   │   │   ├── time/                # SeoulClock
-│   │   │   └── logging/             # RequestLogFilter — 요청 ID · 접근 줄 · MDC 키 상수
+│   │   │   ├── logging/             # RequestLogFilter — 요청 ID · 접근 줄 · MDC 키 상수
+│   │   │   └── persistence/         # AuditedEntity — 엔티티 공통 생성 · 수정 시각 · Auditing 리스너
 │   │   ├── auth/                    # Spring Security · 구글 OAuth 로그인 처리 · 세션 → 회원 필터 · API 레이트리밋 필터
 │   │   ├── account/                 # 회원 · 로그인 — 도메인 패키지는 항상 아래 다섯 하위 패키지로 나눈다
 │   │   │   ├── controller/          # MeController
@@ -24,7 +25,10 @@
 │   │   │   ├── repository/          # UserRepository(Spring Data) · 네이티브 쿼리 클래스
 │   │   │   ├── domain/              # User(@Entity · Lombok @Getter · @NoArgsConstructor(PROTECTED) · 생성은 정적 팩토리 User.join) · UserRole · UserStatus · 도메인 규칙
 │   │   │   └── dto/                 # MeResponse — HTTP 요청 · 응답만
-│   │   ├── <도메인>/                 # curriculum · material · concept · review … — account 와 같은 다섯 하위 패키지. MasteryPolicy 등은 domain/
+│   │   ├── curriculum/              # 묶음 · 단계 · 커리큘럼 · 강의 — controller/ · service/ · dto/ 는 6-curriculum-gen 에서 만든다
+│   │   │   ├── domain/              # CurriculumGroup · CurriculumStep · Curriculum · Lesson(AuditedEntity 상속 · 정적 팩토리) · CurriculumStatus · LessonStatus
+│   │   │   └── repository/          # CurriculumGroupRepository · CurriculumStepRepository · CurriculumRepository · LessonRepository(JpaRepository)
+│   │   ├── <도메인>/                 # material · concept · review … — account 와 같은 다섯 하위 패키지. MasteryPolicy 등은 domain/
 │   │   ├── job/                     # 적재 · 재시도 · 잡 조회 API · jobs/job_events 네이티브 SQL(repository/) — 같은 다섯 하위 패키지 · generation 참조 금지
 │   │   ├── usage/                   # llm_calls 원장 · 일일 · 월 합계(쿼터 · 킬스위치 근거) — 생성과 적재가 함께 쓴다 · 같은 다섯 하위 패키지
 │   │   ├── generation/              # 생성 유스케이스(잡 I · A · B ①②③ · resolveConcepts) + 유료 호출(LlmClient · EmbeddingClient · GuardedLlmClient · InputBudget) — worker · config 만 참조. 계층이 아니라 용도로 나눈다
@@ -74,6 +78,8 @@
 | **관련 숙련도 선별** | 주제/목적 임베딩 검색 + 키워드 검색. 사용자 학습 개념만 후보로 삼고, 선별한 ID의 숙련도를 예산 안에서 주입. 검색 근거는 생성 시점 스냅샷으로 보존 | [02 §5.4](./02-domain-data.md) |
 | **단계 산출물 저장** | 잡 B 는 ①②③ 단계마다 `payload` 저장 → 실패한 단계부터 재개 | [04 §4.6](./04-jobs-and-cost.md) |
 | **파생값은 저장하지 않는다** | 숙련도는 조회 때 계산, "생성 중 · 실패"는 잡으로 판단 | [02 §1 · §4](./02-domain-data.md) |
+| **결과는 성공할 때 생긴다** | 처음 만드는 커리큘럼 · 묶음은 잡 I · 단계 잡이 성공하는 트랜잭션에서 만들고 잡에 결과로 연결한다. 빈 초안 · 빈 묶음이 없다 | [04 §4.2](./04-jobs-and-cost.md) · ADR-050 · ADR-076 |
+| **엔티티 연관 · 시각** | 같은 도메인의 부모는 `@ManyToOne(LAZY)` 단방향, 다른 도메인은 ID · 컬렉션과 cascade 없음 · FK 기본 동작으로 자식부터 지운다. 모든 엔티티는 공통 상위 클래스의 `created_at` · `updated_at` 을 JPA Auditing(`Clock`)으로 채우고, JPA 밖 갱신은 SQL 에 직접 쓴다 | ADR-077 · ADR-078 |
 | **역할 전환(비상용)** | 같은 jar 를 `app.role` = `all` · `api` · `worker` 로. 판단은 `config` 의 빈 등록에서만 — 실행기는 컴포넌트 스캔으로 올리지 않는다 | [04 §3.1](./04-jobs-and-cost.md) |
 
 ## 데이터 흐름
@@ -108,7 +114,7 @@ worker 실행기(빈손일 때만 1개 수령)
 
 **학습 · 복습 — 동기**
 
-넓은 주제는 전체 목표와 단계별 제목/범위/목적/권장 순서의 분할안을 먼저 보존한다. 상세 커리큘럼은 1단계부터 사용자 클릭으로 생성하고, 모든 강의 완료 후 다음 단계 생성 안내를 제공한다. 다음 단계 요청은 최신 숙련도를 선별하는 기존 비동기 생성 경로로 이어지며 복습 완료를 요구하거나 자동 적재하지 않는다. 저장 구조는 `curriculum_groups` → `curriculum_steps` ← `curriculums.step_id`이며 초기 통합 잡은 `CURRICULUM_INITIAL`이다. 묶음/단계 상태는 저장하지 않고 연결 커리큘럼/잡에서 조회한다. 그룹 조회/단계 생성 API와 잡 I의 출력/호출 규약은 구현 전 설계 항목이다([02 §2.1](./02-domain-data.md) · [05 §2.1](./05-api.md)).
+넓은 주제는 전체 목표와 단계별 제목/범위/목적/권장 순서의 분할안을 먼저 보존한다. 상세 커리큘럼은 1단계부터 사용자 클릭으로 생성하고, 모든 강의 완료 후 다음 단계 생성 안내를 제공한다. 다음 단계 요청은 최신 숙련도를 선별하는 기존 비동기 생성 경로로 이어지며 복습 완료를 요구하거나 자동 적재하지 않는다. 단계 생성은 그 단계를 가리키는 단계 잡만 적재하고, 성공할 때 단계의 제목 · 주제 · 목적을 복사한 커리큘럼을 만든다 — 빈 초안은 없다(ADR-076). 저장 구조는 `curriculum_groups` → `curriculum_steps` ← `curriculums.step_id`이며 초기 통합 잡은 `CURRICULUM_INITIAL`이다. 묶음/단계 상태는 저장하지 않고 연결 커리큘럼/잡에서 조회한다. 그룹 조회/단계 생성 API와 잡 I의 출력/호출 규약은 구현 전 설계 항목이다([02 §2.1](./02-domain-data.md) · [05 §2.1](./05-api.md)).
 
 ```
 최초 학습 완료 → 강의 완료 · card_states 최초 생성(NEW · 오늘) · 전 강의 완료 시 커리큘럼 완료를 같은 트랜잭션으로 처리 → 응답에 그 강의의 현재 미평가 카드 → 즉시 첫 복습. 완료 재요청도 성공하며 기존 복습 상태/이력은 보존한다([02 §3](./02-domain-data.md)).

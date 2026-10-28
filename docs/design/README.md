@@ -26,7 +26,7 @@
 | U8 대기 명단 | §5 | `Entry Screens.dc.html` | `u8` → M① 대기 3번째 · D② |
 | U2 홈 | §6 | `U2 Screen.dc.html` | `first` → M① 처음 온 사용자 · `normal` → M② 평소 · D⑤ · `requests` → M③ 짜는 중 · 짜기 실패 요청 · `doneBlocked` → M④ 오늘 복습 끝 + 막힘(막힘 문구는 `scrollTo`=`form`) |
 | U10 커리큘럼 만드는 중 | §7 | `U10 Screen.dc.html` | `queued` → M① 짜는 중 · `failRetry` → M② 실패 — 다시 시도 가능 · `failRejected` → M③ 실패 — 주제 거절 |
-| U3 커리큘럼 | §8 | `U3 Screen.dc.html` | `review` → M① 검토 대기 · D⑨ · `regenOpen` → M② 다시 짜기 펼침 · `regenerating` → M③ 다시 짜는 중 · `regenFailed` → M④ 다시 짜기 실패 · `active` → M⑤ 학습 중 · `deleteOpen` → M⑥ 삭제 확인 펼침 · `doneSingle` → M⑦ 완료 — 하나짜리 · `doneStep` → M⑧ 완료 — 묶음 1단계 · `firstGen` → M⑩ 단계 첫 짜기 |
+| U3 커리큘럼 | §8 | `U3 Screen.dc.html` | `review` → M① 검토 대기 · D⑨ · `regenOpen` → M② 다시 짜기 펼침 · `regenerating` → M③ 다시 짜는 중 · `regenFailed` → M④ 다시 짜기 실패 · `active` → M⑤ 학습 중 · `deleteOpen` → M⑥ 삭제 확인 펼침 · `doneSingle` → M⑦ 완료 — 하나짜리 · `doneStep` → M⑧ 완료 — 묶음 1단계 · `firstGen` → M⑩ 단계 첫 짜기(쓰지 않는다 — 「문서와 다른 곳」) |
 | U11 커리큘럼 묶음 | §9 | `U11 Screen.dc.html` | `plan` → M① 단계 검토 · `learning` → M② 1단계 학습 중 · `nextTurn` → M③ 2단계 만들 차례 · D⑥ · `allDone` → M④ 모두 완료 · `deleteOpen` → M⑤ 묶음 삭제 확인 펼침 |
 | U4 강의 | §10 | `U4 Screen.dc.html` | `queued` → M① 줄서기 · `running` → M② 만드는 중 · `slow` → M③ 평소보다 오래 걸림 · `failRetry` → M④ 실패 — 이어서 다시 시도 · `failRestart` → M⑤ 실패 — 처음부터 다시 만들기 · `blocked` → M⑥ 막힘 · `body` → M⑦ 본문 · D⑨ · `done` → M⑧ 학습 완료 후 |
 | U5 복습 | §11 | `U5 Screen.dc.html` | `todayFront` → M① 오늘의 복습 앞면 · `todayAnswer` → M② 답 + 평가(`desktop` 을 켜면 D⑦) · `firstFront` → M③ 첫 복습 앞면 · `saveFail` → M④ 저장 실패 · `endFirst` → M⑤ 끝 — 첫 복습 · `endToday` → M⑥ 끝 — 오늘의 복습 · `waitReady` → M⑧ 기다리는 동안 준비 알림 · `endStopped` → M⑨ 끝 — 그만했을 때 |
@@ -40,11 +40,11 @@
 |---|---|---|
 | 상단 바 | §2.5 | 어느 화면 파일이든 `data-layer="상단 바"`. 현재 화면 표시는 U2(홈) · U5(복습) · Settings `u9`(설정) · U6(시스템 상태 — 관리자) |
 | 대기 블록 — 강의형(단계 목록) | §2.8 | U4 `queued` · `running` · `slow` |
-| 대기 블록 — 커리큘럼형(한 줄) · 회색 줄 | §2.8 | U10 `queued` · U3 `regenerating`(이전 안 흐리게) · `firstGen` |
+| 대기 블록 — 커리큘럼형(한 줄) · 회색 줄 | §2.8 | U10 `queued` · U3 `regenerating`(이전 안 흐리게). U3 `firstGen` 은 쓰지 않는다 — 「문서와 다른 곳」 |
 | 실패 문구 + 다시 시도 | §15.2 | U4 `failRetry` · `failRestart` · U10 `failRetry` · `failRejected` · U3 `regenFailed` |
 | 막힘 문구 + 지금 할 수 있는 것 | §15.1 | U4 `blocked`(링크 둘) · U2 `doneBlocked`(복습 0장 — 링크 없음) |
 | 그 자리 확인 펼침 | §2.7 | U3 `deleteOpen` · U11 `deleteOpen` · Settings `u9withdraw`(체크해야 눌림) |
-| 화면 아래 고정 행동 자리 | UI_GUIDE 레이아웃 | U3 결정 바(`review` · `regenerating` · `regenFailed` · `firstGen`) · U5 답 보기 · 평가(`todayFront` · `todayAnswer`) |
+| 화면 아래 고정 행동 자리 | UI_GUIDE 레이아웃 | U3 결정 바(`review` · `regenerating` · `regenFailed`) · U5 답 보기 · 평가(`todayFront` · `todayAnswer`) |
 | 막대(진도 · 생성량) | UI_GUIDE 막대 | 진도 — U2 `normal` · U3 `active` · U11 `learning` · U5 머리. 오늘 생성량 — U2 `first` · Settings `u9` |
 | 강의 본문(제목 · 목록 · mermaid · KaTeX · 표 · 그림 실패) | UI_GUIDE 강의 본문 | U4 `body` |
 | 체크박스 | UI_GUIDE 체크박스 | Entry `u7terms` · Settings `u9withdraw` |
@@ -113,6 +113,8 @@
 | 화면 | 시안 | 문서 |
 |---|---|---|
 | U4 실패 — 처음부터 다시 만들기 | 「앞서 만든 부분은 버리고 새로 만들어요.」 가 두 번 나온다 | 한 번 — 버튼 아래 작은 글씨(06 §10 · §15.2) |
+| U3 `firstGen` — 단계 첫 짜기 | 단계를 만들면 커리큘럼 화면이 짜는 중으로 열린다 | **이 상태를 쓰지 않는다.** 단계 커리큘럼은 단계 잡이 성공할 때 생기므로 짜는 동안 · 실패는 U10 이 단계용 머리(묶음 경로 · 단계 제목)로 보여 준다(06 §7 · ADR-076). U10 의 단계용 머리는 아직 그리지 않았다 — U10 `queued` 의 대기 블록에 U3 의 [U3-0] 묶음 경로를 얹는다 |
+| U3 단계 커리큘럼의 제목 줄 | 제목 아래 한 줄이 **묶음의** 주제 · 목적이다(「Spring 백엔드 · 신입 백엔드 개발자로 …」) | 커리큘럼의 `topic` · `purpose` — 단계 커리큘럼은 **단계의** 주제 · 목적을 복사한 값이다(06 §8.1 · 02 §6.2) |
 
 ## 아직 그리지 않은 상태
 

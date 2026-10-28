@@ -7,7 +7,11 @@ import com.mogum.archfixture.job.JobToGeneration;
 import com.mogum.archfixture.worker.JakartaTransactionalWorkerMethod;
 import com.mogum.archfixture.worker.TransactionalWorkerMethod;
 import com.mogum.account.controller.MeController;
+import com.mogum.account.domain.User;
 import com.mogum.account.dto.MeResponse;
+import com.mogum.common.persistence.AuditedEntity;
+import entityfixture.UnauditedEntity;
+import jakarta.persistence.Entity;
 import com.mogum.common.api.ApiErrorController;
 import com.mogum.common.api.ApiResponse;
 import com.tngtech.archunit.base.DescribedPredicate;
@@ -37,6 +41,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import jakarta.validation.Valid;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -49,6 +54,19 @@ class ArchitectureTest {
             .importPackages("com.mogum");
     private static final String SPRING_TRANSACTIONAL = "org.springframework.transaction.annotation.Transactional";
     private static final String JAKARTA_TRANSACTIONAL = "jakarta.transaction.Transactional";
+    private static final ArchRule ENTITIES_EXTEND_AUDITED_ENTITY = classes().that()
+            .areAnnotatedWith(Entity.class).should().beAssignableTo(AuditedEntity.class);
+
+    @Test
+    void 모든_엔티티는_공통_시각_상위_클래스를_상속한다() {
+        assertTrue(CLASSES.contain(User.class));
+        ENTITIES_EXTEND_AUDITED_ENTITY.check(CLASSES);
+    }
+
+    @Test
+    void 공통_시각_상위_클래스를_상속하지_않은_엔티티를_거부한다() {
+        assertViolation(ENTITIES_EXTEND_AUDITED_ENTITY, UnauditedEntity.class);
+    }
 
     // config 는 app.role 별 빈 등록에서 worker 와 generation 을 조립한다.
     private static final ArchRule GENERATION_ONLY_FROM_WORKER = noClasses().that()

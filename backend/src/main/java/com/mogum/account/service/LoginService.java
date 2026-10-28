@@ -6,7 +6,6 @@ import com.mogum.account.repository.UserRepository;
 import com.mogum.config.AuthProperties;
 import org.springframework.stereotype.Service;
 
-import java.time.Clock;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -14,12 +13,10 @@ import java.util.stream.Collectors;
 @Service
 public class LoginService {
     private final UserRepository users;
-    private final Clock clock;
     private final Set<String> adminEmails;
 
-    public LoginService(UserRepository users, Clock clock, AuthProperties properties) {
+    public LoginService(UserRepository users, AuthProperties properties) {
         this.users = users;
-        this.clock = clock;
         this.adminEmails = properties.adminEmails().stream().map(LoginService::normalizeEmail)
                 .filter(email -> !email.isEmpty()).collect(Collectors.toUnmodifiableSet());
     }
@@ -40,7 +37,7 @@ public class LoginService {
             return new LoginResult.Success(existing.get().getId());
         }
         var user = users.save(User.join(account.provider(), account.subject(), account.email(),
-                roleFor(account.email()), clock.instant()));
+                roleFor(account.email())));
         return new LoginResult.Success(user.getId());
     }
 

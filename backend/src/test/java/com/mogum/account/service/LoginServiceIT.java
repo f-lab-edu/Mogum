@@ -12,6 +12,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Clock;
@@ -33,6 +37,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
 @SpringBootTest
+@Import(LoginServiceIT.TestClockConfiguration.class)
 class LoginServiceIT extends PostgresTestConfiguration {
     @Autowired private UserRepository users;
     @Autowired private JdbcTemplate jdbc;
@@ -67,6 +72,7 @@ class LoginServiceIT extends PostgresTestConfiguration {
         assertNull(user.getTermsAgreedAt());
         assertNull(user.getTermsVersion());
         assertEquals(now, user.getCreatedAt());
+        assertEquals(now, user.getUpdatedAt());
         assertEquals(user.getId(), find("google", subject).orElseThrow().getId());
         assertEquals(subject, jdbc.queryForObject("SELECT subject FROM users WHERE id = ?", String.class, user.getId()));
         assertEquals("google", jdbc.queryForObject("SELECT provider FROM users WHERE id = ?", String.class, user.getId()));
@@ -77,7 +83,7 @@ class LoginServiceIT extends PostgresTestConfiguration {
     @ParameterizedTest
     @EnumSource(UserStatus.class)
     void 재로그인은_이메일_역할_상태_약관_가입시각과_외부_식별자를_보존한다(UserStatus status) {
-        var user = users.save(User.join("google", subject, email, UserRole.USER, now.minusSeconds(200)));
+        var user = users.save(User.join("google", subject, email, UserRole.USER));
         jdbc.update("UPDATE users SET status = ?, terms_agreed_at = ?, terms_version = 'v1' WHERE id = ?",
                 status.name(), java.sql.Timestamp.from(now.minusSeconds(100)), user.getId());
         var before = row(user.getId());
@@ -135,6 +141,15 @@ class LoginServiceIT extends PostgresTestConfiguration {
     private ExternalAccount account() { return new ExternalAccount("google", subject, email, true); }
     private LoginService login(UserRepository repository) { return service(repository, List.of(email)); }
     private LoginService service(UserRepository repository, List<String> adminEmails) {
-        return new LoginService(repository, Clock.fixed(now, ZoneOffset.UTC), new AuthProperties(adminEmails));
+        return new LoginService(repository, new AuthProperties(adminEmails));
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class TestClockConfiguration {
+        @Bean
+        @Primary
+        Clock loginTestClock() {
+            return Clock.fixed(Instant.parse("2026-10-12T03:00:00Z"), ZoneOffset.UTC);
+        }
     }
 }

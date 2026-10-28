@@ -12,7 +12,6 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.session.FindByIndexNameSessionRepository;
 
-import java.time.Instant;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -31,7 +30,7 @@ class SessionUserFilterTest {
 
     @Test
     void ID로_조회한_회원을_요청_인증으로만_사용한다() throws Exception {
-        var user = User.join("google", "sub", "me@example.com", UserRole.ADMIN, Instant.now());
+        var user = User.join("google", "sub", "me@example.com", UserRole.ADMIN);
         var id = User.class.getDeclaredField("id");
         id.setAccessible(true);
         id.set(user, 17L);

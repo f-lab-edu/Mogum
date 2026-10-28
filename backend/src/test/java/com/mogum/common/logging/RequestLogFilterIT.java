@@ -39,7 +39,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.TimeZone;
@@ -65,7 +64,7 @@ class RequestLogFilterIT extends PostgresTestConfiguration {
     @BeforeEach
     void setUp() {
         var key = "request-log-" + UUID.randomUUID();
-        user = users.save(User.join("google", key, key + "@example.com", UserRole.ADMIN, Instant.now()));
+        user = users.save(User.join("google", key, key + "@example.com", UserRole.ADMIN));
         testSessions = new TestSessions(sessions);
         session = testSessions.create(user.getId());
         client = HttpClient.newHttpClient();

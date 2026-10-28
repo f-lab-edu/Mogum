@@ -23,7 +23,6 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -53,7 +52,7 @@ class SecurityConfigurationCrossOriginIT extends PostgresTestConfiguration {
                 .addFilters(context.getBean("springSessionRepositoryFilter", jakarta.servlet.Filter.class))
                 .apply(springSecurity()).build();
         testSessions = new TestSessions(sessions);
-        user = users.save(User.join("google", "cors-" + UUID.randomUUID(), "cors@example.com", UserRole.ADMIN, Instant.now()));
+        user = users.save(User.join("google", "cors-" + UUID.randomUUID(), "cors@example.com", UserRole.ADMIN));
         session = testSessions.create(user.getId());
     }
 

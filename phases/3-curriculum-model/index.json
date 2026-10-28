@@ -1,0 +1,32 @@
+{
+  "project": "Mogum",
+  "phase": "3-curriculum-model",
+  "steps": [
+    {
+      "step": 0,
+      "name": "entity-audit",
+      "status": "completed",
+      "summary": "com.mogum.common.persistence.AuditedEntity · JpaAuditingConfiguration · User Auditing 전환 · 엔티티 상속 ArchUnit 규칙 · V7__add_users_updated_at.sql 구현; 테스트는 중첩 @TestConfiguration을 @Import하여 기존 clock과 다른 이름의 @Bean @Primary Clock을 주입(회원 IT는 Clock.fixed, AuditedEntityIT는 auditingTestClock Mockito 모형의 instant() 반환값을 저장/수정 시각으로 변경); ./backend/gradlew -p backend build 서버 테스트 377개 → 383개 통과(실패·오류·건너뜀 0).",
+      "started_at": "2026-10-28T08:29:46+0900",
+      "completed_at": "2026-10-28T08:34:51+0900"
+    },
+    {
+      "step": 1,
+      "name": "curriculum-schema",
+      "status": "completed",
+      "summary": "V8__create_curriculum_model.sql · AuditedEntity 상속 CurriculumGroup/CurriculumStep/Curriculum/Lesson · CurriculumStatus/LessonStatus · 팩토리 5개 · CurriculumGroupRepository/CurriculumStepRepository/CurriculumRepository/LessonRepository 구현; keywords는 List<String> + @JdbcTypeCode(SqlTypes.ARRAY) + @Column(columnDefinition = \"text[]\")로 ddl-auto validate 및 순서/값 보존 확인; CurriculumRepositoryIT는 중첩 @TestConfiguration을 @Import하고 기존 clock과 다른 이름의 @Bean @Primary curriculumTestClock(Clock.fixed)을 주입하며 각 테스트가 만든 회원 ID로 한정해 강의 → 커리큘럼 → 단계 → 묶음 → 회원 순서의 명시적 정리 SQL 사용; DB 제약·FK 삭제 동작·LAZY·Auditing 검증 및 사실 문서 반영; ./backend/gradlew -p backend build 서버 테스트 383개 → 477개 통과(실패·오류·건너뜀 0).",
+      "started_at": "2026-10-28T08:34:52+0900",
+      "completed_at": "2026-10-28T08:39:52+0900"
+    },
+    {
+      "step": 2,
+      "name": "owner-lookup",
+      "status": "completed",
+      "summary": "CurriculumRepository/CurriculumGroupRepository.findByIdAndUserId · LessonRepository.findByIdAndCurriculum_UserId · CurriculumStepRepository.findByIdAndGroup_UserId의 Optional 파생 쿼리 넷 구현; CurriculumRepositoryIT에 내 것·남의 것·없는 것 및 단계 커리큘럼 조회 테스트 14개를 먼저 추가해 메서드 부재 실패 확인 후 구현; docs/02-domain-data.md §6.2·§6.2.1 사실 반영; ./backend/gradlew -p backend build 서버 테스트 477개 → 491개 통과(실패·오류·건너뜀 0).",
+      "started_at": "2026-10-28T08:39:52+0900",
+      "completed_at": "2026-10-28T08:42:07+0900"
+    }
+  ],
+  "created_at": "2026-10-28T08:29:46+0900",
+  "completed_at": "2026-10-28T08:42:07+0900"
+}

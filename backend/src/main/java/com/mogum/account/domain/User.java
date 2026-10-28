@@ -1,5 +1,6 @@
 package com.mogum.account.domain;
 
+import com.mogum.common.persistence.AuditedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -20,7 +21,7 @@ import java.time.Instant;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "users", uniqueConstraints = @UniqueConstraint(
         name = "users_provider_subject_key", columnNames = {"provider", "subject"}))
-public class User {
+public class User extends AuditedEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -48,18 +49,14 @@ public class User {
     @Column(name = "terms_version", columnDefinition = "text")
     private String termsVersion;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
-
     // 첫 로그인으로 가입한 회원 — ACTIVE 로 시작한다. 역할은 바깥 정보(관리자 목록)라 서비스가 정해 넘긴다
-    public static User join(String provider, String subject, String email, UserRole role, Instant joinedAt) {
+    public static User join(String provider, String subject, String email, UserRole role) {
         var user = new User();
         user.provider = provider;
         user.subject = subject;
         user.email = email;
         user.status = UserStatus.ACTIVE;
         user.role = role;
-        user.createdAt = joinedAt;
         return user;
     }
 }

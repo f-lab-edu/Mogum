@@ -14,6 +14,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -24,12 +28,15 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
+@Import(UserRepositoryIT.TestClockConfiguration.class)
 @ExtendWith(OutputCaptureExtension.class)
 class UserRepositoryIT extends PostgresTestConfiguration {
     @Autowired private UserRepository repository;
@@ -68,7 +75,7 @@ class UserRepositoryIT extends PostgresTestConfiguration {
         var failure = new IllegalStateException("rollback user creation");
 
         var actual = assertThrows(IllegalStateException.class, () -> transactions.executeWithoutResult(status -> {
-            var saved = repository.save(User.join("google", "Sub-" + UUID.randomUUID(), email, UserRole.ADMIN, now));
+            var saved = repository.save(User.join("google", "Sub-" + UUID.randomUUID(), email, UserRole.ADMIN));
             ids.add(saved.getId());
             assertTrue(saved.getId() > 0);
             throw failure;
@@ -92,7 +99,7 @@ class UserRepositoryIT extends PostgresTestConfiguration {
         String marker = "LEAKCHECK-" + UUID.randomUUID();
         save("google", marker, UserRole.ADMIN);
         var failure = assertThrows(RuntimeException.class, () ->
-                repository.save(User.join("google", marker, email, UserRole.ADMIN, now)));
+                repository.save(User.join("google", marker, email, UserRole.ADMIN)));
         assertSqlState("23505", failure);
         StringBuilder messages = new StringBuilder();
         for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
@@ -113,16 +120,16 @@ class UserRepositoryIT extends PostgresTestConfiguration {
         assertTrue(find("google", sub.strip()).isEmpty());
         assertTrue(find("google", sub.toLowerCase(java.util.Locale.ROOT)).isEmpty());
         var duplicate = assertThrows(RuntimeException.class, () ->
-                repository.save(User.join("google", sub, email, UserRole.ADMIN, now)));
+                repository.save(User.join("google", sub, email, UserRole.ADMIN)));
         assertSqlState("23505", duplicate);
         for (String blank : java.util.List.of("", "  ", "\t\n")) {
             var invalid = assertThrows(RuntimeException.class, () ->
-                    repository.save(User.join("google", blank, email, UserRole.ADMIN, now)));
+                    repository.save(User.join("google", blank, email, UserRole.ADMIN)));
             assertSqlState("23514", invalid);
         }
         for (String blank : java.util.List.of("", "  ", "\t\n")) {
             var invalid = assertThrows(RuntimeException.class, () ->
-                    repository.save(User.join(blank, sub, email, UserRole.ADMIN, now)));
+                    repository.save(User.join(blank, sub, email, UserRole.ADMIN)));
             assertSqlState("23514", invalid);
         }
         assertEquals(saved.getId(), find("google", sub).orElseThrow().getId());
@@ -152,7 +159,7 @@ class UserRepositoryIT extends PostgresTestConfiguration {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"provider", "subject", "email", "status", "role", "created_at"})
+    @ValueSource(strings = {"provider", "subject", "email", "status", "role", "created_at", "updated_at"})
     void 필수_컬럼은_NULL을_거절한다(String column) {
         var saved = create();
         var failure = assertThrows(RuntimeException.class, () ->
@@ -193,7 +200,7 @@ class UserRepositoryIT extends PostgresTestConfiguration {
     }
 
     private User save(String provider, String subject, UserRole role) {
-        var user = repository.save(User.join(provider, subject, email, role, now));
+        var user = repository.save(User.join(provider, subject, email, role));
         ids.add(user.getId());
         return user;
     }
@@ -223,5 +230,14 @@ class UserRepositoryIT extends PostgresTestConfiguration {
             }
         }
         fail("PostgreSQL constraint failure was expected", failure);
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class TestClockConfiguration {
+        @Bean
+        @Primary
+        Clock repositoryTestClock() {
+            return Clock.fixed(Instant.parse("2026-10-12T03:00:00Z"), ZoneOffset.UTC);
+        }
     }
 }
