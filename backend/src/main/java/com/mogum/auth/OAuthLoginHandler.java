@@ -58,12 +58,12 @@ public final class OAuthLoginHandler implements AuthenticationSuccessHandler, Au
                     response.sendRedirect(origin + "/");
                     log.info("login result=success userId={}", success.userId());
                 }
-                case LoginResult.Rejected rejected ->
-                        fail(request, response, rejected.reason() == LoginResult.RejectionReason.NOT_ALLOWED
-                                ? "not_allowed" : "login_failed", switch (rejected.reason()) {
-                                    case NOT_ALLOWED -> "not_allowed";
-                                    case EMAIL_NOT_VERIFIED -> "email_not_verified";
-                                });
+                // step 1에서 신청 전 신원을 세션에 담도록 바꾼다.
+                case LoginResult.NotApplied notApplied -> fail(request, response, "not_allowed", "not_allowed");
+                case LoginResult.Rejected rejected -> fail(request, response, "login_failed",
+                        switch (rejected.reason()) {
+                            case EMAIL_NOT_VERIFIED -> "email_not_verified";
+                        });
             }
         } finally {
             SecurityContextHolder.clearContext();

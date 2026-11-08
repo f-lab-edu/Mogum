@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class MeController {
     @GetMapping("/api/me")
     public ApiResponse<MeResponse> me(@AuthenticationPrincipal User user) {
-        return ApiResponse.of(new MeResponse(user.getEmail(), user.getStatus(), user.getRole(),
-                user.getTermsAgreedAt() != null, null));
+        return ApiResponse.of(new MeResponse(user.getEmail(), user.getStatus()));
     }
 }

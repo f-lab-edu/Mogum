@@ -1,8 +1,6 @@
 package com.mogum.common.api;
 
-import com.mogum.account.domain.UserRole;
 import com.mogum.account.domain.UserStatus;
-import com.mogum.account.dto.MeResponse;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,16 +25,14 @@ class ApiResponseTest {
     @DisplayName("성공 DTO는 값이 없는 필드도 null로 싣고 최상위는 data 하나뿐이다")
     void preservesNullFieldsInsideSingleDataEnvelope() {
         // given
-        var response = ApiResponse.of(new MeResponse("me@example.com", UserStatus.ACTIVE,
-                UserRole.ADMIN, true, null));
+        var response = ApiResponse.of(new OptionalResponse("me@example.com", null));
 
         // when
         var json = mapper.writeValueAsString(response);
 
         // then
         assertThat(new JsonContent(json)).isStrictlyEqualTo("""
-                {"data":{"email":"me@example.com","status":"ACTIVE","role":"ADMIN",
-                 "termsAgreed":true,"waitlistPosition":null}}
+                {"data":{"email":"me@example.com","optional":null}}
                 """);
         assertThat(context.getBeansOfType(DataSource.class)).isEmpty();
         assertThat(context.getBeansOfType(EntityManagerFactory.class)).isEmpty();
@@ -61,14 +57,14 @@ class ApiResponseTest {
     @DisplayName("성공 DTO의 enum은 대문자 문자열이다")
     void serializesEnumAsUppercaseString() {
         // given
-        var response = ApiResponse.of(new StatusResponse(UserStatus.ACTIVE));
+        var response = ApiResponse.of(new StatusResponse(UserStatus.APPLIED));
 
         // when
         var json = mapper.writeValueAsString(response);
 
         // then
         assertThat(new JsonContent(json)).isStrictlyEqualTo("""
-                {"data":{"status":"ACTIVE"}}
+                {"data":{"status":"APPLIED"}}
                 """);
     }
 
@@ -101,6 +97,7 @@ class ApiResponseTest {
         assertThatThrownBy(() -> new ApiResponse<>(null)).isInstanceOf(NullPointerException.class);
     }
 
+    private record OptionalResponse(String email, String optional) { }
     private record TimestampResponse(Instant createdAt) { }
     private record StatusResponse(UserStatus status) { }
 }

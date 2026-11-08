@@ -1,7 +1,6 @@
 package com.mogum.auth;
 
 import com.mogum.account.domain.UserFixtures;
-import com.mogum.account.domain.UserRole;
 import com.mogum.account.repository.FakeUserRepository;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.common.logging.RequestLogFilter;
@@ -42,7 +41,7 @@ class SessionUserFilterTest {
         // given
         var users = new FakeUserRepository();
         var user = users.save(UserFixtures.withId(
-                UserFixtures.user("google", "sub", "me@example.com", UserRole.ADMIN), 17L));
+                UserFixtures.user("google", "sub", "me@example.com"), 17L));
         var filter = filter(users);
         var request = new MockHttpServletRequest("GET", "/api/me");
         request.getSession().setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, "17");
@@ -54,7 +53,7 @@ class SessionUserFilterTest {
             var authentication = SecurityContextHolder.getContext().getAuthentication();
             assertThat(authentication.getPrincipal()).isSameAs(user);
             assertThat(authentication.isAuthenticated()).isTrue();
-            assertThat(authentication.getAuthorities()).extracting("authority").containsExactly("ROLE_ADMIN");
+            assertThat(authentication.getAuthorities()).isEmpty();
             assertThat(MDC.get(RequestLogFilter.USER_ID)).isEqualTo("17");
         });
 

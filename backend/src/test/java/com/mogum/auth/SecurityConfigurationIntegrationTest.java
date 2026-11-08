@@ -1,7 +1,6 @@
 package com.mogum.auth;
 
 import com.mogum.account.domain.UserFixtures;
-import com.mogum.account.domain.UserRole;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.support.IntegrationTest;
 import com.mogum.support.TestRequests;
@@ -88,35 +87,36 @@ class SecurityConfigurationIntegrationTest extends SecurityScenario {
         assertThat(before.get("principal_name")).isEqualTo(users.findByProviderAndSubject("google", "session-sub").orElseThrow().getId().toString());
     }
 
-    @ParameterizedTest(name = "약관 동의 {0}")
-    @ValueSource(booleans = {false, true})
-    @DisplayName("현재 회원 응답은 data 하나 안의 다섯 필드와 최신 약관 동의를 반환한다")
-    void returnsPublicFieldsWithCurrentTerms(boolean agreed) {
+    @Test
+    @DisplayName("현재 회원 응답은 이메일과 상태만 반환한다")
+    void returnsPublicFields() {
         // given
         var cookie = session();
-        if (agreed) jdbc.update("UPDATE users SET terms_agreed_at = now(), terms_version = 'v1', updated_at = now()");
         // when
         var response = client(cookie).get().uri("/api/me").exchange();
         // then
         response.expectStatus().isOk().expectBody().json("""
-                {"data":{"email":"session@example.com","status":"ACTIVE","role":"ADMIN",
-                "termsAgreed":%s,"waitlistPosition":null}}
-                """.formatted(agreed), JsonCompareMode.STRICT);
+                {"data":{"email":"session@example.com","status":"APPLIED"}}
+                """, JsonCompareMode.STRICT);
     }
 
     @ParameterizedTest(name = "변경 후 상태 {0}")
-    @ValueSource(strings = {"WAITLISTED", "ACTIVE"})
-    @DisplayName("같은 세션의 역할과 상태는 DB에서 매 요청 다시 읽는다")
-    void reloadsUserRoleAndStatus(String status) {
+    @ValueSource(strings = {"APPLIED", "APPROVED", "REJECTED"})
+    @DisplayName("같은 세션의 상태는 DB에서 매 요청 다시 읽는다")
+    void reloadsUserStatus(String status) {
         // given
         var cookie = session();
-        client(cookie).get().uri("/api/me").exchange().expectBody().jsonPath("$.data.role").isEqualTo("ADMIN");
-        jdbc.update("UPDATE users SET role = 'USER', status = ?, updated_at = now()", status);
+        client(cookie).get().uri("/api/me").exchange().expectBody().jsonPath("$.data.status").isEqualTo("APPLIED");
+        jdbc.update("""
+                UPDATE users SET status = ?,
+                    approved_at = CASE WHEN ? = 'APPROVED' THEN now() END,
+                    credit_refill_at = CASE WHEN ? = 'APPROVED' THEN now() + interval '30 days' END,
+                    updated_at = now()
+                """, status, status, status);
         // when
         var response = client(cookie).get().uri("/api/me").exchange();
         // then
-        response.expectStatus().isOk().expectBody().jsonPath("$.data.role").isEqualTo("USER")
-                .jsonPath("$.data.status").isEqualTo(status);
+        response.expectStatus().isOk().expectBody().jsonPath("$.data.status").isEqualTo(status);
     }
 
     @ParameterizedTest(name = "삭제 후 세션 {0}")
@@ -169,7 +169,7 @@ abstract class SecurityScenario {
     @Autowired JdbcIndexedSessionRepository sessions;
 
     Cookie session() {
-        var user = users.save(UserFixtures.user("google", "session-sub", "session@example.com", UserRole.ADMIN));
+        var user = users.save(UserFixtures.user("google", "session-sub", "session@example.com"));
         return new TestSessions(sessions).create(user.getId());
     }
 

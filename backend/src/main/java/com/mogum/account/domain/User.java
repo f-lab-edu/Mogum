@@ -35,28 +35,30 @@ public class User extends AuditedEntity {
     @Column(nullable = false, columnDefinition = "text")
     private String email;
 
+    @Column(nullable = false, columnDefinition = "text")
+    private String name;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, columnDefinition = "text")
     private UserStatus status;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, columnDefinition = "text")
-    private UserRole role;
+    @Column(name = "approved_at")
+    private Instant approvedAt;
 
-    @Column(name = "terms_agreed_at")
-    private Instant termsAgreedAt;
+    @Column(name = "credit_balance", nullable = false)
+    private int creditBalance;
 
-    @Column(name = "terms_version", columnDefinition = "text")
-    private String termsVersion;
+    @Column(name = "credit_refill_at")
+    private Instant creditRefillAt;
 
-    // 첫 로그인으로 가입한 회원 — ACTIVE 로 시작한다. 역할은 바깥 정보(관리자 목록)라 서비스가 정해 넘긴다
-    public static User join(String provider, String subject, String email, UserRole role) {
+    public static User apply(String provider, String subject, String email, String name, int creditBalance) {
         var user = new User();
         user.provider = provider;
         user.subject = subject;
         user.email = email;
-        user.status = UserStatus.ACTIVE;
-        user.role = role;
+        user.name = name;
+        user.status = UserStatus.APPLIED;
+        user.creditBalance = creditBalance;
         return user;
     }
 }

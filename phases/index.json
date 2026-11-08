@@ -38,7 +38,8 @@
     },
     {
       "dir": "4-account",
-      "status": "pending"
+      "status": "blocked",
+      "blocked_at": "2026-11-08T22:53:31+0900"
     }
   ]
 }

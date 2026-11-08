@@ -2,7 +2,6 @@ package com.mogum.account.repository;
 
 import com.mogum.account.domain.User;
 import com.mogum.account.domain.UserFixtures;
-import com.mogum.account.domain.UserRole;
 import com.mogum.account.domain.UserStatus;
 import com.mogum.support.RepositoryTest;
 import com.mogum.support.TestClock;
@@ -43,7 +42,7 @@ class UserRepositoryTest {
     @DisplayName("저장한 회원을 ID로 다시 읽으면 식별자와 가입 정보 및 시각이 보존된다")
     void savesAndReloadsUserById() {
         // given
-        var saved = repository.save(UserFixtures.user("google", "Subject", "repository@example.com", UserRole.ADMIN));
+        var saved = repository.save(UserFixtures.user("google", "Subject", "repository@example.com"));
 
         // when
         var actual = repository.findById(saved.getId()).orElseThrow();
@@ -55,14 +54,15 @@ class UserRepositoryTest {
         assertThat(actual.getProvider()).isEqualTo("google");
         assertThat(actual.getSubject()).isEqualTo("Subject");
         assertThat(actual.getEmail()).isEqualTo("repository@example.com");
-        assertThat(actual.getStatus()).isEqualTo(UserStatus.ACTIVE);
-        assertThat(actual.getRole()).isEqualTo(UserRole.ADMIN);
+        assertThat(actual.getStatus()).isEqualTo(UserStatus.APPLIED);
         assertThat(actual.getCreatedAt()).isEqualTo(clock.instant());
         assertThat(actual.getUpdatedAt()).isEqualTo(clock.instant());
         assertThat(jdbc.queryForMap("SELECT provider, subject FROM users WHERE id = ?", saved.getId()))
                 .containsEntry("provider", "google").containsEntry("subject", "Subject");
-        assertThat(actual.getTermsAgreedAt()).isNull();
-        assertThat(actual.getTermsVersion()).isNull();
+        assertThat(actual.getName()).isEqualTo("repository");
+        assertThat(actual.getCreditBalance()).isEqualTo(100);
+        assertThat(actual.getApprovedAt()).isNull();
+        assertThat(actual.getCreditRefillAt()).isNull();
     }
 
     @Test
@@ -97,10 +97,10 @@ class UserRepositoryTest {
     @DisplayName("이메일이 같아도 외부 계정이 다르면 별도 회원을 저장한다")
     void allowsDuplicateEmailForDifferentIdentities() {
         // given
-        var first = repository.save(UserFixtures.user("google", "first", "shared@example.com", UserRole.USER));
+        var first = repository.save(UserFixtures.user("google", "first", "shared@example.com"));
 
         // when
-        var second = repository.save(UserFixtures.user("google", "second", "shared@example.com", UserRole.USER));
+        var second = repository.save(UserFixtures.user("google", "second", "shared@example.com"));
 
         // then
         assertThat(second.getId()).isNotEqualTo(first.getId());
@@ -113,11 +113,11 @@ class UserRepositoryTest {
     void omitsSubjectFromDuplicateKeyExceptionAndLogs(CapturedOutput output) {
         // given
         String marker = "LEAKCHECK-private-subject";
-        repository.save(UserFixtures.user("google", marker, "repository@example.com", UserRole.ADMIN));
+        repository.save(UserFixtures.user("google", marker, "repository@example.com"));
 
         // when & then
         assertThatThrownBy(() -> repository.save(
-                UserFixtures.user("google", marker, "repository@example.com", UserRole.ADMIN)))
+                UserFixtures.user("google", marker, "repository@example.com")))
                 .satisfies(failure -> {
                     assertSqlState("23505", failure);
                     StringBuilder messages = new StringBuilder();
@@ -133,7 +133,7 @@ class UserRepositoryTest {
     @DisplayName("외부 식별자의 공백과 대소문자를 보정하지 않고 원문으로 조회한다")
     void findsIdentityWithoutNormalizingSubject() {
         // given
-        var saved = repository.save(UserFixtures.user("google", " Sub-Case ", "repository@example.com", UserRole.ADMIN));
+        var saved = repository.save(UserFixtures.user("google", " Sub-Case ", "repository@example.com"));
 
         // when
         var actual = repository.findByProviderAndSubject("google", " Sub-Case ");
@@ -148,7 +148,7 @@ class UserRepositoryTest {
     @DisplayName("공백을 제거하거나 소문자로 바꾼 식별자는 기존 회원과 일치하지 않는다")
     void doesNotFindNormalizedSubject(String subject) {
         // given
-        repository.save(UserFixtures.user("google", " Sub-Case ", "repository@example.com", UserRole.ADMIN));
+        repository.save(UserFixtures.user("google", " Sub-Case ", "repository@example.com"));
 
         // when
         var actual = repository.findByProviderAndSubject("google", subject);
@@ -172,11 +172,11 @@ class UserRepositoryTest {
     @DisplayName("빈 값이나 공백뿐인 제공자와 외부 식별자는 거절한다")
     void rejectsBlankIdentityParts(String provider, String subject) {
         // given
-        var existing = repository.save(UserFixtures.user("google", "Subject", "repository@example.com", UserRole.ADMIN));
+        var existing = repository.save(UserFixtures.user("google", "Subject", "repository@example.com"));
 
         // when & then
         assertThatThrownBy(() -> repository.save(
-                UserFixtures.user(provider, subject, "repository@example.com", UserRole.ADMIN)))
+                UserFixtures.user(provider, subject, "repository@example.com")))
                 .satisfies(failure -> assertSqlState("23514", failure));
         assertThat(repository.findByProviderAndSubject("google", "Subject")).get()
                 .extracting(User::getId).isEqualTo(existing.getId());
@@ -186,11 +186,11 @@ class UserRepositoryTest {
     @DisplayName("다른 제공자의 같은 식별자는 서로 다른 회원이며 각각 조회된다")
     void distinguishesProvidersWithSameSubject() {
         // given
-        var first = repository.save(UserFixtures.user("google", "shared", "repository@example.com", UserRole.USER));
+        var first = repository.save(UserFixtures.user("google", "shared", "repository@example.com"));
         assertThat(repository.findByProviderAndSubject("other-provider", "shared")).isEmpty();
 
         // when
-        var second = repository.save(UserFixtures.user("other-provider", "shared", "repository@example.com", UserRole.USER));
+        var second = repository.save(UserFixtures.user("other-provider", "shared", "repository@example.com"));
 
         // then
         assertThat(second.getId()).isNotEqualTo(first.getId());
@@ -201,11 +201,11 @@ class UserRepositoryTest {
     }
 
     @ParameterizedTest(name = "컬럼 {0}")
-    @ValueSource(strings = {"status", "role"})
-    @DisplayName("허용하지 않은 상태와 역할 갱신은 거절하고 기존 회원을 보존한다")
-    void rejectsUnknownStatusAndRole(String column) {
+    @ValueSource(strings = {"status"})
+    @DisplayName("허용하지 않은 상태 갱신은 거절하고 기존 회원을 보존한다")
+    void rejectsUnknownStatus(String column) {
         // given
-        var saved = repository.save(UserFixtures.user("google", "Subject", "repository@example.com", UserRole.ADMIN));
+        var saved = repository.save(UserFixtures.user("google", "Subject", "repository@example.com"));
 
         // when & then
         assertThatThrownBy(() -> jdbc.update("UPDATE users SET " + column
@@ -215,11 +215,11 @@ class UserRepositoryTest {
     }
 
     @ParameterizedTest(name = "필수 컬럼 {0}")
-    @ValueSource(strings = {"provider", "subject", "email", "status", "role", "created_at", "updated_at"})
+    @ValueSource(strings = {"provider", "subject", "email", "name", "status", "credit_balance", "created_at", "updated_at"})
     @DisplayName("회원 필수 컬럼은 NULL을 거절하고 기존 회원을 보존한다")
     void rejectsNullRequiredColumn(String column) {
         // given
-        var saved = repository.save(UserFixtures.user("google", "Subject", "repository@example.com", UserRole.ADMIN));
+        var saved = repository.save(UserFixtures.user("google", "Subject", "repository@example.com"));
         String audit = column.equals("updated_at") ? "" : ", updated_at = ?";
         Object[] parameters = column.equals("updated_at") ? new Object[]{saved.getId()}
                 : new Object[]{Timestamp.from(clock.instant()), saved.getId()};
@@ -268,12 +268,45 @@ class UserRepositoryTest {
         assertThat(email).isEqualTo("auto-flush@example.com");
     }
 
+    @ParameterizedTest(name = "위반 갱신 {0}")
+    @CsvSource(value = {
+            "credit_balance = -1|users_credit_balance_check",
+            "status = 'APPROVED', approved_at = now()|users_credit_refill_at_check",
+            "credit_refill_at = now()|users_credit_refill_at_check",
+            "status = 'APPROVED', credit_refill_at = now()|users_approved_at_check",
+            "approved_at = now()|users_approved_at_check"
+    }, delimiter = '|')
+    @DisplayName("음수 크레딧과 승인 상태에 맞지 않는 시각은 DB가 거절한다")
+    void rejectsInvalidCreditsAndApprovalTimes(String assignment, String constraint) {
+        // given
+        var saved = repository.save(UserFixtures.user("repository@example.com"));
+
+        // when & then
+        assertThatThrownBy(() -> jdbc.update("UPDATE users SET " + assignment
+                + ", updated_at = now() WHERE id = ?", saved.getId()))
+                .hasMessageContaining(constraint).satisfies(failure -> assertSqlState("23514", failure));
+        assertUnchanged(saved);
+    }
+
+    @ParameterizedTest(name = "공백 칸 {0}")
+    @ValueSource(strings = {"email", "name"})
+    @DisplayName("구글 이메일과 이름도 공백뿐인 값은 DB가 거절한다")
+    void rejectsBlankAccountText(String column) {
+        // given
+        var saved = repository.save(UserFixtures.user("repository@example.com"));
+
+        // when & then
+        assertThatThrownBy(() -> jdbc.update("UPDATE users SET " + column
+                + " = '  ', updated_at = now() WHERE id = ?", saved.getId()))
+                .hasMessageContaining("users_" + column + "_not_blank");
+        assertUnchanged(saved);
+    }
+
     private void assertUnchanged(User saved) {
         var actual = repository.findById(saved.getId()).orElseThrow();
         assertThat(actual.getId()).isEqualTo(saved.getId());
         assertThat(actual.getEmail()).isEqualTo(saved.getEmail());
         assertThat(actual.getStatus()).isEqualTo(saved.getStatus());
-        assertThat(actual.getRole()).isEqualTo(saved.getRole());
         assertThat(actual.getCreatedAt()).isEqualTo(saved.getCreatedAt());
     }
 

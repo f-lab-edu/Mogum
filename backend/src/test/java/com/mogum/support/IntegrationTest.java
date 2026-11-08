@@ -19,7 +19,6 @@ import java.lang.annotation.Target;
 @Inherited
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "app.web.origin=https://mogum.example",
-        "app.auth.admin-emails=admin@example.com,changed@example.com",
         "app.web.cookie-domain=mogum.example",
         // 단일 스레드를 재사용해 모든 HTTP 로그 검사에서 MDC 잔류를 관찰한다.
         "server.tomcat.threads.max=1", "server.tomcat.threads.min-spare=1"

@@ -9,7 +9,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.session.FindByIndexNameSessionRepository;
@@ -42,7 +41,7 @@ public final class SessionUserFilter extends OncePerRequestFilter {
             }
             var context = SecurityContextHolder.createEmptyContext();
             context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(user, null,
-                    List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))));
+                    List.of()));
             SecurityContextHolder.setContext(context);
             MDC.put(RequestLogFilter.USER_ID, user.getId().toString());
         }
