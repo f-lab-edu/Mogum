@@ -38,7 +38,7 @@
 │   │   ├── db/migration/            # Flyway 버전드 SQL(세션 테이블 포함)
 │   │   ├── prompts/v6/              # 운영 프롬프트 — 개발하며 새로 만든다. 명세는 03 §2~§6. 바꾸면 v7 로(금지 목록 18)
 │   │   └── (static/ 없음)           # 화면은 Vercel 에 따로 배포한다
-│   └── src/test/java/…              # 구현과 같은 패키지에 짝 테스트 · ArchUnit(+ archfixture 위반 픽스처) · Testcontainers · 장애 주입 · LLM 스텁
+│   └── src/test/java/…              # 구현과 같은 패키지에 짝 테스트 · support(묶음 어노테이션 · 정리기 · 테스트 시계 · 요청 도우미) · ArchUnit(+ archfixture 위반 픽스처) · Testcontainers · 장애 주입 · LLM 스텁
 ├── compose.yaml                     # 로컬 Postgres(pgvector) + 서버 컨테이너 — 저장소 루트에서. 포트는 127.0.0.1 에만 연다
 ├── .env.example                     # 로컬 백엔드 환경 변수 견본 — .env 는 커밋하지 않는다
 ├── deploy/                          # 운영 EC2 배포

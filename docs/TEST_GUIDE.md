@@ -64,7 +64,7 @@ void returnsExistingUserIdOnRelogin() {
 ## 5. DB 격리 · 컨텍스트
 
 - **테스트는 트랜잭션을 걸지 않는다** — 테스트 롤백(`@Transactional` 테스트 · `@DataJpaTest` 기본값)을 쓰지 않는다. 테스트 전체가 트랜잭션 하나면 지연 로딩이 늘 성공하고(금지 4 · 31), `findById` 가 1차 캐시를 돌려주며, flush 시점 제약 위반이 숨고, 다른 스레드가 데이터를 보지 못한다.
-- **테스트마다 `DatabaseCleaner` 가 `flyway_schema_history` 를 뺀 모든 테이블을 비운다.** UUID 로 행을 가르거나 자식부터 지우는 `@AfterEach` 를 쓰지 않는다 — 고정 값으로 테스트 데이터를 쓴다. DB 를 공유하므로 테스트 클래스를 병렬로 돌리지 않는다.
+- **테스트마다 `DatabaseCleaner` 가 `flyway_schema_history` 를 뺀 모든 테이블을 비운다.** UUID 로 행을 가르거나 자식부터 지우는 `@AfterEach` 를 쓰지 않는다 — 고정 값으로 테스트 데이터를 쓴다. DB 를 공유하므로 테스트 클래스를 병렬로 돌리지 않는다. 2026-11-08 현재 7개 앱 테이블에 각 1행을 넣고 PostgreSQL 17 공유 JDBC 연결에서 방식별 30회 예열 후 200회를 교대로 측정한 결과(카탈로그 조회 · 정리 · 커밋 포함, 데이터 준비 제외), 테스트당 `DELETE` 2.660ms · `TRUNCATE CASCADE` 2.525ms여서 `TRUNCATE CASCADE`를 선택했다.
 - **`@RepositoryTest`** — `@DataJpaTest` · 테스트 DB 교체 끔 · 테스트 트랜잭션 끔 · `TestClock` · Auditing 설정 · 정리기를 묶은 테스트 전용 어노테이션.
 - **`@IntegrationTest`** — `@SpringBootTest(webEnvironment = RANDOM_PORT)` · 공유 컨테이너 · `TestClock` · 공용 테스트 설정 · 정리기를 묶은 테스트 전용 어노테이션.
 - **컨텍스트를 나누지 않는다** — 클래스마다 `@Import` · `properties` · `@MockitoBean` · `@MockitoSpyBean` 을 더하면 Spring 이 컨텍스트를 새로 띄운다. 그래서 더하지 않는다.
