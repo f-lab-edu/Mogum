@@ -53,7 +53,10 @@
     {
       "step": 6,
       "name": "test-rules",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-08T21:22:22+0900",
+      "summary": "LoginIdentityMigrationTest(컨테이너 단독·독립 스키마·이전/실제 세션/재로그인/롤백 12개)와 AppImageTest(헬스·비루트 PID 1·SIGTERM 3개)로 이관; Gradle test 제외/imageTest 포함을 com/mogum/AppImageTest.class로 함께 한정; ArchitectureTest에 ONLY_INCLUDE_TESTS와 archfixture 제외로 JUnit Assertions 금지·픽스처/Fake 밖 ReflectionTestUtils/setAccessible 금지·IT 이름 금지 규칙 및 archfixture/testrules의 JUnitAssertionsUsage·ReflectionUtilsUsage·AccessibleObjectUsage·LegacyIT 위반 검사 추가(기존 제품 규칙 유지); PostgreSQL 지원의 미사용 상속/@ServiceConnection 경로 제거, POSTGRES/initializer와 사용 중인 TestSessions 유지; TEST_GUIDE 머리말·ADR-079 트레이드오프 끝·07 §1.2 계정 문단·02 §6.1 테스트명 사실 갱신(규칙/지난 기록 유지, 07 §1.0·AGENTS imageTest 설명에는 이름/패턴이 없어 변경 불필요); 지정 선별 AC 45개 및 전체 build 709개 통과(서버 기본 테스트 695→709, 실패·오류·건너뜀 0), 기본 test의 이미지/위반 픽스처 제외 확인, imageTest 실행·제품 코드 수정·커밋 없음",
+      "completed_at": "2026-11-08T21:30:06+0900"
     }
   ],
   "created_at": "2026-11-08T17:46:46+0900"
