@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "operator-sql",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-09T02:25:23+0900",
+      "summary": "deploy/sql/list-applications.sql·approve-account.sql·reject-account.sql·reopen-application.sql·delete-account.sql 다섯 파일 구현, psql -v user_id=123와 :'user_id'::bigint로 한 사람 지정; OperatorSqlIntegrationTest가 파일을 그대로 읽어 실제 Testcontainers Postgres의 psql로 실행하고 상태 조건 불일치 0행·updated_at·크레딧 보존·다른 사람 보존·credit_entries→주인 색인 세션(속성 FK CASCADE)→users 삭제 및 마지막 쓰기 실패 시 전체 롤백 검증, 승인 파일의 now()만 고정 시각으로 치환하여 서울 03:59/04:00 경계 양쪽 검증; 승인 식: (((now() AT TIME ZONE 'Asia/Seoul' - interval '4 hours')::date + 30 + time '04:00') AT TIME ZONE 'Asia/Seoul') ; V9 식: (((now() AT TIME ZONE 'Asia/Seoul' - interval '4 hours')::date + 30 + time '04:00') AT TIME ZONE 'Asia/Seoul') (문자열까지 동일); deploy/README.md 「운영자 SQL」에 root 전환 분리·컨테이너 psql·다섯 실행 명령·행 수·정원 확인 절차 추가, docs/01 §10 완료 링크; 허용 목록 환경 변수를 deploy/compose.yaml·deploy/mogum.env.example·.env.example·deploy/README.md·DeployFilesTest.java·AGENTS.md bootRun 설명에서 제거하고 docs/TEST_GUIDE.md 공용 값 갱신; 기존 inputs.dir('../deploy') 유지, 동일 AC UP-TO-DATE 확인 후 SQL 파일만 변경해 --info의 해당 파일 입력 변경 사유와 테스트 재실행 확인; TDD 최초 파일 부재·배포 env 불일치 실패 확인 후 구현, 최종 지정 선별 AC 207개 및 전체 build 811개 통과(서버 기본 테스트 794→811, 실패·오류·건너뜀 0), 아키텍처 체크리스트 확인, 커밋 없음",
+      "completed_at": "2026-11-09T02:32:41+0900"
     },
     {
       "step": 4,
