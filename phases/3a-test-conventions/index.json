@@ -1,0 +1,41 @@
+{
+  "project": "Mogum",
+  "phase": "3a-test-conventions",
+  "steps": [
+    {
+      "step": 0,
+      "name": "test-support",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "repositories",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "domain-service",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "web-slice",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "integration",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "unit-style",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "test-rules",
+      "status": "pending"
+    }
+  ]
+}

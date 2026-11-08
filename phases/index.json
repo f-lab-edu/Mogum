@@ -30,6 +30,10 @@
       "dir": "3-curriculum-model",
       "status": "completed",
       "completed_at": "2026-10-28T08:42:07+0900"
+    },
+    {
+      "dir": "3a-test-conventions",
+      "status": "pending"
     }
   ]
 }
