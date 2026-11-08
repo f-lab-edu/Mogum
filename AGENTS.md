@@ -103,7 +103,7 @@ AI 가 코스(강의 목록) · 강의 자료 · 플래시카드를 만들고, �
 ```
 docker compose up -d --build       # 로컬 Postgres(pgvector) + 서버 컨테이너(backend/Dockerfile · 8080) — 저장소 루트에서. 서버는 루트 .env 를 읽는다
 docker compose up -d postgres       # DB 만 — 서버를 IDE · bootRun 으로 띄울 때(8080 이 겹치지 않게 서버 컨테이너는 띄우지 않는다)
-cd backend && ./gradlew bootRun     # 개발 서버 (API + 워커) — 기동에 GOOGLE_CLIENT_ID · GOOGLE_CLIENT_SECRET 필요(없으면 기동 거부) · 로그인 허용 계정은 APP_AUTH_ADMIN_EMAILS(신청 흐름으로 바뀌기 전까지 — ADR-147)
+cd backend && ./gradlew bootRun     # 개발 서버 (API + 워커) — 기동에 GOOGLE_CLIENT_ID · GOOGLE_CLIENT_SECRET 필요(없으면 기동 거부)
 cd backend && ./gradlew test        # 백엔드 테스트 (Testcontainers — Docker 필요)
 cd backend && ./gradlew build       # 백엔드 jar 생성 — 화면은 넣지 않는다
 ./backend/gradlew -p backend test   # 저장소 루트에서 같은 일 — step 의 AC · 리뷰어는 이 형태로 쓴다(cd 불가)
