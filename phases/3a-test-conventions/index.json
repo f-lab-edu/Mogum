@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "integration",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-08T20:25:55+0900",
+      "summary": "옛 통합 테스트 7개를 DatabaseSetupIntegrationTest, SecurityConfigurationIntegrationTest, SecurityConfigurationErrorIntegrationTest, SecurityConfigurationLogoutIntegrationTest, SecurityConfigurationCrossOriginIntegrationTest, SecurityConfigurationHealthIntegrationTest, SecurityConfigurationLocalCookieIntegrationTest, OAuthLoginHandlerIntegrationTest, OAuthLoginHandlerFailureIntegrationTest, OAuthLoginHandlerPkceIntegrationTest, RequestValidationIntegrationTest, RequestLogFilterIntegrationTest로 분리·이관하고 SecurityConfigurationCookieTest(ApplicationContextRunner)를 추가; 실제 포트 RestTestClient·공용 TestRequests/TestClock/DatabaseCleaner 사용, 클래스별 Import/properties/스파이/DB 정리/UUID 행 구분/MockMvc 제거; 출처 https://mogum.example·관리자 admin@example.com,changed@example.com·쿠키 도메인 mogum.example·Tomcat 최대/최소 스레드 1을 공용 값으로 설정; 로컬 XSRF 쿠키 발급/만료의 Domain 생략은 실제 보안 필터 응답이 필요하여 이유를 주석으로 적은 LocalCookieIntegrationTest 묶음 하나만 도메인을 비움, 통합 컨텍스트 총 2개(레포지토리 슬라이스 제외); 테스트 전용 컨트롤러/필터/Google 가짜 서버/DB 연결 실패 대역은 IntegrationTestConfiguration의 중첩 static 클래스로 이동; MeController/ApiErrorController 스파이는 인증·오류 최종 응답과 ERROR 관찰 헤더로, DataSource 스파이는 공용 DatabaseProbe의 연결 실패 주입/접근 횟수로 대체; 기존 보안·OAuth PKCE/S256·검증·로그/MDC·Flyway/pgvector/컨테이너 공유·종료 후 생존 검증 사실 삭제 없음, 테스트 컴포넌트의 격리 관찰은 공용 앱 등록/레포지토리 슬라이스 제외 확인으로 전환; 리뷰에서 지적한 ERROR 디스패치 실행 중 MDC 요청 ID 검증은 probe의 X-Test-Dispatch-Request-Id 헤더와 응답 X-Request-Id 일치 단언으로 복원하여 RequestLogFilterIntegrationTest와 SecurityConfigurationErrorIntegrationTest에서 확인(운영 로그 줄 추가 없음), OutputCaptureExtension 유지; TEST_GUIDE·ADR-079 구현 상태만 갱신(규칙 문장 변경 없음); ./backend/gradlew -p backend test --tests '*IntegrationTest' --rerun 성공(16개 스위트 154개), ./backend/gradlew -p backend build --rerun-tasks 성공(7개 작업 모두 새 실행), 서버 기본 테스트 600개 → 639개(실패·오류·건너뜀 0), 제품 코드·빌드 의존성·병렬 설정 변경 및 커밋 없음",
+      "completed_at": "2026-11-08T21:07:18+0900"
     },
     {
       "step": 5,
