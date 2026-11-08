@@ -1,0 +1,376 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_dashboard" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={"darkMode":"class","theme":{"extend":{"colors":{"surface-tint":"#6833ea","on-error":"#ffffff","mug-dark":"#4C2882","primary-fixed-dim":"#cdbdff","tertiary":"#824d00","primary-fixed":"#e8deff","on-primary":"#ffffff","on-tertiary-container":"#fff7f2","border-card":"#EAE3FC","text-muted":"#756D82","primary-light":"#8C6BF7","surface-container-high":"#f2e3fa","outline-variant":"#cac3d8","primary-shade":"#5835C4","on-surface-variant":"#494455","surface-bright":"#fff7fe","text-main":"#261E35","secondary-fixed":"#e9ddff","surface-container":"#f8e9ff","secondary":"#6b46c1","primary-container":"#7c4dff","primary":"#632ce5","on-secondary-fixed":"#23005c","on-tertiary-fixed":"#2c1700","error":"#ba1a1a","inverse-primary":"#cdbdff","lavender-soft":"#D6C7FF","on-surface":"#201828","surface-dim":"#e4d5eb","on-primary-fixed":"#20005f","on-error-container":"#93000a","lavender-subtle":"#F1ECFE","surface-cream":"#FAF8FF","surface-container-lowest":"#ffffff","on-secondary-container":"#39008c","surface-card":"#FFFFFF","lavender-tint":"#FAF8FF","surface":"#fff7fe","on-primary-container":"#fcf6ff","tertiary-fixed-dim":"#ffb86b","danger-coral":"#FF5964","surface-variant":"#ecddf4","on-tertiary":"#ffffff","inverse-surface":"#362d3e","surface-container-highest":"#ecddf4","secondary-container":"#a480fe","on-tertiary-fixed-variant":"#683d00","on-secondary":"#ffffff","error-container":"#ffdad6","danger-shade":"#D63031","tertiary-container":"#a46300","success-shade":"#1B998B","inverse-on-surface":"#faecff","tertiary-fixed":"#ffdcbc","on-secondary-fixed-variant":"#522aa7","streak-shade":"#D97B00","success-mint":"#2EC4B6","secondary-fixed-dim":"#d0bcff","on-background":"#201828","outline":"#7a7487","on-primary-fixed-variant":"#4f00d0","background":"#fff7fe","streak-amber":"#FF9F1C","surface-container-low":"#fbf0ff"},"borderRadius":{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},"spacing":{"margin":"1rem","space-xl":"1.75rem","space-md":"1rem","gutter":"1rem","space-sm":"0.5rem","space-xs":"0.25rem","space-lg":"1.25rem"},"fontFamily":{"headline-xl":["Plus Jakarta Sans"],"label-lg":["Plus Jakarta Sans"],"label-sm":["Plus Jakarta Sans"],"headline-sm":["Plus Jakarta Sans"],"body-sm":["Plus Jakarta Sans"],"headline-md":["Plus Jakarta Sans"],"body-lg":["Plus Jakarta Sans"],"body-md":["Plus Jakarta Sans"],"code-md":["JetBrains Mono"],"headline-lg":["Plus Jakarta Sans"],"label-md":["Plus Jakarta Sans"]},"fontSize":{"headline-xl":["30px",{"lineHeight":"38px","fontWeight":"800"}],"label-lg":["15px",{"lineHeight":"20px","fontWeight":"700"}],"label-sm":["11px",{"lineHeight":"14px","fontWeight":"700"}],"headline-sm":["18px",{"lineHeight":"24px","fontWeight":"700"}],"body-sm":["13px",{"lineHeight":"18px","fontWeight":"400"}],"headline-md":["20px",{"lineHeight":"28px","fontWeight":"700"}],"body-lg":["16px",{"lineHeight":"24px","fontWeight":"600"}],"body-md":["15px",{"lineHeight":"22px","fontWeight":"400"}],"code-md":["13px",{"lineHeight":"20px","fontWeight":"500"}],"headline-lg":["24px",{"lineHeight":"32px","fontWeight":"800"}],"label-md":["13px",{"lineHeight":"18px","fontWeight":"700"}]}}}};</script></head><body class="bg-surface font-body-md text-on-surface antialiased"><aside class="hidden lg:flex fixed left-0 top-0 h-full w-64 bg-surface-card border-r-2 border-border-card z-50 flex-col py-space-lg px-space-md"><div class="flex items-center gap-2.5 px-space-sm mb-space-xl"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdvSS_FO1TXvJpvzs159-lCy9n1HjqorYU6_8jod6N5PEn5SdGX6S5Msw2HT6Dj0WIsz-7r1_rvbz4UPV6ArPIPESQL1524Bvp9pU0B3SNwE4jLLV0F5-m8BLVGXJ9K08nXQXMj5EDbGKR6WbbGfxOuXL1mqBFeY_ySKykj9ou2Ick8HCScj8nyrxav7GqKPnM4OG9Mjs1J5yDe06oBctord8Ck06-xsFeTtNug-YlqB77emdC7Y7VhA" alt="Mogum Mascot" class="w-9 h-9 object-contain"><span class="text-xl font-bold tracking-tight text-[#1e1b2e] font-display">Mogum</span><span class="text-xs px-2 py-0.5 rounded-full font-semibold bg-[#ede7f6] text-[#7c4dff]">머금</span></div><nav class="flex-1 flex flex-col gap-space-xs" data-active-classes="bg-lavender-subtle text-primary border-2 border-primary-light"><a aria-current="page" class="flex items-center gap-space-md px-space-md py-space-sm rounded-xl font-label-lg transition-all bg-lavender-subtle text-primary border-2 border-primary-light" data-path="home" href="#"><span class="material-symbols-outlined text-[24px]">home</span><span class="">홈</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-xl text-on-surface-variant font-label-lg text-label-lg transition-all hover:bg-surface-container-low hover:text-on-surface" data-path="courses" href="#"><span class="material-symbols-outlined text-[24px]">school</span><span class="">코스</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-xl text-on-surface-variant font-label-lg text-label-lg transition-all hover:bg-surface-container-low hover:text-on-surface" data-path="roadmap" href="#"><span class="material-symbols-outlined text-[24px]">alt_route</span><span class="">로드맵</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-xl text-on-surface-variant font-label-lg text-label-lg transition-all hover:bg-surface-container-low hover:text-on-surface" data-path="review" href="#"><span class="material-symbols-outlined text-[24px]">style</span><span class="">복습</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-xl text-on-surface-variant font-label-lg text-label-lg transition-all hover:bg-surface-container-low hover:text-on-surface" data-path="profile" href="#"><span class="material-symbols-outlined text-[24px]">account_circle</span><span class="">내 정보</span></a></nav></aside><header class="fixed top-0 left-0 right-0 lg:left-64 h-16 bg-surface/90 backdrop-blur-xl border-b border-border-card z-40 flex items-center justify-between px-space-md lg:px-space-xl"><div class="flex lg:hidden items-center gap-2.5"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdvSS_FO1TXvJpvzs159-lCy9n1HjqorYU6_8jod6N5PEn5SdGX6S5Msw2HT6Dj0WIsz-7r1_rvbz4UPV6ArPIPESQL1524Bvp9pU0B3SNwE4jLLV0F5-m8BLVGXJ9K08nXQXMj5EDbGKR6WbbGfxOuXL1mqBFeY_ySKykj9ou2Ick8HCScj8nyrxav7GqKPnM4OG9Mjs1J5yDe06oBctord8Ck06-xsFeTtNug-YlqB77emdC7Y7VhA" alt="Mogum Mascot" class="w-9 h-9 object-contain"><span class="text-xl font-bold tracking-tight text-[#1e1b2e] font-display">Mogum</span><span class="text-xs px-2 py-0.5 rounded-full font-semibold bg-[#ede7f6] text-[#7c4dff]">머금</span></div><div class="hidden lg:block"></div><div class="flex items-center gap-space-sm bg-[#FFF6E9] border border-streak-amber rounded-full px-space-md py-space-xs shadow-[0_2px_0_0_#D97B00]"><span class="material-symbols-outlined text-streak-amber text-[20px]">local_fire_department</span><span class="font-label-md text-label-md text-streak-shade">5일 연속 학습 중</span></div></header><div class="lg:pl-64"><main class="w-full pt-16 pb-24 lg:pb-space-xl min-h-screen bg-surface px-space-md lg:px-space-xl"><div class="flex flex-col w-full">
+<div class="w-full max-w-3xl mx-auto flex flex-col gap-space-lg pb-12">
+<!-- Top Action / Navigation Breadcrumb -->
+<div class="flex items-center justify-between">
+<a class="inline-flex items-center gap-space-xs px-space-md py-2 rounded-xl bg-surface-card text-mug-dark font-label-md text-label-md shadow-sm hover:bg-lavender-subtle transition-all active:translate-y-0.5" data-path="courses" href="#">
+<span class="material-symbols-outlined text-[18px]">arrow_back</span>
+<span class="">뒤로 가기</span>
+</a>
+<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-lavender-subtle text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[15px]" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<span class="">AI 생성 마법사</span>
+</div>
+</div>
+<!-- Header Section with Mascot Preview -->
+<div class="relative overflow-hidden bg-gradient-to-br from-surface-card via-lavender-tint to-surface-container-high rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6">
+<div class="flex flex-col text-center sm:text-left z-10 max-w-md">
+<div class="inline-flex items-center gap-2 self-center sm:self-start bg-primary-fixed text-primary px-3 py-1 rounded-full font-label-sm text-label-sm mb-2">
+<span class="">맞춤형 커리큘럼</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-mug-dark tracking-tight">새로 배우기</h1>
+<p class="font-body-md text-body-md text-text-muted mt-2 leading-relaxed">
+          배우고 싶은 주제를 적으면 머금이와 AI가 이해도와 목적에 딱 맞춘 인터랙티브 코스를 즉시 설계해 드려요.
+        </p>
+</div>
+<div class="relative flex-shrink-0 w-28 h-28 sm:w-32 sm:h-32">
+<div class="absolute inset-0 bg-secondary-container/20 rounded-full blur-xl transform scale-95"></div>
+<img class="w-full h-full object-contain relative z-10 drop-shadow-md" data-alt="Cute 3D marshmallow character with cheerful expression sitting inside a glossy purple teacup with letter m engraved, holding an open purple book enthusiastically, warm joyful lighting, smooth Pixar render style, lavender and pastel purple palette, clean white background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2VcRewifr87nVso3g3UkSU8973lNRsL_7YKuKwb7vNdnu8orrMjms8k3497Mq_R62HiXU9lA9y7NYivSb2exKdlAUp2sXfDxNuFxhkxKu0kriiSixsF3tY5p3Vn7Z5tTJ51aqUDGH-0SOgESWWpZgWq9ahJR5CsDkIzACLeolFjOGP7WxpG8fpeYRNEt-Q7p0P7-5zFzDQiH9AjMFPof4BnkGRbi_jVsRb1cTDJzK">
+</div>
+</div>
+<!-- Main Creation Form Card -->
+<form class="bg-surface-card rounded-3xl p-6 sm:p-10 shadow-sm flex flex-col gap-8" id="courseCreateForm" onsubmit="event.preventDefault(); handleSubmit();">
+<!-- Section 1: 주제 (Topic) -->
+<section class="flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<label class="font-headline-sm text-headline-sm text-text-main flex items-center gap-1.5" for="topicInput">
+<span class="">어떤 주제를 배우고 싶으신가요?</span>
+<span class="text-danger-coral font-label-lg text-label-lg">*</span>
+</label>
+<span class="font-label-sm text-label-sm text-text-muted">필수 항목</span>
+</div>
+<p class="font-body-sm text-body-sm text-text-muted">
+          프로그래밍, 디자인, 업무 스킬, 어학 등 지금 머릿속에 떠오른 주제를 자유롭게 적어주세요.
+        </p>
+<div class="relative mt-1">
+<input class="w-full h-[52px] px-4 rounded-2xl bg-surface-cream text-text-main font-body-md text-body-md placeholder:text-outline-variant focus:outline-none focus:bg-surface-card focus:shadow-[0_0_0_2px_#7c4dff] transition-all" id="topicInput" placeholder="예: Docker 컨테이너 기초, Next.js 15 App Router, SQL 쿼리 최적화" required="" type="text">
+<div class="absolute right-4 top-1/2 -translate-y-1/2 text-primary opacity-60 pointer-events-none">
+<span class="material-symbols-outlined text-[20px]">search_spark</span>
+</div>
+</div>
+<!-- Quick Keyword Chips -->
+<div class="flex flex-wrap items-center gap-2 pt-1">
+<span class="font-label-sm text-label-sm text-text-muted flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">bolt</span>추천 키워드:
+          </span>
+<button class="px-3 py-1.5 rounded-full bg-lavender-subtle hover:bg-lavender-soft text-primary font-label-sm text-label-sm transition-all active:scale-95" onclick="setTopic('TypeScript 제네릭')" type="button">
+            # TypeScript 제네릭
+          </button>
+<button class="px-3 py-1.5 rounded-full bg-lavender-subtle hover:bg-lavender-soft text-primary font-label-sm text-label-sm transition-all active:scale-95" onclick="setTopic('Figma 오토레이아웃')" type="button">
+            # Figma 오토레이아웃
+          </button>
+<button class="px-3 py-1.5 rounded-full bg-lavender-subtle hover:bg-lavender-soft text-primary font-label-sm text-label-sm transition-all active:scale-95" onclick="setTopic('Python 데이터 분석')" type="button">
+            # Python 데이터 분석
+          </button>
+<button class="px-3 py-1.5 rounded-full bg-lavender-subtle hover:bg-lavender-soft text-primary font-label-sm text-label-sm transition-all active:scale-95" onclick="setTopic('비즈니스 영어 이메일')" type="button">
+            # 비즈니스 영어 이메일
+          </button>
+</div>
+</section>
+<!-- Section 2: 지금 수준 (Current Level) -->
+<section class="flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<label class="font-headline-sm text-headline-sm text-text-main flex items-center gap-1.5">
+<span class="">현재 이 주제에 대한 나의 이해도는 어느 정도인가요?</span>
+<span class="text-danger-coral font-label-lg text-label-lg">*</span>
+</label>
+<span class="font-label-sm text-label-sm text-text-muted">필수 항목</span>
+</div>
+<p class="font-body-sm text-body-sm text-text-muted">
+          선택하신 수준에 맞춰 난이도, 어휘 난이도 및 퀴즈 출제 깊이가 정밀하게 조정됩니다.
+        </p>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1" id="levelContainer">
+<!-- Option 1: 입문 -->
+<label class="level-card relative flex flex-col p-4 rounded-2xl bg-surface-cream cursor-pointer transition-all hover:bg-lavender-subtle/50 active:scale-[0.99] select-none">
+<input class="sr-only" name="level" onchange="handleLevelChange(this)" type="radio" value="beginner">
+<div class="flex items-center justify-between mb-2">
+<span class="font-headline-sm text-headline-sm text-text-main flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-success-mint"></span>
+                입문
+              </span>
+<span class="material-symbols-outlined check-icon text-outline-variant text-[20px]">radio_button_unchecked</span>
+</div>
+<span class="font-label-sm text-label-sm text-primary mb-1">완전 처음 접해요</span>
+<p class="font-body-sm text-body-sm text-text-muted">용어부터 친절한 설명과 쉬운 실생활 비유가 필요해요</p>
+</label>
+<!-- Option 2: 초급 (Selected default) -->
+<label class="level-card relative flex flex-col p-4 rounded-2xl bg-lavender-subtle ring-2 ring-primary cursor-pointer transition-all active:scale-[0.99] select-none">
+<input checked="" class="sr-only" name="level" onchange="handleLevelChange(this)" type="radio" value="elementary">
+<div class="flex items-center justify-between mb-2">
+<span class="font-headline-sm text-headline-sm text-text-main flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-streak-amber"></span>
+                초급
+              </span>
+<span class="material-symbols-outlined check-icon text-primary text-[20px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<span class="font-label-sm text-label-sm text-primary mb-1">기초 지식은 있어요</span>
+<p class="font-body-sm text-body-sm text-text-muted">문법이나 기본 개념은 알지만 실무 적용이 어려워요</p>
+</label>
+<!-- Option 3: 중급 이상 -->
+<label class="level-card relative flex flex-col p-4 rounded-2xl bg-surface-cream cursor-pointer transition-all hover:bg-lavender-subtle/50 active:scale-[0.99] select-none">
+<input class="sr-only" name="level" onchange="handleLevelChange(this)" type="radio" value="intermediate">
+<div class="flex items-center justify-between mb-2">
+<span class="font-headline-sm text-headline-sm text-text-main flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-primary-container"></span>
+                중급 이상
+              </span>
+<span class="material-symbols-outlined check-icon text-outline-variant text-[20px]">radio_button_unchecked</span>
+</div>
+<span class="font-label-sm text-label-sm text-primary mb-1">심화 개념이 필요해요</span>
+<p class="font-body-sm text-body-sm text-text-muted">기본 활용은 능숙하며 실무 패턴과 최적화를 원해요</p>
+</label>
+</div>
+<!-- Custom Level Input Expansion (Optional) -->
+<div class="hidden mt-2" id="customLevelWrap">
+<input class="w-full h-11 px-4 rounded-xl bg-surface-cream text-text-main font-body-sm text-body-sm placeholder:text-outline-variant focus:outline-none focus:bg-surface-card focus:shadow-[0_0_0_2px_#7c4dff]" id="customLevelInput" placeholder="직접 입력: 본인의 현재 수준 상태를 간단히 적어주세요" type="text">
+</div>
+<div class="flex justify-end">
+<button class="font-label-sm text-label-sm text-text-muted hover:text-primary transition-colors flex items-center gap-1" onclick="toggleCustomLevel()" type="button">
+<span class="material-symbols-outlined text-[14px]">edit_note</span>
+<span id="customLevelToggleLabel" class="">직접 입력하기</span>
+</button>
+</div>
+</section>
+<!-- Section 3: 학습 목적 (Goal / Purpose) -->
+<section class="flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<label class="font-headline-sm text-headline-sm text-text-main flex items-center gap-1.5">
+<span class="">학습을 통해 달성하고 싶은 목표는 무엇인가요?</span>
+<span class="text-danger-coral font-label-lg text-label-lg">*</span>
+</label>
+<span class="font-label-sm text-label-sm text-text-muted">필수 항목</span>
+</div>
+<p class="font-body-sm text-body-sm text-text-muted">
+          목표에 어울리는 실습형 예제와 핵심 성취 기준을 AI가 설정합니다.
+        </p>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1" id="goalContainer">
+<!-- Goal 1 (Default Selected) -->
+<label class="goal-chip flex items-center justify-between p-3.5 rounded-2xl bg-lavender-subtle ring-2 ring-primary cursor-pointer transition-all active:scale-[0.99]">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-[22px]" style="font-variation-settings: 'FILL' 1;">terminal</span>
+<span class="font-label-md text-label-md text-mug-dark">실무 프로젝트 / 업무 적용</span>
+</div>
+<input checked="" class="sr-only" name="goal" onchange="handleGoalChange(this)" type="radio" value="project">
+<span class="material-symbols-outlined goal-check text-primary text-[20px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</label>
+<!-- Goal 2 -->
+<label class="goal-chip flex items-center justify-between p-3.5 rounded-2xl bg-surface-cream cursor-pointer transition-all hover:bg-lavender-subtle/40 active:scale-[0.99]">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline text-[22px]">badge</span>
+<span class="font-label-md text-label-md text-text-main">이직 · 기술 면접 준비</span>
+</div>
+<input class="sr-only" name="goal" onchange="handleGoalChange(this)" type="radio" value="interview">
+<span class="material-symbols-outlined goal-check text-outline-variant text-[20px]">radio_button_unchecked</span>
+</label>
+<!-- Goal 3 -->
+<label class="goal-chip flex items-center justify-between p-3.5 rounded-2xl bg-surface-cream cursor-pointer transition-all hover:bg-lavender-subtle/40 active:scale-[0.99]">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline text-[22px]">menu_book</span>
+<span class="font-label-md text-label-md text-text-main">기초 교양 및 전반적 이해</span>
+</div>
+<input class="sr-only" name="goal" onchange="handleGoalChange(this)" type="radio" value="general">
+<span class="material-symbols-outlined goal-check text-outline-variant text-[20px]">radio_button_unchecked</span>
+</label>
+<!-- Goal 4 -->
+<label class="goal-chip flex items-center justify-between p-3.5 rounded-2xl bg-surface-cream cursor-pointer transition-all hover:bg-lavender-subtle/40 active:scale-[0.99]">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline text-[22px]">verified</span>
+<span class="font-label-md text-label-md text-text-main">시험 / 자격증 대비</span>
+</div>
+<input class="sr-only" name="goal" onchange="handleGoalChange(this)" type="radio" value="cert">
+<span class="material-symbols-outlined goal-check text-outline-variant text-[20px]">radio_button_unchecked</span>
+</label>
+</div>
+<!-- Custom Goal Input -->
+<div class="mt-1">
+<input class="w-full h-11 px-4 rounded-xl bg-surface-cream text-text-main font-body-sm text-body-sm placeholder:text-outline-variant focus:outline-none focus:bg-surface-card focus:shadow-[0_0_0_2px_#7c4dff]" id="customGoalInput" onfocus="uncheckGoalRadios()" placeholder="직접 입력: 원하는 다른 목표가 있다면 적어주세요" type="text">
+</div>
+</section>
+<!-- Section 4: 메모 (Notes / Preferences) -->
+<section class="flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<label class="font-headline-sm text-headline-sm text-text-main flex items-center gap-1.5" for="memoInput">
+<span class="">추가로 참고할 사항이 있나요?</span>
+<span class="font-label-sm text-label-sm text-text-muted font-normal">(선택)</span>
+</label>
+</div>
+<p class="font-body-sm text-body-sm text-text-muted">
+          집중하고 싶은 세부 영역이나 특별히 선호하는 학습 방식이 있다면 편하게 적어주세요.
+        </p>
+<textarea class="w-full p-4 rounded-2xl bg-surface-cream text-text-main font-body-md text-body-md placeholder:text-outline-variant focus:outline-none focus:bg-surface-card focus:shadow-[0_0_0_2px_#7c4dff] transition-all resize-none" id="memoInput" placeholder="예: 실무에서 자주 겪는 트러블슈팅 사례 위주로 다뤄주세요, 코드는 간결한 예시가 좋아요." rows="3"></textarea>
+</section>
+<!-- Section 5: 로드맵으로 만들기 (Roadmap Toggle / Checkbox - ADR-074) -->
+<section class="p-5 rounded-2xl bg-lavender-subtle/70 shadow-sm flex flex-col gap-3">
+<label class="flex items-start gap-3.5 cursor-pointer select-none">
+<div class="relative flex items-center justify-center pt-0.5">
+<input class="sr-only peer" id="roadmapToggle" onchange="handleRoadmapToggle(this)" type="checkbox">
+<div class="w-6 h-6 rounded-lg bg-surface-card ring-2 ring-lavender-soft peer-checked:bg-primary-container peer-checked:ring-primary-container transition-all flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-surface-card text-[18px] opacity-0 peer-checked:opacity-100 transition-opacity font-bold">check</span>
+</div>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-mug-dark">로드맵으로 만들기</span>
+<span class="font-label-sm text-label-sm text-primary mt-0.5" id="roadmapModeBadge">단일 코스 모드 (기본)</span>
+</div>
+</label>
+<div class="pl-9.5 text-text-muted font-body-sm text-body-sm leading-relaxed">
+<div class="flex items-start gap-1.5">
+<span class="material-symbols-outlined text-streak-amber text-[18px] flex-shrink-0 mt-0.5">lightbulb</span>
+<p class="">
+<strong class="font-label-md text-label-md text-text-main">로드맵이란?</strong> 넓고 방대한 주제를 여러 단계의 순서 있는 코스들로 나누어 체계적으로 정복하는 플랜입니다. 단일 코스로 가볍게 끝내려면 체크를 해제한 상태로 유지하세요.
+            </p>
+</div>
+</div>
+</section>
+<!-- Action Button (CTA) with Tactile 3D Feedback -->
+<div class="flex flex-col gap-3 pt-2">
+<button class="w-full h-14 rounded-2xl bg-primary-container text-surface-card font-headline-sm text-headline-sm shadow-[0_4px_0_0_#5835C4] hover:bg-primary transition-all active:translate-y-[3px] active:shadow-[0_1px_0_0_#5835C4] flex items-center justify-center gap-2 group" id="submitButton" type="submit">
+<span class="">맞춤 코스 만들기</span>
+<span class="material-symbols-outlined text-[20px] transition-transform group-hover:rotate-12" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+</button>
+<p class="font-label-sm text-label-sm text-center text-text-muted">
+          만들기를 누르면 AI가 커리큘럼을 설계하는 기다리는 화면으로 이동합니다.
+        </p>
+</div>
+</form>
+</div>
+</div>
+<script>
+  function setTopic(name) {
+    const input = document.getElementById('topicInput');
+    input.value = name;
+    input.focus();
+  }
+
+  function handleLevelChange(radio) {
+    const container = document.getElementById('levelContainer');
+    const cards = container.querySelectorAll('.level-card');
+    cards.forEach(card => {
+      card.classList.remove('bg-lavender-subtle', 'ring-2', 'ring-primary');
+      card.classList.add('bg-surface-cream');
+      const icon = card.querySelector('.check-icon');
+      if (icon) {
+        icon.innerText = 'radio_button_unchecked';
+        icon.classList.remove('text-primary');
+        icon.classList.add('text-outline-variant');
+        icon.style.fontVariationSettings = "'FILL' 0";
+      }
+    });
+
+    const activeCard = radio.closest('.level-card');
+    if (activeCard) {
+      activeCard.classList.remove('bg-surface-cream');
+      activeCard.classList.add('bg-lavender-subtle', 'ring-2', 'ring-primary');
+      const icon = activeCard.querySelector('.check-icon');
+      if (icon) {
+        icon.innerText = 'check_circle';
+        icon.classList.remove('text-outline-variant');
+        icon.classList.add('text-primary');
+        icon.style.fontVariationSettings = "'FILL' 1";
+      }
+    }
+  }
+
+  function toggleCustomLevel() {
+    const wrap = document.getElementById('customLevelWrap');
+    const label = document.getElementById('customLevelToggleLabel');
+    if (wrap.classList.contains('hidden')) {
+      wrap.classList.remove('hidden');
+      document.getElementById('customLevelInput').focus();
+      label.innerText = '선택지로 돌아가기';
+    } else {
+      wrap.classList.add('hidden');
+      label.innerText = '직접 입력하기';
+    }
+  }
+
+  function handleGoalChange(radio) {
+    const container = document.getElementById('goalContainer');
+    const chips = container.querySelectorAll('.goal-chip');
+    chips.forEach(chip => {
+      chip.classList.remove('bg-lavender-subtle', 'ring-2', 'ring-primary');
+      chip.classList.add('bg-surface-cream');
+      const check = chip.querySelector('.goal-check');
+      if (check) {
+        check.innerText = 'radio_button_unchecked';
+        check.classList.remove('text-primary');
+        check.classList.add('text-outline-variant');
+        check.style.fontVariationSettings = "'FILL' 0";
+      }
+    });
+
+    const activeChip = radio.closest('.goal-chip');
+    if (activeChip) {
+      activeChip.classList.remove('bg-surface-cream');
+      activeChip.classList.add('bg-lavender-subtle', 'ring-2', 'ring-primary');
+      const check = activeChip.querySelector('.goal-check');
+      if (check) {
+        check.innerText = 'check_circle';
+        check.classList.remove('text-outline-variant');
+        check.classList.add('text-primary');
+        check.style.fontVariationSettings = "'FILL' 1";
+      }
+    }
+  }
+
+  function uncheckGoalRadios() {
+    const customInput = document.getElementById('customGoalInput');
+    if (customInput.value.length > 0) {
+      const container = document.getElementById('goalContainer');
+      const radios = container.querySelectorAll('input[type="radio"]');
+      radios.forEach(r => r.checked = false);
+      const chips = container.querySelectorAll('.goal-chip');
+      chips.forEach(chip => {
+        chip.classList.remove('bg-lavender-subtle', 'ring-2', 'ring-primary');
+        chip.classList.add('bg-surface-cream');
+        const check = chip.querySelector('.goal-check');
+        if (check) {
+          check.innerText = 'radio_button_unchecked';
+          check.classList.remove('text-primary');
+          check.classList.add('text-outline-variant');
+        }
+      });
+    }
+  }
+
+  function handleRoadmapToggle(checkbox) {
+    const badge = document.getElementById('roadmapModeBadge');
+    if (checkbox.checked) {
+      badge.textContent = '단계별 마스터 로드맵 모드 (다중 코스 생성)';
+      badge.classList.remove('text-primary');
+      badge.classList.add('text-secondary');
+    } else {
+      badge.textContent = '단일 코스 모드 (기본)';
+      badge.classList.remove('text-secondary');
+      badge.classList.add('text-primary');
+    }
+  }
+
+  function handleSubmit() {
+    const topic = document.getElementById('topicInput').value.trim();
+    if (!topic) {
+      alert('배우고 싶은 주제를 입력해 주세요!');
+      document.getElementById('topicInput').focus();
+      return;
+    }
+
+    const btn = document.getElementById('submitButton');
+    btn.disabled = true;
+    btn.innerHTML = `
+      <span class="inline-block animate-spin material-symbols-outlined text-[20px]">progress_activity</span>
+      <span>머금 AI와 코스 설계 중...</span>
+    `;
+
+    setTimeout(() => {
+      // Transition simulation to waiting/generation state
+      alert(`'${topic}' 맞춤 코스 생성을 시작합니다! 머금이가 커리큘럼을 요리하고 있어요.`);
+      btn.disabled = false;
+      btn.innerHTML = `
+        <span>맞춤 코스 만들기</span>
+        <span class="material-symbols-outlined text-[20px]">auto_awesome</span>
+      `;
+    }, 1200);
+  }
+</script></main></div><nav class="lg:hidden fixed bottom-0 left-0 right-0 h-[68px] bg-surface-card border-t-2 border-border-card z-50 grid grid-cols-5 items-center px-space-xs" data-active-classes="text-primary font-bold"><a aria-current="page" class="flex flex-col items-center justify-center gap-0.5 transition-all text-primary font-bold" data-path="home" href="#"><span class="material-symbols-outlined text-[24px]">home</span><span class="">홈</span></a><a class="flex flex-col items-center justify-center gap-0.5 text-on-surface-variant font-label-sm text-label-sm transition-all" data-path="courses" href="#"><span class="material-symbols-outlined text-[24px]">school</span><span class="">코스</span></a><a class="flex flex-col items-center justify-center gap-0.5 text-on-surface-variant font-label-sm text-label-sm transition-all" data-path="roadmap" href="#"><span class="material-symbols-outlined text-[24px]">alt_route</span><span class="">로드맵</span></a><a class="flex flex-col items-center justify-center gap-0.5 text-on-surface-variant font-label-sm text-label-sm transition-all" data-path="review" href="#"><span class="material-symbols-outlined text-[24px]">style</span><span class="">복습</span></a><a class="flex flex-col items-center justify-center gap-0.5 text-on-surface-variant font-label-sm text-label-sm transition-all" data-path="profile" href="#"><span class="material-symbols-outlined text-[24px]">account_circle</span><span class="">내 정보</span></a></nav>
+
+</body></html>

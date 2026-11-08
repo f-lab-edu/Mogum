@@ -27,7 +27,7 @@ public class LoginService {
         if (!account.emailVerified()) {
             return new LoginResult.Rejected(LoginResult.RejectionReason.EMAIL_NOT_VERIFIED);
         }
-        // ADR-062: 공개 가입 흐름을 넣을 때 이 임시 거절 분기만 제거한다.
+        // ADR-147: 신청 흐름으로 바꿀 때 이 임시 허용 목록 분기를 제거한다.
         if (!adminEmails.contains(normalizeEmail(account.email()))) {
             return new LoginResult.Rejected(LoginResult.RejectionReason.NOT_ALLOWED);
         }
