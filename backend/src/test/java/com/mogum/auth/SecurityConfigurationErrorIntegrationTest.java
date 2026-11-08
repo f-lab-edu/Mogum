@@ -21,7 +21,7 @@ class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
     @DisplayName("서블릿과 MVC와 보안과 도메인 오류는 공통 JSON을 유지한다")
     void serializesErrorsThroughRealHttp(String path, int status, String code) {
         // given
-        var cookie = session();
+        var cookie = approvedSession();
         // when
         var response = client(cookie).get().uri(path).exchange().returnResult(String.class);
         // then
@@ -33,7 +33,7 @@ class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
     @DisplayName("인증과 CSRF를 거친 잘못된 메서드는 Allow 헤더가 있는 JSON 405다")
     void returnsMethodNotAllowedAfterAuthentication() {
         // given
-        var cookie = session();
+        var cookie = approvedSession();
         var user = users.findByProviderAndSubject("google", "session-sub").orElseThrow();
         var client = requests.asUser(user.getId());
         // when
@@ -48,7 +48,7 @@ class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
     @DisplayName("도메인 오류의 재시도 초는 본문과 헤더에 함께 실린다")
     void returnsRetryDelayInBodyAndHeader() {
         // given
-        var cookie = session();
+        var cookie = approvedSession();
         // when
         var response = client(cookie).get().uri("/api/test-domain-error?retry=true").exchange();
         // then
@@ -66,7 +66,7 @@ class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
             org.springframework.boot.test.system.CapturedOutput output) throws Exception {
         // given
         int logOffset = output.getAll().length();
-        var client = authenticated ? client(session()) : requests.anonymous();
+        var client = authenticated ? client(approvedSession()) : requests.anonymous();
         // when
         var response = client.get().uri("/auth/foo").exchange().returnResult(String.class);
         // then

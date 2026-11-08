@@ -57,6 +57,8 @@ management:
         enabled: false
 
 app:
+  credit:
+    monthly-amount: 100
   web:
     origin: ${APP_WEB_ORIGIN:http://localhost:5173}
     cookie-domain: ${APP_WEB_COOKIE_DOMAIN:}

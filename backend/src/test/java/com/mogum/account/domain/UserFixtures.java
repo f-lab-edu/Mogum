@@ -15,6 +15,14 @@ public final class UserFixtures {
         return User.apply(provider, subject, email, email.split("@", 2)[0], 100);
     }
 
+    public static User approved(String email) {
+        return withStatus(user(email), UserStatus.APPROVED);
+    }
+
+    public static User approved(String provider, String subject, String email) {
+        return withStatus(user(provider, subject, email), UserStatus.APPROVED);
+    }
+
     public static User withId(User user, long id) {
         ReflectionTestUtils.setField(user, "id", id);
         return user;

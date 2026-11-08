@@ -221,6 +221,11 @@ abstract class SecurityScenario {
         return new TestSessions(sessions).create(user.getId());
     }
 
+    Cookie approvedSession() {
+        var user = users.save(UserFixtures.approved("google", "session-sub", "session@example.com"));
+        return new TestSessions(sessions).create(user.getId());
+    }
+
     RestTestClient client(Cookie cookie) {
         return requests.anonymous().mutate().defaultCookie(cookie.getName(), cookie.getValue()).build();
     }

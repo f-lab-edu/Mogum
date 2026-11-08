@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 
 public enum ErrorCode {
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다"),
+    ACCOUNT_NOT_APPROVED(HttpStatus.FORBIDDEN, "승인된 계정이 필요합니다"),
     CSRF_INVALID(HttpStatus.FORBIDDEN, "요청을 확인할 수 없습니다"),
     NOT_FOUND(HttpStatus.NOT_FOUND, "찾을 수 없습니다"),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식입니다"),

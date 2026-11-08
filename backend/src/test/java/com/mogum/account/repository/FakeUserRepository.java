@@ -12,6 +12,9 @@ public final class FakeUserRepository implements UserRepository {
     private long nextId = 1;
 
     @Override
+    public void lockIdentity(String provider, String subject) { }
+
+    @Override
     public <S extends User> S save(S entity) {
         if (entity.getId() == null) {
             while (users.containsKey(nextId)) nextId++;
