@@ -505,6 +505,20 @@
 
 **트레이드오프**: JPA 밖 갱신에서 `updated_at` 을 빠뜨리면 값이 조용히 낡는다 — 그런 갱신을 만드는 TASK 가 경로마다 테스트로 확인한다(AGENTS 금지 32). 공통 상위 클래스와 Auditing 설정이 생긴다. 한 번 쓰고 바뀌지 않는 테이블에도 `updated_at` 이 있고, `reviews` 는 `reviewed_at` 과 `created_at` 이 겹친다. ArchUnit 규칙의 위반 픽스처 `@Entity` 를 `com.mogum` 아래 두면 `@SpringBootTest` 가 엔티티로 읽어 모든 컨텍스트 테스트가 깨진다 — 스캔 밖에 둔다. 운영 DB 의 `users` 에 마이그레이션이 하나 더 나간다. `3-curriculum-model` step 0에서 `common.persistence.AuditedEntity` · `config.JpaAuditingConfiguration` · 엔티티 상속 ArchUnit 규칙과 스캔 밖 위반 픽스처 · `users`의 `V7__add_users_updated_at.sql`을 구현했다. 테스트 컨텍스트의 별도 이름 `@Primary` `Clock`으로 저장 · 수정 시각과 첫 로그인 Auditing을, 이전 DB에서 기존 행의 시각 채우기를 확인했다. `./backend/gradlew -p backend build` 전체 서버 테스트 377개 → 383개 통과(실패 · 오류 · 건너뜀 0). 2026-10-28 step 1에서 `CurriculumGroup` · `CurriculumStep` · `Curriculum` · `Lesson`에도 적용했고, 별도 이름의 `@Primary` 고정 `Clock`을 주입한 DB 테스트로 네 엔티티 저장 시 생성 · 수정 시각을 확인했다. 공통 상위 클래스 상속은 기존 ArchUnit 규칙으로 검사한다.
 
+### ADR-079: 백엔드 테스트는 계층별 슬라이스로 쓰고, 테스트 트랜잭션 없이 테스트마다 DB 를 비운다
+**결정**: 사용자 결정(2026-11-08)에 따라 — 규칙 전문은 [TEST_GUIDE](./TEST_GUIDE.md).
+- 계층마다 도구를 나눈다 — 컨트롤러 `@WebMvcTest` + `MockMvcTester`(보안 필터 끔), 서비스는 단위 테스트 + Fake 레포지토리(mock 은 시스템 경계 밖 · 호출 여부가 규칙인 곳만), 레포지토리 `@RepositoryTest`(`@DataJpaTest` 묶음), 통합 `@IntegrationTest`(실제 포트 · `RestTestClient`)는 핵심 흐름 · 보안 · 오류 처리와 DB 동작이 곧 규칙인 서비스에만.
+- 레포지토리는 Spring Data `Repository<T, ID>` 만 상속하고 쓰는 메서드만 선언한다 — Fake 가 그 메서드만 구현한다.
+- 테스트는 트랜잭션을 걸지 않는다. 테스트마다 정리기가 모든 테이블을 비운다. 컨텍스트 테스트는 옮길 수 있는 공용 `TestClock` 을 쓰고, 클래스마다 컨텍스트 설정을 더하지 않는다.
+- 이름은 `*Test` · `*IntegrationTest`(약어 `IT` 없음) · 영어 camelCase 메서드 + 한국어 `@DisplayName`. 본문은 `// given` · `// when` · `// then`, 단언은 AssertJ, 데이터는 `{엔티티}Fixtures`. `@Nested` 는 쓰지 않는다.
+- 범위는 백엔드다. 화면 테스트는 화면 작업이 늘 때 따로 정한다. 기존 테스트 이관은 `3a-test-conventions`.
+
+**이유**: 지금까지는 DB 가 필요하면 늘 앱 전체(`@SpringBootTest`)를 띄웠고, 서비스는 mock 단위 테스트(`LoginServiceTest`)와 실제 DB 테스트(`LoginServiceIT`)가 같은 시나리오를 두 번 썼다. 클래스마다 시계 · 테스트 컨트롤러 · 속성이 달라 컨텍스트가 클래스마다 새로 떴고, 격리는 UUID 와 자식부터 지우는 정리 코드에 기댔다. 계층별 슬라이스는 책임이 분명하고 실패 위치가 바로 보이며 Codex 에 넘길 규칙을 계층마다 짧게 쓸 수 있다. 다만 이 프로젝트의 위험(잠금 · 조건부 갱신 · 수령 회차)은 Fake 로 흉내 낼 수 없어 그 서비스만 통합 테스트로 둔다. 테스트 롤백은 트랜잭션 경계를 지워 금지 3 · 4 · 31 이 막으려는 오류(지연 로딩 · detached · flush 시점 제약)를 가리므로 끄고, 실제 커밋 + 비우기로 레포지토리와 통합 테스트의 격리 규칙을 하나로 둔다. 영어 메서드 이름은 SonarCloud 의 테스트 이름 지적(`S100` — PR #17 의 48건 중 42건, HARNESS-BACKLOG H19)도 없앤다.
+
+**검토한 대안**: 통합 위주(테스팅 트로피 — 지금 방식. 리팩터링에 강하지만 느리고 준비 코드가 커진다) · 서비스 mock 위주(런던파 — 호출 순서를 단언하지만 잠금 의미를 보지 못해 결국 통합 테스트를 또 쓴다) · 포트와 어댑터 + 계약 테스트(Fake 와 실제의 어긋남을 막지만 인터페이스 · 테스트 구조가 하나씩 는다) · 인수 테스트 위주(RestAssured — 요구가 드러나지만 Hamcrest 단언이 AssertJ 와 갈리고 Jackson 3 호환 확인이 필요하다) · `@DataJpaTest` 기본 롤백(가장 빠르지만 위 오류를 가리고 `flush` · `clear` 습관에 기댄다) · UUID 구분 유지(병렬 실행이 되지만 정리 코드가 테이블마다 는다) · `JpaRepository` 유지 + 추상 Fake(제품 코드를 안 바꾸지만 안 쓰던 메서드 호출이 실행 때야 터진다) · 레포지토리도 `@IntegrationTest` 컨텍스트 공유(컨텍스트가 하나로 줄지만 클래스 하나를 돌리는 TDD 반복이 웹 · 보안 · OAuth 까지 띄운다) · 테스트 데이터 빌더(값 바꾸기가 쉽지만 지금 팩토리 규모에 비해 무겁다) · `@Nested`(결과 목록이 계층으로 보이지만 given 이 본문 밖으로 숨는다).
+
+**트레이드오프**: 테스트마다 비우는 비용이 든다(측정은 `3a` step 0). DB 를 공유해 테스트 클래스를 병렬로 돌리지 못한다. Fake 는 실제 DB 와 어긋날 수 있다 — 어긋나면 안 되는 규칙은 통합 테스트로 둔 것이 그 대가다. 컨트롤러 슬라이스는 인증을 보지 않아 보안은 통합 테스트가 따로 본다. 레포지토리 5개의 상속이 바뀌고 슬라이스 테스트 의존성이 는다 — Spring Boot 4.1.1 의 `spring-boot-test-autoconfigure` jar 에는 `@DataJpaTest` · `@WebMvcTest` 가 없다. 기존 테스트 43개를 모두 옮긴다. **이관 · ArchUnit 테스트 규칙은 아직 수행하지 않았다.**
+
 ## 설계 묶음 정리 때 확정한 것 (Q220~Q231)
 
 옛 서사(v1 → v2 → v3)를 위한 장치를 걷어내며 잠정으로 정했던 것을 2026-10-07 확정했다.
