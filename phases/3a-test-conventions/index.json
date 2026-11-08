@@ -61,7 +61,10 @@
     {
       "step": 7,
       "name": "sonar-record-array",
-      "status": "pending"
+      "status": "completed",
+      "summary": "LoginIdentityMigrationTest.LegacyData의 byte[] attribute를 String attributeBase64로 교체해 record 배열 칸 제거; 이전 전 바이트를 Base64로 보관하고 디코딩한 기대값과 containsExactly로 attribute_bytes의 바이트별 보존을 검증하며 회원·세션 행 보존·실제 /api/me·재로그인·이전 거절/롤백 검증 유지; 지정 선별 AC 45개 및 전체 build 709개 통과(서버 기본 테스트 709→709, 실패·오류·건너뜀 0); 문서·제품 코드·build.gradle·Sonar 예외 변경 및 커밋 없음",
+      "started_at": "2026-11-08T21:52:12+0900",
+      "completed_at": "2026-11-08T21:55:05+0900"
     }
   ],
   "created_at": "2026-11-08T17:46:46+0900",
