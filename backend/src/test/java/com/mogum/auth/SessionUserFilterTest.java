@@ -1,27 +1,35 @@
 package com.mogum.auth;
 
-import com.mogum.account.domain.User;
+import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.domain.UserRole;
+import com.mogum.account.repository.FakeUserRepository;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.common.logging.RequestLogFilter;
-import org.slf4j.MDC;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.session.FindByIndexNameSessionRepository;
 
-import java.util.Optional;
+import java.util.Collections;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.then;
 
+@ExtendWith(MockitoExtension.class)
 class SessionUserFilterTest {
-    private final UserRepository users = mock(UserRepository.class);
-    private final SessionUserFilter filter = new SessionUserFilter(users,
-            (request, response, exception) -> response.setStatus(401));
+    @Mock private UserRepository untouchedUsers;
 
+    // 다른 테스트가 같은 스레드에 남긴 요청 상태도 제거한다.
+    @BeforeEach
     @AfterEach
     void clearContext() {
         SecurityContextHolder.clearContext();
@@ -29,57 +37,100 @@ class SessionUserFilterTest {
     }
 
     @Test
-    void ID로_조회한_회원을_요청_인증으로만_사용한다() throws Exception {
-        var user = User.join("google", "sub", "me@example.com", UserRole.ADMIN);
-        var id = User.class.getDeclaredField("id");
-        id.setAccessible(true);
-        id.set(user, 17L);
-        when(users.findById(17L)).thenReturn(Optional.of(user));
+    @DisplayName("ID로 읽은 회원은 요청 인증에만 넣고 세션에는 ID만 남긴다")
+    void authenticatesRequestWithoutAddingUserToSession() throws Exception {
+        // given
+        var users = new FakeUserRepository();
+        var user = users.save(UserFixtures.withId(
+                UserFixtures.user("google", "sub", "me@example.com", UserRole.ADMIN), 17L));
+        var filter = filter(users);
         var request = new MockHttpServletRequest("GET", "/api/me");
         request.getSession().setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, "17");
-        filter.doFilter(request, new MockHttpServletResponse(),
-                (req, res) -> {
-                    var authentication = SecurityContextHolder.getContext().getAuthentication();
-                    assertSame(user, authentication.getPrincipal());
-                    assertTrue(authentication.isAuthenticated());
-                    assertEquals("ROLE_ADMIN", authentication.getAuthorities().iterator().next().getAuthority());
-                    assertEquals("17", MDC.get(RequestLogFilter.USER_ID));
-                });
-        verify(users).findById(17L);
-        assertEquals(1, java.util.Collections.list(request.getSession().getAttributeNames()).size());
-        assertEquals("17", MDC.get(RequestLogFilter.USER_ID)); // 정리는 바깥 요청 필터의 책임이다.
+        var chainCalled = new AtomicBoolean();
+
+        // when
+        filter.doFilter(request, new MockHttpServletResponse(), (req, res) -> {
+            chainCalled.set(true);
+            var authentication = SecurityContextHolder.getContext().getAuthentication();
+            assertThat(authentication.getPrincipal()).isSameAs(user);
+            assertThat(authentication.isAuthenticated()).isTrue();
+            assertThat(authentication.getAuthorities()).extracting("authority").containsExactly("ROLE_ADMIN");
+            assertThat(MDC.get(RequestLogFilter.USER_ID)).isEqualTo("17");
+        });
+
+        // then
+        assertThat(chainCalled).isTrue();
+        assertThat(Collections.list(request.getSession().getAttributeNames()))
+                .containsExactly(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME);
+        assertThat(request.getSession().getAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME))
+                .isEqualTo("17");
+        // MDC 정리는 바깥 요청 필터의 책임이다.
+        assertThat(MDC.get(RequestLogFilter.USER_ID)).isEqualTo("17");
     }
 
     @Test
-    void 세션이_없으면_DB_조회나_세션_생성을_하지_않는다() throws Exception {
+    @DisplayName("세션이 없으면 DB를 조회하거나 세션을 만들지 않고 다음 필터로 진행한다")
+    void skipsDatabaseAndSessionCreationWithoutSession() throws Exception {
+        // given
+        var filter = filter(untouchedUsers);
         var request = new MockHttpServletRequest("GET", "/api/me");
-        filter.doFilter(request, new MockHttpServletResponse(),
-                (req, res) -> assertNull(SecurityContextHolder.getContext().getAuthentication()));
-        verifyNoInteractions(users);
-        assertNull(request.getSession(false));
-        assertNull(MDC.get(RequestLogFilter.USER_ID));
+        var chainCalled = new AtomicBoolean();
+
+        // when
+        filter.doFilter(request, new MockHttpServletResponse(), (req, res) -> {
+            chainCalled.set(true);
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        });
+
+        // then
+        assertThat(chainCalled).isTrue();
+        then(untouchedUsers).shouldHaveNoInteractions();
+        assertThat(request.getSession(false)).isNull();
+        assertThat(MDC.get(RequestLogFilter.USER_ID)).isNull();
     }
 
     @Test
-    void 잘못된_ID_속성은_세션을_무효화한다() throws Exception {
+    @DisplayName("잘못된 ID는 DB 조회 없이 세션을 무효화하고 요청을 401로 중단한다")
+    void invalidatesMalformedSessionWithoutDatabaseAccess() throws Exception {
+        // given
+        var filter = filter(untouchedUsers);
         var request = new MockHttpServletRequest("GET", "/api/me");
         request.getSession().setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, "invalid");
         var response = new MockHttpServletResponse();
-        filter.doFilter(request, response, (req, res) -> fail("Invalid session must stop the request"));
-        assertEquals(401, response.getStatus());
-        assertNull(request.getSession(false));
-        verifyNoInteractions(users);
-        assertNull(MDC.get(RequestLogFilter.USER_ID));
+        var chainCalled = new AtomicBoolean();
+
+        // when
+        filter.doFilter(request, response, (req, res) -> chainCalled.set(true));
+
+        // then
+        assertThat(chainCalled).isFalse();
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(request.getSession(false)).isNull();
+        then(untouchedUsers).shouldHaveNoInteractions();
+        assertThat(MDC.get(RequestLogFilter.USER_ID)).isNull();
     }
 
     @Test
-    void 세션_회원이_없어_401이면_userId를_넣지_않는다() throws Exception {
-        when(users.findById(18L)).thenReturn(Optional.empty());
+    @DisplayName("세션의 회원이 없으면 요청을 401로 중단하고 MDC에 회원 ID를 넣지 않는다")
+    void rejectsMissingSessionUserWithoutSettingMdc() throws Exception {
+        // given
+        var filter = filter(new FakeUserRepository());
         var request = new MockHttpServletRequest("GET", "/api/me");
         request.getSession().setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, "18");
         var response = new MockHttpServletResponse();
-        filter.doFilter(request, response, (req, res) -> fail("Missing user must stop the request"));
-        assertEquals(401, response.getStatus());
-        assertNull(MDC.get(RequestLogFilter.USER_ID));
+        var chainCalled = new AtomicBoolean();
+
+        // when
+        filter.doFilter(request, response, (req, res) -> chainCalled.set(true));
+
+        // then
+        assertThat(chainCalled).isFalse();
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(request.getSession(false)).isNull();
+        assertThat(MDC.get(RequestLogFilter.USER_ID)).isNull();
+    }
+
+    private static SessionUserFilter filter(UserRepository users) {
+        return new SessionUserFilter(users, (request, response, exception) -> response.setStatus(401));
     }
 }

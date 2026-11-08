@@ -18,6 +18,11 @@ public final class UserFixtures {
         return user;
     }
 
+    public static User withStatus(User user, UserStatus status) {
+        ReflectionTestUtils.setField(user, "status", status);
+        return user;
+    }
+
     // 회원 정보 변경 기능 없이 JPA dirty checking과 flush를 검증할 때만 쓴다.
     public static User withEmail(User user, String email) {
         ReflectionTestUtils.setField(user, "email", email);

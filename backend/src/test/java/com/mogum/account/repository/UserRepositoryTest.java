@@ -58,6 +58,9 @@ class UserRepositoryTest {
         assertThat(actual.getStatus()).isEqualTo(UserStatus.ACTIVE);
         assertThat(actual.getRole()).isEqualTo(UserRole.ADMIN);
         assertThat(actual.getCreatedAt()).isEqualTo(clock.instant());
+        assertThat(actual.getUpdatedAt()).isEqualTo(clock.instant());
+        assertThat(jdbc.queryForMap("SELECT provider, subject FROM users WHERE id = ?", saved.getId()))
+                .containsEntry("provider", "google").containsEntry("subject", "Subject");
         assertThat(actual.getTermsAgreedAt()).isNull();
         assertThat(actual.getTermsVersion()).isNull();
     }
