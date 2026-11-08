@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "pre-login-screens",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-09T07:12:17+0900",
+      "summary": "Me를 NOT_APPLIED/APPLIED/APPROVED/REJECTED·email·name과 모르는 값 허용으로 갱신, /apply(신청)·/waiting-approval(승인 대기)·/rejected(거절됨)·/(승인된 사람의 기존 PlaceholderPage) 상태별 라우팅·직접 진입 보정, /login 유지·/privacy는 인증·서버 읽기 없는 개인정보처리방침 준비 중 자리와 돌아가기; 본문 없는 신청 1회·요청 중 버튼 잠금·성공 응답의 나 캐시 반영·서버 문구 원문과 다시 시도·로그아웃 후 캐시 제거·다른 계정 로그인은 로그아웃 완료 뒤 googleLoginUrl 이동, ACCOUNT_NOT_APPROVED는 나 재조회·모르는 상태는 기존 불러오기 실패; 공통 AccountIdentity·Button secondary 추가 및 기존 AccountLayout/Mogumi/토큰 재사용·UI_GUIDE 컴포넌트/주소/동작 반영, TERMS_REQUIRED·ACCOUNT_WAITLISTED·messages.notAllowed·LoginPage not_allowed 전용 분기 제거(옛 콜백 값은 일반 실패로 검증), RATE_LIMITED는 이번 화면과 무관한 기존 RequireAuth 안내·재시도 동작을 보존해 유지; 테스트 선작성 후 미구현 실패 확인, 화면 테스트 127개(13파일)→174개(16파일)·지정 test/lint·추가 build 통과, Chrome 320/390/1280px 네 화면·긴 이메일 줄바꿈·가로 넘침 없음·제목/키보드 포커스·외부 에셋 요청 없음·처리방침 API 호출 없음 확인, 아키텍처 체크리스트 확인·backend/deploy/docs06 변경 없음·커밋 없음",
+      "completed_at": "2026-11-09T07:20:22+0900"
     }
   ],
   "created_at": "2026-11-08T22:48:26+0900"
