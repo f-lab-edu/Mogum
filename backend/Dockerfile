@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# 서버 이미지 — 로컬 compose 에서 쓰고, 운영도 같은 이미지를 쓸 수 있게 만든다(ADR-069).
+# 서버 이미지 — 로컬 compose 에서 쓰고, 운영도 같은 이미지를 쓸 수 있게 만든다(docs/04-jobs-and-cost.md §3).
 # 테스트는 이미지 빌드에서 돌리지 않는다 — Testcontainers 가 Docker 를 쓰므로 호스트에서 ./gradlew test 로 돌린다.
 
 FROM eclipse-temurin:21-jdk AS build

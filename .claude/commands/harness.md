@@ -8,7 +8,7 @@
 
 ### A. 탐색
 
-`docs/` 하위 문서(PRD, ARCHITECTURE, ADR 등)를 읽고 프로젝트의 기획·아키텍처·설계 의도를 파악한다. 필요시 Explore 에이전트를 병렬로 사용한다. 이전 phase 에서 나온 step 작성 교훈과 하네스 문제는 `phases/HARNESS-BACKLOG.md` 에 있다 — step 을 쓰기 전에 본다.
+`docs/README.md` 의 문서 표를 보고 관련 문서(01 ~ 07 · ERD · GLOSSARY · ADR · SCHEDULE)를 읽고 프로젝트의 기획·아키텍처·설계 의도를 파악한다. 필요시 Explore 에이전트를 병렬로 사용한다. 이전 phase 에서 나온 step 작성 교훈과 하네스 문제는 `phases/HARNESS-BACKLOG.md` 에 있다 — step 을 쓰기 전에 본다.
 
 ### B. 논의
 
@@ -35,11 +35,12 @@
    - 화면: `npm --prefix frontend run test` · `npm --prefix frontend run lint` (`cd frontend && ...` 형태는 리뷰어가 실행하지 못한다)
 6. **주의사항은 구체적으로** — "조심해라" 대신 "X를 하지 마라. 이유: Y" 형식으로 적는다.
 7. **네이밍** — step name은 kebab-case slug로, 해당 step의 핵심 모듈/작업을 한두 단어로 표현한다 (예: `project-setup`, `api-layer`, `auth-flow`).
-8. **문서 갱신을 작업에 넣는다** — 이 step 이 정하거나 바꾸는 사실(버전 · 경로 · 명령어 · 디렉터리 구조 · 🅿️ 값 · "구현 · 검증은 아직" 표기)이 문서에 있으면, 갱신할 문서와 절을 작업 목록에 적는다. 적지 않으면 Codex 는 범위 밖이라 보고 건드리지 않는다.
+8. **문서 갱신을 작업에 넣는다** — 이 step 이 정하거나 바꾸는 사실(버전 · 경로 · 명령어 · 디렉터리 구조 · 문서 끝 「아직 정하지 않은 값」에서 정한 값 · "구현 · 검증은 아직" 표기)이 문서에 있으면, 갱신할 문서와 절을 작업 목록에 적는다. 적지 않으면 Codex 는 범위 밖이라 보고 건드리지 않는다.
 9. **버전 · 이름을 느슨하게 쓰지 않는다** — Codex 는 적힌 말을 문자 그대로 강제한다(0-skeleton: "JUnit 5" → Boot 관리 JUnit 6 을 5 로 낮춤). 프레임워크가 관리하는 버전을 따르게 하려면 그렇게 쓰고, 고정이 필요하면 정확한 값과 이유를 적는다.
-10. **화면 step 은 시안을 짚는다** — `frontend/` 화면을 만들거나 바꾸는 step 은 `docs/design/README.md` 의 표(「화면별 시안」 · 「공통 조각」 · 「흐름」)에서 파일과 **상태 값**을 골라 '읽어야 할 파일'에 적는다. 예: `docs/design/U2 Screen.dc.html` — `state`: `normal` · `requests`. 화면 사이 이동을 만드는 step 만 `docs/design/화면 흐름 보드.dc.html` 의 흐름(`S1`~`S7`)을 더한다. 프레임 모음(`머금 화면.dc.html`)은 적지 않는다 — 화면 파일과 내용이 같고 크다.
-    - **범위는 06 §16 의 그 단계 열이다.** 시안에는 완성형이 다 그려져 있다. 이 step 에서 만들 상태 · 영역을 작업에 적고, 시안에 있어도 범위 밖인 것은 금지사항에 "X 를 만들지 마라. 이유: 06 §16 상 {단계} 에서 만든다" 로 적는다. 적지 않으면 Codex 가 시안 전체를 만든다.
-    - 시안에 없는 상태(README 「아직 그리지 않은 상태」)는 06 의 상태 표 · 문구를 가리킨다. 시안과 문서가 다른 곳(README 「문서와 다른 곳」)이 이 step 에 걸리면 작업에 "문서를 따른다" 로 짚는다.
+10. **화면 step 은 시안을 짚는다** — `frontend/` 화면을 만들거나 바꾸는 step 은 `docs/design/README.md` 의 「화면별 시안」 표에서 화면 이름을 골라 그 스크린샷(모바일 먼저 — `screenshots/{이름}-mobile.png` · `-desktop.png`)과 `html/{이름}.html` 을 '읽어야 할 파일'에 적는다. 화면 사이 이동은 시안의 흐름도가 아니라 06 §2.2 의 흐름도를 가리킨다.
+    - **시안은 방향이다 — 베끼지 않고 공통 컴포넌트로 맞춘다**(design README 「시안을 쓰는 법」). 처음 화면을 만드는 step 이 토큰과 그 step 에 필요한 컴포넌트를 정하게 하고, 뒤 step 은 그것을 쓰고 새로 필요한 것만 더하게 적는다.
+    - **범위는 SCHEDULE §3 의 그 TASK 다.** 시안에는 완성형이 다 그려져 있다. 이 step 에서 만들 화면 · 상태 · 영역을 작업에 적고, 시안에 있어도 범위 밖인 것은 금지사항에 "X 를 만들지 마라. 이유: SCHEDULE §3 상 {TASK} 에서 만든다" 로 적는다. 적지 않으면 Codex 가 시안 전체를 만든다.
+    - 시안이 없는 상태(README 「그리지 않은 것」)는 06 의 표 · 문구를 가리킨다. 「06 과 다른 곳」이 이 step 에 걸리면 작업에 "06 을 따른다" 로 짚고, 「06 이 막은 것」은 금지사항에 적는다.
 11. **확인한 사실만 단정한다** — Codex 는 step 문장을 사실로 받아 견본 · 테스트 · 문서에 고정한다. 도구 동작과 외부 서비스가 만드는 식별 문자열(OIDC `sub` · 콜백 주소 · 토큰 클레임)은 실제 설정을 조회한 값과 그 명령을 함께 적는다. 확인하지 못했으면 "확인해서 적는다" 로 쓴다(1-auth step 3 — Vite proxy 의 Host 동작을 단정해 문서에 틀린 내용이 들어감 · 2-deploy step 4 — 문서의 기본 `sub` 형식을 적었는데 저장소는 불변 subject 라 첫 배포 OIDC 가 거절됨).
 12. **외부 서비스의 가짜는 실제 서비스의 검증을 그대로 한다** — 외부 연동 step 은 "가짜가 검사할 것" 을 작업에 적는다. 프레임워크가 기본으로 켜는 프로토콜 옵션(PKCE 등)도 포함한다. 안 하면 테스트는 통과하고 실제 연동만 깨진다(1-auth step 3 — 가짜 토큰 엔드포인트가 PKCE 를 검사하지 않아 `code_verifier` 를 버린 구현이 통과).
 13. **보안 필터 · 에러 처리는 실제 HTTP 로 검증한다** — MockMvc 는 서블릿 ERROR 디스패치와 실제 컨테이너 동작을 거치지 않는다. 이런 step 은 AC 에 `RANDOM_PORT` 테스트를 넣는다(1-auth step 1 — `/error` 가 막혀 400 · 405 · 500 이 모두 401 이 됐는데 MockMvc 테스트는 통과).
@@ -50,7 +51,7 @@
 18. **사람이 붙여 넣어 실행할 명령 블록은 권한 전환과 나머지를 나눈다** — `sudo -i` 는 따로 두고, 나머지는 `bash -euo pipefail <<'EOF'` 스크립트 한 덩어리로 쓴다. 한 블록에 섞으면 `sudo -i` 뒤 줄이 새 셸로 가지 않고, 대화형 셸의 `set -e` 는 실패 한 번에 세션을 닫는다. 이런 블록은 테스트도 리뷰도 실행하지 못한다(2-deploy 절차서 4번).
 19. **워크플로의 서드파티 액션은 전체 커밋 SHA 로 고정하고 줄 끝에 릴리스를 주석으로 단다** — 태그는 옮겨질 수 있고 SonarCloud 게이트(`githubactions:S7637`)가 PR 에서 막는다. 자격을 받은 뒤 도는 공식 액션도 같이 고정한다. SHA 는 조회한 값을 step 에 적는다(원칙 11 · PR #11).
 20. **계약(API 응답 · 오류 형식 · ADR · `AGENTS.md` 금지 목록)을 바꾸는 phase 는 Claude 가 계약 문서를 step 전에 먼저 고쳐 커밋하고, step 은 그 절을 가리킨다** — step 에는 "어긋나면 코드를 계약에 맞추고, 못 맞추면 blocked 로 멈춰라. 문서를 고치지 마라" 를 적는다. Codex 가 계약을 스스로 해석해 문서와 코드를 함께 바꾸지 않고, step 은 "05 §1 을 따른다" 처럼 짧아진다. step 이 고치는 문서는 구현으로 확정된 사실(경로 · 클래스 이름 · 검증 줄)만 남는다(`2a-api-response` · 그 수정 step 5 · 6 · `2b-ops-logging` · 그 수정 step 5 — 모두 계약 해석으로 인한 반려 · blocked 0).
-21. **운영 로그 줄은 `docs/04-jobs-and-cost.md` §9.2 의 표에서 골라 적는다** — 잡 · 외부 호출 · 알림 · 반복 루프를 만드는 step 은 '읽어야 할 파일'에 §9.2 를 넣고, 표에서 해당 줄을 작업에 적고, 그 줄이 찍히는지 출력 캡처(`OutputCaptureExtension`) 테스트로 확인하게 한다. 줄 이름을 정하면 그 step 이 표에 적는다. 금지사항에는 "표에 없는 운영 로그 줄(`INFO` 이상)을 더하지 마라. 이유: 줄마다 14일 · 500MiB 보관을 나눠 쓰고, DB 에 남는 사실은 DB 에서 본다" 를 적는다.
+21. **운영 로그 줄은 step 이 정해 적는다** — 작업 · 외부 호출 · 반복 루프를 만드는 step 은 '읽어야 할 파일'에 `docs/04-jobs-and-cost.md` §9 · `AGENTS.md` 금지 26 · 기존 로그 코드(`common.logging` · `auth.OAuthLoginHandler`)를 넣고, 새로 남길 줄(수준 · 언제 · 키)을 작업에 적고, 그 줄이 찍히는지 출력 캡처(`OutputCaptureExtension`) 테스트로 확인하게 한다. 새 줄을 정하면 그 step 이 04 §9 에 적는다. 금지사항에는 "작업에 적지 않은 운영 로그 줄(`INFO` 이상)을 더하지 마라. 이유: 줄마다 14일 · 500MiB 보관을 나눠 쓰고, DB 에 남는 사실은 DB 에서 본다" 를 적는다.
 22. **테스트 전용 픽스처를 `@SpringBootTest` 의 스캔에 넣지 않는다** — 스캔은 `src/test` 의 `com.mogum` 아래 클래스까지 읽어, 픽스처 하나가 모든 컨텍스트 테스트에 섞인다. 컴포넌트(`@RestController` · `@Configuration` · `@Component`)는 그것을 쓰는 테스트 클래스의 중첩 static 클래스로 두고 `@Import` 로 그 컨텍스트에만 붙인다 — Spring Boot 4.1.1 의 `TestTypeExcludeFilter` 가 `@Test` 메서드가 있는 클래스의 중첩 클래스를 스캔에서 뺀다. `@Entity` · Spring Data `Repository` 픽스처는 `com.mogum` 밖 패키지에 둔다 — `ddl-auto: validate` 라 테이블 없는 엔티티 하나로 모든 컨텍스트가 뜨지 않고, 중첩으로 두면 빠지는지는 확인하지 않았다. 이런 픽스처를 만드는 step 은 둘 곳을 작업에 적는다(`2a-api-response` step 1 · 2 · `3-curriculum-model` step 0 — S3).
 
 ### D. 파일 생성
@@ -72,7 +73,7 @@
 }
 ```
 
-- `dir`: task 디렉토리명.
+- `dir`: task 디렉토리명 — `{번호}-{task 이름}`(kebab-case). 번호는 `docs/SCHEDULE.md` §3 의 번호다 — 끝난 phase(`0-skeleton` ~ `3-curriculum-model`)에 이어 4 부터 매기고, 새로 매기지 않는다. 수정 phase 는 같은 번호에 `a` · `b` 를 붙인다(`2a-api-response`). 예: `4-account`.
 - `status`: `"pending"` | `"completed"` | `"error"` | `"blocked"`. execute.py가 실행 중 자동으로 업데이트한다.
 - 타임스탬프(`completed_at`, `failed_at`, `blocked_at`)는 execute.py가 상태 변경 시 자동 기록한다. 생성 시 넣지 않는다.
 
@@ -119,9 +120,9 @@
 
 먼저 아래 파일들을 읽고 프로젝트의 아키텍처와 설계 의도를 파악하라:
 
-- `docs/ARCHITECTURE.md`
+- `docs/04-jobs-and-cost.md` §2 (코드 구조 · 패키지 경계)
 - `docs/{이 step 에 해당하는 문서}.md §{절}`
-- (화면 step) `docs/UI_GUIDE.md` · `docs/design/README.md` · `docs/design/{화면 파일}` — `state`: {이 step 에서 만들 상태 값}
+- (화면 step) `docs/06-screens.md §{절}` · `docs/design/README.md` · `docs/design/screenshots/{이름}-mobile.png` · `docs/design/html/{이름}.html` (UI_GUIDE 가 생기면 `docs/UI_GUIDE.md` 도)
 - {이전 step에서 생성/수정된 파일 경로}
 
 이전 step에서 만들어진 코드를 꼼꼼히 읽고, 설계 의도를 이해한 뒤 작업하라.
@@ -143,10 +144,10 @@ npm --prefix frontend run test      # 화면 테스트 통과 (화면 step 일 �
 
 1. 위 AC 커맨드를 실행한다.
 2. 아키텍처 체크리스트를 확인한다:
-   - `docs/ARCHITECTURE.md` 패키지 구조(도메인별 패키지 · 그 안은 `controller` · `service` · `repository` · `domain` · `dto` · `generation` 은 `worker` · `config` 만 참조)를 따르는가?
-   - `docs/ADR.md` 기술 스택을 벗어나지 않았는가?
+   - `docs/04-jobs-and-cost.md` §2 패키지 구조(도메인별 패키지 · 그 안은 `controller` · `service` · `repository` · `domain` · `dto` · `generation` 은 `worker` · `config` 만 참조)를 따르는가?
+   - `docs/04-jobs-and-cost.md` §1 기술 선택을 벗어나지 않았는가?
    - `AGENTS.md` 금지 목록 · 작업 방식(TDD)을 위반하지 않았는가?
-   - (화면 step) 적힌 시안 상태와 영역 순서 · 문구 · 가장 강조가 맞는가? 적히지 않은 상태를 만들지 않았는가? 기준은 `docs/design/README.md` 「어디까지 맞추나」
+   - (화면 step) 06 의 보이는 것 · 할 수 있는 것 · 문구와 시안의 구조(영역 순서 · 가장 강조)가 맞는가? 적히지 않은 상태를 만들지 않았는가? 기준은 `docs/design/README.md` 「시안을 쓰는 법」
 3. 결과에 따라 `phases/{task-name}/index.json`의 해당 step을 업데이트한다:
    - 성공 → `"status": "completed"`, `"summary": "산출물 한 줄 요약"`
    - 수정 3회 시도 후에도 실패 → `"status": "error"`, `"error_message": "구체적 에러 내용"`
