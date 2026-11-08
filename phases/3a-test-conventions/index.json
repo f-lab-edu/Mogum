@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "web-slice",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-08T20:18:30+0900",
+      "summary": "MeControllerTest를 @WebMvcTest(MeController.class) + MockMvcTester로 이관: @AutoConfigureMockMvc(addFilters = false)로 보안 필터를 끄고 SecurityContextHolder의 UsernamePasswordAuthenticationToken.authenticated principal에 UserFixtures 회원을 넣어 @AuthenticationPrincipal User로 전달, @AfterEach에서 clearContext; UserFixtures.withTermsAgreedAt 추가, 약관 동의 true/false와 공개 다섯 필드·data 봉투·waitlistPosition null을 STRICT JSON으로 검증하고 DataSource/EntityManagerFactory/UserRepository/제품 SecurityConfiguration 빈 부재 확인; ApiResponseTest는 기존 의존성의 org.springframework.boot.test.autoconfigure.json.JsonTest(@JsonTest)로 Boot Jackson 자동 설정의 ObjectMapper를 주입받아 DB 없이 null·ISO-8601 UTC Instant·대문자 enum·data 단일 키·오류 선택 필드 생략을 보존하고 null 데이터 거부를 팩토리/생성자별로 분리; ApiExceptionHandlerTest·ApiErrorControllerTest·ApiErrorResponsesTest를 영어 camelCase/한국어 DisplayName/파라미터 이름/given·when·then/AssertJ로 이관, standalone은 MockMvcTester와 @TestConfiguration 아래 예외 전용 컨트롤러를 사용해 제품 컨트롤러 mock 제거; 입력 원문 표식 비노출·모든 오류 code/상태/헤더·필드 정렬/중복 제거/선택 키 생략·컬렉션/맵/배열 Size 상하한 등 기존 검증 사실 삭제 없음, 복합 호출과 반복을 독립 테스트/파라미터 케이스로 분리; TEST_GUIDE·ADR-079 진행 사실만 갱신(규칙 문장 변경 없음); 지정 선별 AC 96개 및 전체 build 통과, 서버 기본 테스트 567개 → 600개(실패·오류·건너뜀 0), 제품 코드·실제 포트 테스트·빌드 의존성 변경 및 커밋 없음",
+      "completed_at": "2026-11-08T20:25:55+0900"
     },
     {
       "step": 4,
