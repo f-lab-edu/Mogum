@@ -153,7 +153,7 @@ erDiagram
         text purpose_other "(빈 값)"
         text memo "(빈 값)"
         text feedback "(빈 값) REPLAN_*(다시 짜기)만"
-        bigint course_id FK "(빈 값)"
+        bigint course_id FK "(빈 값) 대상 · 결과 — 셋 가운데 많아야 하나"
         bigint roadmap_id FK "(빈 값)"
         bigint lesson_id FK "(빈 값)"
         integer claim_count "꺼낼 때마다 1 늘린다"

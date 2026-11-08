@@ -153,7 +153,7 @@
     -H 'Origin: https://other.example'
   ```
 
-- [x] **배포 중 정상 종료:** 한가할 때 SSM root Bash에서 아래를 실행한다. 기대: 종료 대기 설정 **150초**, 직전 컨테이너 종료 코드 **143** · OOM `false`, 앱 로그에 graceful shutdown 시작/완료. **137/SIGKILL이면 실패**이며 원인을 확인한다. 재시작 후 로컬/공개 헬스가 다시 UP이어야 한다. 실행기의 호출 완료/반납은 아직 없으므로 **`4-job-queue`에서 별도 확인**한다. — 2026-10-26(SSM Run Command): 150초 · 143 · OOM `false`, graceful shutdown 시작/완료 → JPA · 커넥션 풀 종료 로그, 정지 1초 · 재시작 12초 뒤 로컬 UP · 공개 200
+- [x] **배포 중 정상 종료:** 한가할 때 SSM root Bash에서 아래를 실행한다. 기대: 종료 대기 설정 **150초**, 직전 컨테이너 종료 코드 **143** · OOM `false`, 앱 로그에 graceful shutdown 시작/완료. **137/SIGKILL이면 실패**이며 원인을 확인한다. 재시작 후 로컬/공개 헬스가 다시 UP이어야 한다. 워커의 진행 중 시도 완료 · 기다림으로 돌려놓기는 아직 없으므로 **만드는 작업 · 워커 TASK(SCHEDULE §3 의 6)에서 별도 확인**한다([04 §4.5](../docs/04-jobs-and-cost.md#45-시한--되찾기)). — 2026-10-26(SSM Run Command): 150초 · 143 · OOM `false`, graceful shutdown 시작/완료 → JPA · 커넥션 풀 종료 로그, 정지 1초 · 재시작 12초 뒤 로컬 UP · 공개 200
 
   ```bash
   export APP_IMAGE="$(cat /opt/mogum/current/app-image.ref)"
