@@ -4,6 +4,8 @@ import { ApiError } from '../api/client'
 import { useMe } from '../api/useMe'
 import { takeReturnPath } from '../lib/authNavigation'
 import { messages } from '../lib/messages'
+import AccountLayout from './AccountLayout'
+import Button from './Button'
 
 export default function RequireAuth() {
   const me = useMe()
@@ -19,14 +21,14 @@ export default function RequireAuth() {
 
   if (me.isPending || (me.error instanceof ApiError && me.error.code === 'UNAUTHORIZED')) {
     return (
-      <main className="min-h-screen bg-paper px-4 py-8">
-        <div role="status" aria-label="로그인 확인 중" aria-busy="true" className="mx-auto max-w-3xl space-y-4">
+      <AccountLayout>
+        <div role="status" aria-label="로그인 확인 중" aria-busy="true" className="space-y-4">
           <span className="sr-only">로그인 확인 중</span>
-          <div aria-hidden="true" className="h-8 w-32 rounded-md bg-muted motion-safe:animate-pulse" />
-          <div aria-hidden="true" className="h-4 w-full rounded-md bg-muted motion-safe:animate-pulse" />
-          <div aria-hidden="true" className="h-4 w-2/3 rounded-md bg-muted motion-safe:animate-pulse" />
+          <div aria-hidden="true" className="h-8 w-32 rounded-control bg-surface-muted motion-safe:animate-pulse" />
+          <div aria-hidden="true" className="h-4 w-full rounded-control bg-surface-muted motion-safe:animate-pulse" />
+          <div aria-hidden="true" className="h-4 w-2/3 rounded-control bg-surface-muted motion-safe:animate-pulse" />
         </div>
-      </main>
+      </AccountLayout>
     )
   }
 
@@ -35,12 +37,12 @@ export default function RequireAuth() {
       ? messages.rateLimited : messages.loadFailed
 
     return (
-      <main className="min-h-screen bg-paper px-4 py-8">
-        <div className="mx-auto max-w-3xl space-y-4">
-          <p role="status" aria-live="polite" className="text-sm text-danger">{message}</p>
-          <button disabled={me.isFetching} onClick={() => void me.refetch()} className="h-11 rounded-md border border-line bg-surface px-4 text-ink hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">다시 시도</button>
+      <AccountLayout>
+        <div className="space-y-4">
+          <p role="status" aria-live="polite" className="text-small text-error">{message}</p>
+          <Button disabled={me.isFetching} onClick={() => void me.refetch()}>다시 시도</Button>
         </div>
-      </main>
+      </AccountLayout>
     )
   }
 
