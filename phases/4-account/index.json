@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "apply-and-guard",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-09T02:15:46+0900",
+      "summary": "본문 없는 POST /api/account/apply와 ApplyService(@Transactional) 구현: app.credit.monthly-amount를 CreditProperties로 읽어 User.apply·잔액·REFILL 기록을 같은 트랜잭션에서 생성, 기존 회원은 상태와 행·기록을 보존; UserRepository의 UserIdentityLock/UserIdentityLockImpl 조각이 EntityManager 네이티브 쿼리의 신원별 PostgreSQL 트랜잭션 advisory lock으로 동시 신청을 직렬화하고 기존 (provider, subject) unique 유지, 실제 HTTP 두 세션은 모두 성공하며 같은 세션 동시 요청도 사용자·기록 하나와 잔액=기록 합 검증(같은 세션 응답은 고정하지 않음); 커밋 후 신청 전 세션 ID 회전·신원 속성 제거·사용자 ID와 주인 색인만 저장, 순차 재신청·채움 저장 실패 롤백·안전한 로그 검증; SecurityConfiguration 한 곳의 GET /api/me·POST 신청·POST /api/auth/logout 허용 목록과 나머지 /api/**의 APPROVED 기본 제한, ACCOUNT_NOT_APPROVED(403)를 ApiErrorResponses.write로 반환, 실제 HTTP 네 상태·메서드 제한·401/CSRF 우선순위·다음 요청 승인 반영 검증; UserFixtures.approved 및 SecurityScenario.approvedSession 추가, SecurityConfigurationErrorIntegrationTest·RequestValidationIntegrationTest·RequestLogFilterIntegrationTest를 승인 픽스처로 갱신하고 기존 검증 유지; FakeCreditEntryRepository·설정 테스트 추가, docs/05 §1.2·§4와 docs/04 §7에 구현 사실 반영(계약 문장 유지); 테스트 먼저 작성 후 미구현 컴파일 실패 확인, 최종 지정 선별 AC 257개 및 전체 build 794개 통과(서버 테스트 739→794, 실패·오류·건너뜀 0), 아키텍처 체크리스트 확인, 커밋 없음",
+      "completed_at": "2026-11-09T02:25:23+0900"
     },
     {
       "step": 3,
