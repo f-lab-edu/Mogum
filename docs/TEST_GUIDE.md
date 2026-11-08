@@ -52,7 +52,7 @@ void returnsExistingUserIdOnRelogin() {
 
 - **픽스처** — `{엔티티}Fixtures`(테스트 쪽의 엔티티와 같은 패키지 — `account/domain/UserFixtures`). 정적 팩토리를 불러 **저장하지 않은** 엔티티를 돌려주고, 저장은 테스트가 레포지토리 · Fake 로 한다. **테스트가 확인하는 값은 인자로 받아 본문에 보이게 하고** 픽스처 기본값에 숨기지 않는다.
 - **ID · 상태** — 팩토리 · 도메인 메서드로 만들 수 없는 값(ID · 아직 바꾸는 메서드가 없는 상태)만 픽스처 · Fake 안에서 `ReflectionTestUtils` 로 넣는다. 테스트 본문에서는 리플렉션을 쓰지 않는다. 그 상태를 바꾸는 도메인 메서드가 생기면 그것을 쓴다.
-- **레포지토리 인터페이스** — Spring Data 의 `Repository<T, ID>` 만 상속하고 **제품 코드가 쓰는 메서드만 선언한다**(`JpaRepository` · `CrudRepository` 계열을 상속하지 않는다). 테스트만 쓰는 메서드를 선언하지 않는다 — 정리는 §5 의 정리기가 한다.
+- **레포지토리 인터페이스** — Spring Data 의 `Repository<T, ID>` 만 상속하고 **그 도메인이 쓰는 동작만 선언한다** — 저장 · 조회 · 주인 확인 조회(`save` · `findById` · `findByIdAndUserId` …)처럼 제품 코드가 쓰거나 그 도메인의 생성 · 조회 흐름이 쓸 것이다. `JpaRepository` · `CrudRepository` 계열을 상속하지 않는다. 정리 · 집계에만 쓰는 메서드(`deleteById` · `deleteAll` · `count` · `findAll`)는 선언하지 않는다 — 정리는 §5 의 정리기가 하고, 집계는 테스트가 SQL 로 센다.
 - **Fake** — `Fake{레포지토리}`(테스트 쪽의 레포지토리와 같은 패키지 — `account/repository/FakeUserRepository`). 메모리 `Map` 에 담고 인터페이스에 선언된 메서드만 구현한다. 저장할 때 ID 를 채운다. Auditing 시각은 비어 있으므로 시각은 레포지토리 테스트가 본다. 그 레포지토리를 쓰는 단위 테스트가 생길 때 만든다.
 - **mock** — `@ExtendWith(MockitoExtension.class)` · `@Mock` · BDDMockito(`given(…).willReturn(…)` · `then(mock).should(…)`). 쓰는 곳은 셋이다.
     - 우리 시스템 경계 밖 — LLM · 임베딩 클라이언트 · Google OAuth 등

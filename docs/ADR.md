@@ -508,7 +508,7 @@
 ### ADR-079: 백엔드 테스트는 계층별 슬라이스로 쓰고, 테스트 트랜잭션 없이 테스트마다 DB 를 비운다
 **결정**: 사용자 결정(2026-11-08)에 따라 — 규칙 전문은 [TEST_GUIDE](./TEST_GUIDE.md).
 - 계층마다 도구를 나눈다 — 컨트롤러 `@WebMvcTest` + `MockMvcTester`(보안 필터 끔), 서비스는 단위 테스트 + Fake 레포지토리(mock 은 시스템 경계 밖 · 호출 여부가 규칙인 곳만), 레포지토리 `@RepositoryTest`(`@DataJpaTest` 묶음), 통합 `@IntegrationTest`(실제 포트 · `RestTestClient`)는 핵심 흐름 · 보안 · 오류 처리와 DB 동작이 곧 규칙인 서비스에만.
-- 레포지토리는 Spring Data `Repository<T, ID>` 만 상속하고 쓰는 메서드만 선언한다 — Fake 가 그 메서드만 구현한다.
+- 레포지토리는 Spring Data `Repository<T, ID>` 만 상속하고 그 도메인이 쓰는 동작(저장 · 조회 · 주인 확인 조회)만 선언한다 — 정리 · 집계 메서드는 두지 않고, Fake 가 선언된 메서드만 구현한다.
 - 테스트는 트랜잭션을 걸지 않는다. 테스트마다 정리기가 모든 테이블을 비운다. 컨텍스트 테스트는 옮길 수 있는 공용 `TestClock` 을 쓰고, 클래스마다 컨텍스트 설정을 더하지 않는다.
 - 이름은 `*Test` · `*IntegrationTest`(약어 `IT` 없음) · 영어 camelCase 메서드 + 한국어 `@DisplayName`. 본문은 `// given` · `// when` · `// then`, 단언은 AssertJ, 데이터는 `{엔티티}Fixtures`. `@Nested` 는 쓰지 않는다.
 - 범위는 백엔드다. 화면 테스트는 화면 작업이 늘 때 따로 정한다. 기존 테스트 이관은 `3a-test-conventions`.
