@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "login-session",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-09T02:08:26+0900",
+      "summary": "Google scope email·profile 및 prompt=select_account 적용(PKCE 유지), ExternalAccount에 name을 더하고 GoogleAccountMapper 한 곳에서 누락·공백 이름을 이메일 @ 앞부분으로 대체; 회원 세션은 PRINCIPAL_NAME_INDEX_NAME의 String 사용자 ID만, 신청 전 세션은 mogum.notAppliedAccount의 Serializable AccountPrincipal.NotApplied(provider, subject, email, name)만 저장하며 주인 색인·users·credit_entries 행 없음; 두 로그인 모두 세션 ID 회전·이전 속성 제거·origin+/ 리다이렉트, 요청 principal은 sealed AccountPrincipal(Member/NotApplied)이고 회원 상태는 매 요청 DB 조회·신청 전은 DB 조회와 userId MDC 없음, 깨진/혼합 세션은 공통 JSON 401 후 폐기; GET /api/me는 status·email·name만 반환(NOT_APPLIED/APPLIED/APPROVED/REJECTED, 크레딧 없음), TestSessions.createNotApplied와 FakeGoogle.name(누락·공백 가능) 추가, 두 세션의 HTTP 조회·로그아웃 204·세션 폐기 검증; INFO login result=not_applied 한 줄과 이메일·이름·subject·토큰 비노출 및 계정 전환 시 이전 userId MDC 제거를 출력 캡처로 검증, docs/04 §2.3·§9.1(실제 출력 줄·MDC 키 순서 미정)·05 §3·GLOSSARY 구현 사실 반영; 기존 OAuthLoginHandlerFailureIntegrationTest의 신청 전 임시 not_allowed·무세션·안전한 분류 검증→OAuthLoginHandlerIntegrationTest.createsNotAppliedSessionAndLogsSafeResult 및 rotatesAndClearsSessionForNotAppliedAccount의 무회원·신원만 저장·안전한 not_applied 로그 검증, 나머지 실패 검증 유지; 기존 시작 scope=email→startsAuthorizationWithMinimalScopeAndShortCookie의 email/profile·prompt·기존 PKCE 검증, 기존 성공·ID만 저장·회전·전체 회원 행 보존 검증은 같은 테스트에 유지하고 이름 변경 입력·세션 내 이름 부재도 확인; SessionUserFilterTest의 User principal 단언→같은 위치의 AccountPrincipal.Member 및 기존 인증·권한 없음·ID만 저장·MDC 단언 유지, MeControllerTest.returnsEmailAndStatus→returnsStatusEmailAndName 및 returnsNotAppliedIdentity, SecurityConfigurationIntegrationTest.returnsPublicFields는 name 포함한 엄격 JSON으로 갱신하고 readsNotAppliedSessionOverHttp·깨진 JDBC 세션 검증 추가, SecurityConfigurationLogoutIntegrationTest.logsOutOnlyCurrentDevice는 회원/신청 전 두 종류로 확장하며 다른 기기 보존·CSRF·쿠키 검증 유지; LoginServiceTest·LoginIdentityMigrationTest는 ExternalAccount 이름 인자만 추가해 기존 무저장·정확한 신원·미인증 선거절·기존 회원/세션 보존 검증 유지; 테스트 먼저 작성 후 미구현 컴파일 실패 확인, 지정 선별 AC 147개 및 전체 build 739개 통과(서버 테스트 707→739, 실패·오류·건너뜀 0), 아키텍처 체크리스트 확인, 커밋 없음",
+      "completed_at": "2026-11-09T02:15:46+0900"
     },
     {
       "step": 2,
