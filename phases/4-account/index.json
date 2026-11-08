@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "ui-foundation",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-09T02:32:41+0900",
+      "summary": "index.css @theme에 색(canvas/surface/surface-soft/surface-muted/border/text/text-secondary/primary/primary-hover/primary-depth/on-primary/error/google-border/google-text)·글꼴(sans/google)·글자(title/body/small/google)·자간(google)·간격(spacing/button-press)·모서리(panel/control/google)·그림자(account/button/button-pressed)·폭(account/content)·분기점(sm) 토큰 확정, 기본색 #632ce5·흰 버튼 글자 대비 6.95:1·본문/화면 바탕 대비 15.97:1·보조 글자/안내 바탕 대비 5.10:1; frontend/src/components/AccountLayout.tsx·Mogumi.tsx·Button.tsx와 각 짝 테스트 구현, frontend/src/assets/mogumi-reading.png는 원본 보존·384×351px·긴 변 384px·투명 PNG·112884바이트, UI_GUIDE §1 기준/대비·§2 토큰·§3 공통 컴포넌트/로그인 전 틀·§4 로그인·§5 모구미 규격/줄이는 명령·§6 미정 항목 작성 및 docs/README·AGENTS 문서 표와 design README 규격 안내 반영; 로그인은 모구미→서비스 소개→정원제→Google 순서, 기존 Roboto·테두리·로고 SVG·문구·오류/세션 만료 포커스·not_allowed 유지, RequireAuth·PlaceholderPage는 모양만 변경; 이전 실행의 테스트 선작성 실패 확인 후 구현 기록 확인, 화면 테스트 123개(10파일)→127개(13파일) 및 지정 test·lint·추가 build 통과, Chrome 320/390/1280px 가로 넘침 없음·외부 에셋 요청 없음·Google 버튼 규격/안내 포커스·기본 버튼 눌림/disabled/focus-visible 모양 확인, 아키텍처 체크리스트 확인, 커밋 없음",
+      "completed_at": "2026-11-09T07:12:16+0900"
     },
     {
       "step": 5,
