@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "unit-style",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-08T21:07:18+0900",
+      "summary": "단위 테스트 17개(CookieAuthorizationRequestRepositoryTest·DiscardingOAuth2AuthorizedClientsTest·GoogleAccountMapperTest·SecurityConfigurationTest·RequestLogFilterTest·SeoulClockTest·AuthPropertiesTest·ClockConfigurationTest·JpaAuditingConfigurationTest·RequestLogConfigurationTest·WebPropertiesTest·AwsFilesTest·BackupFilesTest·DeployFilesTest·WorkflowFilesTest·FsrsLibraryLearningTest·ArchitectureTest)를 영어 camelCase·한국어 DisplayName·값이 보이는 파라미터 이름·given/when/then·AssertJ로 이관; mock은 MockitoExtension/@Mock/BDDMockito로 통일하고 AuthPropertiesTest의 레포지토리는 기존 FakeUserRepository 사용(불필요한 시스템 Clock 빈 제거), Google 자격 정보 검사에는 누락되지 않은 반대편 값도 유효하도록 원래 입력 보존; 배포 파일은 DeployFilesJournalTest·DeployFilesScriptTest, 백업 실행은 BackupFilesScriptTest, 워크플로 실행은 WorkflowFilesScriptTest로 분리; 쿠키 저장/복원/삭제·로그 예외/ERROR/종료/중복 종료·한국 시계 메서드·FSRS 소수일 절삭·필터/리스너 등록·아키텍처 클래스/메서드 검사를 독립 테스트 및 파라미터 케이스로 분리, 기존 검증 사실 삭제 없음; 목록 밖 추가 이관 없음(SecurityConfigurationCookieTest 형식 확인, LoginIdentityMigrationIT/AppImageIT 유지); 아키텍처 규칙·CLASSES·위반 픽스처·타입 판정 함수가 HEAD와 같음을 확인, 가이드/ADR은 이관 진행 사실만 갱신; 지정 선별 AC 최종 --rerun-tasks 실행 467개 통과 및 전체 build 695개 통과(서버 기본 테스트 639→695, 실패·오류·건너뜀 0); 변경 전 및 중간 선별 실행에서는 범위 밖 RequestLogFilterIntegrationTest.cleansUserMdcAfterFilterFailure의 ERROR 로그 검사(75행) 간헐 실패가 관찰되어 기록하며 해당 파일은 수정하지 않음; 제품 코드·deploy·워크플로·Gradle 입력/의존성·병렬 설정 변경 및 커밋 없음",
+      "completed_at": "2026-11-08T21:22:21+0900"
     },
     {
       "step": 6,
