@@ -1,6 +1,7 @@
 package com.mogum.auth;
 
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -18,7 +19,7 @@ import java.time.ZoneOffset;
 import java.util.Base64;
 import java.nio.charset.StandardCharsets;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class CookieAuthorizationRequestRepositoryTest {
     private static final Instant NOW = Instant.parse("2026-10-12T00:00:00Z");
@@ -32,46 +33,88 @@ class CookieAuthorizationRequestRepositoryTest {
             .redirectUri("http://localhost:5173/auth/google/callback").build();
 
     @Test
-    void JSON은_state와_발급시각과_PKCE_verifier만_담고_설정에서_요청을_복원한다() {
+    @DisplayName("JSON은 state와 발급시각과 PKCE verifier만 담고 세션을 만들지 않는다")
+    void savesOnlyStateTimestampAndVerifier() {
+        // given
         var repository = repository(NOW);
         var response = new MockHttpServletResponse();
         var request = new MockHttpServletRequest();
+
+        // when
         repository.saveAuthorizationRequest(authorization(), request, response);
-        assertNull(request.getSession(false));
-        Cookie cookie = response.getCookie("MOGUM_OAUTH_REQUEST");
-        assertNotNull(cookie);
-        String json = new String(Base64.getUrlDecoder().decode(cookie.getValue()), StandardCharsets.UTF_8);
-        assertTrue(json.contains(STATE));
+
+        // then
+        assertThat(request.getSession(false)).isNull();
+        var cookie = response.getCookie("MOGUM_OAUTH_REQUEST");
+        assertThat(cookie).isNotNull();
+        var json = new String(Base64.getUrlDecoder().decode(cookie.getValue()), StandardCharsets.UTF_8);
+        assertThat(json).contains(STATE).doesNotContain("redirect", "secret");
         var saved = new ObjectMapper().readTree(json);
-        assertEquals(3, saved.size());
-        assertEquals(VERIFIER, saved.get("code_verifier").asText());
-        assertFalse(json.contains("redirect"));
-        assertFalse(json.contains("secret"));
-        var callback = callback(cookie, STATE);
+        assertThat(saved.size()).isEqualTo(3);
+        assertThat(saved.get("code_verifier").asText()).isEqualTo(VERIFIER);
+    }
+
+    @Test
+    @DisplayName("저장한 요청은 서버 설정과 쿠키의 verifier로 복원한다")
+    void restoresSavedRequestFromServerConfiguration() {
+        // given
+        var repository = repository(NOW);
+        var response = new MockHttpServletResponse();
+        repository.saveAuthorizationRequest(authorization(), new MockHttpServletRequest(), response);
+        var callback = callback(response.getCookie("MOGUM_OAUTH_REQUEST"), STATE);
+
+        // when
         var restored = repository.loadAuthorizationRequest(callback);
-        assertNotNull(restored);
-        assertEquals(registration.getRedirectUri(), restored.getRedirectUri());
-        assertEquals(registration.getClientId(), restored.getClientId());
-        assertEquals("google", restored.getAttribute("registration_id"));
-        assertEquals(VERIFIER, restored.getAttribute("code_verifier"));
+
+        // then
+        assertThat(restored).isNotNull();
+        assertThat(restored.getRedirectUri()).isEqualTo(registration.getRedirectUri());
+        assertThat(restored.getClientId()).isEqualTo(registration.getClientId());
+        assertThat(restored.<String>getAttribute("registration_id")).isEqualTo("google");
+        assertThat(restored.<String>getAttribute("code_verifier")).isEqualTo(VERIFIER);
+    }
+
+    @Test
+    @DisplayName("요청 삭제는 복원한 요청을 반환하고 쿠키를 만료시키며 세션을 만들지 않는다")
+    void removesRequestAndExpiresCookieWithoutSession() {
+        // given
+        var repository = repository(NOW);
+        var response = new MockHttpServletResponse();
+        repository.saveAuthorizationRequest(authorization(), new MockHttpServletRequest(), response);
+        var callback = callback(response.getCookie("MOGUM_OAUTH_REQUEST"), STATE);
         var removed = new MockHttpServletResponse();
-        assertNotNull(repository.removeAuthorizationRequest(callback, removed));
-        assertEquals(0, removed.getCookie("MOGUM_OAUTH_REQUEST").getMaxAge());
-        assertNull(callback.getSession(false));
+        repository.loadAuthorizationRequest(callback);
+
+        // when
+        var restored = repository.removeAuthorizationRequest(callback, removed);
+
+        // then
+        assertThat(restored).isNotNull();
+        assertThat(removed.getCookie("MOGUM_OAUTH_REQUEST").getMaxAge()).isZero();
+        assertThat(callback.getSession(false)).isNull();
     }
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "verifier 길이 {0}")
     @ValueSource(ints = {43, 128})
-    void RFC7636_verifier의_최소와_최대_길이를_복원한다(int length) {
-        var cookie = savedCookie("a".repeat(length));
-        var restored = repository(NOW).loadAuthorizationRequest(callback(cookie, STATE));
-        assertNotNull(restored);
-        assertEquals("a".repeat(length), restored.getAttribute("code_verifier"));
+    @DisplayName("RFC7636 verifier의 최소와 최대 길이를 복원한다")
+    void restoresVerifierAtLengthBoundaries(int length) {
+        // given
+        var repository = repository(NOW);
+        var callback = callback(savedCookie("a".repeat(length)), STATE);
+
+        // when
+        var restored = repository.loadAuthorizationRequest(callback);
+
+        // then
+        assertThat(restored).isNotNull();
+        assertThat(restored.<String>getAttribute("code_verifier")).isEqualTo("a".repeat(length));
     }
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "verifier 조건 {0}")
     @ValueSource(strings = {"missing", "empty", "short", "long", "space", "padding", "unicode"})
-    void 없거나_RFC7636_형식이_아닌_verifier는_복원하지_않는다(String condition) {
+    @DisplayName("없거나 RFC7636 형식이 아닌 verifier는 복원하지 않는다")
+    void rejectsMissingOrInvalidVerifier(String condition) {
+        // given
         String verifier = switch (condition) {
             case "missing" -> null;
             case "empty" -> "";
@@ -81,17 +124,44 @@ class CookieAuthorizationRequestRepositoryTest {
             case "padding" -> "a".repeat(43) + "=";
             default -> "a".repeat(43) + "가";
         };
-        assertNull(repository(NOW).loadAuthorizationRequest(callback(savedCookie(verifier), STATE)));
+        var repository = repository(NOW);
+        var callback = callback(savedCookie(verifier), STATE);
+
+        // when
+        var restored = repository.loadAuthorizationRequest(callback);
+
+        // then
+        assertThat(restored).isNull();
     }
 
     @Test
-    void 길이_상한을_넘거나_중복된_쿠키는_복원하지_않는다() {
-        assertNull(repository(NOW).loadAuthorizationRequest(
-                callback(new Cookie("MOGUM_OAUTH_REQUEST", "a".repeat(2049)), STATE)));
+    @DisplayName("길이 상한을 넘는 쿠키는 복원하지 않는다")
+    void rejectsOversizedCookie() {
+        // given
+        var repository = repository(NOW);
+        var callback = callback(new Cookie("MOGUM_OAUTH_REQUEST", "a".repeat(2049)), STATE);
+
+        // when
+        var restored = repository.loadAuthorizationRequest(callback);
+
+        // then
+        assertThat(restored).isNull();
+    }
+
+    @Test
+    @DisplayName("중복된 쿠키는 복원하지 않는다")
+    void rejectsDuplicateCookies() {
+        // given
+        var repository = repository(NOW);
         var cookie = savedCookie(VERIFIER);
         var request = callback(cookie, STATE);
         request.setCookies(cookie, cookie);
-        assertNull(repository(NOW).loadAuthorizationRequest(request));
+
+        // when
+        var restored = repository.loadAuthorizationRequest(request);
+
+        // then
+        assertThat(restored).isNull();
     }
 
     private Cookie savedCookie(String verifier) {
@@ -101,21 +171,43 @@ class CookieAuthorizationRequestRepositoryTest {
                 .encodeToString(saved.toString().getBytes(StandardCharsets.UTF_8)));
     }
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "쿠키 값 [{0}]")
     @ValueSource(strings = {"garbage", "e30", "rO0ABXNy", "eyJzdGF0ZSI6MX0", ""})
-    void 망가진_쿠키는_예외_없이_없던_요청으로_처리한다(String value) {
-        assertNull(repository(NOW).loadAuthorizationRequest(callback(new Cookie("MOGUM_OAUTH_REQUEST", value), STATE)));
+    @DisplayName("망가진 쿠키는 예외 없이 없던 요청으로 처리한다")
+    void treatsMalformedCookieAsMissingRequest(String value) {
+        // given
+        var repository = repository(NOW);
+        var callback = callback(new Cookie("MOGUM_OAUTH_REQUEST", value), STATE);
+
+        // when
+        var restored = repository.loadAuthorizationRequest(callback);
+
+        // then
+        assertThat(restored).isNull();
     }
 
-    @Test
-    void 만료된_쿠키와_미래_시각과_불일치_state와_없는_쿠키를_거절한다() {
+    @ParameterizedTest(name = "거절 조건 {0}")
+    @ValueSource(strings = {"expired", "future", "state-mismatch", "missing-cookie"})
+    @DisplayName("만료된 쿠키와 미래 시각과 불일치 state 및 없는 쿠키를 거절한다")
+    void rejectsExpiredFutureMismatchedOrMissingCookie(String condition) {
+        // given
         var response = new MockHttpServletResponse();
         repository(NOW).saveAuthorizationRequest(authorization(), new MockHttpServletRequest(), response);
         var cookie = response.getCookie("MOGUM_OAUTH_REQUEST");
-        assertNull(repository(NOW.plusSeconds(601)).loadAuthorizationRequest(callback(cookie, STATE)));
-        assertNull(repository(NOW.minusSeconds(1)).loadAuthorizationRequest(callback(cookie, STATE)));
-        assertNull(repository(NOW).loadAuthorizationRequest(callback(cookie, "different")));
-        assertNull(repository(NOW).loadAuthorizationRequest(new MockHttpServletRequest()));
+        var instant = switch (condition) {
+            case "expired" -> NOW.plusSeconds(601);
+            case "future" -> NOW.minusSeconds(1);
+            default -> NOW;
+        };
+        var repository = repository(instant);
+        var request = condition.equals("missing-cookie") ? new MockHttpServletRequest()
+                : callback(cookie, condition.equals("state-mismatch") ? "different" : STATE);
+
+        // when
+        var restored = repository.loadAuthorizationRequest(request);
+
+        // then
+        assertThat(restored).isNull();
     }
 
     private CookieAuthorizationRequestRepository repository(Instant instant) {

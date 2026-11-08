@@ -1,5 +1,6 @@
 package com.mogum.config;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -11,7 +12,7 @@ import org.springframework.core.env.SystemEnvironmentPropertySource;
 
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class WebPropertiesTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
@@ -19,47 +20,67 @@ class WebPropertiesTest {
             .withUserConfiguration(PropertiesConfiguration.class);
 
     @Test
-    void 로컬_기본값은_Vite_출처와_빈_쿠키_도메인이다() {
+    @DisplayName("로컬 기본값은 Vite 출처와 빈 쿠키 도메인이다")
+    void defaultsToViteOriginAndHostOnlyCookie() {
+        // when
         runner.run(context -> {
-            assertNull(context.getStartupFailure());
+            // then
+            assertThat(context).hasNotFailed();
             var properties = context.getBean(WebProperties.class);
-            assertEquals("http://localhost:5173", properties.origin());
-            assertEquals("", properties.cookieDomain());
+            assertThat(properties.origin()).isEqualTo("http://localhost:5173");
+            assertThat(properties.cookieDomain()).isEmpty();
         });
     }
 
     @Test
-    void 설정_키로_단일_출처와_쿠키_도메인을_바인딩한다() {
-        runner.withPropertyValues("app.web.origin=https://mogum.example", "app.web.cookie-domain=mogum.example")
-                .run(context -> {
-                    assertNull(context.getStartupFailure());
-                    var properties = context.getBean(WebProperties.class);
-                    assertEquals("https://mogum.example", properties.origin());
-                    assertEquals("mogum.example", properties.cookieDomain());
-                });
+    @DisplayName("설정 키로 단일 출처와 쿠키 도메인을 바인딩한다")
+    void bindsOriginAndCookieDomain() {
+        // given
+        var configured = runner.withPropertyValues("app.web.origin=https://mogum.example", "app.web.cookie-domain=mogum.example");
+
+        // when
+        configured.run(context -> {
+            // then
+            assertThat(context).hasNotFailed();
+            var properties = context.getBean(WebProperties.class);
+            assertThat(properties.origin()).isEqualTo("https://mogum.example");
+            assertThat(properties.cookieDomain()).isEqualTo("mogum.example");
+        });
     }
 
     @Test
-    void 환경_변수로_출처와_쿠키_도메인을_덮어쓴다() {
-        runner.withInitializer(context -> context.getEnvironment().getPropertySources().addFirst(
+    @DisplayName("환경 변수로 출처와 쿠키 도메인을 덮어쓴다")
+    void overridesOriginAndDomainFromEnvironment() {
+        // given
+        var configured = runner.withInitializer(context -> context.getEnvironment().getPropertySources().addFirst(
                 new SystemEnvironmentPropertySource("test-env", Map.of(
                         "APP_WEB_ORIGIN", "https://mogum.example",
-                        "APP_WEB_COOKIE_DOMAIN", "mogum.example"))))
-                .run(context -> {
-                    assertNull(context.getStartupFailure());
-                    var properties = context.getBean(WebProperties.class);
-                    assertEquals("https://mogum.example", properties.origin());
-                    assertEquals("mogum.example", properties.cookieDomain());
-                });
+                        "APP_WEB_COOKIE_DOMAIN", "mogum.example"))));
+
+        // when
+        configured.run(context -> {
+            // then
+            assertThat(context).hasNotFailed();
+            var properties = context.getBean(WebProperties.class);
+            assertThat(properties.origin()).isEqualTo("https://mogum.example");
+            assertThat(properties.cookieDomain()).isEqualTo("mogum.example");
+        });
     }
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "출처 [{0}]")
     @ValueSource(strings = {"*", "https://*.mogum.example", "https://mogum.example,https://evil.example",
             "https://mogum.example/", "https://mogum.example/path", "https://mogum.example?next=x",
             "https://user@mogum.example", "", "mogum.example"})
-    void 출처는_경로와_패턴과_목록_없는_단일_HTTP_출처여야_한다(String origin) {
-        runner.withPropertyValues("app.web.origin=" + origin).run(context ->
-                assertNotNull(context.getStartupFailure()));
+    @DisplayName("출처는 경로와 패턴과 목록 없는 단일 HTTP 출처여야 한다")
+    void rejectsInvalidSingleHttpOrigin(String origin) {
+        // given
+        var configured = runner.withPropertyValues("app.web.origin=" + origin);
+
+        // when
+        configured.run(context -> {
+            // then
+            assertThat(context).hasFailed();
+        });
     }
 
     @Configuration(proxyBeanMethods = false)

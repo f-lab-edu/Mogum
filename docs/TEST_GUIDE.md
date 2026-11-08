@@ -1,9 +1,11 @@
 # 테스트 코드 작성 가이드 — 백엔드
 
 > 백엔드 테스트 코드를 쓸 때 본다 — 종류 · 이름 · 본문 · 데이터 · 격리 · 요청 도구. **이 규칙의 단일 출처다**(요약 입구가 아니다). 무엇을 검증해야 하는지(장애 주입 · 규칙 테스트 · 용량 측정)는 [07](./07-testing.md)에 있다.
-> 2026-11-08 사용자 결정([ADR-079](./ADR.md)). 기존 테스트의 이관은 `3a-test-conventions` 에서 한다 — **지원 도구와 레포지토리 · Auditing · 도메인 · 로그인 서비스 · 세션 회원 필터 · 웹 슬라이스 · 공통 API · 보안/OAuth/검증/로그/DB 설정 통합 테스트 이관, 제품 레포지토리 상속 규칙(§7 넷째 줄)은 구현했다. 나머지 테스트 이관과 테스트 코드 규칙 검사는 후속 step에서 수행한다.** 화면(`frontend/`) 테스트는 화면 작업이 늘어날 때 따로 정한다.
+> 2026-11-08 사용자 결정([ADR-079](./ADR.md)). 기존 테스트의 이관은 `3a-test-conventions` 에서 한다 — **지원 도구와 레포지토리 · Auditing · 도메인 · 로그인 서비스 · 세션 회원 필터 · 웹 슬라이스 · 공통 API · 보안/OAuth/검증/로그/DB 설정 통합 테스트 및 남은 단위 테스트 이관, 제품 레포지토리 상속 규칙(§7 넷째 줄)은 구현했다. `LoginIdentityMigrationIT` · `AppImageIT` 이관과 테스트 코드 규칙 검사는 step 6에서 수행한다.** 화면(`frontend/`) 테스트는 화면 작업이 늘어날 때 따로 정한다.
 >
 > `3a` step 4 현재 통합 테스트는 실제 포트 `RestTestClient`와 공용 컨텍스트를 사용한다. 출처 `https://mogum.example` · 관리자 `admin@example.com,changed@example.com` · 쿠키 도메인 `mogum.example` · Tomcat 스레드 최대/최소 1을 공용 값으로 두었다. 세션 쿠키 직렬화는 `SecurityConfigurationCookieTest`의 `ApplicationContextRunner`에서 두 도메인 설정을 확인한다. 로컬 XSRF 쿠키 발급/만료의 Domain 생략은 실제 필터 응답을 확인해야 하므로 `LocalCookieIntegrationTest` 묶음 하나만 도메인을 비워 **통합 컨텍스트는 총 2개**다(레포지토리 슬라이스 제외). 실패용 컨트롤러 · ERROR 관찰 필터 · DB 연결 실패 대역 · Google 가짜 서버는 공용 테스트 설정의 중첩 static 클래스에 있고, ERROR 관찰은 테스트 응답 헤더로 디스패치 종류와 실행 중 MDC의 요청 ID가 응답 요청 ID와 같은지 확인한다. 스파이와 클래스별 설정은 제거했다.
+
+> `3a` step 5에서 인증 · 로그/시계 · 설정 · 배포 파일 · FSRS 학습 · `ArchitectureTest`의 단위 테스트 형식을 이관했다. 배포 파일 검사는 `DeployFilesTest` · `DeployFilesJournalTest` · `DeployFilesScriptTest`, 백업은 `BackupFilesTest` · `BackupFilesScriptTest`, 워크플로는 `WorkflowFilesTest` · `WorkflowFilesScriptTest`로 나눴다. 설정 바인딩의 레포지토리 대역은 기존 `FakeUserRepository`를 쓴다. 기존 검증 사실과 아키텍처 규칙 · 위반 픽스처 · 제품 클래스 검사 범위는 유지했다.
 
 ## 1. 종류 — 무엇으로 무엇을 보나
 

@@ -51,9 +51,9 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ArchitectureTest {
     private static final JavaClasses CLASSES = new ClassFileImporter()
@@ -74,8 +74,11 @@ class ArchitectureTest {
     @Test
     @DisplayName("제품 레포지토리는 정리와 집계를 제공하는 상위 인터페이스를 상속하지 않는다")
     void repositoriesDeclareOnlyDomainOperations() {
-        // when & then
-        REPOSITORIES_DECLARE_DOMAIN_OPERATIONS.check(CLASSES);
+        // when
+        var result = REPOSITORIES_DECLARE_DOMAIN_OPERATIONS.evaluate(CLASSES);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
     }
 
     @Test
@@ -86,13 +89,20 @@ class ArchitectureTest {
     }
 
     @Test
-    void 모든_엔티티는_공통_시각_상위_클래스를_상속한다() {
-        assertTrue(CLASSES.contain(User.class));
-        ENTITIES_EXTEND_AUDITED_ENTITY.check(CLASSES);
+    @DisplayName("모든 엔티티는 공통 시각 상위 클래스를 상속한다")
+    void requiresAuditedEntitySuperclass() {
+        // when
+        var result = ENTITIES_EXTEND_AUDITED_ENTITY.evaluate(CLASSES);
+
+        // then
+        assertThat(CLASSES.contain(User.class)).isTrue();
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
     }
 
     @Test
-    void 공통_시각_상위_클래스를_상속하지_않은_엔티티를_거부한다() {
+    @DisplayName("공통 시각 상위 클래스를 상속하지 않은 엔티티를 거부한다")
+    void rejectsUnauditedEntity() {
+        // when & then
         assertViolation(ENTITIES_EXTEND_AUDITED_ENTITY, UnauditedEntity.class);
     }
 
@@ -164,96 +174,169 @@ class ArchitectureTest {
     }
 
     @Test
-    void 생성은_worker만_부른다() {
-        GENERATION_ONLY_FROM_WORKER.allowEmptyShould(true).check(CLASSES);
+    @DisplayName("생성은 worker만 부른다")
+    void restrictsGenerationAccess() {
+        // when
+        var result = GENERATION_ONLY_FROM_WORKER.allowEmptyShould(true).evaluate(CLASSES);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
     }
 
     @Test
-    void worker를_부르는_곳은_config뿐이다() {
-        WORKER_ONLY_FROM_CONFIG.allowEmptyShould(true).check(CLASSES);
+    @DisplayName("worker를 부르는 곳은 config뿐이다")
+    void restrictsWorkerAccess() {
+        // when
+        var result = WORKER_ONLY_FROM_CONFIG.allowEmptyShould(true).evaluate(CLASSES);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
     }
 
     @Test
-    void LLM을_부르는_패키지는_Transactional을_쓰지_않는다() {
-        NO_TRANSACTIONAL_CLASSES_AROUND_LLM_CALLS.allowEmptyShould(true).check(CLASSES);
-        NO_TRANSACTIONAL_METHODS_AROUND_LLM_CALLS.allowEmptyShould(true).check(CLASSES);
+    @DisplayName("LLM을 부르는 패키지는 Transactional을 쓰지 않는다")
+    void prohibitsTransactionsAroundLlmCalls() {
+        // when
+        var result = NO_TRANSACTIONAL_CLASSES_AROUND_LLM_CALLS.allowEmptyShould(true).evaluate(CLASSES);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
     }
 
     @Test
-    void OpenAI_SDK는_LLM_어댑터에만_둔다() {
-        OPENAI_SDK_ONLY_IN_LLM_ADAPTER.allowEmptyShould(true).check(CLASSES);
+    @DisplayName("LLM을 부르는 메서드는 Transactional을 쓰지 않는다")
+    void prohibitsTransactionalMethodsAroundLlmCalls() {
+        // when
+        var result = NO_TRANSACTIONAL_METHODS_AROUND_LLM_CALLS.allowEmptyShould(true).evaluate(CLASSES);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
     }
 
     @Test
-    void REST_컨트롤러의_성공_응답은_명시적으로_감싼다() {
-        assertTrue(CLASSES.contain(MeController.class));
-        assertTrue(CLASSES.contain(ApiErrorController.class));
-        CONTROLLER_RESPONSE_TYPES.check(CLASSES);
+    @DisplayName("OpenAI SDK는 LLM 어댑터에만 둔다")
+    void restrictsOpenAiSdkToAdapter() {
+        // when
+        var result = OPENAI_SDK_ONLY_IN_LLM_ADAPTER.allowEmptyShould(true).evaluate(CLASSES);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
     }
 
     @Test
-    void REST_요청_본문은_Valid로_검증한다() {
-        REQUEST_BODY_REQUIRES_VALID.allowEmptyShould(true).check(CLASSES);
+    @DisplayName("REST 컨트롤러의 성공 응답은 명시적으로 감싼다")
+    void requiresExplicitControllerResponseWrapping() {
+        // when
+        var result = CONTROLLER_RESPONSE_TYPES.evaluate(CLASSES);
+
+        // then
+        assertThat(CLASSES.contain(MeController.class)).isTrue();
+        assertThat(CLASSES.contain(ApiErrorController.class)).isTrue();
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
     }
 
     @Test
-    void Valid_없는_요청_본문을_거부한다() {
+    @DisplayName("REST 요청 본문은 Valid로 검증한다")
+    void requiresValidationOnRequestBodies() {
+        // when
+        var result = REQUEST_BODY_REQUIRES_VALID.allowEmptyShould(true).evaluate(CLASSES);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Valid 없는 요청 본문을 거부한다")
+    void rejectsUnvalidatedRequestBody() {
+        // when & then
         assertViolation(REQUEST_BODY_REQUIRES_VALID, UnvalidatedBodyController.class);
     }
 
     @Test
-    void Valid_요청_본문을_허용하고_매핑_없는_메서드와_다른_매개변수는_검사하지_않는다() {
-        REQUEST_BODY_REQUIRES_VALID.check(new ClassFileImporter().importClasses(ValidatedBodyController.class));
+    @DisplayName("Valid 요청 본문을 허용하고 매핑 없는 메서드와 다른 매개변수는 검사하지 않는다")
+    void acceptsValidatedBodyAndIgnoresOtherParameters() {
+        // given
+        var classes = new ClassFileImporter().importClasses(ValidatedBodyController.class);
+
+        // when
+        var result = REQUEST_BODY_REQUIRES_VALID.evaluate(classes);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
     }
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "조건 {0}")
     @ValueSource(classes = {UnwrappedController.class, UnwrappedEntityController.class,
             RawEntityController.class, RawResponseController.class})
-    void DTO_직접_반환과_감싸지_않은_ResponseEntity와_원시_타입을_거부한다(Class<?> fixture) {
+    @DisplayName("DTO 직접 반환과 감싸지 않은 ResponseEntity와 원시 타입을 거부한다")
+    void rejectsUnwrappedAndRawResponseTypes(Class<?> fixture) {
+        // when & then
         assertViolation(CONTROLLER_RESPONSE_TYPES, fixture);
     }
 
     @Test
-    void 성공_응답의_네_반환_모양을_허용하고_매핑_없는_메서드는_검사하지_않는다() {
-        CONTROLLER_RESPONSE_TYPES.check(new ClassFileImporter().importClasses(AllowedController.class));
+    @DisplayName("성공 응답의 네 반환 모양을 허용하고 매핑 없는 메서드는 검사하지 않는다")
+    void acceptsSupportedResponseTypesAndIgnoresHelpers() {
+        // given
+        var classes = new ClassFileImporter().importClasses(AllowedController.class);
+
+        // when
+        var result = CONTROLLER_RESPONSE_TYPES.evaluate(classes);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
     }
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "조건 {0}")
     @ValueSource(classes = {AccountToGeneration.class, JobToGeneration.class})
-    void 생성_직접_참조와_job_우회를_거부한다(Class<?> fixture) {
+    @DisplayName("생성 직접 참조와 job 우회를 거부한다")
+    void rejectsDirectAndIndirectGenerationAccess(Class<?> fixture) {
+        // when & then
         assertViolation(GENERATION_ONLY_FROM_WORKER, fixture);
     }
 
     @Test
-    void 도메인에서_worker_참조를_거부한다() {
+    @DisplayName("도메인에서 worker 참조를 거부한다")
+    void rejectsDomainAccessToWorker() {
+        // when & then
         assertViolation(WORKER_ONLY_FROM_CONFIG, AccountToWorker.class);
     }
 
     @Test
-    void 생성_클래스의_Transactional을_거부한다() {
+    @DisplayName("생성 클래스의 Transactional을 거부한다")
+    void rejectsTransactionalGenerationClass() {
+        // when & then
         assertViolation(NO_TRANSACTIONAL_CLASSES_AROUND_LLM_CALLS, TransactionalGeneration.class);
     }
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "조건 {0}")
     @ValueSource(classes = {TransactionalWorkerMethod.class, JakartaTransactionalWorkerMethod.class})
-    void worker_메서드의_Transactional을_거부한다(Class<?> fixture) {
+    @DisplayName("worker 메서드의 Transactional을 거부한다")
+    void rejectsTransactionalWorkerMethod(Class<?> fixture) {
+        // when & then
         assertViolation(NO_TRANSACTIONAL_METHODS_AROUND_LLM_CALLS, fixture);
     }
 
     @Test
-    void 운영_검사는_애플리케이션을_포함하고_테스트를_제외한다() {
-        assertTrue(CLASSES.contain(MogumApplication.class));
-        assertFalse(CLASSES.contain(ArchitectureTest.class));
-        assertFalse(CLASSES.contain(AllowedController.class));
-        assertFalse(CLASSES.contain(UnvalidatedBodyController.class));
-        assertFalse(CLASSES.contain(ValidatedBodyController.class));
-        assertTrue(CLASSES.stream().noneMatch(type -> type.getPackageName().startsWith("com.mogum.archfixture")));
+    @DisplayName("운영 검사는 애플리케이션을 포함하고 테스트를 제외한다")
+    void excludesTestsFromProductionClasses() {
+        // when
+        var classes = CLASSES;
+
+        // then
+        assertThat(classes.contain(MogumApplication.class)).isTrue();
+        assertThat(classes.contain(ArchitectureTest.class)).isFalse();
+        assertThat(classes.contain(AllowedController.class)).isFalse();
+        assertThat(classes.contain(UnvalidatedBodyController.class)).isFalse();
+        assertThat(classes.contain(ValidatedBodyController.class)).isFalse();
+        assertThat(classes.stream().noneMatch(type -> type.getPackageName().startsWith("com.mogum.archfixture"))).isTrue();
     }
 
     private static void assertViolation(ArchRule rule, Class<?> fixture) {
         JavaClasses classes = new ClassFileImporter().importClasses(fixture);
-        AssertionError violation = assertThrows(AssertionError.class, () -> rule.check(classes));
-        assertTrue(violation.getMessage().contains(fixture.getName()), violation::getMessage);
+        assertThatThrownBy(() -> rule.check(classes))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining(fixture.getName());
     }
 
     @RestController

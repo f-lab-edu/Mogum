@@ -1,9 +1,11 @@
 package com.mogum.auth;
 
 import com.mogum.account.service.ExternalAccount;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
@@ -11,50 +13,82 @@ import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class GoogleAccountMapperTest {
     private final GoogleAccountMapper mapper = new GoogleAccountMapper();
 
     @Test
-    void 서버_등록_ID와_구글_응답을_로그인_입력으로_변환하고_원문을_보존한다() {
-        assertEquals(new ExternalAccount("google", " Case-Sensitive-Sub ", "Admin@Example.com", true),
-                mapper.map(authentication("google", attributes())));
+    @DisplayName("서버 등록 ID와 구글 응답을 로그인 입력으로 변환하고 원문을 보존한다")
+    void mapsGoogleAccountWithoutChangingOriginalValues() {
+        // given
+        var authentication = authentication("google", attributes());
+
+        // when
+        var account = mapper.map(authentication);
+
+        // then
+        assertThat(account).isEqualTo(new ExternalAccount("google", " Case-Sensitive-Sub ", "Admin@Example.com", true));
     }
 
     @Test
-    void 구글_외_등록은_같은_응답_필드가_있어도_거절한다() {
-        assertThrows(OAuth2AuthenticationException.class, () -> mapper.map(authentication("kakao", attributes())));
+    @DisplayName("구글 외 등록은 같은 응답 필드가 있어도 거절한다")
+    void rejectsOtherProviderRegistration() {
+        // given
+        var authentication = authentication("kakao", attributes());
+
+        // when & then
+        assertThatThrownBy(() -> mapper.map(authentication)).isInstanceOf(OAuth2AuthenticationException.class);
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"sub", "email"})
-    void 식별자와_이메일의_누락_빈값_잘못된_타입을_거절한다(String field) {
+    @ParameterizedTest(name = "필드 {0} 값 [{1}]")
+    @MethodSource("invalidIdentityAttributes")
+    @DisplayName("식별자와 이메일의 누락과 빈값 및 잘못된 타입을 거절한다")
+    void rejectsInvalidIdentityAttribute(String field, Object invalid) {
+        // given
         var values = attributes();
-        values.remove(field);
-        assertThrows(OAuth2AuthenticationException.class, () -> mapper.map(authentication("google", values)));
-        for (Object invalid : List.of("", "  ", 123)) {
-            values.put(field, invalid);
-            assertThrows(OAuth2AuthenticationException.class, () -> mapper.map(authentication("google", values)));
-        }
+        if (invalid == null) values.remove(field);
+        else values.put(field, invalid);
+        var authentication = authentication("google", values);
+
+        // when & then
+        assertThatThrownBy(() -> mapper.map(authentication)).isInstanceOf(OAuth2AuthenticationException.class);
     }
 
-    @Test
-    void 이메일_검증_표시가_없거나_boolean_true가_아니면_미인증이다() {
+    @ParameterizedTest(name = "인증 표시 [{0}]")
+    @MethodSource("unverifiedAttributes")
+    @DisplayName("이메일 검증 표시가 없거나 boolean true가 아니면 미인증이다")
+    void treatsMissingOrNonBooleanVerificationAsUnverified(Object value) {
+        // given
         var values = attributes();
-        values.remove("email_verified");
-        assertFalse(mapper.map(authentication("google", values)).emailVerified());
-        for (Object value : List.of(false, "true", 1)) {
-            values.put("email_verified", value);
-            assertFalse(mapper.map(authentication("google", values)).emailVerified());
-        }
+        if (value == null) values.remove("email_verified");
+        else values.put("email_verified", value);
+        var authentication = authentication("google", values);
+
+        // when
+        var account = mapper.map(authentication);
+
+        // then
+        assertThat(account.emailVerified()).isFalse();
+    }
+
+    private static Stream<Arguments> invalidIdentityAttributes() {
+        return Stream.of("sub", "email").flatMap(field -> Stream.of(null, "", "  ", 123)
+                .map(value -> Arguments.of(field, value)));
+    }
+
+    private static Stream<Arguments> unverifiedAttributes() {
+        return Stream.of(null, false, "true", 1).map(value -> Arguments.of(value));
     }
 
     private static Map<String, Object> attributes() {
         return new HashMap<>(Map.of("name", "test", "sub", " Case-Sensitive-Sub ",
                 "email", "Admin@Example.com", "email_verified", true));
     }
+
     private static OAuth2AuthenticationToken authentication(String registration, Map<String, Object> attributes) {
         return new OAuth2AuthenticationToken(new DefaultOAuth2User(List.of(), attributes, "name"), List.of(), registration);
     }
