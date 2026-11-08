@@ -38,8 +38,8 @@
     },
     {
       "dir": "4-account",
-      "status": "blocked",
-      "blocked_at": "2026-11-09T02:36:58+0900"
+      "status": "completed",
+      "completed_at": "2026-11-09T07:20:23+0900"
     }
   ]
 }
