@@ -1,0 +1,146 @@
+<!DOCTYPE html><html lang="ko" style=""><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>로그인 - 머금 (Mogum)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&amp;family=Pretendard:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              DEFAULT: '#7c4dff',
+              dark: '#6200ea',
+              light: '#f3e8ff',
+              container: '#ede7f6'
+            },
+            surface: {
+              bg: '#fff7fe',
+              card: '#ffffff',
+              low: '#fbf0ff',
+              dim: '#f1e5f5'
+            },
+            mogum: {
+              charcoal: '#1e1b2e',
+              muted: '#756f86',
+              border: '#f1e5f5'
+            }
+          },
+          fontFamily: {
+            sans: ['Pretendard', 'Plus Jakarta Sans', '-apple-system', 'sans-serif'],
+            en: ['Plus Jakarta Sans', 'sans-serif']
+          },
+          boxShadow: {
+            tactile: '0 12px 36px -4px rgba(124, 77, 255, 0.08), 0 4px 16px -2px rgba(124, 77, 255, 0.03)',
+            button: '0 4px 12px rgba(0, 0, 0, 0.05)'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Pretendard', -apple-system, sans-serif;
+    }
+    .font-en {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-[#fff7fe] text-[#1e1b2e] min-h-screen flex flex-col justify-between selection:bg-purple-100 selection:text-[#7c4dff]">
+
+  <!-- Top Simple Brand Header (No Sidebar, No Navigation Tabs as per Pre-login Spec) -->
+  <header class="h-16 w-full max-w-6xl mx-auto px-6 flex items-center justify-between">
+    <div class="flex items-center gap-2.5">
+  <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdvSS_FO1TXvJpvzs159-lCy9n1HjqorYU6_8jod6N5PEn5SdGX6S5Msw2HT6Dj0WIsz-7r1_rvbz4UPV6ArPIPESQL1524Bvp9pU0B3SNwE4jLLV0F5-m8BLVGXJ9K08nXQXMj5EDbGKR6WbbGfxOuXL1mqBFeY_ySKykj9ou2Ick8HCScj8nyrxav7GqKPnM4OG9Mjs1J5yDe06oBctord8Ck06-xsFeTtNug-YlqB77emdC7Y7VhA" alt="Mogum Mascot" class="w-9 h-9 object-contain">
+  <span class="text-xl font-bold tracking-tight text-[#1e1b2e] font-display">Mogum</span>
+  <span class="text-xs px-2 py-0.5 rounded-full font-semibold bg-[#ede7f6] text-[#7c4dff]">머금</span>
+</div>
+    <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#f3e8ff] border border-[#e9d5ff] text-xs font-semibold text-[#7c4dff]">
+      <span class="w-2 h-2 rounded-full bg-[#7c4dff] animate-pulse"></span>
+      <span class="">정원제 운영 중</span>
+    </div>
+  </header>
+
+  <!-- Main Login Card Container -->
+  <main class="flex-1 flex items-center justify-center px-4 py-8 sm:py-12">
+    <div class="w-full max-w-[440px] bg-white rounded-3xl p-7 sm:p-9 shadow-tactile border border-[#f1e5f5] text-center relative overflow-hidden">
+      
+      <!-- Subtle Decorative Background Glow -->
+      <div class="absolute -top-24 -right-24 w-48 h-48 bg-purple-200/40 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-100/60 rounded-full blur-2xl pointer-events-none"></div>
+
+      <!-- Mascot Visual -->
+      <div class="relative mx-auto mb-6 w-28 h-28 flex items-center justify-center">
+        <div class="absolute inset-0 bg-gradient-to-b from-purple-100/60 to-purple-50/20 rounded-full scale-110"></div>
+        <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQHDG8OV_cRtz_N-jDelYwBMZncRigXf0P9vzQ-3n7-H2rIL_c8sxZTCt34NHO31vBLkiYJClBTIuxgfoc0gi0oOJmnnqpt3SvV0PuVQ-CTdCQjepIy1g9PGH3VIBBbiMvs1y99R0tbHmktnWaMlNX8KSpgBNNMgjo9rYfoohIQzZ8l5_5nyZ7SLt9R8a2Ko-wzsKGBLjeyFgF_YCCdV5n7iLI0OdBlYS7G0B_MxrXdxppbOADt82A_A" alt="책 읽는 모구미 마스코트" class="w-24 h-24 object-contain relative z-10 drop-shadow-md transform hover:scale-105 transition-transform duration-300">
+      </div>
+
+      <!-- Service Title & Short Description (ADR-091 strictly followed) -->
+      <div class="space-y-2 mb-8 relative z-10">
+        <h1 class="text-2xl sm:text-[26px] font-extrabold text-[#1e1b2e] tracking-tight">
+          한 모금씩 삼키는 배움
+        </h1>
+        <p class="text-sm text-[#756f86] leading-relaxed break-keep px-2">
+          부담 없이 매일 조금씩 쌓아가는 맞춤형 AI 학습 공간, <span class="font-bold text-[#7c4dff]">머금</span>에 오신 것을 환영해요.
+        </p>
+      </div>
+
+      <!-- Limited Quota Info Banner (ADR-091: 정원제라는 것 명시) -->
+      <div class="mb-7 p-3.5 rounded-2xl bg-[#fbf0ff] border border-purple-100/80 text-left flex items-start gap-3 relative z-10">
+        <div class="w-8 h-8 rounded-xl bg-purple-100 text-[#7c4dff] flex items-center justify-center shrink-0 mt-0.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="text-xs font-bold text-[#1e1b2e] mb-0.5">쾌적한 학습 환경을 위한 정원제</div>
+          <div class="text-[11px] text-[#756f86] leading-snug">
+            구글 계정으로 로그인 후 간편 승인 신청을 완료하면 관리자 확인을 거쳐 이용하실 수 있습니다.
+          </div>
+        </div>
+      </div>
+
+      <!-- Google Login Button (ADR-091) -->
+      <div class="space-y-3 relative z-10">
+        <button type="button" class="w-full flex items-center justify-center gap-3 py-3.5 px-4 bg-white hover:bg-neutral-50 active:bg-neutral-100 text-[#1e1b2e] font-semibold text-[15px] rounded-2xl border border-[#e5e7eb] hover:border-[#d1d5db] shadow-button transition-all duration-200 group">
+          <!-- Official Google "G" Logo SVG -->
+          <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"></path>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"></path>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"></path>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"></path>
+          </svg>
+          <span class="tracking-tight group-hover:text-black">Google 계정으로 계속하기</span>
+        </button>
+
+        <p class="text-[12px] text-[#9ca3af] pt-1">
+          처음 오셨다면 로그인 후 신청 화면으로 바로 연결됩니다
+        </p>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Clean Footer (No Privacy Policy link on Login page as per ADR-062 & ADR-091) -->
+  <footer class="w-full py-5 text-center text-xs text-[#9ca3af]">
+    <div class="flex items-center justify-center gap-2">
+      <span class="">© 2025 Mogum.</span>
+      <span class="">•</span>
+      <span class="">AI 맞춤형 학습 보조 서비스</span>
+    </div>
+  </footer>
+
+
+
+
+
+
+
+</body></html>

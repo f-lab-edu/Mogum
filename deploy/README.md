@@ -37,7 +37,7 @@
 
    **수행 기록(2026-10-25~26)** — 위 7개를 콘솔로 만들고 CLI 읽기로 견본과 대조했다: OIDC URL · audience, ECR IMMUTABLE · 예외 없음 · AES256 · 수명주기 일치, S3 공개 차단 4개 · `BucketOwnerEnforced` · SSE-S3 · 버전 관리 · 수명주기 일치, 두 역할의 신뢰 · 권한이 치환본과 일치, EC2 상태 검사 ok · SSM Online · 루트 볼륨 암호화, Elastic IP 연결. IAM 시뮬레이터로 두 역할의 허용 9건 · 거부 12건이 기대대로였다(아래 [첫 배포 때 확인](#첫-배포-때-확인) 11의 시뮬레이터 부분). 실제 수임 · 업로드 · 배포는 8번에서 확인한다. 실제 ID · 주소는 비공개 운영 기록에 둔다.
 
-3. **Cloudflare DNS.** `api.{도메인}`의 **A 레코드 값은 위 Elastic IP**, 프록시는 **DNS only · 회색 구름**으로 저장한다. 쓸 파일: [Caddyfile](./Caddyfile)의 `API_DOMAIN`, [05 §1.4](../docs/05-api.md#14-우리-api-레이트리밋). 프록시를 켜면 모든 요청이 Cloudflare IP로 보여 IP당 레이트리밋이 깨지고 Caddy 인증서 발급 경로도 바뀐다(ADR-060이 Vercel API 프록시를 뺀 것과 같은 이유). 완료 확인: DNS → Records에서 해당 행의 Proxy status가 **DNS only**인지 다시 연다. 로컬의 `dig +short A api.{도메인}`이 Elastic IP인지 확인한다. 같은 호스트의 예전 A/AAAA 레코드가 다른 서버를 가리키면 정리한다. [Cloudflare 프록시 상태 문서](https://developers.cloudflare.com/dns/proxy-status/). 화면 `{도메인}` 레코드는 6번의 Vercel 안내값으로 만들며 그것도 DNS only다.
+3. **Cloudflare DNS.** `api.{도메인}`의 **A 레코드 값은 위 Elastic IP**, 프록시는 **DNS only · 회색 구름**으로 저장한다. 쓸 파일: [Caddyfile](./Caddyfile)의 `API_DOMAIN`. 프록시를 켜면 모든 요청이 Cloudflare IP로 보이고 Caddy 인증서 발급 경로도 바뀐다. 완료 확인: DNS → Records에서 해당 행의 Proxy status가 **DNS only**인지 다시 연다. 로컬의 `dig +short A api.{도메인}`이 Elastic IP인지 확인한다. 같은 호스트의 예전 A/AAAA 레코드가 다른 서버를 가리키면 정리한다. [Cloudflare 프록시 상태 문서](https://developers.cloudflare.com/dns/proxy-status/). 화면 `{도메인}` 레코드는 6번의 Vercel 안내값으로 만들며 그것도 DNS only다.
 
    **수행 기록(2026-10-26)** — `api` A 레코드를 DNS only로 저장했다. 공용 리졸버 세 곳과 Cloudflare 권한 네임서버가 모두 Elastic IP를 돌려주고 AAAA/CNAME은 없다(프록시였다면 Cloudflare IP와 AAAA가 나온다).
 
@@ -106,7 +106,7 @@
 
    **수행 기록(2026-10-25~26)** — 프로젝트 · Production `VITE_API_BASE_URL` · 도메인 연결을 마쳤다. 운영 `/`는 200이고 번들에 API 출처가 들어 있다. `/login` 새로고침은 아직 404다 — SPA rewrite(`frontend/vercel.json`)가 `main`에 들어간 뒤 운영 확인 목록에서 다시 본다.
 
-7. **Google 콘솔 운영 콜백.** 쓸 문서: [05 §1.1](../docs/05-api.md#11-인증--구글-oauth--쿠키-세션db-저장), 서버의 `GOOGLE_REDIRECT_URI`. 기존 OAuth 웹 클라이언트의 승인된 리디렉션 URI에 **`https://api.{도메인}/auth/google/callback`을 추가**한다. 로컬 **`http://localhost:5173/auth/google/callback`은 유지**한다. 완료 확인: 두 URI가 모두 저장되어 있고 서버 값과 스킴/호스트/경로가 정확히 같다. Google 동의 화면이 테스트 모드라면 검사할 계정이 테스트 사용자에 포함되는지도 확인한다.
+7. **Google 콘솔 운영 콜백.** 쓸 문서: [05 §1.1](../docs/05-api.md#11-인증--구글-로그인--쿠키-세션db-저장), 서버의 `GOOGLE_REDIRECT_URI`. 기존 OAuth 웹 클라이언트의 승인된 리디렉션 URI에 **`https://api.{도메인}/auth/google/callback`을 추가**한다. 로컬 **`http://localhost:5173/auth/google/callback`은 유지**한다. 완료 확인: 두 URI가 모두 저장되어 있고 서버 값과 스킴/호스트/경로가 정확히 같다. Google 동의 화면이 테스트 모드라면 검사할 계정이 테스트 사용자에 포함되는지도 확인한다.
 
 8. **첫 배포.** 위 준비가 끝나면 `DEPLOY_ENABLED=true`로 바꾸고 Actions → **Deploy backend → Run workflow**에서 브랜치 **`main`**, **`sha`는 빈칸**으로 실행한다. 쓸 파일: [deploy.yml](../.github/workflows/deploy.yml), [deploy.sh](./deploy.sh). 완료 확인: 빌드/`imageTest`(새 이미지일 때) · ECR · S3 · **Deploy through SSM and print the command result**의 `Success`/종료 코드 0 · **Check public HTTPS health**의 200을 확인한다. SSM stdout에 `Deployment healthy; current release updated.`가 있어야 한다. 이후 아래 운영 확인을 수행한다. 실패하면 [수동 롤백 · 실패 확인](#수동-롤백--실패-확인)을 따르며 첫 배포에는 직전 릴리스가 없다.
 
@@ -153,7 +153,7 @@
     -H 'Origin: https://other.example'
   ```
 
-- [x] **배포 중 정상 종료:** 한가할 때 SSM root Bash에서 아래를 실행한다. 기대: 종료 대기 설정 **150초**, 직전 컨테이너 종료 코드 **143** · OOM `false`, 앱 로그에 graceful shutdown 시작/완료. **137/SIGKILL이면 실패**이며 원인을 확인한다. 재시작 후 로컬/공개 헬스가 다시 UP이어야 한다. 실행기의 호출 완료/반납은 아직 없으므로 **`4-job-queue`에서 별도 확인**한다. — 2026-10-26(SSM Run Command): 150초 · 143 · OOM `false`, graceful shutdown 시작/완료 → JPA · 커넥션 풀 종료 로그, 정지 1초 · 재시작 12초 뒤 로컬 UP · 공개 200
+- [x] **배포 중 정상 종료:** 한가할 때 SSM root Bash에서 아래를 실행한다. 기대: 종료 대기 설정 **150초**, 직전 컨테이너 종료 코드 **143** · OOM `false`, 앱 로그에 graceful shutdown 시작/완료. **137/SIGKILL이면 실패**이며 원인을 확인한다. 재시작 후 로컬/공개 헬스가 다시 UP이어야 한다. 워커의 진행 중 시도 완료 · 기다림으로 돌려놓기는 아직 없으므로 **만드는 작업 · 워커 TASK(SCHEDULE §3 의 6)에서 별도 확인**한다([04 §4.5](../docs/04-jobs-and-cost.md#45-시한--되찾기)). — 2026-10-26(SSM Run Command): 150초 · 143 · OOM `false`, graceful shutdown 시작/완료 → JPA · 커넥션 풀 종료 로그, 정지 1초 · 재시작 12초 뒤 로컬 UP · 공개 200
 
   ```bash
   export APP_IMAGE="$(cat /opt/mogum/current/app-image.ref)"
@@ -234,7 +234,7 @@
 
 ## 서버 구성
 
-서울 리전(`ap-northeast-2`) EC2 한 대(arm64 · 2GB · Amazon Linux 2023)에서 Docker Compose 프로젝트 **`mogum`** 하나를 실행한다. 화면은 Vercel에 둔다. 서버 접속과 명령 실행은 SSM을 사용한다(ADR-072). 처음에는 위 [구축 순서](#처음-구축-순서)와 [운영 확인 목록](#운영-확인-목록)을 따른다.
+서울 리전(`ap-northeast-2`) EC2 한 대(arm64 · 2GB · Amazon Linux 2023)에서 Docker Compose 프로젝트 **`mogum`** 하나를 실행한다. 화면은 Vercel에 둔다. 서버 접속과 명령 실행은 SSM을 사용한다([04 §3](../docs/04-jobs-and-cost.md#3-배포)). 처음에는 위 [구축 순서](#처음-구축-순서)와 [운영 확인 목록](#운영-확인-목록)을 따른다.
 
 | 위치 | 용도 |
 |---|---|
@@ -268,7 +268,7 @@ SSM은 릴리스 묶음을 푼 뒤 root로 해당 릴리스의 `deploy/deploy.sh
 5. 성공하면 `current` 링크를 교체하고 `timedatectl set-timezone Asia/Seoul`을 한 번 실행한다. 이 릴리스의 `deploy/systemd/mogum-backup.service` · `mogum-backup.timer`를 `/etc/systemd/system/`과 비교해 다른 파일만 권한 644로 복사하고, 변경이 있을 때만 `systemctl daemon-reload`와 `systemctl enable --now mogum-backup.timer`를 실행한다. 이어 journald 설정을 `cmp`로 비교해 다를 때만 디렉터리를 만들고 권한 644로 설치한 뒤 journald를 restart한다. 각각 같으면 설치와 해당 systemctl 호출을 생략한다. 시간대 설정 · 설정 설치나 systemctl 실패는 오류로 종료하며 갱신된 `current`는 유지한다. 헬스 실패로 복귀하거나 링크 갱신에 실패한 경로에서는 시간대 설정과 두 설정 설치를 모두 생략한다. 이어서 릴리스를 현재 · 직전을 포함해 최근 **3개**로 정리한다. 현재 · 직전 이미지 ID를 보호하고 나머지 이미지는 강제 삭제 없이 정리한다. 정리 실패는 정상 기동한 앱을 되돌리지 않고 결과만 알린다.
 6. 실패하면 기존 `current`의 Compose · 지문 · Caddyfile로 복귀하고 같은 헬스 확인을 한다. 복귀에는 `--pull never`를 사용하므로 ECR 없이 로컬 이미지로 실행한다. 복귀 성공도 배포 자체는 **실패 코드**로 끝낸다. 첫 배포 실패는 링크를 만들지 않고 실패로 끝낸다.
 
-Flyway 마이그레이션은 되돌리지 않는다. 직전 앱이 새 스키마에서 기동할 수 있는지는 마이그레이션마다 확인해야 한다. 이 배포는 앱을 하나만 실행하므로 배포 중 중단이 있다(ADR-061). 단계 이름과 결과만 표준 출력으로 내보내며 비밀 · 환경 변수 · env 파일 내용 · 로그인 토큰을 출력하지 않는다. 별도의 배포 로그 파일은 만들지 않는다.
+Flyway 마이그레이션은 되돌리지 않는다. 직전 앱이 새 스키마에서 기동할 수 있는지는 마이그레이션마다 확인해야 한다. 이 배포는 앱을 하나만 실행하므로 배포 중 중단이 있다 — 끄고 켤지 겹칠지는 아직 정하지 않았다([04 §10](../docs/04-jobs-and-cost.md#10-아직-정하지-않은-값)). 단계 이름과 결과만 표준 출력으로 내보내며 비밀 · 환경 변수 · env 파일 내용 · 로그인 토큰을 출력하지 않는다. 별도의 배포 로그 파일은 만들지 않는다.
 
 서버에 필요한 명령은 **Bash**, **Docker Engine**, **Docker Compose 플러그인**(`docker compose`), **AWS CLI v2**(`aws`), **curl**, **systemd**(`systemctl` · `timedatectl`), 그리고 Amazon Linux 2023 기본 도구인 `cat` · `stat` · `install` · `readlink` · `ln` · `mv` · `sort` · `rm` · `sleep` · `id` · `mktemp` · `date` · `wc`(GNU coreutils), `cmp`(GNU diffutils), `find`(GNU findutils)다. Docker 데몬은 부팅 시 자동 시작하도록 활성화해야 한다. 설치와 초기화는 [처음 구축 순서](#처음-구축-순서)의 4번을 따른다. 스크립트는 AWS 키를 받지 않고 인스턴스 역할을 사용한다.
 
@@ -441,7 +441,7 @@ docker logs --tail 50 mogum-postgres-1
 
 ## Vercel(화면)
 
-프로젝트는 **2026-10-25에 Hobby 팀에서 이미 만들었다.** 다시 만들 때도 Vercel의 Git 가져오기에서 이 GitHub 저장소 **`f-lab-edu/Mogum`**을 연결하고 다음 값을 사용한다. 운영 브랜치는 **`main`**이며 병합마다 Vercel Git 연동이 화면을 빌드 · 배포한다(ADR-060 · ADR-072).
+프로젝트는 **2026-10-25에 Hobby 팀에서 이미 만들었다.** 다시 만들 때도 Vercel의 Git 가져오기에서 이 GitHub 저장소 **`f-lab-edu/Mogum`**을 연결하고 다음 값을 사용한다. 운영 브랜치는 **`main`**이며 병합마다 Vercel Git 연동이 화면을 빌드 · 배포한다([04 §3](../docs/04-jobs-and-cost.md#3-배포)).
 
 | 프로젝트 설정 | 값 |
 |---|---|
@@ -451,7 +451,7 @@ docker logs --tail 50 mogum-postgres-1
 | Output Directory | `dist` — Vite 감지 기본값 유지 |
 | Production Branch | `main` |
 
-환경 변수 **`VITE_API_BASE_URL=https://api.{도메인}`**은 **Production에만** 등록하고 운영 배포를 다시 빌드한다. 브라우저는 이 출처의 `/api/*`와 `/auth/*`로 직접 요청한다. PR 미리보기(`*.vercel.app`)는 API와 다른 사이트라 세션 쿠키가 실리지 않으므로 로그인 확인에 사용하지 않는다([05 §1.1](../docs/05-api.md#11-인증--구글-oauth--쿠키-세션db-저장)).
+환경 변수 **`VITE_API_BASE_URL=https://api.{도메인}`**은 **Production에만** 등록하고 운영 배포를 다시 빌드한다. 브라우저는 이 출처의 `/api/*`와 `/auth/*`로 직접 요청한다. PR 미리보기(`*.vercel.app`)는 API와 다른 사이트라 세션 쿠키가 실리지 않으므로 로그인 확인에 사용하지 않는다([05 §1.1](../docs/05-api.md#11-인증--구글-로그인--쿠키-세션db-저장)).
 
 프로젝트의 Domains에 **`{도메인}`**을 연결한다. Vercel이 안내하는 DNS 레코드 종류 · 이름 · 값을 Cloudflare에 그대로 등록하고 **프록시를 끈다(DNS only)**. Vercel이 인증서를 직접 받도록 앞에 프록시를 두지 않는다.
 
@@ -467,7 +467,7 @@ docker logs --tail 50 mogum-postgres-1
 
 백업은 Compose 프로젝트 `mogum` · 서비스 `postgres` 라벨로 실행 중 컨테이너를 찾는다. Compose 파일을 읽지 않으므로 `APP_IMAGE`가 없어도 실행한다. 재부팅 직후에는 5초 간격으로 최대 120초 준비를 기다린다. 컨테이너 안의 `pg_dump -Fc`로 운영 DB `mogum` 전체(스키마 · 데이터 · 시퀀스 · 확장)를 custom 형식으로 받아, 덤프가 성공하고 파일이 비어 있지 않을 때만 업로드한다. 호스트 임시 파일은 root 전용(`umask 077` · 600)이며 성공/실패 시 trap으로 지운다. 강제 전원 종료/SIGKILL은 trap을 실행할 수 없으므로 서버 재기동 후 남은 임시 파일 유무를 확인한다. 출력은 객체 경로와 바이트 크기 한 줄이다. 호스트에 PostgreSQL 도구를 설치하지 않는다.
 
-객체 형식은 **`s3://${MOGUM_BUCKET}/backups/YYYYMMDDTHHMMSS+0900.dump`**(예: `backups/20261025T040000+0900.dump`)다. 키의 시각은 `TZ=Asia/Seoul`로 만든다. 배포 묶음은 같은 버킷의 `releases/`를 쓴다. 버전 관리를 켜고 **현재 버전 6일 + 이전 버전 1일, 합쳐 총 7일 상한**으로 보관한다(ADR-072). [AWS 설정](#aws-설정)의 수명주기 규칙과 IAM 정책 견본을 적용한다. 백업/연습 스크립트에는 S3 객체나 버전을 지우는 명령이 없으며 서버 역할에도 삭제 권한을 주지 않는다. 이 설정은 버킷에 적용한 뒤 첫 배포 때 확인해야 한다.
+객체 형식은 **`s3://${MOGUM_BUCKET}/backups/YYYYMMDDTHHMMSS+0900.dump`**(예: `backups/20261025T040000+0900.dump`)다. 키의 시각은 `TZ=Asia/Seoul`로 만든다. 배포 묶음은 같은 버킷의 `releases/`를 쓴다. 버전 관리를 켜고 **현재 버전 6일 + 이전 버전 1일, 합쳐 총 7일 상한**으로 보관한다(`2-deploy` 에서 정했다 — ADR-146). [AWS 설정](#aws-설정)의 수명주기 규칙과 IAM 정책 견본을 적용한다. 백업/연습 스크립트에는 S3 객체나 버전을 지우는 명령이 없으며 서버 역할에도 삭제 권한을 주지 않는다. 이 설정은 버킷에 적용한 뒤 첫 배포 때 확인해야 한다.
 
 ### 복원 연습
 
@@ -515,7 +515,7 @@ rm -f -- "$dump"
 trap - EXIT
 ```
 
-**서비스 재개 전 탈퇴 · 삭제를 다시 적용한다.** 백업에 탈퇴/삭제 데이터가 최대 7일 남을 수 있다. [02 §7의 탈퇴 범위](../docs/02-domain-data.md#7-계정--정원--탈퇴)와 §6.2의 커리큘럼 완전 삭제 범위를 기준으로, 백업 시점부터 장애까지 접수한 탈퇴 · 삭제를 확인하고 같은 트랜잭션/잠금/원장 연결 해제 규칙으로 재적용한다. 자동 재적용 기능은 없다. 재적용을 확인하기 전에는 Caddy를 켜지 않는다. 복원으로 되살아난 로그인 세션도 모두 무효화한다.
+**서비스 재개 전 탈퇴 · 삭제를 다시 적용한다.** 백업에 탈퇴/삭제 데이터가 최대 7일 남을 수 있다. [02 §7의 지우기 · 탈퇴 범위](../docs/02-domain-data.md#7-지우기--탈퇴--함께-사라지는-범위)를 기준으로, 백업 시점부터 장애까지 접수한 탈퇴 · 삭제를 확인하고 [02 §8.6의 지우는 순서](../docs/02-domain-data.md#86-지우는-순서)대로 재적용한다. 자동 재적용 기능은 없다. 재적용을 확인하기 전에는 Caddy를 켜지 않는다. 복원으로 되살아난 로그인 세션도 모두 무효화한다.
 
 ```bash
 docker exec "$postgres" sh -c \

@@ -1,0 +1,323 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_dashboard" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"inverse-surface":"#362d3e","on-tertiary-fixed":"#2c1700","primary-container":"#7c4dff","text-muted":"#756D82","tertiary-container":"#a46300","danger-shade":"#D63031","secondary":"#6b46c1","surface-variant":"#ecddf4","on-secondary-fixed-variant":"#522aa7","lavender-tint":"#FAF8FF","secondary-fixed":"#e9ddff","tertiary":"#824d00","primary-fixed-dim":"#cdbdff","primary-fixed":"#e8deff","outline-variant":"#cac3d8","tertiary-fixed-dim":"#ffb86b","surface-container-low":"#fbf0ff","mug-dark":"#4C2882","surface-container":"#f8e9ff","surface":"#fff7fe","primary":"#632ce5","streak-shade":"#D97B00","on-tertiary-container":"#fff7f2","danger-coral":"#FF5964","on-primary-fixed":"#20005f","secondary-container":"#a480fe","on-primary":"#ffffff","lavender-soft":"#D6C7FF","surface-tint":"#6833ea","on-primary-container":"#fcf6ff","inverse-on-surface":"#faecff","surface-card":"#FFFFFF","secondary-fixed-dim":"#d0bcff","primary-shade":"#5835C4","success-shade":"#1B998B","lavender-subtle":"#F1ECFE","border-card":"#EAE3FC","background":"#fff7fe","surface-container-high":"#f2e3fa","surface-cream":"#FAF8FF","on-surface-variant":"#494455","tertiary-fixed":"#ffdcbc","error":"#ba1a1a","surface-bright":"#fff7fe","on-secondary-fixed":"#23005c","streak-amber":"#FF9F1C","on-surface":"#201828","surface-container-lowest":"#ffffff","on-background":"#201828","text-main":"#261E35","on-error-container":"#93000a","on-primary-fixed-variant":"#4f00d0","on-secondary":"#ffffff","inverse-primary":"#cdbdff","primary-light":"#8C6BF7","on-secondary-container":"#39008c","error-container":"#ffdad6","success-mint":"#2EC4B6","on-tertiary-fixed-variant":"#683d00","on-tertiary":"#ffffff","surface-dim":"#e4d5eb","on-error":"#ffffff","surface-container-highest":"#ecddf4","outline":"#7a7487"},borderRadius:{DEFAULT:"0.25rem",lg:"0.5rem",xl:"0.75rem",full:"9999px"},spacing:{"space-sm":"0.5rem",margin:"1rem","space-xs":"0.25rem",gutter:"1rem","space-lg":"1.25rem","space-xl":"1.75rem","space-md":"1rem"},fontFamily:{"headline-sm":["Plus Jakarta Sans"],"body-md":["Plus Jakarta Sans"],"code-md":["JetBrains Mono"],"label-lg":["Plus Jakarta Sans"],"headline-xl":["Plus Jakarta Sans"],"label-sm":["Plus Jakarta Sans"],"body-lg":["Plus Jakarta Sans"],"body-sm":["Plus Jakarta Sans"],"headline-lg":["Plus Jakarta Sans"],"label-md":["Plus Jakarta Sans"],"headline-md":["Plus Jakarta Sans"]},fontSize:{"headline-sm":["18px",{lineHeight:"24px",fontWeight:"700"}],"body-md":["15px",{lineHeight:"22px",fontWeight:"400"}],"code-md":["13px",{lineHeight:"20px",fontWeight:"500"}],"label-lg":["15px",{lineHeight:"20px",fontWeight:"700"}],"headline-xl":["30px",{lineHeight:"38px",fontWeight:"800"}],"label-sm":["11px",{lineHeight:"14px",fontWeight:"700"}],"body-lg":["16px",{lineHeight:"24px",fontWeight:"600"}],"body-sm":["13px",{lineHeight:"18px",fontWeight:"400"}],"headline-lg":["24px",{lineHeight:"32px",fontWeight:"800"}],"label-md":["13px",{lineHeight:"18px",fontWeight:"700"}],"headline-md":["20px",{lineHeight:"28px",fontWeight:"700"}]}}}};</script></head><body class="bg-background text-on-background antialiased"><aside class="hidden lg:flex fixed left-0 top-0 h-full w-64 bg-surface-card border-r border-[#f1e5f5] z-50 flex-col py-6 px-4"><div class="flex items-center gap-2.5 px-3 mb-8">
+  <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdvSS_FO1TXvJpvzs159-lCy9n1HjqorYU6_8jod6N5PEn5SdGX6S5Msw2HT6Dj0WIsz-7r1_rvbz4UPV6ArPIPESQL1524Bvp9pU0B3SNwE4jLLV0F5-m8BLVGXJ9K08nXQXMj5EDbGKR6WbbGfxOuXL1mqBFeY_ySKykj9ou2Ick8HCScj8nyrxav7GqKPnM4OG9Mjs1J5yDe06oBctord8Ck06-xsFeTtNug-YlqB77emdC7Y7VhA" alt="Mogum Mascot" class="w-9 h-9 object-contain">
+  <span class="text-xl font-bold tracking-tight text-[#1e1b2e] font-display">Mogum</span>
+  <span class="text-xs px-2 py-0.5 rounded-full font-semibold bg-[#ede7f6] text-[#7c4dff]">머금</span>
+</div><nav class="flex-1 flex flex-col gap-2" data-active-classes="bg-lavender-subtle text-primary-container font-headline-sm"><a class="flex items-center gap-3 px-3 py-3 rounded-xl font-label-lg text-label-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="home" href="#"><svg class="w-5 h-5 flex-shrink-0 stroke-current fill-none stroke-2" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9z"></path><polyline points="9 21 9 12 15 12 15 21"></polyline></svg><span class="">홈</span></a><a class="flex items-center gap-3 px-3 py-3 rounded-xl font-label-lg text-label-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="courses" href="#"><svg class="w-5 h-5 flex-shrink-0 stroke-current fill-none stroke-2" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg><span class="">코스</span></a><a class="flex items-center gap-3 px-3 py-3 rounded-xl font-label-lg text-label-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="roadmap" href="#"><svg class="w-5 h-5 flex-shrink-0 stroke-current fill-none stroke-2" viewBox="0 0 24 24"><circle cx="6" cy="19" r="3"></circle><path d="M9 19h8.5a4.5 4.5 0 0 0 4.5-4.5v-5A4.5 4.5 0 0 0 17.5 5H9"></path><circle cx="6" cy="5" r="3"></circle></svg><span class="">로드맵</span></a><a aria-current="page" class="flex items-center gap-3 px-3 py-3 rounded-xl transition-colors bg-lavender-subtle text-primary-container font-headline-sm" data-path="review" href="#"><svg class="w-5 h-5 flex-shrink-0 stroke-current fill-none stroke-2" viewBox="0 0 24 24"><rect height="15" rx="2" width="14" x="3" y="5"></rect><path d="M7 2.5h12a2 2 0 0 1 2 2v13"></path></svg><span class="">복습</span></a><a class="flex items-center gap-3 px-3 py-3 rounded-xl font-label-lg text-label-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="profile" href="#"><svg class="w-5 h-5 flex-shrink-0 stroke-current fill-none stroke-2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg><span class="">내 정보</span></a></nav></aside><div class="lg:pl-64 flex flex-col min-h-screen"><header class="fixed top-0 left-0 right-0 lg:left-64 h-16 bg-surface-card/90 backdrop-blur-md border-b border-[#f1e5f5] z-40 flex items-center justify-between lg:justify-end px-4 lg:px-8"><div class="flex items-center gap-2.5 lg:hidden">
+  <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdvSS_FO1TXvJpvzs159-lCy9n1HjqorYU6_8jod6N5PEn5SdGX6S5Msw2HT6Dj0WIsz-7r1_rvbz4UPV6ArPIPESQL1524Bvp9pU0B3SNwE4jLLV0F5-m8BLVGXJ9K08nXQXMj5EDbGKR6WbbGfxOuXL1mqBFeY_ySKykj9ou2Ick8HCScj8nyrxav7GqKPnM4OG9Mjs1J5yDe06oBctord8Ck06-xsFeTtNug-YlqB77emdC7Y7VhA" alt="Mogum Mascot" class="w-9 h-9 object-contain">
+  <span class="text-xl font-bold tracking-tight text-[#1e1b2e] font-display">Mogum</span>
+  <span class="text-xs px-2 py-0.5 rounded-full font-semibold bg-[#ede7f6] text-[#7c4dff]">머금</span>
+</div><div class="flex items-center gap-2 bg-[#FFF6E9] border border-streak-amber text-streak-shade px-3 py-1.5 rounded-full"><span class="text-sm leading-none">🔥</span><span class="font-label-sm text-label-sm font-bold">5일 연속 학습 중</span></div></header><main class="flex-1 pt-16 pb-24 lg:pb-8 w-full px-4 lg:px-8"><div class="flex flex-col w-full">
+<div class="w-full max-w-3xl mx-auto flex flex-col gap-6">
+<!-- Top Status & Progress Bar -->
+<header class="flex flex-col gap-3">
+<div class="flex flex-wrap items-center justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-2xl bg-lavender-subtle flex items-center justify-center text-primary-container shadow-sm">
+<span class="material-symbols-outlined text-[24px]">psychology</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<h1 class="font-headline-md text-headline-md text-text-main">오늘의 복습</h1>
+<span class="px-2 py-0.5 rounded-full bg-lavender-subtle text-primary-container font-label-sm text-label-sm">FSRS 주기 기억</span>
+</div>
+<p class="font-body-sm text-body-sm text-text-muted">한 모금씩 마시듯 가볍게 기억을 다져봐요!</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-card shadow-sm">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
+<span class="font-label-md text-label-md text-text-main" id="queueCountBadge">14장 남음</span>
+</div>
+<button class="group flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-high text-on-surface-variant hover:bg-error-container hover:text-on-error-container transition-colors" id="deleteCardBtn" title="이 카드를 향후 복습 및 숙련도 계산에서 제외합니다" type="button">
+<span class="material-symbols-outlined text-[16px]">delete_sweep</span>
+<span class="font-label-sm text-label-sm">이 카드 지우기</span>
+</button>
+</div>
+</div>
+<!-- Linear tactile progress strip -->
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between items-center text-on-surface-variant">
+<span class="font-label-sm text-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-primary-container">menu_book</span>
+<span id="courseOriginTag" class="">TypeScript 입문 • 3강 제네릭(Generics)</span>
+</span>
+<span class="font-code-md text-code-md text-text-muted" id="progressRatio">1 / 14</span>
+</div>
+<div class="w-full h-3 rounded-full bg-surface-container-highest overflow-hidden p-0.5">
+<div class="h-full rounded-full bg-primary-container transition-all duration-500 ease-out" id="reviewProgressBar" style="width: 7.14286%;"></div>
+</div>
+</div>
+</header>
+<!-- Main Tactile Flashcard Container -->
+<main class="w-full">
+<div class="w-full bg-surface-card rounded-[28px] p-6 sm:p-10 shadow-lg flex flex-col gap-6 relative transition-all duration-300" id="flashcardElement">
+<!-- Question Block -->
+<div class="flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-lavender-subtle text-primary-container">
+<span class="font-label-md text-label-md">Q. 핵심 질문</span>
+</div>
+<div class="flex items-center gap-1 text-text-muted">
+<span class="material-symbols-outlined text-[18px]">alarm</span>
+<span class="font-label-sm text-label-sm" id="intervalTag">예정 간격: 1일</span>
+</div>
+</div>
+<p class="font-headline-sm sm:font-headline-md text-headline-sm sm:text-headline-md text-text-main leading-relaxed" id="questionContent">TypeScript에서 `interface`와 `type` 별칭의 제네릭(`Generic <t>`) 선언 방식과 선언 병합(Declaration Merging) 지원 여부의 핵심 차이는 무엇인가요?</t></p>
+<div class="flex items-center gap-2 p-3.5 rounded-2xl bg-lavender-tint text-text-muted" id="promptHint">
+<span class="material-symbols-outlined text-streak-amber text-[20px]">lightbulb</span>
+<span class="font-body-sm text-body-sm">머릿속으로 조용히 답을 떠올려본 후 아래 <strong class="text-text-main">정답 확인하기</strong>를 눌러주세요.</span>
+</div>
+</div>
+<!-- Answer Reveal Trigger (Initial State) -->
+<div class="pt-2" id="answerRevealTrigger">
+<button class="w-full h-14 rounded-2xl bg-primary-container text-on-primary font-headline-sm text-headline-sm flex items-center justify-center gap-2 shadow-[0_4px_0_0_#5835C4] hover:shadow-[0_2px_0_0_#5835C4] active:translate-y-[3px] active:shadow-none transition-all cursor-pointer" id="showAnswerBtn" type="button">
+<span class="material-symbols-outlined text-[22px]">visibility</span>
+<span class="">정답 확인하기</span>
+<span class="font-label-sm text-label-sm opacity-80 ml-2 hidden sm:inline">(Space)</span>
+</button>
+</div>
+<!-- Answer Section (Revealed State) -->
+<div class="hidden flex-col gap-6 animate-fadeIn" id="answerSection">
+<div class="p-6 rounded-2xl bg-surface-container-low flex flex-col gap-4">
+<div class="flex items-center gap-2 text-primary-shade">
+<span class="material-symbols-outlined text-[20px]">task_alt</span>
+<span class="font-label-lg text-label-lg">정답 및 핵심 요약</span>
+</div>
+<ol class="space-y-3 font-body-md text-body-md text-text-main list-decimal list-inside pl-1" id="answerList"><li class="leading-relaxed"><strong class="text-primary-shade">interface:</strong> 동일한 이름으로 여러 번 선언할 경우 자동으로 <span class="text-secondary font-bold">'선언 병합(Declaration Merging)'</span>이 적용되어 속성들이 합쳐집니다. 외부 라이브러리 타입 확장에 매우 유리합니다.</li><li class="leading-relaxed"><strong class="text-primary-shade">type 별칭:</strong> 한 번 선언된 이름은 다시 선언할 수 없으며 선언 병합이 지원되지 않습니다. 대신 Union(<code class="font-code-md text-code-md text-secondary">|</code>), Tuple, 조건부 타입 등 정교한 계산 타입 표현에 적합합니다.</li><li class="leading-relaxed"><strong class="text-primary-shade">제네릭(&lt;T&gt;):</strong> 두 형태 모두 문법적으로 <code class="font-code-md text-code-md text-primary">interface Foo&lt;T&gt; { data: T }</code> 및 <code class="font-code-md text-code-md text-primary">type Bar&lt;T&gt; = { data: T }</code> 형태로 동일하게 적용 가능합니다.</li></ol>
+</div>
+<!-- FSRS 4-Level Tactile Rating Buttons -->
+<div class="flex flex-col gap-3">
+<span class="font-label-sm text-label-sm text-text-muted text-center">얼마나 잘 떠올리셨나요? FSRS 알고리즘이 다음 복습 주기를 계산합니다</span>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+<!-- Level 1: Again -->
+<button class="grade-btn flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl bg-rose-50 text-danger-shade shadow-[0_3px_0_0_#D63031] hover:bg-rose-100 active:translate-y-[2px] active:shadow-none transition-all cursor-pointer" data-grade="1" type="button">
+<span class="font-headline-sm text-headline-sm">다시</span>
+<span class="font-label-sm text-label-sm text-danger-shade mt-0.5">1분 후</span>
+<span class="font-code-md text-code-md opacity-60 text-xs mt-1 hidden sm:inline">[1]</span>
+</button>
+<!-- Level 2: Hard -->
+<button class="grade-btn flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl bg-[#FFF6E9] text-streak-shade shadow-[0_3px_0_0_#D97B00] hover:bg-[#ffedd5] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer" data-grade="2" type="button">
+<span class="font-headline-sm text-headline-sm">어려움</span>
+<span class="font-label-sm text-label-sm text-streak-shade mt-0.5">12시간 후</span>
+<span class="font-code-md text-code-md opacity-60 text-xs mt-1 hidden sm:inline">[2]</span>
+</button>
+<!-- Level 3: Good (Recommended primary) -->
+<button class="grade-btn flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl bg-primary-container text-on-primary shadow-[0_4px_0_0_#5835C4] hover:bg-primary-shade active:translate-y-[3px] active:shadow-none transition-all cursor-pointer" data-grade="3" type="button">
+<div class="flex items-center gap-1">
+<span class="font-headline-sm text-headline-sm">좋음</span>
+<span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+</div>
+<span class="font-label-sm text-label-sm text-on-primary-container mt-0.5">1일 후</span>
+<span class="font-code-md text-code-md opacity-80 text-xs mt-1 hidden sm:inline">[3]</span>
+</button>
+<!-- Level 4: Easy -->
+<button class="grade-btn flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl bg-emerald-50 text-success-shade shadow-[0_3px_0_0_#1B998B] hover:bg-emerald-100 active:translate-y-[2px] active:shadow-none transition-all cursor-pointer" data-grade="4" type="button">
+<span class="font-headline-sm text-headline-sm">쉬움</span>
+<span class="font-label-sm text-label-sm text-success-shade mt-0.5">4일 후</span>
+<span class="font-code-md text-code-md opacity-60 text-xs mt-1 hidden sm:inline">[4]</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Contextual Status and Shortcuts -->
+<footer class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<div class="bg-surface-card rounded-2xl p-4 shadow-sm flex items-center gap-3.5">
+<div class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">keyboard</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-text-muted">단축키 안내</span>
+<span class="font-body-sm text-body-sm text-text-main">스페이스바로 정답 확인 • 1~4 키로 평가</span>
+</div>
+</div>
+<div class="bg-surface-card rounded-2xl p-4 shadow-sm flex items-center justify-between">
+<div class="flex items-center gap-3.5">
+<div class="w-9 h-9 rounded-xl bg-[#FFF6E9] flex items-center justify-center text-streak-shade">
+<span class="material-symbols-outlined text-[20px]">schedule</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-text-muted">오늘 복습 완료율</span>
+<span class="font-body-sm text-body-sm text-text-main" id="sessionCompletedText">완료 0장 / 총 14장</span>
+</div>
+</div>
+<span class="font-label-sm text-label-sm px-2 py-1 rounded bg-surface-container-high text-on-surface-variant">새벽 4시 기준</span>
+</div>
+</footer>
+<!-- Completion Modal State (Initially hidden) -->
+<div class="hidden flex-col items-center justify-center text-center p-8 sm:p-12 bg-surface-card rounded-[28px] shadow-lg gap-5" id="completionOverlay">
+<div class="w-20 h-20 rounded-full bg-lavender-subtle flex items-center justify-center text-primary-container text-4xl shadow-inner">
+        ☕
+      </div>
+<div class="flex flex-col gap-1">
+<h2 class="font-headline-lg text-headline-lg text-text-main">오늘의 머금 복습 완료!</h2>
+<p class="font-body-md text-body-md text-text-muted">기억의 망각 곡선을 넘어 지식이 차곡차곡 쌓였습니다.</p>
+</div>
+<div class="flex items-center gap-4 py-3 px-6 rounded-2xl bg-surface-container-low">
+<div class="flex flex-col items-center">
+<span class="font-headline-sm text-headline-sm text-primary-container">14장</span>
+<span class="font-label-sm text-label-sm text-text-muted">복습 완료</span>
+</div>
+<div class="w-px h-8 bg-surface-variant"></div>
+<div class="flex flex-col items-center">
+<span class="font-headline-sm text-headline-sm text-streak-shade">5일 연속</span>
+<span class="font-label-sm text-label-sm text-text-muted">학습 스트릭</span>
+</div>
+</div>
+<button class="mt-2 px-8 h-12 rounded-xl bg-primary-container text-on-primary font-label-lg text-label-lg shadow-[0_4px_0_0_#5835C4] hover:shadow-[0_2px_0_0_#5835C4] active:translate-y-[2px] transition-all" id="restartBtn" type="button">
+        다시 한 번 살펴보기
+      </button>
+</div>
+</div>
+</div>
+<script>
+(() => {
+  const cards = [
+    {
+      course: "TypeScript 입문 • 3강 제네릭(Generics)",
+      question: "TypeScript에서 `interface`와 `type` 별칭의 제네릭(`Generic <T>`) 선언 방식과 선언 병합(Declaration Merging) 지원 여부의 핵심 차이는 무엇인가요?",
+      answers: [
+        "<strong class='text-primary-shade'>interface:</strong> 동일한 이름으로 여러 번 선언할 경우 자동으로 <span class='text-secondary font-bold'>'선언 병합(Declaration Merging)'</span>이 적용되어 속성들이 합쳐집니다. 외부 라이브러리 타입 확장에 매우 유리합니다.",
+        "<strong class='text-primary-shade'>type 별칭:</strong> 한 번 선언된 이름은 다시 선언할 수 없으며 선언 병합이 지원되지 않습니다. 대신 Union(<code class='font-code-md text-code-md text-secondary'>|</code>), Tuple, 조건부 타입 등 정교한 계산 타입 표현에 적합합니다.",
+        "<strong class='text-primary-shade'>제네릭(&lt;T&gt;):</strong> 두 형태 모두 문법적으로 <code class='font-code-md text-code-md text-primary'>interface Foo&lt;T&gt; { data: T }</code> 및 <code class='font-code-md text-code-md text-primary'>type Bar&lt;T&gt; = { data: T }</code> 형태로 동일하게 적용 가능합니다."
+      ],
+      interval: "1일"
+    },
+    {
+      course: "파이썬 비동기 프로그래밍 • 2강 이벤트 루프",
+      question: "Python `asyncio`에서 `asyncio.gather()`와 `asyncio.wait()`의 차이점 및 예외 발생 시 전파 방식의 차이는 무엇인가요?",
+      answers: [
+        "<strong class='text-primary-shade'>asyncio.gather():</strong> 여러 코루틴을 그룹화하여 결과를 입력 순서대로 리스트로 반환합니다. `return_exceptions=True`로 개별 예외를 결과값처럼 안전하게 포획할 수 있습니다.",
+        "<strong class='text-primary-shade'>asyncio.wait():</strong> 코루틴을 Task 세트로 받아 `FIRST_COMPLETED`, `ALL_COMPLETED` 등의 세밀한 완료 조건(`return_when`)에 따라 분기 처리가 가능합니다.",
+        "<strong class='text-primary-shade'>적용 권장:</strong> 단순 병렬 데이터 집계에는 `gather`, 개별 타임아웃 및 세분화된 상태 제어에는 `wait`를 사용합니다."
+      ],
+      interval: "3일"
+    },
+    {
+      course: "React 심화 • 성능 최적화 패턴",
+      question: "React 18의 `useTransition` 훅과 `useDeferredValue` 훅의 공통점과 사용처 차이는 무엇인가요?",
+      answers: [
+        "<strong class='text-primary-shade'>공통점:</strong> 메인 UI 스레드의 블로킹 없이 긴급한 업데이트(키 입력 등)를 우선 처리하고 무거운 렌더링을 지연 우선순위로 강등합니다.",
+        "<strong class='text-primary-shade'>useTransition:</strong> 상태 업데이트 함수(`startTransition(() => setState(...))`) 자체를 직접 제어할 수 있을 때 사용하며 `isPending` 불리언을 제공합니다.",
+        "<strong class='text-primary-shade'>useDeferredValue:</strong> 부모로부터 전달받은 props나 외부 상태 값만 존재하여 직접 상태 setter를 감쌀 수 없을 때 유용합니다."
+      ],
+      interval: "12시간"
+    }
+  ];
+
+  let currentIndex = 0;
+  let totalCards = 14;
+  let completedCount = 0;
+  let isAnswerRevealed = false;
+
+  const cardElement = document.getElementById("flashcardElement");
+  const courseTag = document.getElementById("courseOriginTag");
+  const progressRatio = document.getElementById("progressRatio");
+  const progressBar = document.getElementById("reviewProgressBar");
+  const queueBadge = document.getElementById("queueCountBadge");
+  const intervalTag = document.getElementById("intervalTag");
+  const questionContent = document.getElementById("questionContent");
+  const answerRevealTrigger = document.getElementById("answerRevealTrigger");
+  const answerSection = document.getElementById("answerSection");
+  const answerList = document.getElementById("answerList");
+  const showAnswerBtn = document.getElementById("showAnswerBtn");
+  const deleteCardBtn = document.getElementById("deleteCardBtn");
+  const sessionCompletedText = document.getElementById("sessionCompletedText");
+  const completionOverlay = document.getElementById("completionOverlay");
+  const restartBtn = document.getElementById("restartBtn");
+
+  function renderCard() {
+    if (currentIndex >= totalCards) {
+      cardElement.classList.add("hidden");
+      completionOverlay.classList.remove("hidden");
+      completionOverlay.classList.add("flex");
+      return;
+    }
+
+    const cardData = cards[currentIndex % cards.length];
+    courseTag.textContent = cardData.course;
+    questionContent.innerHTML = cardData.question;
+    intervalTag.textContent = `예정 간격: ${cardData.interval}`;
+    
+    answerList.innerHTML = cardData.answers
+      .map(ans => `<li class="leading-relaxed">${ans}</li>`)
+      .join("");
+
+    const displayIndex = currentIndex + 1;
+    const remaining = totalCards - currentIndex;
+    
+    progressRatio.textContent = `${displayIndex} / ${totalCards}`;
+    queueBadge.textContent = `${remaining}장 남음`;
+    progressBar.style.width = `${(displayIndex / totalCards) * 100}%`;
+    sessionCompletedText.textContent = `완료 ${completedCount}장 / 총 ${totalCards}장`;
+
+    // Reset card state
+    isAnswerRevealed = false;
+    answerRevealTrigger.classList.remove("hidden");
+    answerSection.classList.add("hidden");
+    answerSection.classList.remove("flex");
+    cardElement.classList.remove("hidden");
+    completionOverlay.classList.add("hidden");
+  }
+
+  function revealAnswer() {
+    if (isAnswerRevealed) return;
+    isAnswerRevealed = true;
+    answerRevealTrigger.classList.add("hidden");
+    answerSection.classList.remove("hidden");
+    answerSection.classList.add("flex");
+  }
+
+  function handleGrade(grade) {
+    completedCount++;
+    currentIndex++;
+    renderCard();
+  }
+
+  showAnswerBtn.addEventListener("click", revealAnswer);
+
+  document.querySelectorAll(".grade-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const grade = btn.getAttribute("data-grade");
+      handleGrade(grade);
+    });
+  });
+
+  deleteCardBtn.addEventListener("click", () => {
+    if (confirm("이 카드를 복습 대기열에서 제거하시겠습니까? (숙련도 점수에서도 제외됩니다)")) {
+      totalCards = Math.max(1, totalCards - 1);
+      renderCard();
+    }
+  });
+
+  restartBtn.addEventListener("click", () => {
+    currentIndex = 0;
+    completedCount = 0;
+    totalCards = 14;
+    renderCard();
+  });
+
+  // Keyboard navigation for power learners
+  window.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+    
+    if (e.code === "Space") {
+      e.preventDefault();
+      if (!isAnswerRevealed) {
+        revealAnswer();
+      }
+    } else if (isAnswerRevealed) {
+      if (e.key === "1") handleGrade(1);
+      else if (e.key === "2") handleGrade(2);
+      else if (e.key === "3") handleGrade(3);
+      else if (e.key === "4") handleGrade(4);
+    }
+  });
+
+  renderCard();
+})();
+</script></main></div><nav class="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-card border-t border-[#f1e5f5] z-50 grid grid-cols-5 items-center px-2" data-active-classes="text-primary-container"><a class="flex flex-col items-center justify-center gap-1 text-on-surface-variant hover:text-on-surface transition-colors" data-path="home" href="#"><svg class="w-5 h-5 stroke-current fill-none stroke-2" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9z"></path><polyline points="9 21 9 12 15 12 15 21"></polyline></svg><span class="font-label-sm text-label-sm">홈</span></a><a class="flex flex-col items-center justify-center gap-1 text-on-surface-variant hover:text-on-surface transition-colors" data-path="courses" href="#"><svg class="w-5 h-5 stroke-current fill-none stroke-2" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg><span class="font-label-sm text-label-sm">코스</span></a><a class="flex flex-col items-center justify-center gap-1 text-on-surface-variant hover:text-on-surface transition-colors" data-path="roadmap" href="#"><svg class="w-5 h-5 stroke-current fill-none stroke-2" viewBox="0 0 24 24"><circle cx="6" cy="19" r="3"></circle><path d="M9 19h8.5a4.5 4.5 0 0 0 4.5-4.5v-5A4.5 4.5 0 0 0 17.5 5H9"></path><circle cx="6" cy="5" r="3"></circle></svg><span class="font-label-sm text-label-sm">로드맵</span></a><a aria-current="page" class="flex flex-col items-center justify-center gap-1 text-primary-container" data-path="review" href="#"><svg class="w-5 h-5 stroke-current fill-none stroke-2" viewBox="0 0 24 24"><rect height="15" rx="2" width="14" x="3" y="5"></rect><path d="M7 2.5h12a2 2 0 0 1 2 2v13"></path></svg><span class="font-label-sm text-label-sm font-bold">복습</span></a><a class="flex flex-col items-center justify-center gap-1 text-on-surface-variant hover:text-on-surface transition-colors" data-path="profile" href="#"><svg class="w-5 h-5 stroke-current fill-none stroke-2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg><span class="font-label-sm text-label-sm">내 정보</span></a></nav>
+
+</body></html>

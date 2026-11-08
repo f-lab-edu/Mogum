@@ -1,7 +1,7 @@
 # 테스트 코드 작성 가이드 — 백엔드
 
 > 백엔드 테스트 코드를 쓸 때 본다 — 종류 · 이름 · 본문 · 데이터 · 격리 · 요청 도구. **이 규칙의 단일 출처다**(요약 입구가 아니다). 무엇을 검증해야 하는지(장애 주입 · 규칙 테스트 · 용량 측정)는 [07](./07-testing.md)에 있다.
-> 2026-11-08 사용자 결정([ADR-079](./ADR.md)). 기존 테스트 이관은 `3a-test-conventions`에서 **2026-11-08 완료했다. §7의 네 규칙(JUnit `Assertions` 금지 · 픽스처/Fake 밖 리플렉션 금지 · `IT` 이름 금지 · 제품 레포지토리 상속 제한)을 위반 픽스처 검증과 함께 ArchUnit으로 빌드에 걸었다.** 화면(`frontend/`) 테스트는 화면 작업이 늘어날 때 따로 정한다.
+> 2026-11-08 사용자 결정([ADR-179](./ADR.md)). 기존 테스트 이관은 `3a-test-conventions`에서 **2026-11-08 완료했다. §7의 네 규칙(JUnit `Assertions` 금지 · 픽스처/Fake 밖 리플렉션 금지 · `IT` 이름 금지 · 제품 레포지토리 상속 제한)을 위반 픽스처 검증과 함께 ArchUnit으로 빌드에 걸었다.** 화면(`frontend/`) 테스트는 화면 작업이 늘어날 때 따로 정한다.
 >
 > `3a` step 4 현재 통합 테스트는 실제 포트 `RestTestClient`와 공용 컨텍스트를 사용한다. 출처 `https://mogum.example` · 관리자 `admin@example.com,changed@example.com` · 쿠키 도메인 `mogum.example` · Tomcat 스레드 최대/최소 1을 공용 값으로 두었다. 세션 쿠키 직렬화는 `SecurityConfigurationCookieTest`의 `ApplicationContextRunner`에서 두 도메인 설정을 확인한다. 로컬 XSRF 쿠키 발급/만료의 Domain 생략은 실제 필터 응답을 확인해야 하므로 `LocalCookieIntegrationTest` 묶음 하나만 도메인을 비워 **통합 컨텍스트는 총 2개**다(레포지토리 슬라이스 제외). 실패용 컨트롤러 · ERROR 관찰 필터 · DB 연결 실패 대역 · Google 가짜 서버는 공용 테스트 설정의 중첩 static 클래스에 있고, ERROR 관찰은 테스트 응답 헤더로 디스패치 종류와 실행 중 MDC의 요청 ID가 응답 요청 ID와 같은지 확인한다. 스파이와 클래스별 설정은 제거했다.
 
@@ -17,9 +17,9 @@
 | **통합** | `@IntegrationTest` | 핵심 흐름 · 보안 · 오류 처리 · **DB 동작이 곧 규칙인 서비스** | 실제 포트 HTTP · 실제 커밋 | — |
 | **컨테이너 단독** | 없음 — 공유 컨테이너(`PostgresTestConfiguration.POSTGRES`)만 쓴다 | 마이그레이션처럼 Spring 없이 DB 가 필요한 것 | 자기 스키마를 만들고 끝나면 지운다 | — |
 
-- 서비스는 단위 테스트(Fake)가 기본이다. advisory lock · `SKIP LOCKED` · 조건부 `UPDATE` 의 `0 rows` · 수령 회차 · unique 제약 경합처럼 **DB 가 어떻게 잠그고 몇 행을 바꿨는지가 규칙인 것**(AGENTS 금지 7~13 · 17 · 19)은 Fake 로 흉내 내지 않고 통합 테스트로 확인한다.
+- 서비스는 단위 테스트(Fake)가 기본이다. advisory lock · `SKIP LOCKED` · 조건부 `UPDATE` 의 `0 rows` · 꺼낸 횟수(`claim_count`) · unique 제약 경합처럼 **DB 가 어떻게 잠그고 몇 행을 바꿨는지가 규칙인 것**(AGENTS 금지 8~11 · 14 · 16)은 Fake 로 흉내 내지 않고 통합 테스트로 확인한다.
 - 보안 필터 · 오류 처리는 실제 포트로 확인한다 — MockMvc 는 서블릿 ERROR 디스패치를 거치지 않는다(1-auth step 1).
-- 서버 이미지 검사(`imageTest`)는 위 종류 밖이며 기본 `test` 에서 뺀다([07 §1.0](./07-testing.md)).
+- 서버 이미지 검사(`imageTest`)는 위 종류 밖이며 기본 `test` 에서 뺀다(`AGENTS.md` 명령어의 `imageTest`).
 
 ## 2. 이름
 
@@ -61,13 +61,13 @@ void returnsExistingUserIdOnRelogin() {
 - **mock** — `@ExtendWith(MockitoExtension.class)` · `@Mock` · BDDMockito(`given(…).willReturn(…)` · `then(mock).should(…)`). 쓰는 곳은 셋이다.
     - 우리 시스템 경계 밖 — LLM · 임베딩 클라이언트 · Google OAuth 등
     - `@WebMvcTest` 의 컨트롤러가 기대는 서비스 — `@MockitoBean`
-    - 호출 여부 · 순서 자체가 규칙인 곳 — 예: 허용 검사는 DB 접근 전([02 §6.1](./02-domain-data.md)) → `then(users).shouldHaveNoInteractions()`
+    - 호출 여부 · 순서 자체가 규칙인 곳 — 예: 로그인 허용 검사는 DB 접근 전(`LoginServiceTest`) → `then(users).shouldHaveNoInteractions()`
     - 레포지토리는 마지막 경우가 아니면 mock 하지 않고 Fake 를 쓴다.
 - **시계** — 단위 테스트는 `Clock.fixed(…)`. 컨텍스트 테스트(`@RepositoryTest` · `@IntegrationTest`)는 공용 `TestClock` 하나를 쓴다 — 정해진 시각에서 시작하고 테스트가 `set` · `advance` 로 옮기며, 정리기가 테스트마다 처음 시각으로 되돌린다. 클래스마다 시계 설정을 따로 두지 않는다.
 
 ## 5. DB 격리 · 컨텍스트
 
-- **테스트는 트랜잭션을 걸지 않는다** — 테스트 롤백(`@Transactional` 테스트 · `@DataJpaTest` 기본값)을 쓰지 않는다. 테스트 전체가 트랜잭션 하나면 지연 로딩이 늘 성공하고(금지 4 · 31), `findById` 가 1차 캐시를 돌려주며, flush 시점 제약 위반이 숨고, 다른 스레드가 데이터를 보지 못한다.
+- **테스트는 트랜잭션을 걸지 않는다** — 테스트 롤백(`@Transactional` 테스트 · `@DataJpaTest` 기본값)을 쓰지 않는다. 테스트 전체가 트랜잭션 하나면 지연 로딩이 늘 성공하고(금지 4 · 27), `findById` 가 1차 캐시를 돌려주며, flush 시점 제약 위반이 숨고, 다른 스레드가 데이터를 보지 못한다.
 - **테스트마다 `DatabaseCleaner` 가 `flyway_schema_history` 를 뺀 모든 테이블을 비운다.** UUID 로 행을 가르거나 자식부터 지우는 `@AfterEach` 를 쓰지 않는다 — 고정 값으로 테스트 데이터를 쓴다. DB 를 공유하므로 테스트 클래스를 병렬로 돌리지 않는다. 2026-11-08 현재 7개 앱 테이블에 각 1행을 넣고 PostgreSQL 17 공유 JDBC 연결에서 방식별 30회 예열 후 200회를 교대로 측정한 결과(카탈로그 조회 · 정리 · 커밋 포함, 데이터 준비 제외), 테스트당 `DELETE` 2.660ms · `TRUNCATE CASCADE` 2.525ms여서 `TRUNCATE CASCADE`를 선택했다.
 - **`@RepositoryTest`** — `@DataJpaTest` · 테스트 DB 교체 끔 · 테스트 트랜잭션 끔 · `TestClock` · Auditing 설정 · 정리기를 묶은 테스트 전용 어노테이션.
 - **`@IntegrationTest`** — `@SpringBootTest(webEnvironment = RANDOM_PORT)` · 공유 컨테이너 · `TestClock` · 공용 테스트 설정 · 정리기를 묶은 테스트 전용 어노테이션.
@@ -88,4 +88,4 @@ void returnsExistingUserIdOnRelogin() {
 - 테스트 클래스 이름이 `IT` 로 끝나지 않는다.
 - 제품 코드의 레포지토리는 `JpaRepository` · `CrudRepository` 계열을 상속하지 않는다.
 
-규칙마다 위반 픽스처로 실제로 걸리는지 확인한다([07 §1.2](./07-testing.md) ArchUnit 줄과 같다).
+규칙마다 위반 픽스처(`archfixture` · `repositoryfixture`)로 실제로 걸리는지 `ArchitectureTest` 가 확인한다.

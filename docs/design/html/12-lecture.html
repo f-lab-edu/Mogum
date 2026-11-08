@@ -1,0 +1,563 @@
+<!DOCTYPE html><html lang="ko"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>강의 화면: 3강 제네릭과 재사용 컴포넌트 패턴</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Pretendard', 'Plus Jakarta Sans', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace'],
+          },
+          colors: {
+            primary: {
+              DEFAULT: '#7c4dff',
+              dark: '#6200ea',
+              darker: '#5300b8',
+              light: '#f3e8ff',
+              surface: '#ede7f6',
+            },
+            surface: {
+              DEFAULT: '#fff7fe',
+              dim: '#f1e5f5',
+              low: '#fbf0ff',
+              card: '#ffffff',
+            },
+            charcoal: '#1e1b2e',
+            subtext: '#6b7280',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Pretendard', 'Plus Jakarta Sans', -apple-system, sans-serif;
+      background-color: #fff7fe;
+      color: #1e1b2e;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #fbf0ff;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #e9d5ff;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#fff7fe] text-[#1e1b2e] antialiased selection:bg-purple-100 selection:text-purple-900">
+
+  <!-- Desktop & Tablet Shell / Mobile Wrapper -->
+  <div class="flex-1 flex flex-col lg:flex-row w-full max-w-[1600px] mx-auto min-h-screen">
+
+    <!-- DESKTOP SIDEBAR (Visible lg >= 1024px) -->
+    <aside class="hidden lg:flex w-64 flex-col justify-between border-r border-[#f1e5f5] bg-white/80 backdrop-blur-md px-6 py-7 sticky top-0 h-screen z-30">
+      <div class="flex flex-col gap-8">
+        <!-- Logo -->
+        <a href="#home" class="flex items-center gap-2.5 transition-transform hover:scale-105"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdvSS_FO1TXvJpvzs159-lCy9n1HjqorYU6_8jod6N5PEn5SdGX6S5Msw2HT6Dj0WIsz-7r1_rvbz4UPV6ArPIPESQL1524Bvp9pU0B3SNwE4jLLV0F5-m8BLVGXJ9K08nXQXMj5EDbGKR6WbbGfxOuXL1mqBFeY_ySKykj9ou2Ick8HCScj8nyrxav7GqKPnM4OG9Mjs1J5yDe06oBctord8Ck06-xsFeTtNug-YlqB77emdC7Y7VhA" alt="Mogum Mascot" class="w-9 h-9 object-contain"><span class="text-xl font-bold tracking-tight text-[#1e1b2e] font-display">Mogum</span><span class="text-xs px-2 py-0.5 rounded-full font-semibold bg-[#ede7f6] text-[#7c4dff]">머금</span></a>
+
+        <!-- 5 Standard Navigation Tabs -->
+        <nav class="flex flex-col gap-1.5" aria-label="메인 내비게이션">
+          <!-- 1. Home -->
+          <a href="#home" class="flex items-center gap-3.5 px-4 py-3 rounded-2xl text-[#6b7280] hover:text-[#1e1b2e] hover:bg-[#fbf0ff] transition-all font-medium text-sm">
+            <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 10.5L12 3l9 7.5v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9z"></path>
+              <polyline points="9 21 9 12 15 12 15 21"></polyline>
+            </svg>
+            <span class="">홈</span>
+          </a>
+
+          <!-- 2. Courses (Active) -->
+          <a href="#courses" class="flex items-center gap-3.5 px-4 py-3 rounded-2xl bg-[#f3e8ff] text-primary font-bold text-sm transition-all shadow-sm">
+            <svg class="w-5 h-5 flex-shrink-0 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+              <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+            </svg>
+            <span class="">코스</span>
+          </a>
+
+          <!-- 3. Roadmap -->
+          <a href="#roadmap" class="flex items-center gap-3.5 px-4 py-3 rounded-2xl text-[#6b7280] hover:text-[#1e1b2e] hover:bg-[#fbf0ff] transition-all font-medium text-sm">
+            <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="6" cy="19" r="3"></circle>
+              <path d="M9 19h8.5a4.5 4.5 0 0 0 4.5-4.5v-5A4.5 4.5 0 0 0 17.5 5H9"></path>
+              <circle cx="6" cy="5" r="3"></circle>
+            </svg>
+            <span class="">로드맵</span>
+          </a>
+
+          <!-- 4. Review -->
+          <a href="#review" class="flex items-center gap-3.5 px-4 py-3 rounded-2xl text-[#6b7280] hover:text-[#1e1b2e] hover:bg-[#fbf0ff] transition-all font-medium text-sm">
+            <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="5" width="14" height="15" rx="2"></rect>
+              <path d="M7 2.5h12a2 2 0 0 1 2 2v13"></path>
+            </svg>
+            <span class="">복습</span>
+          </a>
+
+          <!-- 5. Profile -->
+          <a href="#profile" class="flex items-center gap-3.5 px-4 py-3 rounded-2xl text-[#6b7280] hover:text-[#1e1b2e] hover:bg-[#fbf0ff] transition-all font-medium text-sm">
+            <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span class="">내 정보</span>
+          </a>
+        </nav>
+      </div>
+
+      <!-- Sidebar Course Navigation Context Widget -->
+      <div class="flex flex-col gap-3">
+        <div class="bg-[#fbf0ff] border border-[#f1e5f5] rounded-2xl p-3.5 flex flex-col gap-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-xs font-bold text-primary">현재 학습 코스</span>
+            <span class="font-semibold text-subtext text-[11px]">3 / 5강</span>
+          </div>
+          <p class="text-xs font-bold text-[#1e1b2e] truncate">모던 프론트엔드를 위한 TypeScript 핵심 입문</p>
+          <div class="w-full bg-[#f1e5f5] h-1.5 rounded-full overflow-hidden">
+            <div class="bg-primary h-full rounded-full transition-all duration-300" style="width: 40%;"></div>
+          </div>
+          <a href="#course-detail" class="text-[11px] text-primary hover:text-primary-dark font-medium flex items-center gap-1 mt-1 transition-colors">
+            <span class="">← 코스 목차로 돌아가기</span>
+          </a>
+        </div>
+        <div class="text-[11px] text-subtext/70 px-1">Mogum v2.4</div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-1 flex flex-col min-w-0 pb-28 lg:pb-16">
+
+      <!-- TOP APP BAR / HEADER -->
+      <header class="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-[#f1e5f5] px-4 sm:px-8 py-3.5 flex items-center justify-between transition-all">
+        <!-- Back Navigation & Lecture Breadcrumbs -->
+        <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+          <a href="#course-detail" class="inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-[#fbf0ff] hover:bg-[#f3e8ff] text-[#1e1b2e] border border-[#f1e5f5] transition-all hover:scale-105 active:scale-95 flex-shrink-0" title="코스 화면으로 돌아가기">
+            <svg class="w-5 h-5 text-[#1e1b2e]" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path>
+            </svg>
+          </a>
+          
+          <div class="flex flex-col min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] sm:text-xs font-semibold text-primary px-2 py-0.5 bg-primary-light rounded-md">TypeScript 입문</span>
+              <span class="text-[11px] sm:text-xs text-subtext hidden sm:inline">• 3강 / 총 5강</span>
+            </div>
+            <h1 class="text-sm sm:text-base font-bold text-[#1e1b2e] truncate">
+              3강 · 제네릭과 재사용 컴포넌트 패턴
+            </h1>
+          </div>
+        </div>
+
+        <!-- Right Side: Streak Counter Only (NO profile, NO search per strict guide) -->
+        <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+          <div class="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full bg-gradient-to-r from-amber-50 to-orange-50 border border-orange-200/80 shadow-sm" title="연속 5일 학습 스트릭">
+            <span class="text-base sm:text-lg leading-none">🔥</span>
+            <span class="text-xs sm:text-sm font-bold text-orange-600 tracking-tight">5일 연속 학습 중</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- LECTURE BODY CONTAINER -->
+      <div class="w-full max-w-4xl mx-auto px-4 sm:px-8 py-6 sm:py-8 flex flex-col gap-8 sm:gap-10"><!-- MARKDOWN DOCUMENT ARTICLE CARD -->
+<article class="bg-white border border-[#f1e5f5] rounded-3xl shadow-sm overflow-hidden flex flex-col">
+
+  <!-- MD File Meta & Toolbar Header -->
+  <div class="border-b border-[#f1e5f5] bg-[#fbf0ff]/80 px-6 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3 text-xs text-subtext">
+    <div class="flex items-center gap-2.5 font-mono text-[13px] font-semibold text-[#1e1b2e]">
+      <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+      </svg>
+      <span class="text-primary font-bold">lecture-03-generics-reusable-components.md</span>
+      <span class="hidden sm:inline-block px-2 py-0.5 rounded bg-white text-[11px] text-[#6b7280] border border-[#e9d5ff]">Markdown Rendered</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="flex items-center gap-1 text-[11px] font-medium text-subtext">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" stroke-width="2"></circle>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2"></path>
+        </svg>
+        예상 소요: 12분 (3,420자)
+      </span>
+      <span class="text-[#e9d5ff]">|</span>
+      <span class="px-2 py-0.5 rounded-full bg-[#f3e8ff] text-primary text-[11px] font-bold">TS v5.4+</span>
+    </div>
+  </div>
+
+  <!-- Rendered Markdown Body -->
+  <div class="p-6 sm:p-10 flex flex-col gap-8 text-[#1e1b2e] leading-relaxed">
+
+    <!-- Document Title & Frontmatter-style meta -->
+    <div class="border-b border-[#f1e5f5] pb-6 flex flex-col gap-3">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-primary px-2.5 py-1 bg-primary-light rounded-lg">Chapter 03</span>
+        <span class="text-xs text-subtext font-mono">Updated 2025.03</span>
+      </div>
+      <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1e1b2e] flex items-center gap-2">
+        <span class="">제네릭(Generics) 심화와 실무 재사용 컴포넌트 설계</span>
+      </h1>
+      <p class="text-sm sm:text-base text-subtext leading-relaxed mt-1">
+        정적 타이핑의 유연성을 극대화하는 제네릭의 작동 원리부터, <code class="text-primary font-mono bg-purple-50 px-1.5 py-0.5 rounded border border-[#e9d5ff]">extends</code> 타입 제약조건, 그리고 실제 React UI 컴포넌트 라이브러리 및 API 계층에 응용하는 패턴까지 단계별로 학습합니다.
+      </p>
+    </div>
+
+    <!-- Markdown Callout / Tip Block -->
+    <div class="bg-[#fbf0ff] border-l-4 border-primary rounded-r-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-sm">
+      <span class="text-xl">💡</span>
+      <div class="flex flex-col gap-1 text-xs sm:text-sm text-[#2d2843]">
+        <p class="font-bold text-[#1e1b2e]">학습 전 핵심 질문 던지기</p>
+        <p class="text-subtext leading-relaxed">
+          "어떤 함수나 컴포넌트를 만들 때, 입력 형태가 수십 가지로 바뀔 수 있다면 우리는 매번 타입을 유니온으로 이어 붙여야 할까요? 아니면 <code class="text-rose-600 bg-rose-50 px-1 rounded font-mono">any</code>를 선언해 컴파일러를 무력화해야 할까요?" — 제네릭은 이 질문에 대한 TypeScript의 가장 우아한 해답입니다.
+        </p>
+      </div>
+    </div>
+
+    <!-- SECTION 1 -->
+    <section class="flex flex-col gap-4">
+      <h2 class="text-xl sm:text-2xl font-bold text-[#1e1b2e] tracking-tight flex items-center gap-2 border-b border-[#f1e5f5] pb-2">
+        <span class="text-primary font-mono text-lg font-extrabold"># 1.</span>
+        <span class="">왜 제네릭이 필요한가? (The Problem with `any`)</span>
+      </h2>
+      <p class="text-sm sm:text-[15px] text-[#2d2843] leading-relaxed">
+        자바스크립트의 유연함을 유지하면서도 컴파일 타임의 엄격한 타입 추론을 놓치지 않기 위해 제네릭이 도입되었습니다. 아래 두 가지 접근 방식의 한계를 살펴봅니다.
+      </p>
+
+      <!-- Code comparison tabs / blocks -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-1">
+        <!-- Bad: any usage -->
+        <div class="bg-[#1e1b2e] text-[#f3e8ff] rounded-2xl p-4 font-mono text-xs shadow-inner flex flex-col gap-2">
+          <div class="flex items-center justify-between border-b border-gray-700/60 pb-2 text-[11px]">
+            <span class="text-rose-400 font-bold flex items-center gap-1">❌ Bad: any 사용 시 타입 상실</span>
+            <span class="text-gray-400">any-wrapper.ts</span>
+          </div>
+          <pre class="overflow-x-auto leading-relaxed"><span class="text-purple-400">function</span> <span class="text-blue-300">firstItem</span>(arr: <span class="text-rose-400 font-bold">any</span>[]): <span class="text-rose-400 font-bold">any</span> {
+  <span class="text-purple-400">return</span> arr[<span class="text-amber-300">0</span>];
+}
+
+<span class="text-gray-400">// 반환값이 any로 강등됨!</span>
+<span class="text-purple-400">const</span> num = <span class="text-blue-300">firstItem</span>([<span class="text-amber-300">10</span>, <span class="text-amber-300">20</span>, <span class="text-amber-300">30</span>]);
+<span class="text-gray-400">// 런타임 에러 위험 (자동완성 불가):</span>
+num.toUpperCase(); <span class="text-rose-400 font-bold">// 컴파일 타임 감지 불가!</span></pre>
+        </div>
+
+        <!-- Good: Generics -->
+        <div class="bg-[#1e1b2e] text-[#f3e8ff] rounded-2xl p-4 font-mono text-xs shadow-inner flex flex-col gap-2">
+          <div class="flex items-center justify-between border-b border-gray-700/60 pb-2 text-[11px]">
+            <span class="text-emerald-400 font-bold flex items-center gap-1">✅ Good: Generic &lt;T&gt; 타입 보존</span>
+            <span class="text-gray-400">generic-wrapper.ts</span>
+          </div>
+          <pre class="overflow-x-auto leading-relaxed"><span class="text-purple-400">function</span> <span class="text-blue-300">firstItem</span>&lt;<span class="text-amber-300 font-bold">T</span>&gt;(arr: <span class="text-amber-300 font-bold">T</span>[]): <span class="text-amber-300 font-bold">T</span> | <span class="text-blue-300">undefined</span> {
+  <span class="text-purple-400">return</span> arr[<span class="text-amber-300">0</span>];
+}
+
+<span class="text-gray-400">// T가 number로 자동 추론됨</span>
+<span class="text-purple-400">const</span> num = <span class="text-blue-300">firstItem</span>([<span class="text-amber-300">10</span>, <span class="text-amber-300">20</span>, <span class="text-amber-300">30</span>]);
+<span class="text-gray-400">// num.toUpperCase(); 에러 발생! TS2339</span>
+num?.toFixed(<span class="text-amber-300">2</span>); <span class="text-emerald-300 font-semibold">// 정확한 자동완성 지원</span></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2 -->
+    <section class="flex flex-col gap-4">
+      <h2 class="text-xl sm:text-2xl font-bold text-[#1e1b2e] tracking-tight flex items-center gap-2 border-b border-[#f1e5f5] pb-2">
+        <span class="text-primary font-mono text-lg font-extrabold"># 2.</span>
+        <span class="">타입 제약 조건 (`extends`) 심층 분석</span>
+      </h2>
+      <p class="text-sm sm:text-[15px] text-[#2d2843] leading-relaxed">
+        때로는 <em>"어떤 타입이든 들어올 수 있지만, 최소한 특정 속성(예: <code class="text-primary font-mono bg-purple-50 px-1 rounded">id</code>나 <code class="text-primary font-mono bg-purple-50 px-1 rounded">length</code>)은 반드시 가지고 있어야 한다"</em>는 보장이 필요합니다. 이때 사용하는 키워드가 바로 <code class="text-primary font-bold font-mono bg-purple-50 px-1.5 py-0.5 rounded border border-[#e9d5ff]">extends</code>입니다.
+      </p>
+
+      <!-- ASCII Diagram Box -->
+      <div class="bg-[#fff7fe] border border-[#e9d5ff] rounded-2xl p-4 sm:p-5 flex flex-col gap-2 font-mono text-xs">
+        <div class="flex items-center justify-between text-primary font-bold text-xs pb-1">
+          <span class="">제약조건 포함 파이프라인 (Constraint Pipeline)</span>
+          <span class="text-[11px] font-normal text-subtext">Type Filtering</span>
+        </div>
+        <div class="bg-white border border-[#f1e5f5] rounded-xl p-3.5 leading-relaxed text-[#1e1b2e] overflow-x-auto custom-scrollbar">
+Type Argument &lt;T&gt; ───► [ Check: T extends { id: string | number } ]
+                           │
+                           ├─── Pass ──► 반환값 및 컴포넌트 렌더링에 T 유지
+                           └─── Fail ──► 컴파일 에러: Property 'id' is missing
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: 실전 예제 -->
+    <section class="flex flex-col gap-4">
+      <h2 class="text-xl sm:text-2xl font-bold text-[#1e1b2e] tracking-tight flex items-center gap-2 border-b border-[#f1e5f5] pb-2">
+        <span class="text-primary font-mono text-lg font-extrabold"># 3.</span>
+        <span class="">실무 실전 예제: 제네릭 API 응답 &amp; 재사용 컴포넌트</span>
+      </h2>
+      <p class="text-sm sm:text-[15px] text-[#2d2843] leading-relaxed">
+        프론트엔드 프로젝트에서 가장 흔하게 마주하는 패턴 2가지를 실제로 작성해봅니다.
+      </p>
+
+      <!-- Single Big Code Block with Title -->
+      <div class="bg-[#1e1b2e] text-[#f3e8ff] rounded-2xl p-5 font-mono text-xs sm:text-[13px] leading-relaxed overflow-x-auto shadow-inner custom-scrollbar flex flex-col gap-2">
+        <div class="flex items-center justify-between border-b border-gray-700/60 pb-2.5 text-[11px]">
+          <span class="text-primary-light font-bold flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+            GenericComponents.tsx
+          </span>
+          <span class="text-gray-400">TypeScript + React</span>
+        </div>
+<pre><span class="text-purple-400">import</span> React <span class="text-purple-400">from</span> <span class="text-emerald-300">'react'</span>;
+
+<span class="text-gray-400">// 1. 공통 API 응답 래퍼 인터페이스</span>
+<span class="text-purple-400">export interface</span> <span class="text-amber-300">ApiResponse</span>&lt;<span class="text-amber-300">TData</span>&gt; {
+  status: <span class="text-amber-300">200</span> | <span class="text-amber-300">400</span> | <span class="text-amber-300">500</span>;
+  message: <span class="text-blue-300">string</span>;
+  data: <span class="text-amber-300">TData</span>;
+  timestamp: <span class="text-blue-300">number</span>;
+}
+
+<span class="text-gray-400">// 2. 최소 식별자 제약조건 정의</span>
+<span class="text-purple-400">export interface</span> <span class="text-amber-300">Identifiable</span> {
+  id: <span class="text-blue-300">string</span> | <span class="text-blue-300">number</span>;
+}
+
+<span class="text-gray-400">// 3. 제네릭 셀렉트 드롭다운 Props</span>
+<span class="text-purple-400">interface</span> <span class="text-amber-300">SelectDropdownProps</span>&lt;<span class="text-amber-300">TItem</span> <span class="text-purple-400">extends</span> <span class="text-amber-300">Identifiable</span>&gt; {
+  items: <span class="text-amber-300">TItem</span>[];
+  selectedId: <span class="text-blue-300">string</span> | <span class="text-blue-300">number</span>;
+  renderLabel: (item: <span class="text-amber-300">TItem</span>) =&gt; React.ReactNode;
+  onSelect: (selected: <span class="text-amber-300">TItem</span>) =&gt; <span class="text-blue-300">void</span>;
+}
+
+<span class="text-gray-400">// 4. 고차(Generic) UI 컴포넌트 선언</span>
+<span class="text-purple-400">export function</span> <span class="text-amber-300">SelectDropdown</span>&lt;<span class="text-amber-300">TItem</span> <span class="text-purple-400">extends</span> <span class="text-amber-300">Identifiable</span>&gt;({
+  items,
+  selectedId,
+  renderLabel,
+  onSelect,
+}: <span class="text-amber-300">SelectDropdownProps</span>&lt;<span class="text-amber-300">TItem</span>&gt;) {
+  <span class="text-purple-400">return</span> (
+    &lt;<span class="text-blue-300">div</span> <span class="text-indigo-300">className</span>=<span class="text-emerald-300">"flex flex-col gap-1 w-full"</span>&gt;
+      {items.<span class="text-blue-300">map</span>((item) =&gt; {
+        <span class="text-purple-400">const</span> isSelected = item.id === selectedId;
+        <span class="text-purple-400">return</span> (
+          &lt;<span class="text-blue-300">button</span>
+            <span class="text-indigo-300">key</span>={item.id}
+            <span class="text-indigo-300">type</span>=<span class="text-emerald-300">"button"</span>
+            <span class="text-indigo-300">onClick</span>={() =&gt; <span class="text-blue-300">onSelect</span>(item)}
+            <span class="text-indigo-300">className</span>={<span class="text-emerald-300">`px-3 py-2 text-left rounded-lg ${isSelected ? 'bg-purple-100 text-purple-900 font-bold' : 'hover:bg-purple-50'}`</span>}
+          &gt;
+            {<span class="text-blue-300">renderLabel</span>(item)}
+          &lt;/<span class="text-blue-300">button</span>&gt;
+        );
+      })}
+    &lt;/<span class="text-blue-300">div</span>&gt;
+  );
+}</pre>
+      </div>
+    </section>
+
+    <!-- SECTION 4: MARKDOWN TABLE COMPARISON -->
+    <section class="flex flex-col gap-4">
+      <h2 class="text-xl sm:text-2xl font-bold text-[#1e1b2e] tracking-tight flex items-center gap-2 border-b border-[#f1e5f5] pb-2">
+        <span class="text-primary font-mono text-lg font-extrabold"># 4.</span>
+        <span class="">타입 전략 비교표: any vs unknown vs Generic &lt;T&gt;</span>
+      </h2>
+      <p class="text-sm text-subtext">
+        동적 타이핑 요구 시 각 키워드의 타입 안전성과 자동완성 특징을 한눈에 대조합니다.
+      </p>
+
+      <div class="border border-[#e9d5ff] rounded-2xl overflow-hidden shadow-sm">
+        <div class="overflow-x-auto custom-scrollbar">
+          <table class="w-full text-left text-xs sm:text-sm">
+            <thead class="bg-[#fbf0ff] text-[#1e1b2e] font-bold border-b border-[#e9d5ff]">
+              <tr>
+                <th class="py-3 px-4">구분</th>
+                <th class="py-3 px-4">컴파일 타입 검사</th>
+                <th class="py-3 px-4">IDE 자동완성</th>
+                <th class="py-3 px-4">타입 추론 보존</th>
+                <th class="py-3 px-4">권장 사용 상황</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[#f1e5f5] bg-white text-[#2d2843]">
+              <tr class="hover:bg-[#fff7fe] transition-colors">
+                <td class="py-3 px-4 font-mono font-bold text-rose-600">any</td>
+                <td class="py-3 px-4 text-subtext">완전 무시 (포기)</td>
+                <td class="py-3 px-4 text-subtext">지원 안 됨</td>
+                <td class="py-3 px-4 text-subtext">불가능</td>
+                <td class="py-3 px-4">마이그레이션 임시용 (지양)</td>
+              </tr>
+              <tr class="hover:bg-[#fff7fe] transition-colors">
+                <td class="py-3 px-4 font-mono font-bold text-amber-500">unknown</td>
+                <td class="py-3 px-4 text-emerald-600 font-semibold">엄격 (타입 좁히기 필수)</td>
+                <td class="py-3 px-4 text-subtext">좁히기 전까지 불가</td>
+                <td class="py-3 px-4 text-subtext">불가능</td>
+                <td class="py-3 px-4">외부 입력값 검증 전</td>
+              </tr>
+              <tr class="bg-purple-50/50 hover:bg-purple-50 transition-colors font-medium">
+                <td class="py-3 px-4 font-mono font-bold text-primary">Generic &lt;T&gt;</td>
+                <td class="py-3 px-4 text-emerald-600 font-bold">완전 보장</td>
+                <td class="py-3 px-4 text-emerald-600 font-bold">100% 인텔리센스 지원</td>
+                <td class="py-3 px-4 text-emerald-600 font-bold">입력-출력 완벽 보존</td>
+                <td class="py-3 px-4 text-primary font-bold">재사용 컴포넌트 / 유틸 함수</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 5: 안티패턴 및 흔한 실수 -->
+    <section class="flex flex-col gap-4">
+      <h2 class="text-xl sm:text-2xl font-bold text-[#1e1b2e] tracking-tight flex items-center gap-2 border-b border-[#f1e5f5] pb-2">
+        <span class="text-primary font-mono text-lg font-extrabold"># 5.</span>
+        <span class="">실무 안티패턴: 불필요한 제네릭 남용 피하기</span>
+      </h2>
+      <p class="text-sm sm:text-[15px] text-[#2d2843] leading-relaxed">
+        제네릭은 강력하지만, <strong>두 개 이상의 인자 사이의 관계를 맺어주지 않거나 반환값에 영향을 주지 않는 단발성 함수</strong>에 사용하는 것은 코드 복잡도만 높이는 안티패턴입니다.
+      </p>
+
+      <div class="bg-rose-50 border border-red-200 rounded-2xl p-4 sm:p-5 flex flex-col gap-2">
+        <div class="flex items-center gap-2 font-bold text-rose-600 text-xs sm:text-sm">
+          <span class="">⚠️ 주의: 타입 매개변수가 한 곳에서만 쓰이는 경우</span>
+        </div>
+        <p class="text-xs sm:text-sm text-subtext leading-relaxed">
+          예: <code class="text-rose-600 font-mono bg-white px-1.5 py-0.5 rounded border">function printName&lt;T extends { name: string }&gt;(obj: T): void</code><br>
+          이 경우 굳이 &lt;T&gt;를 쓰지 않고 <code class="text-primary font-mono bg-white px-1.5 py-0.5 rounded border">function printName(obj: { name: string }): void</code>로 선언하는 것이 훨씬 읽기 쉽고 직관적입니다.
+        </p>
+      </div>
+    </section>
+
+    <!-- SECTION 6: 인터뷰 & 실무 Q&A -->
+    <section class="flex flex-col gap-4">
+      <h2 class="text-xl sm:text-2xl font-bold text-[#1e1b2e] tracking-tight flex items-center gap-2 border-b border-[#f1e5f5] pb-2">
+        <span class="text-primary font-mono text-lg font-extrabold"># 6.</span>
+        <span class="">프론트엔드 테크 면접 단골 질문 Q&amp;A</span>
+      </h2>
+
+      <div class="flex flex-col gap-3">
+        <div class="border border-[#e9d5ff] rounded-2xl p-4 sm:p-5 bg-[#fff7fe] flex flex-col gap-2">
+          <p class="font-bold text-sm sm:text-base text-[#1e1b2e] flex items-center gap-2">
+            <span class="text-primary">Q.</span>
+            <span class="">"React에서 제네릭 컴포넌트(Generic Component)를 선언할 때 .tsx 파일 화살표 함수 문법 충돌 문제는 어떻게 해결하나요?"</span>
+          </p>
+          <div class="text-xs sm:text-sm text-subtext leading-relaxed border-t border-[#f1e5f5] pt-2 mt-1 space-y-1">
+            <p class=""><strong>모범 답변:</strong> TSX 문법 파서는 <code class="text-primary font-mono bg-white px-1 py-0.5 rounded">&lt;T&gt;</code>를 JSX 태그의 시작으로 오인합니다. 이를 해결하기 위해 두 가지 방식을 씁니다:</p>
+            <ol class="list-decimal list-inside space-y-1 pl-1">
+              <li class=""><code class="text-primary font-mono bg-white px-1 py-0.5 rounded">extends unknown</code> 추가: <code class="font-mono text-[#1e1b2e]">const Comp = &lt;T extends unknown&gt;(props: Props&lt;T&gt;) =&gt; ...</code></li>
+              <li class="">혹은 trailing comma를 부여: <code class="font-mono text-[#1e1b2e]">const Comp = &lt;T, &gt;(props: Props&lt;T&gt;) =&gt; ...</code></li>
+              <li class="">가장 권장되는 표준은 일반 <code class="text-primary font-mono bg-white px-1 py-0.5 rounded">function GenericComp&lt;T&gt;(props)</code> 선언식을 사용하는 것입니다.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 7: 요약 및 체크리스트 -->
+    <section class="bg-gradient-to-r from-purple-50 via-[#fbf0ff] to-white border border-[#e9d5ff] rounded-2xl p-5 sm:p-6 flex flex-col gap-3">
+      <div class="flex items-center gap-2 text-base font-bold text-[#1e1b2e]">
+        <span class="">✅</span>
+        <span class="">3줄 핵심 정리 &amp; 자가 점검 (Checklist)</span>
+      </div>
+      <ul class="space-y-2 text-xs sm:text-sm text-[#2d2843] leading-relaxed">
+        <li class="flex items-start gap-2">
+          <input type="checkbox" checked="" disabled="" class="mt-1 rounded text-primary">
+          <span class="">제네릭은 <strong>'타입을 인자로 전달하여 호출 시점에 결정하는 동적 타입 안전장치'</strong>입니다.</span>
+        </li>
+        <li class="flex items-start gap-2">
+          <input type="checkbox" checked="" disabled="" class="mt-1 rounded text-primary">
+          <span class=""><code class="font-mono text-primary font-bold">extends</code>를 부여하여 제네릭 타입이 가질 최소한의 형태(인터페이스)를 엄격히 강제할 수 있습니다.</span>
+        </li>
+        <li class="flex items-start gap-2">
+          <input type="checkbox" checked="" disabled="" class="mt-1 rounded text-primary">
+          <span class="">반환값이나 다른 파라미터와의 연결 고리가 없는 단일 매개변수에는 제네릭을 남용하지 않습니다.</span>
+        </li>
+      </ul>
+    </section>
+
+  </div>
+
+  <!-- BOTTOM ACTIONS BAR (Inside the Article Card footer) -->
+  <div class="border-t border-[#f1e5f5] bg-[#fbf0ff]/50 p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+    <button type="button" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-white hover:bg-[#fbf0ff] text-subtext hover:text-[#1e1b2e] border border-[#e9d5ff] font-medium text-xs sm:text-sm transition-all hover:scale-[1.02] active:scale-95 shadow-sm" title="AI에게 피드백을 전달하여 자료를 재생성합니다">
+      <svg class="w-4 h-4 text-subtext" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+      </svg>
+      <span class="">강의 자료 다시 만들기</span>
+    </button>
+
+    <button type="button" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl bg-primary hover:bg-primary-dark text-white font-bold text-sm sm:text-base shadow-lg shadow-purple-500/25 transition-all hover:scale-[1.02] active:scale-95">
+      <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
+      </svg>
+      <span class="">이 강의 학습 완료하기</span>
+    </button>
+  </div>
+
+</article></div>
+    </main>
+  </div>
+
+  <!-- FIXED BOTTOM TAB BAR FOR MOBILE (< 1024px) -->
+  <nav class="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-[#f1e5f5] px-2 py-2 flex items-center justify-around shadow-lg" aria-label="모바일 하단 탭 내비게이션">
+    <!-- 1. Home -->
+    <a href="#home" class="flex flex-col items-center justify-center flex-1 py-1 text-[#6b7280] hover:text-[#1e1b2e] transition-colors">
+      <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 10.5L12 3l9 7.5v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9z"></path>
+        <polyline points="9 21 9 12 15 12 15 21"></polyline>
+      </svg>
+      <span class="text-[11px] font-medium mt-1">홈</span>
+    </a>
+
+    <!-- 2. Courses (Active) -->
+    <a href="#courses" class="flex flex-col items-center justify-center flex-1 py-1 text-primary font-bold">
+      <svg class="w-6 h-6 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+        <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+      </svg>
+      <span class="text-[11px] mt-1">코스</span>
+    </a>
+
+    <!-- 3. Roadmap -->
+    <a href="#roadmap" class="flex flex-col items-center justify-center flex-1 py-1 text-[#6b7280] hover:text-[#1e1b2e] transition-colors">
+      <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="6" cy="19" r="3"></circle>
+        <path d="M9 19h8.5a4.5 4.5 0 0 0 4.5-4.5v-5A4.5 4.5 0 0 0 17.5 5H9"></path>
+        <circle cx="6" cy="5" r="3"></circle>
+      </svg>
+      <span class="text-[11px] font-medium mt-1">로드맵</span>
+    </a>
+
+    <!-- 4. Review -->
+    <a href="#review" class="flex flex-col items-center justify-center flex-1 py-1 text-[#6b7280] hover:text-[#1e1b2e] transition-colors">
+      <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="14" height="15" rx="2"></rect>
+        <path d="M7 2.5h12a2 2 0 0 1 2 2v13"></path>
+      </svg>
+      <span class="text-[11px] font-medium mt-1">복습</span>
+    </a>
+
+    <!-- 5. Profile -->
+    <a href="#profile" class="flex flex-col items-center justify-center flex-1 py-1 text-[#6b7280] hover:text-[#1e1b2e] transition-colors">
+      <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+      </svg>
+      <span class="text-[11px] font-medium mt-1">내 정보</span>
+    </a>
+  </nav>
+
+
+
+
+
+
+
+
+</body></html>
