@@ -60,7 +60,7 @@ tasks.withType(Test).configureEach {
 }
 
 tasks.named('test') {
-    exclude '**/*ImageIT.class'
+    exclude 'com/mogum/AppImageTest.class'
     inputs.dir('../deploy')
     inputs.dir('../.github/workflows')
 }
@@ -81,7 +81,7 @@ tasks.register('imageTest', Test) {
     }
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
-    include '**/*ImageIT.class'
+    include 'com/mogum/AppImageTest.class'
     systemProperty 'appImage', suppliedAppImage.getOrElse(localAppImage)
     // 같은 태그의 이미지 내용이 바뀔 수 있으므로 매번 실제 컨테이너를 검사한다.
     outputs.upToDateWhen { false }

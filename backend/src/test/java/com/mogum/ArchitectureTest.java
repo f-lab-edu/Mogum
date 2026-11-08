@@ -1,5 +1,12 @@
 package com.mogum;
 
+import com.mogum.archfixture.testrules.AccessibleObjectUsage;
+import com.mogum.archfixture.testrules.JUnitAssertionsUsage;
+import com.mogum.archfixture.testrules.LegacyIT;
+import com.mogum.archfixture.testrules.ReflectionUtilsUsage;
+import com.mogum.account.domain.UserFixtures;
+import com.mogum.account.repository.FakeUserRepository;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.mogum.archfixture.account.AccountToGeneration;
 import com.mogum.archfixture.account.AccountToWorker;
 import com.mogum.archfixture.generation.TransactionalGeneration;
@@ -59,6 +66,103 @@ class ArchitectureTest {
     private static final JavaClasses CLASSES = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .importPackages("com.mogum");
+    private static final JavaClasses TEST_CLASSES = new ClassFileImporter()
+            .withImportOption(ImportOption.Predefined.ONLY_INCLUDE_TESTS)
+            .withImportOption(location -> !location.contains("/com/mogum/archfixture/"))
+            .importClasspath();
+    private static final ArchRule TESTS_USE_ASSERTJ = noClasses().should().dependOnClassesThat()
+            .haveFullyQualifiedName("org.junit.jupiter.api.Assertions");
+    private static final ArchRule TEST_NAMES_AVOID_IT = noClasses().should().haveSimpleNameEndingWith("IT");
+    private static final ArchRule REFLECTION_ONLY_IN_FIXTURES_AND_FAKES = classes().that(
+            new DescribedPredicate<JavaClass>("are neither *Fixtures nor Fake*") {
+                @Override
+                public boolean test(JavaClass type) {
+                    return !type.getSimpleName().endsWith("Fixtures") && !type.getSimpleName().startsWith("Fake");
+                }
+            }).should(new ArchCondition<JavaClass>("avoid ReflectionTestUtils and setAccessible calls") {
+                @Override
+                public void check(JavaClass type, ConditionEvents events) {
+                    for (var dependency : type.getDirectDependenciesFromSelf()) {
+                        if (dependency.getTargetClass().getName().equals("org.springframework.test.util.ReflectionTestUtils")) {
+                            events.add(SimpleConditionEvent.violated(type, dependency.getDescription()));
+                        }
+                    }
+                    for (var call : type.getMethodCallsFromSelf()) {
+                        if (call.getTarget().getName().equals("setAccessible")
+                                && call.getTargetOwner().isAssignableTo(java.lang.reflect.AccessibleObject.class)) {
+                            events.add(SimpleConditionEvent.violated(type, call.getDescription()));
+                        }
+                    }
+                }
+            });
+
+    @Test
+    @DisplayName("테스트 코드는 JUnit Assertions 대신 AssertJ로 단언한다")
+    void requiresAssertJInTests() {
+        // when
+        var result = TESTS_USE_ASSERTJ.evaluate(TEST_CLASSES);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
+    }
+
+    @Test
+    @DisplayName("JUnit Assertions에 의존하는 위반 픽스처를 거부한다")
+    void rejectsJUnitAssertions() {
+        // when & then
+        assertViolation(TESTS_USE_ASSERTJ, JUnitAssertionsUsage.class);
+    }
+
+    @Test
+    @DisplayName("리플렉션은 픽스처와 Fake 안에서만 사용한다")
+    void restrictsReflectionToFixturesAndFakes() {
+        // when
+        var result = REFLECTION_ONLY_IN_FIXTURES_AND_FAKES.evaluate(TEST_CLASSES);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
+    }
+
+    @ParameterizedTest(name = "위반 클래스 {0}")
+    @ValueSource(classes = {ReflectionUtilsUsage.class, AccessibleObjectUsage.class})
+    @DisplayName("일반 테스트 도우미의 ReflectionTestUtils와 setAccessible을 거부한다")
+    void rejectsReflectionOutsideFixturesAndFakes(Class<?> fixture) {
+        // when & then
+        assertViolation(REFLECTION_ONLY_IN_FIXTURES_AND_FAKES, fixture);
+    }
+
+    @Test
+    @DisplayName("테스트 클래스 이름은 IT 약어로 끝나지 않는다")
+    void prohibitsItSuffixInTestNames() {
+        // when
+        var result = TEST_NAMES_AVOID_IT.evaluate(TEST_CLASSES);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
+    }
+
+    @Test
+    @DisplayName("IT 약어로 끝나는 위반 픽스처를 거부한다")
+    void rejectsItSuffix() {
+        // when & then
+        assertViolation(TEST_NAMES_AVOID_IT, LegacyIT.class);
+    }
+
+    @Test
+    @DisplayName("테스트 검사에는 테스트와 지원 도구를 포함하고 제품 코드와 위반 픽스처는 제외한다")
+    void importsOnlyTestsWithoutViolationFixtures() {
+        // when
+        var classes = TEST_CLASSES;
+
+        // then
+        assertThat(classes.contain(ArchitectureTest.class)).isTrue();
+        assertThat(classes.contain(UserFixtures.class)).isTrue();
+        assertThat(classes.contain(FakeUserRepository.class)).isTrue();
+        assertThat(classes.contain(com.mogum.support.TestSessions.class)).isTrue();
+        assertThat(classes.contain(MogumApplication.class)).isFalse();
+        assertThat(classes.stream()).noneMatch(type -> type.getPackageName().startsWith("com.mogum.archfixture"));
+    }
+
     private static final String SPRING_TRANSACTIONAL = "org.springframework.transaction.annotation.Transactional";
     private static final String JAKARTA_TRANSACTIONAL = "jakarta.transaction.Transactional";
     private static final ArchRule ENTITIES_EXTEND_AUDITED_ENTITY = classes().that()

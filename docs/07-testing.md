@@ -55,7 +55,7 @@
 
 그룹 화면은 [06 §9](./06-screens.md)(U11)에서 정했다. 아래 분할 관련 검증은 기능 계약이 대상이며, 화면 테스트는 화면 TASK 에서 06 을 기준으로 쓴다. LLM의 단일/그룹 판단 적절성은 기존 콘텐츠 수동 채점에서 목표/범위/선행 관계를 확인하며 구조 테스트만으로 검증됐다고 쓰지 않는다.
 
-회원 테이블의 제공자·식별자 일반화(ADR-066)는 [02 §6.1](./02-domain-data.md)에 따라 구현했다. `LoginServiceTest` · `LoginServiceIT` · `UserRepositoryIT` · `GoogleAccountMapperTest` · `OAuthLoginHandlerIT` · `LoginIdentityMigrationIT`로 아래 계정 항목을 검증했다. 2026-10-20 패키지 재구성(ADR-067) 뒤 전체 서버 테스트 179개가 통과했다. 작업/생성 등 아직 구현하지 않은 영역의 아래 항목은 해당 TASK의 검증 기준이다.
+회원 테이블의 제공자·식별자 일반화(ADR-066)는 [02 §6.1](./02-domain-data.md)에 따라 구현했다. `LoginServiceTest` · `LoginServiceConcurrencyIntegrationTest` · `UserRepositoryTest` · `GoogleAccountMapperTest` · `OAuthLoginHandlerIntegrationTest` · `OAuthLoginHandlerFailureIntegrationTest` · `OAuthLoginHandlerPkceIntegrationTest` · `LoginIdentityMigrationTest`로 아래 계정 항목을 검증했다. 2026-10-20 패키지 재구성(ADR-067) 뒤 전체 서버 테스트 179개가 통과했다. 작업/생성 등 아직 구현하지 않은 영역의 아래 항목은 해당 TASK의 검증 기준이다.
 
 | 테스트 | 왜 |
 |---|---|
