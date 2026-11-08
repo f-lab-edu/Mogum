@@ -5,7 +5,10 @@
     {
       "step": 0,
       "name": "test-support",
-      "status": "pending"
+      "status": "completed",
+      "summary": "Boot 4.1.1 BOM 관리 테스트 모듈 spring-boot-data-jpa-test(@DataJpaTest, 전이 spring-boot-jdbc-test의 @AutoConfigureTestDatabase), spring-boot-webmvc-test(@WebMvcTest · @AutoConfigureMockMvc), spring-boot-resttestclient(@AutoConfigureRestTestClient · spring-test의 RestTestClient 실제 포트 자동 설정)을 버전 없이 추가; com.mogum.support.RepositoryTest · com.mogum.support.IntegrationTest · com.mogum.support.IntegrationTestConfiguration · com.mogum.support.TestClock · com.mogum.support.TestClockConfiguration(@Primary testClock 빈, 기존 clock 보존) · com.mogum.support.DatabaseCleaner(BeforeEachCallback) · com.mogum.support.TestRequests(asUser · anonymous)를 구현하고 기존 com.mogum.support.TestSessions 유지; com.mogum.support.PostgresTestConfiguration.ConnectionInitializer를 @ContextConfiguration(initializers=...)으로 연결해 JVM 단일 POSTGRES 컨테이너를 빈 등록 없이 공유하며 기존 상속 · POSTGRES 필드와 컨텍스트 종료 후 생존 유지(이관 중 풀 공존을 위해 테스트 DB max_connections=200); 정리기는 카탈로그에서 flyway_schema_history를 제외한 테이블을 읽고 TRUNCATE CASCADE · 시계 reset, PostgreSQL 17의 현재 앱 테이블 7개에 각 1행 · 공유 JDBC 연결 · 방식별 30회 예열 뒤 200회 교대 측정(카탈로그 조회 · 정리 · 커밋 포함, 데이터 준비 제외)에서 테스트당 DELETE 2.660ms · TRUNCATE CASCADE 2.525ms로 후자 선택; docs/TEST_GUIDE.md §5 · docs/ARCHITECTURE.md 테스트 구조에 사실 반영; 픽스처는 public com.mogum.account.domain.UserFixtures.user(email) · public com.mogum.curriculum.domain.CurriculumFixtures.curriculum(userId)/lesson(curriculum)로 통일하고 support의 중복 픽스처 제거, 검증 이메일은 테스트 인자로 명시; ./backend/gradlew -p backend build 성공(테스트 새 실행), 서버 기본 테스트 491개 → 508개(기존 491개 유지 + 지원 검증 17개, 실패 · 오류 · 건너뜀 0), 제품 코드 · 기존 테스트 변경 및 병렬 실행 설정 없음",
+      "started_at": "2026-11-08T17:46:46+0900",
+      "completed_at": "2026-11-08T17:59:02+0900"
     },
     {
       "step": 1,
@@ -37,5 +40,6 @@
       "name": "test-rules",
       "status": "pending"
     }
-  ]
+  ],
+  "created_at": "2026-11-08T17:46:46+0900"
 }
