@@ -2,11 +2,39 @@
   "project": "Mogum",
   "phase": "4-account",
   "steps": [
-    { "step": 0, "name": "account-schema", "status": "pending" },
-    { "step": 1, "name": "login-session", "status": "pending" },
-    { "step": 2, "name": "apply-and-guard", "status": "pending" },
-    { "step": 3, "name": "operator-sql", "status": "pending" },
-    { "step": 4, "name": "ui-foundation", "status": "pending" },
-    { "step": 5, "name": "pre-login-screens", "status": "pending" }
-  ]
+    {
+      "step": 0,
+      "name": "account-schema",
+      "status": "completed",
+      "started_at": "2026-11-08T22:48:26+0900",
+      "summary": "V9__migrate_account_schema.sql로 users의 역할·약관을 제거하고 이름·승인 시각·크레딧 잔액·다음 채움 시각·상태 제약 적용, ACTIVE→APPROVED·PENDING/WAITLISTED→APPLIED 이전 및 모든 기존 행에 숫자 100의 잔액과 REFILL 기록 생성(알 수 없는 상태는 롤백, 서울 03:59/04:00 경계 검증); AuditedEntity를 상속하는 User.apply(String provider, String subject, String email, String name, int creditBalance)·CreditEntry.refill(User user, int amount), UserStatus(APPLIED/APPROVED/REJECTED)·CreditEntryType(REFILL/CONSUME/RESTORE)·CreditEntryRepository(save만, Repository<CreditEntry, Long>) 구현, CreditEntry→User는 LAZY 단방향이며 cascade·job_id·승인/거절 메서드 없음; 허용 목록 설정·AuthProperties·UserRole·roleFor 제거, LoginResult는 Success(long userId)/NotApplied(ExternalAccount account)/Rejected(EMAIL_NOT_VERIFIED)이며 로그인은 행을 만들지 않고 미인증은 DB 접근 전에 거절; OAuthLoginHandler의 신청 전 결과는 step 1까지 임시 /login?error=not_allowed 및 기존 실패 로그, SessionUserFilter는 권한 없는 인증, MeController/MeResponse는 email·status만 반환; 옛 첫 로그인 생성·허용 목록 거절 검증→LoginServiceTest의 무저장 NotApplied·세 상태 재로그인·정확한 신원 일치 및 OAuthLoginHandlerFailureIntegrationTest의 무행·무세션 임시 실패 검증, 성공·세션 회전·ID만 저장·안전한 로그→기존 회원을 UserFixtures로 준비한 OAuthLoginHandlerIntegrationTest, 커밋된 회원 행 보존→동 테스트의 rotatesSessionAndPreservesExistingAccount(세 상태·DB 전체 행·시계 이동)와 LoginIdentityMigrationTest의 기존 ID/이메일/가입시각·세션 보존 검증; LoginServiceConcurrencyIntegrationTest는 로그인이 저장하지 않아 삭제(동시 신청→행 하나는 step 2에서 재검증), AuthPropertiesTest는 설정 제거로 삭제, 역할·약관·대기 순번 단언은 칸 삭제로 제거; 기존 V7 updated_at=created_at 검증은 V9 갱신 전 V8 시점에서 유지, DB 크레딧/상태/시각/종류 제약·Auditing·LAZY·FK 검증, docs/04 §2.3·§10 구현 사실 반영; 지정 선별 AC 143개와 전체 build 707개 통과(서버 기본 테스트 이전 승인 기록 709개→707개, 실패·오류·건너뜀 0), 아키텍처 체크리스트 확인, 커밋 없음",
+      "completed_at": "2026-11-09T02:08:26+0900"
+    },
+    {
+      "step": 1,
+      "name": "login-session",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "apply-and-guard",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "operator-sql",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "ui-foundation",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "pre-login-screens",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-11-08T22:48:26+0900"
 }
