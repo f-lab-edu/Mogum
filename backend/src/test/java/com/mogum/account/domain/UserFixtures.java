@@ -2,6 +2,8 @@ package com.mogum.account.domain;
 
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Instant;
+
 public final class UserFixtures {
     private UserFixtures() { }
 
@@ -20,6 +22,11 @@ public final class UserFixtures {
 
     public static User withStatus(User user, UserStatus status) {
         ReflectionTestUtils.setField(user, "status", status);
+        return user;
+    }
+
+    public static User withTermsAgreedAt(User user, Instant termsAgreedAt) {
+        ReflectionTestUtils.setField(user, "termsAgreedAt", termsAgreedAt);
         return user;
     }
 
