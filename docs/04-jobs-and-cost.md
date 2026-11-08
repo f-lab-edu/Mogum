@@ -64,7 +64,7 @@
 | `3a-test-conventions` | 테스트 작성 규칙과 지원 도구 · 레포지토리 `Repository<T, ID>` 상속 · ArchUnit 테스트 규칙(ADR-179 · [TEST_GUIDE](./TEST_GUIDE.md)) | — | 옛 커리큘럼 모델의 테스트 — 모델과 함께(ADR-148) |
 | `frontend/` | 스택 · 로그인 확인 · 요청 도구 | 화면 자체는 06 대로 새로 만든다 | — |
 
-- **계정**(ADR-147) — 정해 둔 이메일만 들어오던 것을 누구나 신청 · 운영자가 승인 · 거절로 바꾼다. 역할은 지운다 — 운영자는 DB 에서 직접 한다(ADR-060). `4-account` step 0에서 `V9__migrate_account_schema.sql`로 옛 상태를 옮기고 이름 · 크레딧 잔액 · 채움 기록을 넣었다. `User.apply(provider, subject, email, name, creditBalance)` · `CreditEntry.refill(user, amount)`와 `CreditEntryRepository`를 두었고, 허용 목록 설정 · 역할 · 약관 칸은 제거했다. 로그인은 기존 회원 ID 또는 `LoginResult.NotApplied(ExternalAccount)`를 반환하며 행을 만들지 않는다. 신청 전 콜백은 step 1까지 임시 실패 리다이렉트를 쓰고, 요청 인증은 권한 없이 구성하며 「나」는 이메일 · 상태만 반환한다.
+- **계정**(ADR-147) — 정해 둔 이메일만 들어오던 것을 누구나 신청 · 운영자가 승인 · 거절로 바꾼다. 역할은 지운다 — 운영자는 DB 에서 직접 한다(ADR-060). `4-account` step 0에서 `V9__migrate_account_schema.sql`로 옛 상태를 옮기고 이름 · 크레딧 잔액 · 채움 기록을 넣었다. `User.apply(provider, subject, email, name, creditBalance)` · `CreditEntry.refill(user, amount)`와 `CreditEntryRepository`를 두었고, 허용 목록 설정 · 역할 · 약관 칸은 제거했다. 로그인은 기존 회원 ID 또는 `LoginResult.NotApplied(ExternalAccount)`를 반환하며 행을 만들지 않는다. step 1에서 신청 전 콜백은 구글 신원만 JDBC 세션에 담고 화면의 `/`로 보내도록 바꿨다. 요청 인증은 `AccountPrincipal`로 통일하고 권한 없이 구성한다. 「나」의 구현 경로와 칸은 [05 §3](./05-api.md#3-읽기--화면마다-한-번)에 적었다.
 - **커리큘럼 모델**(ADR-148) — 단계를 두지 않고(ADR-070) 상태(ADR-136) · 입력(ADR-137) · 강의 한 줄(ADR-020 · ADR-138)이 달라 새로 만든다. 운영에 적용한 마이그레이션은 고치지 않고 새 마이그레이션으로 지우고 만든다 — 커리큘럼을 만드는 API 가 아직 없어 운영 DB 에 커리큘럼 데이터가 없다. 패키지 이름은 GLOSSARY, 테이블은 [02 §8](./02-domain-data.md#8-테이블)을 따른다.
 
 ## 3. 배포
@@ -200,7 +200,16 @@
 | `ERROR` | 사람이 원인을 봐야 하는 우리 쪽 실패 — 스택과 함께 | 처리되지 않은 예외(5xx) · 결과 저장 실패 · 불변식 위반 |
 | `WARN` | 외부 실패 · 이상 징후 — 시스템은 계속 돈다 | 구글 토큰 교환 실패 · 외부 호출 실패 · 시한 상실 |
 | `INFO` | 흐름 한 줄 | 접근 줄 · 로그인 결과 · 기동/종료 · 작업 받기 · 끝남 |
+| `INFO` | 신청 전 로그인 | `login result=not_applied` — MDC `requestId`, `userId` 없음 |
 | `DEBUG` 이하 | 운영에서 끈다 | — |
+
+신청 전 로그인 줄의 실제 출력(`OAuthLoginHandlerIntegrationTest`의 `OutputCaptureExtension` 캡처):
+
+```text
+2026-11-09T02:12:09.565+09:00  INFO requestId=ffca82fe-917b-4c93-8414-efed31108b51 46685 --- [mogum] [o-auto-1-exec-1] com.mogum.auth.OAuthLoginHandler         : login result=not_applied
+```
+
+MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID · 스레드 이름은 실행마다 달라진다.
 
 - **MDC 키** — 줄마다 MDC 값을 모두 `키=값` 으로 싣는다. 키를 더해도 로그 패턴은 고치지 않는다. 지금 키는 `requestId` · `userId` 이고, 작업을 다루는 코드는 `jobId` 를 더한다. 키 이름은 `common.logging` 의 상수로 둔다.
 - **시각** — 사람이 읽는 시각은 한국 시간(`+09:00`)이다. 저장 시각 · DB 세션은 UTC 그대로다.

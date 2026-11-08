@@ -1,6 +1,4 @@
 package com.mogum.account.dto;
 
-import com.mogum.account.domain.UserStatus;
-
-public record MeResponse(String email, UserStatus status) {
+public record MeResponse(String status, String email, String name) {
 }

@@ -88,7 +88,7 @@ class SecurityConfigurationIntegrationTest extends SecurityScenario {
     }
 
     @Test
-    @DisplayName("현재 회원 응답은 이메일과 상태만 반환한다")
+    @DisplayName("현재 회원 응답은 상태와 이메일과 이름만 반환한다")
     void returnsPublicFields() {
         // given
         var cookie = session();
@@ -96,8 +96,56 @@ class SecurityConfigurationIntegrationTest extends SecurityScenario {
         var response = client(cookie).get().uri("/api/me").exchange();
         // then
         response.expectStatus().isOk().expectBody().json("""
-                {"data":{"email":"session@example.com","status":"APPLIED"}}
+                {"data":{"status":"APPLIED","email":"session@example.com","name":"session"}}
                 """, JsonCompareMode.STRICT);
+    }
+
+    @Test
+    @DisplayName("구글 신원 도우미의 세션은 주인 색인과 회원 행 없이 내 정보를 읽는다")
+    void readsNotAppliedSessionOverHttp() {
+        // given
+        var identity = new AccountPrincipal.NotApplied("google", "new-sub", "new@example.com", "새 이름");
+        var helper = new TestSessions(sessions);
+        var cookie = helper.createNotApplied(identity);
+
+        // when
+        var response = client(cookie).get().uri("/api/me").exchange();
+
+        // then
+        response.expectStatus().isOk().expectBody().json("""
+                {"data":{"status":"NOT_APPLIED","email":"new@example.com","name":"새 이름"}}
+                """, JsonCompareMode.STRICT);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM users", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT principal_name FROM spring_session WHERE session_id = ?",
+                String.class, helper.id(cookie))).isNull();
+        org.springframework.session.Session stored = sessions.findById(helper.id(cookie));
+        assertThat(stored.getAttributeNames()).containsExactly(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE);
+        assertThat((Object) stored.getAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE)).isEqualTo(identity);
+    }
+
+    @ParameterizedTest(name = "깨진 세션 {0}")
+    @ValueSource(strings = {"empty", "wrong-type", "blank-name", "mixed"})
+    @DisplayName("JDBC에 저장된 깨진 신원은 실제 HTTP에서도 공통 JSON 401로 버린다")
+    void rejectsMalformedStoredIdentity(String condition) {
+        // given
+        var jdbcSession = sessions.createSession();
+        org.springframework.session.Session stored = jdbcSession;
+        if (condition.equals("wrong-type")) stored.setAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE, "broken");
+        if (condition.equals("blank-name") || condition.equals("mixed")) {
+            stored.setAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE,
+                    new AccountPrincipal.NotApplied("google", "sub", "me@example.com", condition.equals("blank-name") ? " " : "이름"));
+        }
+        if (condition.equals("mixed")) stored.setAttribute(org.springframework.session.FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, "17");
+        sessions.save(jdbcSession);
+        var cookie = new Cookie("SESSION", java.util.Base64.getEncoder().encodeToString(
+                stored.getId().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+        // when
+        var response = client(cookie).get().uri("/api/me").exchange().returnResult(String.class);
+
+        // then
+        assertError(response, 401, "UNAUTHORIZED");
+        assertThat(sessions.findById(stored.getId())).isNull();
     }
 
     @ParameterizedTest(name = "변경 후 상태 {0}")

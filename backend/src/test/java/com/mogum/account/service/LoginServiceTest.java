@@ -27,7 +27,7 @@ class LoginServiceTest {
         var login = new LoginService(untouchedUsers);
 
         // when
-        var result = login.login(new ExternalAccount("google", "sub", "me@example.com", false));
+        var result = login.login(new ExternalAccount("google", "sub", "me@example.com", "Google name", false));
 
         // then
         assertThat(result).isEqualTo(new LoginResult.Rejected(LoginResult.RejectionReason.EMAIL_NOT_VERIFIED));
@@ -40,7 +40,7 @@ class LoginServiceTest {
         // given
         var users = new FakeUserRepository();
         var login = new LoginService(users);
-        var account = new ExternalAccount("google", "new-sub", "any@example.com", true);
+        var account = new ExternalAccount("google", "new-sub", "any@example.com", "Google name", true);
 
         // when
         var result = login.login(account);
@@ -61,7 +61,7 @@ class LoginServiceTest {
         var login = new LoginService(users);
 
         // when
-        var result = login.login(new ExternalAccount("google", "stable-sub", "changed@example.com", true));
+        var result = login.login(new ExternalAccount("google", "stable-sub", "changed@example.com", "Google name", true));
 
         // then
         assertThat(result).isEqualTo(new LoginResult.Success(existing.getId()));
@@ -79,7 +79,7 @@ class LoginServiceTest {
         var users = new FakeUserRepository();
         users.save(UserFixtures.user("google", "shared", "shared@example.com"));
         var login = new LoginService(users);
-        var account = new ExternalAccount(provider, subject, "shared@example.com", true);
+        var account = new ExternalAccount(provider, subject, "shared@example.com", "Google name", true);
 
         // when
         var result = login.login(account);

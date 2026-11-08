@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -35,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(OutputCaptureExtension.class)
 class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
     @Test
-    @DisplayName("시작은 최소 범위와 로컬 콜백과 짧은 쿠키를 쓰고 세션을 만들지 않는다")
+    @DisplayName("시작은 이메일과 프로필 범위와 계정 선택과 로컬 콜백과 짧은 쿠키를 쓰고 세션을 만들지 않는다")
     void startsAuthorizationWithMinimalScopeAndShortCookie() throws Exception {
         // when
         var start = start(null);
@@ -45,7 +46,9 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
         var query = UriComponentsBuilder.fromUriString(location).build().getQueryParams();
         assertThat(query.getFirst("client_id")).isEqualTo("test-google-client");
         assertThat(java.net.URLDecoder.decode(query.getFirst("redirect_uri"), StandardCharsets.UTF_8)).isEqualTo("http://localhost:5173/auth/google/callback");
-        assertThat(query.getFirst("scope")).isEqualTo("email");
+        assertThat(java.net.URLDecoder.decode(query.getFirst("scope"), StandardCharsets.UTF_8).split(" "))
+                .containsExactlyInAnyOrder("email", "profile");
+        assertThat(query.getFirst("prompt")).isEqualTo("select_account");
         assertThat(query.getFirst("code_challenge_method")).isEqualTo("S256");
         assertThat(query.getFirst("code_challenge")).isNotNull();
         assertThat(query.getFirst("code_challenge").matches("[A-Za-z0-9_-]{43}")).isTrue();
@@ -114,6 +117,7 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
         var before = jdbc.queryForMap("SELECT * FROM users WHERE id = ?", id);
         clock.advance(Duration.ofHours(1));
         email = "changed@example.com";
+        name = "changed Google name";
         // when
         var second = callback(start(oldCookie), "ok", oldCookie);
         // then
@@ -138,6 +142,7 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
         var oldCookie = cookiePair(cookieHeader(first, "SESSION"));
         jdbc.update("UPDATE users SET status = 'REJECTED', updated_at = now()");
         email = "changed@example.com";
+        name = "changed Google name";
         var second = callback(start(oldCookie), "ok", oldCookie);
         var cookie = which.equals("old") ? oldCookie : cookiePair(cookieHeader(second, "SESSION"));
         // when
@@ -173,6 +178,112 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
         assertRedirect(response, "https://mogum.example/");
     }
 
+    @Test
+    @DisplayName("신청 전 로그인은 회원 없이 구글 신원만 저장하고 개인정보 없는 INFO 줄을 남긴다")
+    void createsNotAppliedSessionAndLogsSafeResult(CapturedOutput output) throws Exception {
+        // given
+        sub = "LEAKCHECK-sub-marker";
+        email = "LEAKCHECK-email-marker@example.com";
+        name = "LEAKCHECK-name-marker";
+        var start = start(null);
+
+        // when
+        var response = callback(start, "ok", null);
+
+        // then
+        assertRedirect(response, "https://mogum.example/");
+        assertExpired(response);
+        var sessionHeader = cookieHeader(response, "SESSION");
+        assertCookieSecurity(sessionHeader);
+        assertThat(sessionHeader).doesNotContain("Domain=");
+        var cookie = cookiePair(sessionHeader);
+        assertNotAppliedOnly(cookie);
+        assertThat(count("users")).isEqualTo(usersBefore);
+        assertThat(count("credit_entries")).isZero();
+        assertThat(count("spring_session")).isEqualTo(sessionsBefore + 1);
+        assertThat(TOKEN_CALLS.get()).isEqualTo(1);
+        var line = loginLine(response, output);
+        assertThat(line).contains(" INFO ").endsWith("login result=not_applied").doesNotContain("userId=");
+        assertPrivate(output, email, name, sub, "fake-access-token", "fake-id-token", cookie,
+                start.state(), start.cookie(), verifier(start));
+        var me = get("/api/me", cookie);
+        assertThat(me.getStatus().value()).isEqualTo(200);
+        org.springframework.test.json.JsonAssert.comparator(org.springframework.test.json.JsonCompareMode.STRICT)
+                .assertIsMatch("""
+                        {"data":{"status":"NOT_APPLIED","email":"LEAKCHECK-email-marker@example.com","name":"LEAKCHECK-name-marker"}}
+                        """, me.getResponseBody());
+        assertNotAppliedOnly(cookie);
+        assertPrivate(output, email, name, sub);
+    }
+
+    @ParameterizedTest(name = "구글 이름 [{0}]")
+    @NullAndEmptySource
+    @ValueSource(strings = {"   "})
+    @DisplayName("이름이 없거나 공백인 구글 응답도 이메일 앞부분으로 실제 HTTP 인증을 마친다")
+    void usesEmailNameWhenGoogleOmitsName(String googleName) throws Exception {
+        // given
+        name = googleName;
+        email = "test123@gmail.com";
+        var loggedIn = callback(start(null), "ok", null);
+        var cookie = cookiePair(cookieHeader(loggedIn, "SESSION"));
+
+        // when
+        var me = get("/api/me", cookie);
+
+        // then
+        assertThat(me.getStatus().value()).isEqualTo(200);
+        org.springframework.test.json.JsonAssert.comparator(org.springframework.test.json.JsonCompareMode.STRICT)
+                .assertIsMatch("""
+                        {"data":{"status":"NOT_APPLIED","email":"test123@gmail.com","name":"test123"}}
+                        """, me.getResponseBody());
+        assertThat(count("users")).isEqualTo(usersBefore);
+    }
+
+    @ParameterizedTest(name = "기존 세션 {0}")
+    @ValueSource(strings = {"not-applied", "member"})
+    @DisplayName("신청 전 로그인도 기존 세션을 회전하고 속성과 주인 색인을 지우며 MDC를 남기지 않는다")
+    void rotatesAndClearsSessionForNotAppliedAccount(String previous, CapturedOutput output) throws Exception {
+        // given
+        if (previous.equals("member")) users.save(UserFixtures.user("google", sub, email));
+        var first = callback(start(null), "ok", null);
+        var oldCookie = cookiePair(cookieHeader(first, "SESSION"));
+        var oldId = new String(Base64.getDecoder().decode(oldCookie.substring("SESSION=".length())), StandardCharsets.UTF_8);
+        var jdbcSession = sessions.findById(oldId);
+        org.springframework.session.Session stored = jdbcSession;
+        stored.setAttribute("stale", "must-be-cleared");
+        sessions.save(jdbcSession);
+        sub = "LEAKCHECK-next-sub";
+        email = "LEAKCHECK-next-email@example.com";
+        name = "LEAKCHECK-next-name";
+        var next = start(oldCookie);
+
+        // when
+        var response = callback(next, "ok", oldCookie);
+
+        // then
+        assertRedirect(response, "https://mogum.example/");
+        var newCookie = cookiePair(cookieHeader(response, "SESSION"));
+        assertThat(newCookie).isNotEqualTo(oldCookie);
+        assertThat(sessions.findById(oldId)).isNull();
+        assertNotAppliedOnly(newCookie);
+        assertThat(count("users")).isEqualTo(usersBefore + (previous.equals("member") ? 1 : 0));
+        assertThat(count("spring_session")).isEqualTo(sessionsBefore + 1);
+        assertThat(get("/api/me", oldCookie).getStatus().value()).isEqualTo(401);
+        assertThat(get("/api/me", newCookie).getStatus().value()).isEqualTo(200);
+        assertThat(loginLine(response, output)).endsWith("login result=not_applied").doesNotContain("userId=");
+        assertPrivate(output, sub, email, name);
+    }
+
+    private void assertNotAppliedOnly(String cookie) {
+        String id = new String(Base64.getDecoder().decode(cookie.substring("SESSION=".length())), StandardCharsets.UTF_8);
+        assertThat(jdbc.queryForObject("SELECT principal_name FROM spring_session WHERE session_id = ?", String.class, id)).isNull();
+        org.springframework.session.Session stored = sessions.findById(id);
+        assertThat(stored).isNotNull();
+        assertThat(stored.getAttributeNames()).containsExactly(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE);
+        assertThat((Object) stored.getAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE))
+                .isEqualTo(new AccountPrincipal.NotApplied("google", sub, email, name));
+    }
+
 }
 
 @IntegrationTest
@@ -191,6 +302,7 @@ abstract class OAuthScenario {
     void resetProvider() {
         sub = "google-sub";
         email = "admin@example.com";
+        name = "Google name";
         verified = true;
         tokenFailure = false;
         userInfoFailure = false;
@@ -251,7 +363,7 @@ abstract class OAuthScenario {
                 (rs, row) -> rs.getBytes(1), sessionId);
         assertThat(attributes).hasSize(1);
         String bytes = new String(attributes.getFirst(), StandardCharsets.ISO_8859_1);
-        for (String forbidden : List.of(email, sub, "fake-access-token", "fake-id-token")) assertThat(bytes).doesNotContain(forbidden);
+        for (String forbidden : List.of(email, sub, name, "fake-access-token", "fake-id-token")) assertThat(bytes).doesNotContain(forbidden);
     }
 
     Start start(String existingCookie) throws Exception {

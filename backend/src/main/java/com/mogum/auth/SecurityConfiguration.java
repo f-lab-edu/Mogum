@@ -90,6 +90,8 @@ public class SecurityConfiguration {
         var oauthRequests = new CookieAuthorizationRequestRepository(registrations, mapper, clock);
         var loginHandler = new OAuthLoginHandler(login, new GoogleAccountMapper(), web.origin(), oauthRequests);
         var resolver = new DefaultOAuth2AuthorizationRequestResolver(registrations, "/auth");
+        resolver.setAuthorizationRequestCustomizer(builder -> builder
+                .additionalParameters(parameters -> parameters.put("prompt", "select_account")));
         var getOnlyResolver = new OAuth2AuthorizationRequestResolver() {
             @Override
             public OAuth2AuthorizationRequest resolve(jakarta.servlet.http.HttpServletRequest request) {

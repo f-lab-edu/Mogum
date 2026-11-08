@@ -113,7 +113,7 @@ class LoginIdentityMigrationTest {
             try (var app = database.startApplication()) {
                 long id = ((Number) legacy.users().getFirst().get("id")).longValue();
                 var login = app.getBean(LoginService.class);
-                var account = new ExternalAccount("google", "Original-Sub", "new@example.com", true);
+                var account = new ExternalAccount("google", "Original-Sub", "new@example.com", "Google name", true);
 
                 // when
                 var result = login.login(account);

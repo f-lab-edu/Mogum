@@ -8,6 +8,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.Arguments;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -51,7 +55,8 @@ class SessionUserFilterTest {
         filter.doFilter(request, new MockHttpServletResponse(), (req, res) -> {
             chainCalled.set(true);
             var authentication = SecurityContextHolder.getContext().getAuthentication();
-            assertThat(authentication.getPrincipal()).isSameAs(user);
+            assertThat(authentication.getPrincipal()).isEqualTo(
+                    new AccountPrincipal.Member(17L, user.getEmail(), user.getName(), user.getStatus()));
             assertThat(authentication.isAuthenticated()).isTrue();
             assertThat(authentication.getAuthorities()).isEmpty();
             assertThat(MDC.get(RequestLogFilter.USER_ID)).isEqualTo("17");
@@ -127,6 +132,72 @@ class SessionUserFilterTest {
         assertThat(response.getStatus()).isEqualTo(401);
         assertThat(request.getSession(false)).isNull();
         assertThat(MDC.get(RequestLogFilter.USER_ID)).isNull();
+    }
+
+    @Test
+    @DisplayName("구글 신원 세션은 DB 조회와 회원 MDC 없이 신청 전 인증을 만든다")
+    void authenticatesNotAppliedWithoutDatabaseAccess() throws Exception {
+        // given
+        var identity = new AccountPrincipal.NotApplied("google", "sub", "new@example.com", "구글 이름");
+        var request = new MockHttpServletRequest("GET", "/api/me");
+        request.getSession().setAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE, identity);
+        var chainCalled = new AtomicBoolean();
+
+        // when
+        filter(untouchedUsers).doFilter(request, new MockHttpServletResponse(), (req, res) -> {
+            chainCalled.set(true);
+            var authentication = SecurityContextHolder.getContext().getAuthentication();
+            assertThat(authentication.getPrincipal()).isEqualTo(identity);
+            assertThat(authentication.isAuthenticated()).isTrue();
+            assertThat(authentication.getAuthorities()).isEmpty();
+            assertThat(MDC.get(RequestLogFilter.USER_ID)).isNull();
+        });
+
+        // then
+        assertThat(chainCalled).isTrue();
+        then(untouchedUsers).shouldHaveNoInteractions();
+        assertThat(Collections.list(request.getSession().getAttributeNames()))
+                .containsExactly(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE);
+    }
+
+    @ParameterizedTest(name = "주인 색인 [{0}] 구글 신원 [{1}]")
+    @MethodSource("malformedIdentities")
+    @DisplayName("깨졌거나 두 종류가 섞인 세션은 DB 접근 없이 버리고 401로 끝낸다")
+    void rejectsMalformedIdentity(Object userId, Object identity) throws Exception {
+        // given
+        var request = new MockHttpServletRequest("GET", "/api/me");
+        var session = request.getSession();
+        if (userId != null) session.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, userId);
+        if (identity != null) session.setAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE, identity);
+        var response = new MockHttpServletResponse();
+        var chainCalled = new AtomicBoolean();
+
+        // when
+        filter(untouchedUsers).doFilter(request, response, (req, res) -> chainCalled.set(true));
+
+        // then
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(chainCalled).isFalse();
+        assertThat(request.getSession(false)).isNull();
+        then(untouchedUsers).shouldHaveNoInteractions();
+        assertThat(MDC.get(RequestLogFilter.USER_ID)).isNull();
+    }
+
+    private static Stream<Arguments> malformedIdentities() {
+        return Stream.of(
+                Arguments.of(null, null), Arguments.of(17L, null), Arguments.of("0", null),
+                Arguments.of("-1", null), Arguments.of("99999999999999999999", null),
+                Arguments.of(null, "invalid"),
+                Arguments.of("17", new AccountPrincipal.NotApplied("google", "sub", "me@example.com", "이름")),
+                Arguments.of("broken", new AccountPrincipal.NotApplied("google", "sub", "me@example.com", "이름")),
+                Arguments.of(null, new AccountPrincipal.NotApplied(null, "sub", "me@example.com", "이름")),
+                Arguments.of(null, new AccountPrincipal.NotApplied("other", "sub", "me@example.com", "이름")),
+                Arguments.of(null, new AccountPrincipal.NotApplied("google", null, "me@example.com", "이름")),
+                Arguments.of(null, new AccountPrincipal.NotApplied("google", " ", "me@example.com", "이름")),
+                Arguments.of(null, new AccountPrincipal.NotApplied("google", "sub", null, "이름")),
+                Arguments.of(null, new AccountPrincipal.NotApplied("google", "sub", " ", "이름")),
+                Arguments.of(null, new AccountPrincipal.NotApplied("google", "sub", "me@example.com", null)),
+                Arguments.of(null, new AccountPrincipal.NotApplied("google", "sub", "me@example.com", " ")));
     }
 
     private static SessionUserFilter filter(UserRepository users) {

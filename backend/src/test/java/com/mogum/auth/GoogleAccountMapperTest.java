@@ -31,7 +31,7 @@ class GoogleAccountMapperTest {
         var account = mapper.map(authentication);
 
         // then
-        assertThat(account).isEqualTo(new ExternalAccount("google", " Case-Sensitive-Sub ", "Admin@Example.com", true));
+        assertThat(account).isEqualTo(new ExternalAccount("google", " Case-Sensitive-Sub ", "Admin@Example.com", "test", true));
     }
 
     @Test
@@ -75,6 +75,27 @@ class GoogleAccountMapperTest {
         assertThat(account.emailVerified()).isFalse();
     }
 
+    @ParameterizedTest(name = "구글 이름 [{0}]")
+    @MethodSource("missingNames")
+    @DisplayName("구글 이름이 없거나 공백이면 이메일 앞부분을 이름으로 쓴다")
+    void fallsBackToEmailLocalPart(Object name) {
+        // given
+        var values = attributes();
+        if (name == null) values.remove("name");
+        else values.put("name", name);
+        var authentication = authentication("google", values);
+
+        // when
+        var account = mapper.map(authentication);
+
+        // then
+        assertThat(account.name()).isEqualTo("Admin");
+    }
+
+    private static Stream<Arguments> missingNames() {
+        return Stream.of(null, "", "  \t\n", 123).map(Arguments::of);
+    }
+
     private static Stream<Arguments> invalidIdentityAttributes() {
         return Stream.of("sub", "email").flatMap(field -> Stream.of(null, "", "  ", 123)
                 .map(value -> Arguments.of(field, value)));
@@ -90,6 +111,8 @@ class GoogleAccountMapperTest {
     }
 
     private static OAuth2AuthenticationToken authentication(String registration, Map<String, Object> attributes) {
-        return new OAuth2AuthenticationToken(new DefaultOAuth2User(List.of(), attributes, "name"), List.of(), registration);
+        var values = new HashMap<>(attributes);
+        values.put("fixture-id", "fixture-principal");
+        return new OAuth2AuthenticationToken(new DefaultOAuth2User(List.of(), values, "fixture-id"), List.of(), registration);
     }
 }
