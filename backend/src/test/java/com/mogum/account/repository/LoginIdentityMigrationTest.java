@@ -71,7 +71,7 @@ class LoginIdentityMigrationTest {
                     """, Integer.class, database.schema)).isZero();
             assertThat(jdbc.queryForList("SELECT * FROM spring_session")).isEqualTo(legacy.sessions());
             assertThat(jdbc.queryForObject("SELECT attribute_bytes FROM spring_session_attributes", byte[].class))
-                    .isEqualTo(legacy.attribute());
+                    .containsExactly(Base64.getDecoder().decode(legacy.attributeBase64()));
         }
     }
 
@@ -157,7 +157,7 @@ class LoginIdentityMigrationTest {
     }
 
     private record LegacyData(List<Map<String, Object>> users, List<Map<String, Object>> sessions,
-                              byte[] attribute, String sessionId) {
+                              String attributeBase64, String sessionId) {
     }
 
     private static final class MigrationDatabase implements AutoCloseable {
@@ -202,7 +202,7 @@ class LoginIdentityMigrationTest {
                 migrateTo(version);
             }
 
-            return new LegacyData(users, sessions, attribute, sessionId);
+            return new LegacyData(users, sessions, Base64.getEncoder().encodeToString(attribute), sessionId);
         }
 
         private List<Map<String, Object>> users() {
