@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "repositories",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-08T17:59:03+0900",
+      "summary": "Repository<T, Long> 상속으로 5개 인터페이스 축소: UserRepository(save, findById, findByProviderAndSubject), CurriculumGroupRepository/CurriculumRepository(save, findById, findByIdAndUserId), CurriculumStepRepository(save, findById, findByIdAndGroup_UserId), LessonRepository(save, findById, findByIdAndCurriculum_UserId); 정리 및 집계 메서드 없음; ArchitectureTest에 JpaRepository/CrudRepository/ListCrudRepository/PagingAndSortingRepository 계열 상속 금지 규칙과 스캔 밖 repositoryfixture.BroadUserRepository 위반 검사 추가(TDD 실패 확인 후 상속 수정); UserFixtures.user(email)/(provider, subject, email, role), withId, withEmail 및 CurriculumFixtures.group, step, curriculum, curriculumForStep, lesson, withId 제공; UserRepositoryTest, CurriculumOwnershipRepositoryTest, CurriculumConstraintRepositoryTest, CurriculumForeignKeyRepositoryTest, CurriculumLazyLoadingRepositoryTest, CurriculumAuditingRepositoryTest, CurriculumKeywordsRepositoryTest, AuditedEntityTest로 이관하고 옛 IT 3개 삭제; 공용 @RepositoryTest/TestClock/DatabaseCleaner, 고정 데이터, 영어 메서드와 한국어 DisplayName, given/when/then, AssertJ 적용; 기존 검증 사실 삭제 없음(롤백, flush, 원문 로그 유출 방지, 주인 조회, 모든 제약/FK/LAZY/배열/Auditing 보존; 무명시 flush 조회의 stdout 관찰은 같은 값 단언으로 전환해 출력 제거), 복합 동작과 반복 검사를 독립 테스트 및 파라미터 케이스로 분리; 범위 밖 RequestValidationIT.java, RequestLogFilterIT.java는 users.deleteById 정리 호출만 JdbcTemplate DELETE로 교체(필요한 import와 주입 포함); ARCHITECTURE 상속 현황 및 TEST_GUIDE/ADR-079 진행 표기 갱신(규칙 문장 변경 없음); 선별 AC 207개와 전체 build 통과, 서버 기본 테스트 508개에서 554개로 증가(실패/오류/건너뜀 0); 엔티티/쿼리/매핑/제약/서비스/컨트롤러 변경 및 커밋 없음",
+      "completed_at": "2026-11-08T18:09:25+0900"
     },
     {
       "step": 2,
