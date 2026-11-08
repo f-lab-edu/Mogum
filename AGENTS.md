@@ -13,6 +13,7 @@ AI 가 코스(강의 목록) · 강의 자료 · 플래시카드를 만들고, �
 | `docs/05-api.md` · `docs/06-screens.md` | API · 화면을 만들 때 — 인증(쿠키 세션) · 오류 묶음 · 화면마다 보이는 것과 할 수 있는 것 |
 | `docs/design/` | 화면 코드를 쓸 때 — Stitch 화면 시안. 방향이며 06 과 다르면 06 이 맞다 |
 | `docs/07-testing.md` | 시험을 쓸 때 — 결정이 남긴 필수 시험 · LLM 스텁 · 공개 전 품질 점검 |
+| `docs/TEST_GUIDE.md` | 백엔드 테스트 코드를 쓸 때 — 종류 · 이름 · given/when/then · 픽스처 · Fake · DB 격리 · 요청 도구 |
 | `docs/SCHEDULE.md` | 다음 TASK 를 고를 때 — 순서 · 마일스톤 · 진행 기록 |
 | `docs/ADR.md` · `docs/GLOSSARY.md` | 이유가 궁금할 때 · 새 이름을 쓸 때 |
 
@@ -85,7 +86,8 @@ AI 가 코스(강의 목록) · 강의 자료 · 플래시카드를 만들고, �
 - **바꾸면 깨지는 계약은 넓힐 수 있는 모양으로 두고, 후속 기능은 미리 만들지 않는다**(ADR-145). API 요청 · 응답 · 오류 형식과 DB 스키마를 정할 때 `docs/01-overview.md §6` 의 미루는 것 중 그 계약에 닿는 것이 들어온다고 가정하고, 키 · 값을 더하는 것만으로 담기는지 확인한다(객체 · 이름 있는 필드 · 받는 쪽의 모르는 값 무시). 담기지 않으면 지금 모양을 고친다. 그 기능이 쓸 필드 · 값 · 컬럼 · 검사 · 분기는 넣지 않는다(금지 5). 예: 크레딧 충전을 더하면 충전 몫과 기록 종류를 하나씩 더한다(ADR-131). → 화면(Vercel)과 API(EC2)는 따로 배포되어 모양 변경이 깨지는 변경이다. 반대로 쓰이지 않는 값을 미리 넣으면 근거 없이 복잡도만 는다.
 
 - CRITICAL: 새 기능은 **테스트를 먼저 쓰고**, 그 테스트가 통과하는 구현을 쓴다(TDD). 작업을 검증 가능한 목표로 바꾸고 통과할 때까지 반복한다.
-    훅이 강제한다(`scripts/tdd_guard.py` — Claude · Codex 공통). 짝 테스트 없이 구현 파일을 쓰면 막히고, 구현만 바꾸고 끝내면 한 번 되돌려진다. 짝 테스트는 `backend/src/main/java/…/Foo.java` → 같은 패키지의 `backend/src/test/java/…/Foo*Test.java` 또는 `Foo*IT.java`, `frontend/src/…/foo.tsx` → 같은 폴더의 `foo.test.tsx` 또는 `__tests__/foo.test.tsx` 다. interface · record · enum · 예외 · `@Entity` · 타입 전용 파일은 검사하지 않는다.
+    훅이 강제한다(`scripts/tdd_guard.py` — Claude · Codex 공통). 짝 테스트 없이 구현 파일을 쓰면 막히고, 구현만 바꾸고 끝내면 한 번 되돌려진다. 짝 테스트는 `backend/src/main/java/…/Foo.java` → 같은 패키지의 `backend/src/test/java/…/Foo*Test.java`(통합 테스트는 `Foo*IntegrationTest.java`), `frontend/src/…/foo.tsx` → 같은 폴더의 `foo.test.tsx` 또는 `__tests__/foo.test.tsx` 다. interface · record · enum · 예외 · `@Entity` · 타입 전용 파일은 검사하지 않는다.
+- **백엔드 테스트는 [`docs/TEST_GUIDE.md`](docs/TEST_GUIDE.md) 를 따른다**([ADR-179](docs/ADR.md)) — 컨트롤러 `@WebMvcTest` · 서비스 단위 + Fake · 레포지토리 `@RepositoryTest` · 통합 `@IntegrationTest`(DB 동작이 규칙인 서비스 포함). 이름은 `*Test` · `*IntegrationTest`(`IT` 약어 없음) · 영어 메서드 + 한국어 `@DisplayName`, 본문은 `// given` · `// when` · `// then`, 단언은 AssertJ, 데이터는 `{엔티티}Fixtures`. 테스트는 트랜잭션을 걸지 않고 정리기가 매번 DB 를 비운다. → 테스트 롤백은 지연 로딩 · flush 오류를 가리고, 클래스마다 설정을 더하면 컨텍스트가 클래스마다 새로 뜬다.
 - 커밋 메시지는 conventional commits(`feat:` · `fix:` · `docs:` · `refactor:` · `test:`).
 - **`main` 은 PR 로만 바뀐다.** `main` 에서 커밋 · 병합하거나 `main` 으로 push 하지 않는다. GitHub 룰셋(PR 필수 · 강제 push/삭제 금지 · 예외 없음)이 서버에서 막고, `.githooks/` 가 로컬에서 먼저 막는다. PR 병합 뒤 로컬 `main` 은 `git pull --ff-only` 로만 따라간다.
 - 설계와 다르게 가야 하면 **코드보다 `docs/` 를 먼저 고친다.** 문서와 코드가 다르면 문서가 틀린 것으로 보고 묻는다. 결정이 바뀌면 ADR 을 먼저 고친다.

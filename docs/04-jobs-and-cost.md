@@ -34,7 +34,7 @@
 │   │   ├── generation/              # 생성 · 유료 호출(LLM · 임베딩) · 호출 기록
 │   │   └── worker/                  # 꺼내기 · 시한 · 실행(ADR-126 · ADR-129)
 │   ├── src/main/resources/db/migration/   # Flyway — 적용한 마이그레이션은 고치지 않는다(ADR-148)
-│   └── src/test/java/…              # 짝 테스트 · ArchUnit · Testcontainers · LLM 스텁
+│   └── src/test/java/…              # 짝 테스트 · support(묶음 어노테이션 · 정리기 · 테스트 시계 · 요청 도우미 — TEST_GUIDE) · ArchUnit · Testcontainers · LLM 스텁
 ├── frontend/                        # React + TypeScript · Vite — 화면은 06 대로 새로 만든다(ADR-146)
 ├── deploy/                          # 운영 서버 배포 · 백업 · 절차서 — 그대로 쓴다
 ├── phases/ · scripts/ · .claude/ · .codex/   # 하네스
@@ -51,7 +51,7 @@
 
 ### 2.3 기존 구현 — 그대로 · 바꾼다 · 버린다
 
-이미 구현한 TASK(`0-skeleton` ~ `3-curriculum-model`)를 새 설계와 맞댄 결과다. 바꾸는 방법은 각 TASK 에서 정한다.
+이미 구현한 TASK(`0-skeleton` ~ `3a-test-conventions`)를 새 설계와 맞댄 결과다. 바꾸는 방법은 각 TASK 에서 정한다.
 
 | TASK | 그대로 쓴다(ADR-146) | 바꾼다 | 버린다 |
 |---|---|---|---|
@@ -61,6 +61,7 @@
 | `2a-api-response` | 성공 · 오류 응답의 모양 — code 와 서버가 정한 문구가 있어 ADR-145 와 맞는다 | 오류 code 목록을 새 묶음(ADR-088 · ADR-116)에 맞춘다 | — |
 | `2b-ops-logging` | 요청 로그 | — | — |
 | `3-curriculum-model` | — | — | 커리큘럼 · 그룹 · 단계 · 강의 테이블과 엔티티(ADR-148) |
+| `3a-test-conventions` | 테스트 작성 규칙과 지원 도구 · 레포지토리 `Repository<T, ID>` 상속 · ArchUnit 테스트 규칙(ADR-179 · [TEST_GUIDE](./TEST_GUIDE.md)) | — | 옛 커리큘럼 모델의 테스트 — 모델과 함께(ADR-148) |
 | `frontend/` | 스택 · 로그인 확인 · 요청 도구 | 화면 자체는 06 대로 새로 만든다 | — |
 
 - **계정**(ADR-147) — 정해 둔 이메일만 들어오던 것을 누구나 신청 · 운영자가 승인 · 거절로 바꾼다. 역할은 지운다 — 운영자는 DB 에서 직접 한다(ADR-060). 지금은 허용 목록이 운영자 이메일뿐이라 운영 DB 의 사용자도 운영자뿐이다 — 옮길 것이 적다.

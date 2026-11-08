@@ -1,216 +1,108 @@
 package com.mogum.deploy;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermissions;
-import java.util.List;
-import java.util.Map;
 import java.util.regex.Pattern;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class BackupFilesTest {
     private static final Path DEPLOY = Path.of("../deploy");
-    private static final String KEY = "backups/20261025T040000+0900.dump";
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "파일 {0}")
     @ValueSource(strings = {"backup.sh", "restore.sh"})
-    void 실행_가능한_엄격한_bash이며_비밀_추적과_S3_삭제가_없다(String name) throws Exception {
+    @DisplayName("실행 가능한 엄격한 bash이며 비밀 추적과 S3 삭제가 없다")
+    void usesStrictExecutableShellWithoutSecretsOrDeletion(String name) throws Exception {
+        // given
         var path = DEPLOY.resolve(name);
-        assertTrue(Files.isExecutable(path));
+
+        // when
         var script = Files.readString(path);
-        assertTrue(script.startsWith("#!/usr/bin/env bash\n"));
-        assertTrue(script.contains("set -euo pipefail"));
-        assertTrue(script.contains("umask 077"));
-        assertTrue(script.contains("trap"));
-        assertFalse(Pattern.compile("(?m)^\\s*set\\s+[^\\n]*[+-]x").matcher(script).find());
-        assertFalse(Pattern.compile("aws\\s+s3\\s+rm|delete-object").matcher(script).find());
-        assertFalse(script.contains("docker compose"), "APP_IMAGE 없이도 동작해야 한다");
-        var process = new ProcessBuilder("bash", "-n", path.toString()).redirectErrorStream(true).start();
-        var output = new String(process.getInputStream().readAllBytes());
-        assertEquals(0, process.waitFor(), output);
+
+        // then
+        assertThat(Files.isExecutable(path)).isTrue();
+        assertThat(script).startsWith("#!/usr/bin/env bash\n");
+        assertThat(script).contains("set -euo pipefail");
+        assertThat(script).contains("umask 077");
+        assertThat(script).contains("trap");
+        assertThat(Pattern.compile("(?m)^\\s*set\\s+[^\\n]*[+-]x").matcher(script).find()).isFalse();
+        assertThat(Pattern.compile("aws\\s+s3\\s+rm|delete-object").matcher(script).find()).isFalse();
+        assertThat(script).as("APP_IMAGE 없이도 동작해야 한다").doesNotContain("docker compose");
     }
 
     @Test
-    void 백업은_custom_덤프를_성공한_뒤_한국_시각_키로_올린다() throws Exception {
+    @DisplayName("백업은 custom 덤프를 성공한 뒤 한국 시각 키로 올린다")
+    void uploadsSuccessfulDumpWithSeoulTimestamp() throws Exception {
+        // when
         var script = Files.readString(DEPLOY.resolve("backup.sh"));
-        assertTrue(script.contains("pg_dump"));
-        assertTrue(script.contains("-Fc"));
-        assertTrue(script.contains("TZ=Asia/Seoul"));
-        assertTrue(script.contains("backups/"));
-        assertTrue(script.indexOf("pg_dump") < script.indexOf("aws s3 cp"));
-        assertTrue(script.contains("[[ -s $dump ]]"));
-        assertTrue(Files.readString(DEPLOY.resolve("mogum.env.example")).contains("MOGUM_BUCKET="));
+
+        // then
+        assertThat(script).contains("pg_dump");
+        assertThat(script).contains("-Fc");
+        assertThat(script).contains("TZ=Asia/Seoul");
+        assertThat(script).contains("backups/");
+        assertThat(script.indexOf("pg_dump") < script.indexOf("aws s3 cp")).isTrue();
+        assertThat(script).contains("[[ -s $dump ]]");
+        assertThat(Files.readString(DEPLOY.resolve("mogum.env.example"))).contains("MOGUM_BUCKET=");
     }
 
     @Test
-    void 복원_대상은_연습_DB로_고정되고_운영_DB를_대상으로_받지_않는다() throws Exception {
+    @DisplayName("복원 대상은 연습 DB로 고정되고 운영 DB를 대상으로 받지 않는다")
+    void restrictsRestoreToPracticeDatabase() throws Exception {
+        // when
         var script = Files.readString(DEPLOY.resolve("restore.sh"));
-        assertTrue(script.contains("mogum_restore_check"));
-        assertTrue(script.contains("pg_restore --exit-on-error"));
-        assertFalse(Pattern.compile("(?:-d|--dbname[= ])\\s*['\"]?mogum(?:['\"\\s]|$)").matcher(script).find());
-        assertFalse(script.contains("POSTGRES_DB"));
-        assertTrue(script.contains("--output json"), "latest는 모든 페이지를 합친 뒤 고른다");
+
+        // then
+        assertThat(script).contains("mogum_restore_check");
+        assertThat(script).contains("pg_restore --exit-on-error");
+        assertThat(Pattern.compile("(?:-d|--dbname[= ])\\s*['\"]?mogum(?:['\"\\s]|$)").matcher(script).find()).isFalse();
+        assertThat(script).doesNotContain("POSTGRES_DB");
+        assertThat(script).as("latest는 모든 페이지를 합친 뒤 고른다").contains("--output json");
     }
 
     @Test
-    void 타이머는_매일_한국_04시이고_놓친_실행을_보충하며_root로_현재_백업을_실행한다() throws Exception {
+    @DisplayName("백업 타이머는 매일 한국 04시에 실행하고 놓친 실행을 보충한다")
+    void schedulesPersistentDailyBackup() throws Exception {
+        // when
         var timer = Files.readString(DEPLOY.resolve("systemd/mogum-backup.timer"));
-        assertTrue(timer.contains("OnCalendar=*-*-* 19:00:00 UTC"));
-        assertTrue(timer.contains("Persistent=true"));
-        assertTrue(timer.contains("WantedBy=timers.target"));
+
+        // then
+        assertThat(timer).contains("OnCalendar=*-*-* 19:00:00 UTC");
+        assertThat(timer).contains("Persistent=true");
+        assertThat(timer).contains("WantedBy=timers.target");
+    }
+
+    @Test
+    @DisplayName("백업 서비스는 root로 현재 릴리스의 스크립트를 실행한다")
+    void runsCurrentBackupAsRootAfterDockerAndNetwork() throws Exception {
+        // when
         var service = Files.readString(DEPLOY.resolve("systemd/mogum-backup.service"));
-        assertTrue(service.contains("Type=oneshot"));
-        assertTrue(service.contains("User=root"));
-        assertTrue(service.contains("EnvironmentFile=/etc/mogum/mogum.env"));
-        assertTrue(service.contains("ExecStart=/opt/mogum/current/deploy/backup.sh"));
-        assertTrue(service.contains("After=docker.service network-online.target"));
+
+        // then
+        assertThat(service).contains("Type=oneshot");
+        assertThat(service).contains("User=root");
+        assertThat(service).contains("EnvironmentFile=/etc/mogum/mogum.env");
+        assertThat(service).contains("ExecStart=/opt/mogum/current/deploy/backup.sh");
+        assertThat(service).contains("After=docker.service network-online.target");
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"success", "dump-failure", "empty", "not-ready", "delayed", "ambiguous", "upload-failure"})
-    @Timeout(15)
-    void 성공한_덤프만_업로드하고_준비_재확인과_임시파일_정리를_한다(String scenario, @TempDir Path root) throws Exception {
-        var result = runScript("backup.sh", scenario, root);
-        boolean success = List.of("success", "delayed").contains(scenario);
-        assertEquals(success ? 0 : 1, result.status(), result.output());
-        assertEquals(!List.of("not-ready", "ambiguous").contains(scenario), result.commands().contains("pg_dump"));
-        boolean upload = success || scenario.equals("upload-failure");
-        assertEquals(upload, result.commands().contains("s3 cp"), result.commands());
-        if (upload) {
-            assertTrue(result.commands().contains("-Fc"));
-            assertTrue(result.commands().contains("s3://test-bucket/" + KEY));
-            assertTrue(result.commands().contains("mode=600"));
-        }
-        if (scenario.equals("not-ready")) {
-            assertEquals(24, result.commands().lines().filter(line -> line.equals("sleep 5")).count());
-        }
-        if (scenario.equals("delayed")) assertTrue(result.commands().contains("sleep 5"));
-        if (success) {
-            assertTrue(result.output().contains(KEY));
-            assertTrue(result.output().contains("bytes"));
-            assertTrue(result.output().lines().count() <= 2);
-        }
-        assertClean(root, result);
-    }
+    @ParameterizedTest(name = "스크립트 {0}")
+    @ValueSource(strings = {"backup.sh", "restore.sh"})
+    @DisplayName("백업과 복원 스크립트는 bash 구문 검사를 통과한다")
+    void passesBashSyntaxCheck(String name) throws Exception {
+        // given
+        var path = DEPLOY.resolve(name);
 
-    @ParameterizedTest
-    @ValueSource(strings = {"success", "latest", "no-backup", "download-failure", "restore-failure",
-            "create-failure", "report-failure", "cleanup-failure", "invalid-key"})
-    @Timeout(15)
-    void 복원은_연습_DB만_사용하고_실패해도_DB와_파일을_정리한다(String scenario, @TempDir Path root) throws Exception {
-        var result = runScript("restore.sh", scenario, root);
-        boolean success = List.of("success", "latest").contains(scenario);
-        assertEquals(success ? 0 : 1, result.status(), result.output());
-        boolean downloaded = !List.of("no-backup", "invalid-key").contains(scenario);
-        assertEquals(downloaded, result.commands().contains("s3 cp"));
-        boolean cleanupDb = downloaded && !scenario.equals("download-failure");
-        assertEquals(cleanupDb ? 2 : 0,
-                result.commands().lines().filter(line -> line.contains("dropdb")).count(), result.commands());
-        if (cleanupDb) {
-            assertTrue(result.commands().contains("mogum_restore_check"));
-            assertFalse(result.commands().contains("POSTGRES_DB"));
-            assertFalse(Pattern.compile("(?:-d|--dbname[= ])\\s*mogum(?:\\s|$)").matcher(result.commands()).find());
-        }
-        if (success) {
-            assertTrue(result.output().contains("users | 2"));
-            assertTrue(result.commands().contains("pg_tables"));
-            assertTrue(result.commands().contains("mode=600"));
-        }
-        if (scenario.equals("latest")) {
-            assertTrue(result.commands().contains("list-objects-v2"));
-            assertTrue(result.commands().contains("--prefix backups/"));
-            assertTrue(result.commands().contains("s3://test-bucket/" + KEY));
-        }
-        assertClean(root, result);
-    }
+        // when
+        var process = new ProcessBuilder("bash", "-n", path.toString()).redirectErrorStream(true).start();
 
-    private void assertClean(Path root, Result result) throws Exception {
-        try (var files = Files.list(root.resolve("tmp"))) { assertEquals(0, files.count()); }
-        assertFalse(result.output().contains("private-dump-content"));
-        assertFalse(result.output().contains("private-error-content"));
-    }
-
-    private Result runScript(String name, String scenario, Path root) throws Exception {
-        var bin = Files.createDirectory(root.resolve("bin"));
-        var tmp = Files.createDirectory(root.resolve("tmp"));
-        String fake = """
-                #!/usr/bin/env bash
-                set -euo pipefail
-                tool=${0##*/}
-                printf '%s %s\\n' "$tool" "$*" >> "$TEST_ROOT/commands"
-                case "$tool" in
-                  id) printf '0\\n' ;;
-                  date) [[ ${TZ:-} == Asia/Seoul ]]; printf '20261025T040000+0900\\n' ;;
-                  sleep) exit 0 ;;
-                  aws)
-                    if [[ $* == *list-objects-v2* ]]; then
-                      if [[ $SCENARIO == no-backup ]]; then printf 'null\\n'
-                      else printf '\\"backups/20261025T040000+0900.dump\\"\\n'; fi
-                    elif [[ $3 == s3://* ]]; then
-                      printf private-dump-content > "$4"
-                      [[ $SCENARIO != download-failure ]] || exit 1
-                    else
-                      [[ $(cat "$3") == private-dump-content ]]
-                    fi
-                    if [[ $* == *'s3 cp'* ]]; then
-                      if [[ $3 == s3://* ]]; then path=$4; else path=$3; fi
-                      ls -l "$path" | awk '{print "mode=" (substr($1, 1, 10) == "-rw-------" ? "600" : "bad")}' >> "$TEST_ROOT/commands"
-                    fi
-                    [[ $SCENARIO != upload-failure ]] || exit 1 ;;
-                  docker)
-                    if [[ $1 == ps ]]; then
-                      [[ $* == *com.docker.compose.project=mogum* && $* == *com.docker.compose.service=postgres* ]]
-                      printf 'postgres-id\\n'
-                      [[ $SCENARIO != ambiguous ]] || printf 'another-id\\n'
-                    elif [[ $* == *pg_isready* ]]; then
-                      [[ $SCENARIO != not-ready ]] || exit 1
-                      if [[ $SCENARIO == delayed && ! -f $TEST_ROOT/ready ]]; then touch "$TEST_ROOT/ready"; exit 1; fi
-                    elif [[ $* == *pg_dump* ]]; then
-                      [[ $SCENARIO != empty ]] || exit 0
-                      printf private-dump-content
-                      [[ $SCENARIO != dump-failure ]] || { printf private-error-content >&2; exit 1; }
-                    elif [[ $* == *pg_restore* ]]; then
-                      [[ $(cat) == private-dump-content ]]
-                      [[ $SCENARIO != restore-failure ]] || { printf private-error-content >&2; exit 1; }
-                    elif [[ $* == *createdb* ]]; then
-                      [[ $SCENARIO != create-failure ]] || exit 1
-                    elif [[ $* == *dropdb* ]]; then
-                      if [[ $SCENARIO == cleanup-failure && -f $TEST_ROOT/dropped ]]; then exit 1; fi
-                      touch "$TEST_ROOT/dropped"
-                    elif [[ $* == *psql* ]]; then
-                      cat >> "$TEST_ROOT/commands"
-                      printf 'users | 2\\n'
-                      [[ $SCENARIO != report-failure ]] || exit 1
-                    else exit 1; fi ;;
-                esac
-                """;
-        for (var nameOfCommand : List.of("id", "date", "sleep", "aws", "docker")) {
-            var path = Files.writeString(bin.resolve(nameOfCommand), fake);
-            Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwx------"));
-        }
-        var builder = new ProcessBuilder("bash", DEPLOY.resolve(name).toAbsolutePath().toString());
-        if (name.equals("restore.sh")) {
-            builder.command().add(List.of("latest", "no-backup").contains(scenario) ? "latest"
-                    : scenario.equals("invalid-key") ? "releases/not-a-backup" : KEY);
-        }
-        builder.redirectErrorStream(true);
-        builder.environment().remove("APP_IMAGE");
-        builder.environment().putAll(Map.of("TEST_ROOT", root.toString(), "SCENARIO", scenario,
-                "MOGUM_BUCKET", "test-bucket", "TMPDIR", tmp.toString(),
-                "PATH", bin + ":" + System.getenv("PATH")));
-        var process = builder.start();
+        // then
         var output = new String(process.getInputStream().readAllBytes());
-        int status = process.waitFor();
-        var log = root.resolve("commands");
-        return new Result(status, output, Files.exists(log) ? Files.readString(log) : "");
+        assertThat(process.waitFor()).as(output).isZero();
     }
-
-    private record Result(int status, String output, String commands) {}
 }

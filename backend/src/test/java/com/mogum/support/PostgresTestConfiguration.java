@@ -1,22 +1,38 @@
 package com.mogum.support;
 
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.boot.test.util.TestPropertyValues;
+import org.springframework.context.ApplicationContextInitializer;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
- * DB 테스트는 {@code @SpringBootTest} (또는 DB 슬라이스 어노테이션)를 붙이고
- * 이 클래스를 상속한다. 상속된 {@code @ServiceConnection}이 접속 정보를 제공한다.
- * 컨테이너는 테스트 JVM에서 한 번 시작하며 서로 다른 Spring 컨텍스트도 공유한다.
- * {@code @Testcontainers}/{@code @Container}나 컨테이너 빈으로 등록하지 않는다:
- * 클래스/컨텍스트 종료 때 공유 DB를 멈추지 않고, JVM 종료 후 Ryuk이 정리한다.
- * DB 내용도 공유되므로 쓰기 테스트는 트랜잭션 롤백이나 명시적 정리로 격리한다.
+ * 테스트 JVM에서 한 번 시작하는 공유 DB다. 컨테이너 단독 테스트는 POSTGRES를 직접 쓰고,
+ * 레포지토리/통합 묶음은 {@link ConnectionInitializer}로 접속 정보만 제공한다.
+ * 컨테이너를 빈이나 @Container로 등록하지 않아 클래스/컨텍스트 종료 때 멈추지 않으며,
+ * JVM 종료 후 Ryuk이 정리한다. DB 내용은 {@link DatabaseCleaner}로 테스트마다 비운다.
+ * Boot 4.1.1의 @ImportTestcontainers는 컨테이너 빈을 등록하고 종료 때 close하므로 쓰지 않는다.
  */
-public abstract class PostgresTestConfiguration {
-    @ServiceConnection
-    protected static final PostgreSQLContainer POSTGRES =
-            new PostgreSQLContainer("pgvector/pgvector:pg17");
+public final class PostgresTestConfiguration {
+    private PostgresTestConfiguration() {
+    }
+
+    public static final PostgreSQLContainer POSTGRES =
+            // 공용 통합 컨텍스트 · 레포지토리 슬라이스 · 마이그레이션 검사의 풀이 함께 쓰는 테스트 DB다.
+            new PostgreSQLContainer("pgvector/pgvector:pg17")
+                    .withCommand("postgres", "-c", "max_connections=200");
 
     static {
         POSTGRES.start();
+    }
+
+    public static final class ConnectionInitializer
+            implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+        @Override
+        public void initialize(ConfigurableApplicationContext context) {
+            TestPropertyValues.of(
+                    "spring.datasource.url=" + POSTGRES.getJdbcUrl(),
+                    "spring.datasource.username=" + POSTGRES.getUsername(),
+                    "spring.datasource.password=" + POSTGRES.getPassword()).applyTo(context);
+        }
     }
 }

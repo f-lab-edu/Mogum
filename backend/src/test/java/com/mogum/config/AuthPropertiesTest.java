@@ -1,67 +1,86 @@
 package com.mogum.config;
 
 import com.mogum.account.domain.UserRole;
+import com.mogum.account.repository.FakeUserRepository;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.account.service.LoginService;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
 
-import java.time.Clock;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class AuthPropertiesTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(PropertiesConfiguration.class)
-            .withBean(UserRepository.class, () -> mock(UserRepository.class))
-            .withBean(Clock.class, Clock::systemUTC)
+            .withBean(UserRepository.class, FakeUserRepository::new)
             .withBean(LoginService.class);
 
     @Test
-    void 기본_관리자_목록은_비어_있고_로그인_서비스에_전달한다() {
+    @DisplayName("기본 관리자 목록은 비어 있고 로그인 서비스에 전달한다")
+    void passesEmptyDefaultAllowlistToLoginService() {
+        // when
         runner.run(context -> {
-            assertNull(context.getStartupFailure());
-            assertTrue(context.getBean(AuthProperties.class).adminEmails().isEmpty());
-            assertEquals(UserRole.USER, context.getBean(LoginService.class).roleFor("admin@example.com"));
+            // then
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(AuthProperties.class).adminEmails()).isEmpty();
+            assertThat(context.getBean(LoginService.class).roleFor("admin@example.com")).isEqualTo(UserRole.USER);
         });
     }
 
     @Test
-    void 쉼표_목록을_바인딩하고_역할_계산에_전달한다() {
-        runner.withPropertyValues("app.auth.admin-emails= ADMIN@example.com , second@example.com")
-                .run(context -> {
-                    assertNull(context.getStartupFailure());
-                    assertEquals(2, context.getBean(AuthProperties.class).adminEmails().size());
-                    var login = context.getBean(LoginService.class);
-                    assertEquals(UserRole.ADMIN, login.roleFor("admin@example.com"));
-                    assertEquals(UserRole.ADMIN, login.roleFor(" SECOND@example.com "));
-                    assertEquals(UserRole.USER, login.roleFor("other@example.com"));
-                });
-    }
+    @DisplayName("쉼표 목록을 바인딩하고 역할 계산에 전달한다")
+    void bindsCommaSeparatedAllowlistToRoleCalculation() {
+        // given
+        var configured = runner.withPropertyValues("app.auth.admin-emails= ADMIN@example.com , second@example.com");
 
-    @Test
-    void 빈_설정_값은_빈_목록으로_바인딩한다() {
-        runner.withPropertyValues("app.auth.admin-emails=").run(context -> {
-            assertNull(context.getStartupFailure());
-            assertTrue(context.getBean(AuthProperties.class).adminEmails().isEmpty());
+        // when
+        configured.run(context -> {
+            // then
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(AuthProperties.class).adminEmails()).hasSize(2);
+            var login = context.getBean(LoginService.class);
+            assertThat(login.roleFor("admin@example.com")).isEqualTo(UserRole.ADMIN);
+            assertThat(login.roleFor(" SECOND@example.com ")).isEqualTo(UserRole.ADMIN);
+            assertThat(login.roleFor("other@example.com")).isEqualTo(UserRole.USER);
         });
     }
 
     @Test
-    void 환경_변수로_관리자_목록을_덮어쓴다() {
-        runner.withInitializer(context -> context.getEnvironment().getPropertySources().addFirst(
+    @DisplayName("빈 설정 값은 빈 목록으로 바인딩한다")
+    void bindsEmptySettingToEmptyAllowlist() {
+        // given
+        var configured = runner.withPropertyValues("app.auth.admin-emails=");
+
+        // when
+        configured.run(context -> {
+            // then
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(AuthProperties.class).adminEmails()).isEmpty();
+        });
+    }
+
+    @Test
+    @DisplayName("환경 변수로 관리자 목록을 덮어쓴다")
+    void overridesAllowlistFromEnvironment() {
+        // given
+        var configured = runner.withInitializer(context -> context.getEnvironment().getPropertySources().addFirst(
                 new SystemEnvironmentPropertySource("test-env", Map.of(
                         "APP_AUTH_ADMIN_EMAILS", "env-admin@example.com,second@example.com"))))
-                .withPropertyValues("app.auth.admin-emails=").run(context -> {
-                    assertNull(context.getStartupFailure());
-                    assertEquals(UserRole.ADMIN, context.getBean(LoginService.class).roleFor("env-admin@example.com"));
-                    assertEquals(2, context.getBean(AuthProperties.class).adminEmails().size());
-                });
+                .withPropertyValues("app.auth.admin-emails=");
+
+        // when
+        configured.run(context -> {
+            // then
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(LoginService.class).roleFor("env-admin@example.com")).isEqualTo(UserRole.ADMIN);
+            assertThat(context.getBean(AuthProperties.class).adminEmails()).hasSize(2);
+        });
     }
 
     @Configuration(proxyBeanMethods = false)
