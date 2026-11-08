@@ -200,8 +200,7 @@
 |---|---|---|
 | `ERROR` | 사람이 원인을 봐야 하는 우리 쪽 실패 — 스택과 함께 | 처리되지 않은 예외(5xx) · 결과 저장 실패 · 불변식 위반 |
 | `WARN` | 외부 실패 · 이상 징후 — 시스템은 계속 돈다 | 구글 토큰 교환 실패 · 외부 호출 실패 · 시한 상실 |
-| `INFO` | 흐름 한 줄 | 접근 줄 · 로그인 결과 · 기동/종료 · 작업 받기 · 끝남 |
-| `INFO` | 신청 전 로그인 | `login result=not_applied` — MDC `requestId`, `userId` 없음 |
+| `INFO` | 흐름 한 줄 | 접근 줄 · 로그인 결과(신청 전 로그인 `login result=not_applied` 는 MDC 에 `userId` 가 없다) · 기동/종료 · 작업 받기 · 끝남 |
 | `DEBUG` 이하 | 운영에서 끈다 | — |
 
 신청 전 로그인 줄의 실제 출력(`OAuthLoginHandlerIntegrationTest`의 `OutputCaptureExtension` 캡처):
