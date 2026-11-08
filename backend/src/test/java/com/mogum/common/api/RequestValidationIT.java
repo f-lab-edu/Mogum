@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -44,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(OutputCaptureExtension.class)
 class RequestValidationIT extends PostgresTestConfiguration {
     @Autowired private UserRepository users;
+    @Autowired private JdbcTemplate jdbc;
     @Autowired private JdbcIndexedSessionRepository sessions;
     @Value("${local.server.port}") private int port;
     private TestSessions testSessions;
@@ -73,7 +75,7 @@ class RequestValidationIT extends PostgresTestConfiguration {
     void cleanUp() {
         if (client != null) client.close();
         if (session != null) sessions.deleteById(testSessions.id(session));
-        if (user != null) users.deleteById(user.getId());
+        if (user != null) jdbc.update("DELETE FROM users WHERE id = ?", user.getId());
     }
 
     @Test

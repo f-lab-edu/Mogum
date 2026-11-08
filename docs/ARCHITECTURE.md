@@ -22,12 +22,12 @@
 │   │   ├── account/                 # 회원 · 로그인 — 도메인 패키지는 항상 아래 다섯 하위 패키지로 나눈다
 │   │   │   ├── controller/          # MeController
 │   │   │   ├── service/             # LoginService · ExternalAccount(입력) · LoginResult(결과)
-│   │   │   ├── repository/          # UserRepository(Spring Data) · 네이티브 쿼리 클래스
+│   │   │   ├── repository/          # UserRepository(Spring Data Repository · 저장/조회/외부 식별자 조회만 선언) · 네이티브 쿼리 클래스
 │   │   │   ├── domain/              # User(@Entity · Lombok @Getter · @NoArgsConstructor(PROTECTED) · 생성은 정적 팩토리 User.join) · UserRole · UserStatus · 도메인 규칙
 │   │   │   └── dto/                 # MeResponse — HTTP 요청 · 응답만
 │   │   ├── curriculum/              # 묶음 · 단계 · 커리큘럼 · 강의 — controller/ · service/ · dto/ 는 6-curriculum-gen 에서 만든다
 │   │   │   ├── domain/              # CurriculumGroup · CurriculumStep · Curriculum · Lesson(AuditedEntity 상속 · 정적 팩토리) · CurriculumStatus · LessonStatus
-│   │   │   └── repository/          # CurriculumGroupRepository · CurriculumStepRepository · CurriculumRepository · LessonRepository(JpaRepository)
+│   │   │   └── repository/          # CurriculumGroupRepository · CurriculumStepRepository · CurriculumRepository · LessonRepository(Repository<T, Long> · 저장/조회/주인 확인만 선언)
 │   │   ├── <도메인>/                 # material · concept · review … — account 와 같은 다섯 하위 패키지. MasteryPolicy 등은 domain/
 │   │   ├── job/                     # 적재 · 재시도 · 잡 조회 API · jobs/job_events 네이티브 SQL(repository/) — 같은 다섯 하위 패키지 · generation 참조 금지
 │   │   ├── usage/                   # llm_calls 원장 · 일일 · 월 합계(쿼터 · 킬스위치 근거) — 생성과 적재가 함께 쓴다 · 같은 다섯 하위 패키지

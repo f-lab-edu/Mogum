@@ -11,6 +11,13 @@ import com.mogum.account.domain.User;
 import com.mogum.account.dto.MeResponse;
 import com.mogum.common.persistence.AuditedEntity;
 import entityfixture.UnauditedEntity;
+import repositoryfixture.BroadUserRepository;
+import org.junit.jupiter.api.DisplayName;
+import org.springframework.data.repository.Repository;
+import org.springframework.data.repository.CrudRepository;
+import org.springframework.data.repository.ListCrudRepository;
+import org.springframework.data.repository.PagingAndSortingRepository;
+import org.springframework.data.jpa.repository.JpaRepository;
 import jakarta.persistence.Entity;
 import com.mogum.common.api.ApiErrorController;
 import com.mogum.common.api.ApiResponse;
@@ -56,6 +63,27 @@ class ArchitectureTest {
     private static final String JAKARTA_TRANSACTIONAL = "jakarta.transaction.Transactional";
     private static final ArchRule ENTITIES_EXTEND_AUDITED_ENTITY = classes().that()
             .areAnnotatedWith(Entity.class).should().beAssignableTo(AuditedEntity.class);
+
+    private static final ArchRule REPOSITORIES_DECLARE_DOMAIN_OPERATIONS = noClasses().that()
+            .areAssignableTo(Repository.class)
+            .should().beAssignableTo(JpaRepository.class)
+            .orShould().beAssignableTo(CrudRepository.class)
+            .orShould().beAssignableTo(ListCrudRepository.class)
+            .orShould().beAssignableTo(PagingAndSortingRepository.class);
+
+    @Test
+    @DisplayName("제품 레포지토리는 정리와 집계를 제공하는 상위 인터페이스를 상속하지 않는다")
+    void repositoriesDeclareOnlyDomainOperations() {
+        // when & then
+        REPOSITORIES_DECLARE_DOMAIN_OPERATIONS.check(CLASSES);
+    }
+
+    @Test
+    @DisplayName("넓은 Spring Data 인터페이스를 상속한 레포지토리를 거부한다")
+    void rejectsBroadRepositoryInheritance() {
+        // when & then
+        assertViolation(REPOSITORIES_DECLARE_DOMAIN_OPERATIONS, BroadUserRepository.class);
+    }
 
     @Test
     void 모든_엔티티는_공통_시각_상위_클래스를_상속한다() {
