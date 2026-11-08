@@ -13,7 +13,7 @@ export default function LoginPage() {
   const notice = useRef<HTMLParagraphElement>(null)
   const sessionExpired = location.state?.sessionExpired === true
   const message = params.has('error')
-    ? params.get('error') === 'not_allowed' ? messages.notAllowed : messages.loginFailed
+    ? messages.loginFailed
     : sessionExpired ? messages.sessionExpired : ''
 
   useEffect(() => {

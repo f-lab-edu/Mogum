@@ -15,9 +15,9 @@ export default function RequireAuth() {
   useEffect(() => {
     if (me.isSuccess && pathname === '/') {
       const path = takeReturnPath()
-      if (path) void navigate(path, { replace: true })
+      if (path && me.data.status === 'APPROVED') void navigate(path, { replace: true })
     }
-  }, [me.isSuccess, pathname, navigate])
+  }, [me.isSuccess, me.data?.status, pathname, navigate])
 
   if (me.isPending || (me.error instanceof ApiError && me.error.code === 'UNAUTHORIZED')) {
     return (
@@ -32,7 +32,7 @@ export default function RequireAuth() {
     )
   }
 
-  if (me.isError) {
+  if (me.isError || !['NOT_APPLIED', 'APPLIED', 'APPROVED', 'REJECTED'].includes(me.data.status)) {
     const message = me.error instanceof ApiError && me.error.code === 'RATE_LIMITED'
       ? messages.rateLimited : messages.loadFailed
 
@@ -46,5 +46,5 @@ export default function RequireAuth() {
     )
   }
 
-  return <Outlet />
+  return <Outlet context={me.data} />
 }

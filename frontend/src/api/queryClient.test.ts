@@ -35,13 +35,32 @@ test('변경 요청의 401도 공통 콜백을 부른다', async () => {
   client.clear()
 })
 
-test.each(['CSRF_INVALID', 'TERMS_REQUIRED', 'ACCOUNT_WAITLISTED'])('403 %s는 로그인으로 보내거나 변경 요청을 재전송하지 않는다', async (code) => {
+test.each(['CSRF_INVALID', 'ACCOUNT_NOT_APPROVED', 'FUTURE_ERROR'])('403 %s는 로그인으로 보내거나 변경 요청을 재전송하지 않는다', async (code) => {
   const unauthorized = vi.fn()
   const client = createAuthQueryClient(unauthorized)
   const mutationFn = vi.fn().mockRejectedValue(new ApiError(403, code, '서버 문구'))
   const mutation = client.getMutationCache().build(client, { mutationFn })
   await expect(mutation.execute(undefined)).rejects.toBeInstanceOf(ApiError)
   expect(mutationFn).toHaveBeenCalledTimes(1)
+  expect(unauthorized).not.toHaveBeenCalled()
+  client.clear()
+})
+
+test.each(['조회', '변경'])('%s의 ACCOUNT_NOT_APPROVED는 나를 다시 읽어 현재 상태를 반영한다', async (operation) => {
+  const unauthorized = vi.fn()
+  const client = createAuthQueryClient(unauthorized)
+  const queryFn = vi.fn().mockResolvedValueOnce({ status: 'APPROVED' }).mockResolvedValue({ status: 'REJECTED' })
+  await client.fetchQuery({ queryKey: ['me'], queryFn })
+  const error = new ApiError(403, 'ACCOUNT_NOT_APPROVED', '승인된 계정이 필요합니다')
+  if (operation === '조회') {
+    await expect(client.fetchQuery({ queryKey: ['other'], queryFn: () => Promise.reject(error) })).rejects.toBe(error)
+  } else {
+    const mutation = client.getMutationCache().build(client, { mutationFn: () => Promise.reject(error) })
+    await expect(mutation.execute(undefined)).rejects.toBe(error)
+  }
+  // 여기서는 화면 관찰자가 없는 캐시여도 같은 상태 읽기를 확인한다.
+  await vi.waitFor(() => expect(queryFn).toHaveBeenCalledTimes(2))
+  expect(client.getQueryData(['me'])).toEqual({ status: 'REJECTED' })
   expect(unauthorized).not.toHaveBeenCalled()
   client.clear()
 })

@@ -9,7 +9,7 @@ import { redirectToLogin, rememberReturnPath, takeReturnPath } from '../lib/auth
 import LoginPage from '../pages/LoginPage'
 import RequireAuth from './RequireAuth'
 
-const me = { email: 'admin@example.com', status: 'ACTIVE', role: 'ADMIN', termsAgreed: false, waitlistPosition: null }
+const me = { email: 'admin@example.com', status: 'APPROVED', name: '민서' }
 
 function ProtectedContent() {
   const client = useQueryClient()

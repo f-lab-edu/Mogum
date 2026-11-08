@@ -1,7 +1,16 @@
-import { beforeEach, expect, test, vi } from 'vitest'
-import { hasConfirmedLogin, markLoginConfirmed, redirectToLogin, rememberReturnPath, takeReturnPath } from './authNavigation'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { hasConfirmedLogin, markLoginConfirmed, openGoogleLogin, redirectToLogin, rememberReturnPath, takeReturnPath } from './authNavigation'
 
 beforeEach(() => sessionStorage.clear())
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
+
+test.each(['', 'https://api.mogum.example'])('계정 전환은 %s 서버의 Google 로그인 주소를 연다', (origin) => {
+  const assign = vi.fn()
+  vi.stubEnv('VITE_API_BASE_URL', origin)
+  vi.stubGlobal('window', { location: { assign } })
+  openGoogleLogin()
+  expect(assign).toHaveBeenCalledWith(`${origin}/auth/google`)
+})
 
 test('확인 이력은 이 탭의 화면 상태이며 사용자 정보는 저장하지 않는다', () => {
   expect(hasConfirmedLogin()).toBe(false)

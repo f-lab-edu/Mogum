@@ -5,7 +5,8 @@ import { createAuthQueryClient } from './api/queryClient'
 import RequireAuth from './components/RequireAuth'
 import { redirectToLogin } from './lib/authNavigation'
 import LoginPage from './pages/LoginPage'
-import PlaceholderPage from './pages/PlaceholderPage'
+import AccountPage from './pages/AccountPage'
+import PrivacyPage from './pages/PrivacyPage'
 
 function ApplicationRoutes() {
   const navigate = useNavigate()
@@ -15,9 +16,13 @@ function ApplicationRoutes() {
     <QueryClientProvider client={queryClient}>
       <Routes>
         <Route element={<RequireAuth />}>
-          <Route path="/" element={<PlaceholderPage />} />
+          <Route path="/" element={<AccountPage />} />
+          <Route path="/apply" element={<AccountPage />} />
+          <Route path="/waiting-approval" element={<AccountPage />} />
+          <Route path="/rejected" element={<AccountPage />} />
         </Route>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
       </Routes>
     </QueryClientProvider>
   )

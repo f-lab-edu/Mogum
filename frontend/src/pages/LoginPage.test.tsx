@@ -8,7 +8,7 @@ afterEach(() => vi.unstubAllEnvs())
 
 test.each([
   ['?error=login_failed', '로그인하지 못했어요. 다시 시도해 주세요.'],
-  ['?error=not_allowed', '지금은 공개 전이라 정해진 계정만 들어올 수 있어요.'],
+  ['?error=not_allowed', '로그인하지 못했어요. 다시 시도해 주세요.'],
   ['?error=unknown', '로그인하지 못했어요. 다시 시도해 주세요.'],
   ['?error=', '로그인하지 못했어요. 다시 시도해 주세요.'],
 ])('로그인 콜백 %s 안내를 읽어 준다', (search, message) => {
@@ -79,6 +79,6 @@ test('정원제와 승인 신청을 소개하고 처리방침 링크나 넘겨 �
 })
 
 test('세션 만료 안내보다 콜백 오류를 먼저 표시한다', () => {
-  render(<MemoryRouter initialEntries={[{ pathname: '/login', search: '?error=not_allowed', state: { sessionExpired: true } }]}><LoginPage /></MemoryRouter>)
-  expect(screen.getByRole('status')).toHaveTextContent('지금은 공개 전이라 정해진 계정만 들어올 수 있어요.')
+  render(<MemoryRouter initialEntries={[{ pathname: '/login', search: '?error=login_failed', state: { sessionExpired: true } }]}><LoginPage /></MemoryRouter>)
+  expect(screen.getByRole('status')).toHaveTextContent('로그인하지 못했어요. 다시 시도해 주세요.')
 })

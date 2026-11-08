@@ -10,11 +10,19 @@ export function retryApiQuery(failureCount: number, error: unknown) {
 export function createAuthQueryClient(onUnauthorized: () => void) {
   const onError = (error: unknown) => {
     if (error instanceof ApiError && error.code === 'UNAUTHORIZED') onUnauthorized()
+    if (error instanceof ApiError && error.code === 'ACCOUNT_NOT_APPROVED') {
+      void client.invalidateQueries({ queryKey: ['me'], exact: true, refetchType: 'all' })
+    }
   }
 
-  return new QueryClient({
+  const client = new QueryClient({
     queryCache: new QueryCache({
-      onError,
+      onError: (error, query) => {
+        // 나 읽기의 실패는 RequireAuth의 기존 오류 화면에서 처리한다.
+        if (error instanceof ApiError && error.code === 'ACCOUNT_NOT_APPROVED'
+          && query.queryKey.length === 1 && query.queryKey[0] === 'me') return
+        onError(error)
+      },
       onSuccess: (_data, query) => {
         if (query.queryKey.length === 1 && query.queryKey[0] === 'me') markLoginConfirmed()
       },
@@ -25,4 +33,5 @@ export function createAuthQueryClient(onUnauthorized: () => void) {
       mutations: { retry: false },
     },
   })
+  return client
 }
