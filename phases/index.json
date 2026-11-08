@@ -35,6 +35,10 @@
       "dir": "3a-test-conventions",
       "status": "completed",
       "completed_at": "2026-11-08T21:55:05+0900"
+    },
+    {
+      "dir": "4-account",
+      "status": "pending"
     }
   ]
 }

@@ -1,0 +1,12 @@
+{
+  "project": "Mogum",
+  "phase": "4-account",
+  "steps": [
+    { "step": 0, "name": "account-schema", "status": "pending" },
+    { "step": 1, "name": "login-session", "status": "pending" },
+    { "step": 2, "name": "apply-and-guard", "status": "pending" },
+    { "step": 3, "name": "operator-sql", "status": "pending" },
+    { "step": 4, "name": "ui-foundation", "status": "pending" },
+    { "step": 5, "name": "pre-login-screens", "status": "pending" }
+  ]
+}
