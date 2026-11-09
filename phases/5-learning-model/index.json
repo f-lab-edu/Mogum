@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "card-entities",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-10T07:08:38+0900",
+      "summary": "Card/Concept/CardConcept/Review extend AuditedEntity; own enums CardStatus/FsrsState/Rating; factories Card.write(long userId, long lessonId, int position, String question, String answer), Concept.add(long userId, String name, String definition, float[] embedding), CardConcept.link(Card card, Concept concept), Review.record(Card card, Rating rating); CardConceptId(Long cardId, Long conceptId) record @EmbeddedId with read-only LAZY parent mappings, Persistable.isNew() checks common createdAt so duplicate new links fail on save; CardRepository/ConceptRepository/ReviewRepository extend Repository<T, Long>, CardConceptRepository extends Repository<CardConcept, CardConceptId>, all declare only <S extends T> S save(S entity) and Optional<T> findById(ID id); added versionless org.hibernate.orm:hibernate-vector managed by Boot/Hibernate BOM (7.4.5.Final), float[] mapped with @JdbcTypeCode(SqlTypes.VECTOR) and dimensionless vector, verified versioned source JAR (PGVectorTypeContributor/PGVectorJdbcType/VectorDdlType), Gradle dependencyInsight, ddl-auto: validate and PostgreSQL 3/5-dimensional value round trips plus vector_dims/actual column type; unsaved fixtures CardFixtures.card/withId, ConceptFixtures.concept/withId, CardConceptFixtures.link, ReviewFixtures.review; all factory fields, initial FSRS, duplicate link rejection, LAZY exception and common TestClock auditing verified; docs/04 section 2.3 and AGENTS stack updated; both AC commands passed, backend tests 873 -> 889 (+16, zero failures/errors/skips); migrations, contract rules and FSRS test-only dependency unchanged.",
+      "completed_at": "2026-11-10T07:14:46+0900"
     }
   ],
   "created_at": "2026-11-10T06:53:56+0900"
