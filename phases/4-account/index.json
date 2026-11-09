@@ -53,7 +53,10 @@
     {
       "step": 6,
       "name": "flaky-focus-test",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-09T20:33:26+0900",
+      "summary": "AccountPage.test.tsx 상태별 test.each(NOT_APPLIED/APPLIED/REJECTED)의 findByRole 뒤 포커스·document.title 단언을 같은 await waitFor로 감싸 효과를 기다리도록 수정하고 나머지 단언 유지; frontend/src/**/*.test.tsx 전체 검색에서 같은 비동기 패턴 추가 없음, LoginPage.test.tsx·PrivacyPage.test.tsx의 동기 render 뒤 효과 단언과 Button.test.tsx의 직접 focus 뒤 단언은 그대로 유지; 수정 파일 단독 20회 연속 모두 통과(매회 14개, 총 280개), 전체 화면 테스트 174→174개(16파일) 및 지정 test/lint 통과; 아키텍처 체크리스트 확인(상태 기록 index.json 외 *.test.tsx만 변경·단언 유지·재시도/고정 지연/시간 증가 없음·제품 코드 변경 없음·AGENTS.md 준수), 커밋 없음",
+      "completed_at": "2026-11-09T20:34:56+0900"
     }
   ],
   "created_at": "2026-11-08T22:48:26+0900",
