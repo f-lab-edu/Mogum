@@ -1,0 +1,72 @@
+{
+  "project": "Mogum",
+  "phase": "4-account",
+  "steps": [
+    {
+      "step": 0,
+      "name": "account-schema",
+      "status": "completed",
+      "started_at": "2026-11-08T22:48:26+0900",
+      "summary": "V9__migrate_account_schema.sql로 users의 역할·약관을 제거하고 이름·승인 시각·크레딧 잔액·다음 채움 시각·상태 제약 적용, ACTIVE→APPROVED·PENDING/WAITLISTED→APPLIED 이전 및 모든 기존 행에 숫자 100의 잔액과 REFILL 기록 생성(알 수 없는 상태는 롤백, 서울 03:59/04:00 경계 검증); AuditedEntity를 상속하는 User.apply(String provider, String subject, String email, String name, int creditBalance)·CreditEntry.refill(User user, int amount), UserStatus(APPLIED/APPROVED/REJECTED)·CreditEntryType(REFILL/CONSUME/RESTORE)·CreditEntryRepository(save만, Repository<CreditEntry, Long>) 구현, CreditEntry→User는 LAZY 단방향이며 cascade·job_id·승인/거절 메서드 없음; 허용 목록 설정·AuthProperties·UserRole·roleFor 제거, LoginResult는 Success(long userId)/NotApplied(ExternalAccount account)/Rejected(EMAIL_NOT_VERIFIED)이며 로그인은 행을 만들지 않고 미인증은 DB 접근 전에 거절; OAuthLoginHandler의 신청 전 결과는 step 1까지 임시 /login?error=not_allowed 및 기존 실패 로그, SessionUserFilter는 권한 없는 인증, MeController/MeResponse는 email·status만 반환; 옛 첫 로그인 생성·허용 목록 거절 검증→LoginServiceTest의 무저장 NotApplied·세 상태 재로그인·정확한 신원 일치 및 OAuthLoginHandlerFailureIntegrationTest의 무행·무세션 임시 실패 검증, 성공·세션 회전·ID만 저장·안전한 로그→기존 회원을 UserFixtures로 준비한 OAuthLoginHandlerIntegrationTest, 커밋된 회원 행 보존→동 테스트의 rotatesSessionAndPreservesExistingAccount(세 상태·DB 전체 행·시계 이동)와 LoginIdentityMigrationTest의 기존 ID/이메일/가입시각·세션 보존 검증; LoginServiceConcurrencyIntegrationTest는 로그인이 저장하지 않아 삭제(동시 신청→행 하나는 step 2에서 재검증), AuthPropertiesTest는 설정 제거로 삭제, 역할·약관·대기 순번 단언은 칸 삭제로 제거; 기존 V7 updated_at=created_at 검증은 V9 갱신 전 V8 시점에서 유지, DB 크레딧/상태/시각/종류 제약·Auditing·LAZY·FK 검증, docs/04 §2.3·§10 구현 사실 반영; 지정 선별 AC 143개와 전체 build 707개 통과(서버 기본 테스트 이전 승인 기록 709개→707개, 실패·오류·건너뜀 0), 아키텍처 체크리스트 확인, 커밋 없음",
+      "completed_at": "2026-11-09T02:08:26+0900"
+    },
+    {
+      "step": 1,
+      "name": "login-session",
+      "status": "completed",
+      "started_at": "2026-11-09T02:08:26+0900",
+      "summary": "Google scope email·profile 및 prompt=select_account 적용(PKCE 유지), ExternalAccount에 name을 더하고 GoogleAccountMapper 한 곳에서 누락·공백 이름을 이메일 @ 앞부분으로 대체; 회원 세션은 PRINCIPAL_NAME_INDEX_NAME의 String 사용자 ID만, 신청 전 세션은 mogum.notAppliedAccount의 Serializable AccountPrincipal.NotApplied(provider, subject, email, name)만 저장하며 주인 색인·users·credit_entries 행 없음; 두 로그인 모두 세션 ID 회전·이전 속성 제거·origin+/ 리다이렉트, 요청 principal은 sealed AccountPrincipal(Member/NotApplied)이고 회원 상태는 매 요청 DB 조회·신청 전은 DB 조회와 userId MDC 없음, 깨진/혼합 세션은 공통 JSON 401 후 폐기; GET /api/me는 status·email·name만 반환(NOT_APPLIED/APPLIED/APPROVED/REJECTED, 크레딧 없음), TestSessions.createNotApplied와 FakeGoogle.name(누락·공백 가능) 추가, 두 세션의 HTTP 조회·로그아웃 204·세션 폐기 검증; INFO login result=not_applied 한 줄과 이메일·이름·subject·토큰 비노출 및 계정 전환 시 이전 userId MDC 제거를 출력 캡처로 검증, docs/04 §2.3·§9.1(실제 출력 줄·MDC 키 순서 미정)·05 §3·GLOSSARY 구현 사실 반영; 기존 OAuthLoginHandlerFailureIntegrationTest의 신청 전 임시 not_allowed·무세션·안전한 분류 검증→OAuthLoginHandlerIntegrationTest.createsNotAppliedSessionAndLogsSafeResult 및 rotatesAndClearsSessionForNotAppliedAccount의 무회원·신원만 저장·안전한 not_applied 로그 검증, 나머지 실패 검증 유지; 기존 시작 scope=email→startsAuthorizationWithMinimalScopeAndShortCookie의 email/profile·prompt·기존 PKCE 검증, 기존 성공·ID만 저장·회전·전체 회원 행 보존 검증은 같은 테스트에 유지하고 이름 변경 입력·세션 내 이름 부재도 확인; SessionUserFilterTest의 User principal 단언→같은 위치의 AccountPrincipal.Member 및 기존 인증·권한 없음·ID만 저장·MDC 단언 유지, MeControllerTest.returnsEmailAndStatus→returnsStatusEmailAndName 및 returnsNotAppliedIdentity, SecurityConfigurationIntegrationTest.returnsPublicFields는 name 포함한 엄격 JSON으로 갱신하고 readsNotAppliedSessionOverHttp·깨진 JDBC 세션 검증 추가, SecurityConfigurationLogoutIntegrationTest.logsOutOnlyCurrentDevice는 회원/신청 전 두 종류로 확장하며 다른 기기 보존·CSRF·쿠키 검증 유지; LoginServiceTest·LoginIdentityMigrationTest는 ExternalAccount 이름 인자만 추가해 기존 무저장·정확한 신원·미인증 선거절·기존 회원/세션 보존 검증 유지; 테스트 먼저 작성 후 미구현 컴파일 실패 확인, 지정 선별 AC 147개 및 전체 build 739개 통과(서버 테스트 707→739, 실패·오류·건너뜀 0), 아키텍처 체크리스트 확인, 커밋 없음",
+      "completed_at": "2026-11-09T02:15:46+0900"
+    },
+    {
+      "step": 2,
+      "name": "apply-and-guard",
+      "status": "completed",
+      "started_at": "2026-11-09T02:15:46+0900",
+      "summary": "본문 없는 POST /api/account/apply와 ApplyService(@Transactional) 구현: app.credit.monthly-amount를 CreditProperties로 읽어 User.apply·잔액·REFILL 기록을 같은 트랜잭션에서 생성, 기존 회원은 상태와 행·기록을 보존; UserRepository의 UserIdentityLock/UserIdentityLockImpl 조각이 EntityManager 네이티브 쿼리의 신원별 PostgreSQL 트랜잭션 advisory lock으로 동시 신청을 직렬화하고 기존 (provider, subject) unique 유지, 실제 HTTP 두 세션은 모두 성공하며 같은 세션 동시 요청도 사용자·기록 하나와 잔액=기록 합 검증(같은 세션 응답은 고정하지 않음); 커밋 후 신청 전 세션 ID 회전·신원 속성 제거·사용자 ID와 주인 색인만 저장, 순차 재신청·채움 저장 실패 롤백·안전한 로그 검증; SecurityConfiguration 한 곳의 GET /api/me·POST 신청·POST /api/auth/logout 허용 목록과 나머지 /api/**의 APPROVED 기본 제한, ACCOUNT_NOT_APPROVED(403)를 ApiErrorResponses.write로 반환, 실제 HTTP 네 상태·메서드 제한·401/CSRF 우선순위·다음 요청 승인 반영 검증; UserFixtures.approved 및 SecurityScenario.approvedSession 추가, SecurityConfigurationErrorIntegrationTest·RequestValidationIntegrationTest·RequestLogFilterIntegrationTest를 승인 픽스처로 갱신하고 기존 검증 유지; FakeCreditEntryRepository·설정 테스트 추가, docs/05 §1.2·§4와 docs/04 §7에 구현 사실 반영(계약 문장 유지); 테스트 먼저 작성 후 미구현 컴파일 실패 확인, 최종 지정 선별 AC 257개 및 전체 build 794개 통과(서버 테스트 739→794, 실패·오류·건너뜀 0), 아키텍처 체크리스트 확인, 커밋 없음",
+      "completed_at": "2026-11-09T02:25:23+0900"
+    },
+    {
+      "step": 3,
+      "name": "operator-sql",
+      "status": "completed",
+      "started_at": "2026-11-09T02:25:23+0900",
+      "summary": "deploy/sql/list-applications.sql·approve-account.sql·reject-account.sql·reopen-application.sql·delete-account.sql 다섯 파일 구현, psql -v user_id=123와 :'user_id'::bigint로 한 사람 지정; OperatorSqlIntegrationTest가 파일을 그대로 읽어 실제 Testcontainers Postgres의 psql로 실행하고 상태 조건 불일치 0행·updated_at·크레딧 보존·다른 사람 보존·credit_entries→주인 색인 세션(속성 FK CASCADE)→users 삭제 및 마지막 쓰기 실패 시 전체 롤백 검증, 승인 파일의 now()만 고정 시각으로 치환하여 서울 03:59/04:00 경계 양쪽 검증; 승인 식: (((now() AT TIME ZONE 'Asia/Seoul' - interval '4 hours')::date + 30 + time '04:00') AT TIME ZONE 'Asia/Seoul') ; V9 식: (((now() AT TIME ZONE 'Asia/Seoul' - interval '4 hours')::date + 30 + time '04:00') AT TIME ZONE 'Asia/Seoul') (문자열까지 동일); deploy/README.md 「운영자 SQL」에 root 전환 분리·컨테이너 psql·다섯 실행 명령·행 수·정원 확인 절차 추가, docs/01 §10 완료 링크; 허용 목록 환경 변수를 deploy/compose.yaml·deploy/mogum.env.example·.env.example·deploy/README.md·DeployFilesTest.java·AGENTS.md bootRun 설명에서 제거하고 docs/TEST_GUIDE.md 공용 값 갱신; 기존 inputs.dir('../deploy') 유지, 동일 AC UP-TO-DATE 확인 후 SQL 파일만 변경해 --info의 해당 파일 입력 변경 사유와 테스트 재실행 확인; TDD 최초 파일 부재·배포 env 불일치 실패 확인 후 구현, 최종 지정 선별 AC 207개 및 전체 build 811개 통과(서버 기본 테스트 794→811, 실패·오류·건너뜀 0), 아키텍처 체크리스트 확인, 커밋 없음",
+      "completed_at": "2026-11-09T02:32:41+0900"
+    },
+    {
+      "step": 4,
+      "name": "ui-foundation",
+      "status": "completed",
+      "started_at": "2026-11-09T02:32:41+0900",
+      "summary": "index.css @theme에 색(canvas/surface/surface-soft/surface-muted/border/text/text-secondary/primary/primary-hover/primary-depth/on-primary/error/google-border/google-text)·글꼴(sans/google)·글자(title/body/small/google)·자간(google)·간격(spacing/button-press)·모서리(panel/control/google)·그림자(account/button/button-pressed)·폭(account/content)·분기점(sm) 토큰 확정, 기본색 #632ce5·흰 버튼 글자 대비 6.95:1·본문/화면 바탕 대비 15.97:1·보조 글자/안내 바탕 대비 5.10:1; frontend/src/components/AccountLayout.tsx·Mogumi.tsx·Button.tsx와 각 짝 테스트 구현, frontend/src/assets/mogumi-reading.png는 원본 보존·384×351px·긴 변 384px·투명 PNG·112884바이트, UI_GUIDE §1 기준/대비·§2 토큰·§3 공통 컴포넌트/로그인 전 틀·§4 로그인·§5 모구미 규격/줄이는 명령·§6 미정 항목 작성 및 docs/README·AGENTS 문서 표와 design README 규격 안내 반영; 로그인은 모구미→서비스 소개→정원제→Google 순서, 기존 Roboto·테두리·로고 SVG·문구·오류/세션 만료 포커스·not_allowed 유지, RequireAuth·PlaceholderPage는 모양만 변경; 이전 실행의 테스트 선작성 실패 확인 후 구현 기록 확인, 화면 테스트 123개(10파일)→127개(13파일) 및 지정 test·lint·추가 build 통과, Chrome 320/390/1280px 가로 넘침 없음·외부 에셋 요청 없음·Google 버튼 규격/안내 포커스·기본 버튼 눌림/disabled/focus-visible 모양 확인, 아키텍처 체크리스트 확인, 커밋 없음",
+      "completed_at": "2026-11-09T07:12:16+0900"
+    },
+    {
+      "step": 5,
+      "name": "pre-login-screens",
+      "status": "completed",
+      "started_at": "2026-11-09T07:12:17+0900",
+      "summary": "Me를 NOT_APPLIED/APPLIED/APPROVED/REJECTED·email·name과 모르는 값 허용으로 갱신, /apply(신청)·/waiting-approval(승인 대기)·/rejected(거절됨)·/(승인된 사람의 기존 PlaceholderPage) 상태별 라우팅·직접 진입 보정, /login 유지·/privacy는 인증·서버 읽기 없는 개인정보처리방침 준비 중 자리와 돌아가기; 본문 없는 신청 1회·요청 중 버튼 잠금·성공 응답의 나 캐시 반영·서버 문구 원문과 다시 시도·로그아웃 후 캐시 제거·다른 계정 로그인은 로그아웃 완료 뒤 googleLoginUrl 이동, ACCOUNT_NOT_APPROVED는 나 재조회·모르는 상태는 기존 불러오기 실패; 공통 AccountIdentity·Button secondary 추가 및 기존 AccountLayout/Mogumi/토큰 재사용·UI_GUIDE 컴포넌트/주소/동작 반영, TERMS_REQUIRED·ACCOUNT_WAITLISTED·messages.notAllowed·LoginPage not_allowed 전용 분기 제거(옛 콜백 값은 일반 실패로 검증), RATE_LIMITED는 이번 화면과 무관한 기존 RequireAuth 안내·재시도 동작을 보존해 유지; 테스트 선작성 후 미구현 실패 확인, 화면 테스트 127개(13파일)→174개(16파일)·지정 test/lint·추가 build 통과, Chrome 320/390/1280px 네 화면·긴 이메일 줄바꿈·가로 넘침 없음·제목/키보드 포커스·외부 에셋 요청 없음·처리방침 API 호출 없음 확인, 아키텍처 체크리스트 확인·backend/deploy/docs06 변경 없음·커밋 없음",
+      "completed_at": "2026-11-09T07:20:22+0900"
+    },
+    {
+      "step": 6,
+      "name": "flaky-focus-test",
+      "status": "completed",
+      "started_at": "2026-11-09T20:33:26+0900",
+      "summary": "AccountPage.test.tsx 상태별 test.each(NOT_APPLIED/APPLIED/REJECTED)의 findByRole 뒤 포커스·document.title 단언을 같은 await waitFor로 감싸 효과를 기다리도록 수정하고 나머지 단언 유지; frontend/src/**/*.test.tsx 전체 검색에서 같은 비동기 패턴 추가 없음, LoginPage.test.tsx·PrivacyPage.test.tsx의 동기 render 뒤 효과 단언과 Button.test.tsx의 직접 focus 뒤 단언은 그대로 유지; 수정 파일 단독 20회 연속 모두 통과(매회 14개, 총 280개), 전체 화면 테스트 174→174개(16파일) 및 지정 test/lint 통과; 아키텍처 체크리스트 확인(상태 기록 index.json 외 *.test.tsx만 변경·단언 유지·재시도/고정 지연/시간 증가 없음·제품 코드 변경 없음·AGENTS.md 준수), 커밋 없음",
+      "completed_at": "2026-11-09T20:34:56+0900"
+    },
+    {
+      "step": 7,
+      "name": "enum-comments",
+      "status": "completed",
+      "summary": "UserStatus(3)·CreditEntryType(3)·LoginResult.RejectionReason(1)·ErrorCode(8)·FieldViolation.Reason(2)의 총 17개 상수와 5개 enum 타입에 한국어 한 줄 Javadoc 추가; 계정 상태·크레딧 종류는 02 §8.7 표 그대로, 표에 없는 EMAIL_NOT_VERIFIED는 LoginService.login·OAuthLoginHandler.onAuthenticationSuccess, 오류 8개는 SecurityConfiguration.apiSecurity·SessionUserFilter.doFilterInternal·ApplyService.apply·ApiExceptionHandler·ApiErrorResponses.forStatus, TOO_LONG·REQUIRED는 ApiExceptionHandler.fieldViolation의 실제 분기에서 발생 조건 확인; CONSUME·RESTORE는 현재 운영 코드의 직접 참조가 없어 표 기반 설명으로 유지; 주석·줄 나눔 외 토큰 동일 및 지정 파일 외 변경 없음(index.json 상태 기록 제외), AGENTS 금지 목록 포함 아키텍처 체크리스트 확인; 지정 backend build 통과(811개, 실패·오류·건너뜀 0), 최종 주석 정리 후 동일 AC 재실행 통과(test UP-TO-DATE), docs·테스트·동작 변경 및 커밋 없음",
+      "started_at": "2026-11-09T20:44:23+0900",
+      "completed_at": "2026-11-09T20:47:21+0900"
+    }
+  ],
+  "created_at": "2026-11-08T22:48:26+0900",
+  "completed_at": "2026-11-09T20:47:21+0900"
+}

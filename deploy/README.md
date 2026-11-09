@@ -79,7 +79,6 @@
    | `GOOGLE_REDIRECT_URI` | `https://api.{도메인}/auth/google/callback` |
    | `APP_WEB_ORIGIN` | `https://{도메인}` — 끝 `/` 없음 |
    | `APP_WEB_COOKIE_DOMAIN` | `{도메인}` — 스킴/경로 없음 |
-   | `APP_AUTH_ADMIN_EMAILS` | 로그인할 관리자 이메일, 여러 개면 쉼표 구분. 1개 이상 필수 — 비우면 Compose가 기동을 거부해 배포가 `Deployment failed.`로 끝난다 |
    | `MOGUM_BUCKET` | 2번 S3 버킷 이름, `s3://` 없음 |
 
    `APP_IMAGE`는 넣지 않는다(배포가 `app-image.ref`로 주입). `DB_URL` · `SPRING_PROFILES_ACTIVE=aws`도 Compose가 고정한다. 완료 확인: 값 누락은 편집기에서 확인하고 내용은 출력하지 않는다. 아래는 권한/도구만 확인한다. `stat` 결과는 `0:600`, Docker 활성/자동 시작은 `active`/`enabled`여야 한다. `current`와 백업 unit은 첫 성공 배포가 만든다.
@@ -191,6 +190,67 @@
 - [ ] **되돌리기 연습(선택):** 호환되는 직전 릴리스가 생기면 Actions `workflow_dispatch`에 **직전 전체 SHA**를 넣는다. 기대: 기존 이미지/묶음 지문 검사 후 **빌드/검사/push 없이 재배포**, SSM 성공 · HTTPS 200. 헬스 실패 릴리스를 일부러 만들 필요는 없다. Flyway는 되돌아가지 않는다([롤백 범위](#보관과-롤백-범위)).
 
 - [ ] **journald 로그 · 요청 추적:** 성공 배포 뒤 SSM에서 `timedatectl`이 `Time zone: Asia/Seoul`을 보이고 `docker logs --tail 20 mogum-postgres-1`의 로그 줄이 `KST`인지 확인한다. 이어 `systemd-analyze cat-config systemd/journald.conf`에 `Storage=persistent` · `SystemMaxUse=500M` · `MaxRetentionSec=13day` · `MaxFileSec=1day`가 보이는지 확인한다. journald 전환 후 다음 배포에서 `journalctl CONTAINER_NAME=mogum-backend-1`에 **배포 전 컨테이너의 로그가 남아 있고**, `docker logs --tail 100 mogum-backend-1`도 동작해야 한다. 브라우저 개발자 도구 Network에서 응답의 `X-Request-Id`를 읽고 그 값으로 해당 요청의 접근 줄을 찾는다. 줄 시각이 `+09:00`이며 이메일 · 쿼리가 없는지 확인한다([로그 보기](#로그-보기)). 최초 전환 직전의 json-file 로그는 보존되지 않는다. **서버에서의 실제 동작은 아직 확인하지 않았다.**
+
+## 운영자 SQL
+
+신청 목록 · 승인 · 거절 · 거절 풀기 · 요청받은 계정 지우기는 [sql/](./sql/)의 다섯 파일로 실행한다(ADR-060). 승인 전에 **매번 신청 목록의 `approved_count`와 대상 ID · 이메일 · 이름 · 상태를 확인**하고, 승인 뒤에도 정원(운영자 포함 10명)을 지킨다. 정원 검사는 운영자가 하므로 승인 작업을 겹쳐 실행하지 않는다.
+
+서버의 SSM 세션에서 먼저 root로 전환한다. 권한 전환은 이 블록만 실행한다.
+
+```bash
+sudo -i
+```
+
+전환 뒤 아래를 실행한다. [운영 확인 목록](#운영-확인-목록)과 같이 실행 중인 Postgres 컨테이너 안의 `psql -X … -d mogum`을 쓴다. SQL 파일은 서버의 현재 릴리스에서 표준 입력으로 전달하므로 컨테이너에 파일을 설치하거나 호스트에 psql을 설치할 필요가 없다.
+
+```bash
+postgres=$(docker ps --filter label=com.docker.compose.project=mogum \
+  --filter label=com.docker.compose.service=postgres --format '{{.ID}}')
+[[ -n $postgres && $postgres != *$'\n'* ]] || exit 1
+docker exec -i "$postgres" sh -c \
+  'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d mogum -f -' \
+  < /opt/mogum/current/deploy/sql/list-applications.sql
+```
+
+이하 명령은 **하려는 동작 하나만 골라 실행**한다. 각 명령의 `user_id=123`에서 `123`을 목록에서 확인한 사용자 ID 하나로 바꾼다. `psql -v user_id=…`가 파일의 `:'user_id'`를 SQL 문자열로 안전하게 인용하고, SQL이 `bigint`로 바꾼다. 이메일로 대상을 고르지 않는다.
+
+승인(`APPLIED`만):
+
+```bash
+docker exec -i "$postgres" sh -c \
+  'psql -X -v ON_ERROR_STOP=1 -v user_id=123 -U "$POSTGRES_USER" -d mogum -f -' \
+  < /opt/mogum/current/deploy/sql/approve-account.sql
+```
+
+거절(`APPLIED`만):
+
+```bash
+docker exec -i "$postgres" sh -c \
+  'psql -X -v ON_ERROR_STOP=1 -v user_id=123 -U "$POSTGRES_USER" -d mogum -f -' \
+  < /opt/mogum/current/deploy/sql/reject-account.sql
+```
+
+거절 풀기(`REJECTED` → `APPLIED`):
+
+```bash
+docker exec -i "$postgres" sh -c \
+  'psql -X -v ON_ERROR_STOP=1 -v user_id=123 -U "$POSTGRES_USER" -d mogum -f -' \
+  < /opt/mogum/current/deploy/sql/reopen-application.sql
+```
+
+요청받은 계정 지우기(`APPLIED` · `REJECTED`만):
+
+```bash
+docker exec -i "$postgres" sh -c \
+  'psql -X -v ON_ERROR_STOP=1 -v user_id=123 -U "$POSTGRES_USER" -d mogum -f -' \
+  < /opt/mogum/current/deploy/sql/delete-account.sql
+```
+
+변경 결과는 `UPDATE 1`(해당 사용자 변경), `UPDATE 0`(ID 없음 또는 상태 조건 불일치)으로 확인한다. 삭제는 잠근 사용자 ID 뒤에 `DELETE n`이 크레딧 기록 · 로그인 세션 · 사용자 순으로 나오고 마지막에 `COMMIT`이 나온다. 조건에 맞지 않으면 세 DELETE가 모두 0이다. 세션은 `spring_session.principal_name`이 사용자 ID의 문자열인 행만 지우며, `spring_session_attributes`는 V3의 `ON DELETE CASCADE` FK로 함께 지워진다. 삭제 도중 오류가 나면 `ON_ERROR_STOP=1`로 psql이 종료되어 연결의 미커밋 트랜잭션 전체가 롤백된다. 승인된 사람은 이 파일로 지우지 않고 탈퇴 흐름(TASK 12)을 쓴다.
+
+승인은 상태 · 승인 시각 · 다음 채움 시각 · 수정 시각을 쓰고 크레딧이나 채움 기록은 바꾸지 않는다. 다음 채움은 서울 새벽 4시를 경계로 센 승인한 날 + 30일의 04:00이며, V9의 기존 회원 이전과 같은 식이다. 상태 변경 파일은 `updated_at = now()`를 함께 쓴다. 계약은 [02 §8.2](../docs/02-domain-data.md#82-계정--크레딧) · [§8.6](../docs/02-domain-data.md#86-지우는-순서)를 따른다.
+
+`OperatorSqlIntegrationTest`가 이 파일들을 읽어 Testcontainers Postgres 안의 psql로 그대로 실행한다. 시각 경계 시험에서만 읽은 승인 파일의 `now()`를 고정 시각으로 바꿔 서울 03:59와 04:00을 확인한다. 서버에서 실제 계정을 변경하는 운영 검증은 아직 수행하지 않았다.
 
 ## 첫 배포 때 확인
 

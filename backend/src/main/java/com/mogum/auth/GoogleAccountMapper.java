@@ -19,7 +19,10 @@ public final class GoogleAccountMapper {
                 || !(email instanceof String address) || address.isBlank()) {
             throw invalidAccount();
         }
-        return new ExternalAccount("google", subject, address,
+        Object name = principal.getAttribute("name");
+        String accountName = name instanceof String value && !value.isBlank()
+                ? value : address.split("@", 2)[0];
+        return new ExternalAccount("google", subject, address, accountName,
                 Boolean.TRUE.equals(principal.getAttribute("email_verified")));
     }
 

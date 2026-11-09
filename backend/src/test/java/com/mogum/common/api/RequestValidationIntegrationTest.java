@@ -34,7 +34,7 @@ class RequestValidationIntegrationTest {
 
     @BeforeEach
     void prepareUserRequest() {
-        var user = users.save(UserFixtures.user("validation@example.com"));
+        var user = users.save(UserFixtures.approved("validation@example.com"));
         authenticated = requests.asUser(user.getId());
         var cookie = new TestSessions(sessions).create(user.getId());
         sessionClient = requests.anonymous().mutate().defaultCookie("SESSION", cookie.getValue()).build();

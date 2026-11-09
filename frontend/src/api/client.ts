@@ -7,8 +7,7 @@ export type ApiErrorCode =
   | 'FIELD_INVALID'
   | 'INTERNAL_ERROR'
   | 'RATE_LIMITED'
-  | 'TERMS_REQUIRED'
-  | 'ACCOUNT_WAITLISTED'
+  | 'ACCOUNT_NOT_APPROVED'
   // Preserve unknown server codes while keeping known codes available for completion.
   | (string & Record<never, never>)
 

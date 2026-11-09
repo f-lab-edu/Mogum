@@ -1,4 +1,9 @@
 import type { NavigateFunction } from 'react-router-dom'
+import { googleLoginUrl } from '../api/client'
+
+export function openGoogleLogin() {
+  window.location.assign(googleLoginUrl())
+}
 
 const returnPathKey = 'mogum:return-path'
 // Historical UI state for U1 wording only; this never determines authentication.

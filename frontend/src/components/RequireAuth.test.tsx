@@ -9,7 +9,7 @@ import { redirectToLogin, rememberReturnPath, takeReturnPath } from '../lib/auth
 import LoginPage from '../pages/LoginPage'
 import RequireAuth from './RequireAuth'
 
-const me = { email: 'admin@example.com', status: 'ACTIVE', role: 'ADMIN', termsAgreed: false, waitlistPosition: null }
+const me = { email: 'admin@example.com', status: 'APPROVED', name: '민서' }
 
 function ProtectedContent() {
   const client = useQueryClient()
@@ -141,6 +141,8 @@ test('다시 시도는 응답을 기다리는 동안 잠겨 추가 요청을 보
   fireEvent.click(screen.getByRole('button', { name: '사용자 다시 확인' }))
   const button = await screen.findByRole('button', { name: '다시 시도' })
   expect(button).toBeEnabled()
+  expect(button).toHaveAttribute('type', 'button')
+  expect(button).toHaveClass('bg-primary', 'shadow-button', 'rounded-control')
 
   let resolve!: (response: Response) => void
   vi.mocked(fetch).mockImplementation(() => new Promise((done) => { resolve = done }))

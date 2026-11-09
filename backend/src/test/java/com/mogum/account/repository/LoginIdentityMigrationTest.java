@@ -41,6 +41,10 @@ class LoginIdentityMigrationTest {
             var jdbc = database.jdbc;
 
             // when
+            database.migrateTo("8");
+            // V7의 초기 Auditing 값은 V9가 실제 갱신하기 전에 확인한다.
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM users WHERE updated_at = created_at", Integer.class))
+                    .isEqualTo(2);
             database.flyway().migrate();
 
             // then
@@ -49,8 +53,6 @@ class LoginIdentityMigrationTest {
                     WHERE table_schema = ? AND table_name = 'user_identities'
                     """, Integer.class, database.schema)).isZero();
             assertThat(database.users()).isEqualTo(legacy.users());
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM users WHERE updated_at = created_at", Integer.class))
-                    .isEqualTo(2);
             assertThat(jdbc.queryForObject("""
                     SELECT count(*) FROM information_schema.columns
                     WHERE table_schema = ? AND table_name = 'users' AND column_name = 'updated_at'
@@ -111,7 +113,7 @@ class LoginIdentityMigrationTest {
             try (var app = database.startApplication()) {
                 long id = ((Number) legacy.users().getFirst().get("id")).longValue();
                 var login = app.getBean(LoginService.class);
-                var account = new ExternalAccount("google", "Original-Sub", "new@example.com", true);
+                var account = new ExternalAccount("google", "Original-Sub", "new@example.com", "Google name", true);
 
                 // when
                 var result = login.login(account);
@@ -184,7 +186,7 @@ class LoginIdentityMigrationTest {
                            ('other-sub', 'old@example.com', 'ACTIVE', 'ADMIN', NULL, NULL, ?)
                     """, java.sql.Timestamp.from(created.plusSeconds(10)), java.sql.Timestamp.from(created),
                     java.sql.Timestamp.from(created));
-            var users = jdbc.queryForList("SELECT id, email, status, role, terms_agreed_at, terms_version, created_at FROM users ORDER BY id");
+            var users = jdbc.queryForList("SELECT id, email, created_at FROM users ORDER BY id");
             String primaryId = UUID.randomUUID().toString();
             String sessionId = UUID.randomUUID().toString();
             long now = System.currentTimeMillis();
@@ -206,7 +208,7 @@ class LoginIdentityMigrationTest {
         }
 
         private List<Map<String, Object>> users() {
-            return jdbc.queryForList("SELECT id, email, status, role, terms_agreed_at, terms_version, created_at FROM users ORDER BY id");
+            return jdbc.queryForList("SELECT id, email, created_at FROM users ORDER BY id");
         }
 
         private void migrateTo(String version) {
@@ -225,7 +227,7 @@ class LoginIdentityMigrationTest {
                     "--spring.datasource.username=" + POSTGRES.getUsername(),
                     "--spring.datasource.password=" + POSTGRES.getPassword(),
                     "--spring.flyway.default-schema=" + schema, "--spring.flyway.schemas=" + schema,
-                    "--app.auth.admin-emails=new@example.com", "--app.web.cookie-domain=",
+                    "--app.web.cookie-domain=",
                     "--debug=false", "--logging.level.org.springframework=INFO");
         }
 

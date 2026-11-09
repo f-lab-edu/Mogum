@@ -10,8 +10,8 @@ afterEach(() => {
   sessionStorage.clear()
 })
 
-test('서버가 돌려준 현재 사용자 필드를 Query에 보관한다', async () => {
-  const me = { email: 'admin@example.com', status: 'ACTIVE', role: 'ADMIN', termsAgreed: false, waitlistPosition: null }
+test.each(['NOT_APPLIED', 'APPLIED', 'APPROVED', 'REJECTED', 'FUTURE_STATUS'])('서버의 %s 상태와 확장된 필드를 오류 없이 읽는다', async (status) => {
+  const me = { email: 'admin@example.com', status, name: '민서', futureField: '새로운 칸' }
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: me }))))
   const client = createAuthQueryClient(vi.fn())
   const { result } = renderHook(useMe, { wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> })

@@ -1,6 +1,7 @@
 package com.mogum.auth;
 
 import com.mogum.account.repository.UserRepository;
+import com.mogum.account.domain.UserStatus;
 import com.mogum.account.service.LoginService;
 import com.mogum.common.api.ApiErrorResponses;
 import com.mogum.common.api.ErrorCode;
@@ -12,6 +13,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -90,6 +92,8 @@ public class SecurityConfiguration {
         var oauthRequests = new CookieAuthorizationRequestRepository(registrations, mapper, clock);
         var loginHandler = new OAuthLoginHandler(login, new GoogleAccountMapper(), web.origin(), oauthRequests);
         var resolver = new DefaultOAuth2AuthorizationRequestResolver(registrations, "/auth");
+        resolver.setAuthorizationRequestCustomizer(builder -> builder
+                .additionalParameters(parameters -> parameters.put("prompt", "select_account")));
         var getOnlyResolver = new OAuth2AuthorizationRequestResolver() {
             @Override
             public OAuth2AuthorizationRequest resolve(jakarta.servlet.http.HttpServletRequest request) {
@@ -136,6 +140,8 @@ public class SecurityConfiguration {
                                         new InsufficientAuthenticationException("Login required"));
                             } else if (exception instanceof CsrfException) {
                                 ApiErrorResponses.write(response, mapper, ErrorCode.CSRF_INVALID, null);
+                            } else if (request.getRequestURI().startsWith(request.getContextPath() + "/api/")) {
+                                ApiErrorResponses.write(response, mapper, ErrorCode.ACCOUNT_NOT_APPROVED, null);
                             } else {
                                 ApiErrorResponses.write(response, mapper, ErrorCode.NOT_FOUND, null);
                             }
@@ -143,7 +149,12 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(requests -> requests.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET, "/auth/google", "/auth/google/callback").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
-                        .requestMatchers("/api/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/me").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/account/apply", "/api/auth/logout").authenticated()
+                        .requestMatchers("/api/**").access((authentication, context) ->
+                                new AuthorizationDecision(
+                                        authentication.get().getPrincipal() instanceof AccountPrincipal.Member member
+                                                && member.status() == UserStatus.APPROVED))
                         .anyRequest().denyAll())
                 .logout(logout -> logout.logoutRequestMatcher(logoutRequest)
                         .logoutSuccessHandler((request, response, authentication) -> response.setStatus(204)));
