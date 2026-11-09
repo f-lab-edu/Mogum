@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "course-entities",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-10T07:02:29+0900",
+      "summary": "course.domain에 AuditedEntity를 상속하는 Roadmap·Course·Lesson·Material과 RoadmapStatus·CourseStatus·Level·Purpose 추가; 팩토리 Roadmap.plan(long userId, LearningInput input, String title, String description), Course.single(long userId, LearningInput input, String title), Course.inRoadmap(Roadmap roadmap, int position, String title, String planDescription, List<PlannedConcept> planConcepts), Lesson.listed(Course course, int position, String title, String description, List<PlannedConcept> concepts), Material.write(Lesson lesson, String body); RoadmapRepository·CourseRepository·LessonRepository·MaterialRepository는 Repository<T, Long>만 상속하고 <S extends T> S save(S entity)·Optional<T> findById(Long id)만 선언; LearningInput(String topic, Level level, String levelOther, Purpose purpose, String purposeOther, String memo)은 변경 메서드 없는 @Embeddable; PlannedConcept(String name, String definition) record의 List는 @JdbcTypeCode(SqlTypes.JSON)+jsonb로 매핑, Hibernate 7.4.5 소스와 Gradle 의존성 및 실제 매퍼 확인 후 application.yml의 spring.jpa.properties.hibernate.type.json_format_mapper=jackson3으로 Jackson 3.1.5 명시(FSRS 테스트 의존성의 Jackson 2 기본 우선 선택 방지), 한국어·순서·name/definition 키 PostgreSQL 왕복 검증; 픽스처 RoadmapFixtures.roadmap(long userId)·roadmap(long userId, LearningInput input, String title, String description), CourseFixtures.single(long userId)·single(long userId, LearningInput input, String title)·inRoadmap(Roadmap roadmap, int position, String title, String planDescription, List<PlannedConcept> planConcepts), LessonFixtures.lesson(Course course, int position)·lesson(Course course, int position, String title, String description, List<PlannedConcept> concepts), MaterialFixtures.material(Lesson lesson, String body)는 미저장 엔티티 반환; 팩토리 전 필드·입력 기타/메모 없음·LAZY·TestClock Auditing 검증, docs/04 §2.3 구현 사실 추가; AC 두 명령 통과, 서버 테스트 856→873(17개 추가, 실패·건너뜀 0), 마이그레이션·계약 규칙 변경 및 mastery_report 매핑 없음.",
+      "completed_at": "2026-11-10T07:08:37+0900"
     },
     {
       "step": 2,
