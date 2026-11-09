@@ -1,0 +1,8 @@
+{
+  "project": "Mogum",
+  "phase": "3b-ci-checks",
+  "steps": [
+    { "step": 0, "name": "ci-workflow", "status": "pending" },
+    { "step": 1, "name": "sonar-coverage", "status": "pending" }
+  ]
+}
