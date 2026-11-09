@@ -40,6 +40,10 @@
       "dir": "4-account",
       "status": "completed",
       "completed_at": "2026-11-09T20:47:21+0900"
+    },
+    {
+      "dir": "5-learning-model",
+      "status": "pending"
     }
   ]
 }

@@ -1,0 +1,9 @@
+{
+  "project": "Mogum",
+  "phase": "5-learning-model",
+  "steps": [
+    { "step": 0, "name": "learning-schema", "status": "pending" },
+    { "step": 1, "name": "course-entities", "status": "pending" },
+    { "step": 2, "name": "card-entities", "status": "pending" }
+  ]
+}
