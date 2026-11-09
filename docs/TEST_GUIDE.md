@@ -26,7 +26,7 @@
 - **클래스** — `@IntegrationTest` 만 `*IntegrationTest`, 나머지는 모두 `*Test`. `IT` 약어는 쓰지 않는다. 대상 클래스 이름으로 시작해 TDD 가드의 짝 규칙(`Foo*Test.java`)에 맞춘다 — `LoginService` → `LoginServiceTest` · `LoginServiceConcurrencyIntegrationTest`.
 - **메서드** — 영어 camelCase 로 동작을 서술한다(`rejectsUnverifiedEmailBeforeQueryingDatabase`). `should` 접두 · 밑줄 · `대상메서드_상황_결과` 틀은 쓰지 않는다.
 - **`@DisplayName`** — 모든 테스트 메서드에 한국어 문장으로 단다. 파라미터 테스트는 `@ParameterizedTest(name = …)` 로 값이 보이게 한다.
-- **`@Nested` 는 쓰지 않는다.** 클래스가 커지면 기능별로 파일을 나눈다(`CurriculumOwnershipRepositoryTest` · `LessonOrderRepositoryTest`). 겹치는 `@BeforeEach` 는 given 일부를 본문 밖으로 숨긴다.
+- **`@Nested` 는 쓰지 않는다.** 클래스가 커지면 기능별로 파일을 나눈다(`CourseSchemaRepositoryTest` · `CardSchemaRepositoryTest`). 겹치는 `@BeforeEach` 는 given 일부를 본문 밖으로 숨긴다.
 
 ## 3. 본문
 

@@ -28,7 +28,6 @@
 │   │   ├── common/                  # api(성공 · 오류 응답) · time · logging · persistence — 그대로 쓴다
 │   │   ├── auth/                    # 구글 로그인 · 세션 → 사용자 — 그대로 쓴다
 │   │   ├── account/                 # 사용자 · 로그인 → 신청 · 승인 · 거절됨으로 바꾼다(ADR-147) · 크레딧도 여기서(ADR-153)
-│   │   ├── curriculum/              # 옛 커리큘럼 · 그룹 · 단계 · 강의 → 버리고 course · card 로 새로 만든다(ADR-148)
 │   │   ├── course/                  # 로드맵 · 코스 · 강의 · 강의 자료 — 02 §8.3. 입력 칸 묶음도 여기(job 이 함께 쓴다)
 │   │   ├── card/                    # 카드 · 카드의 개념 연결 · 복습 · 개념 사전 — 02 §8.4. 강의는 ID 값으로 가리킨다
 │   │   ├── job/                     # 만드는 작업 받기 · 읽기 · 다시 시도 · 버리기(ADR-143)
@@ -66,7 +65,7 @@
 | `frontend/` | 스택 · 로그인 확인 · 요청 도구 | 화면 자체는 06 대로 새로 만든다 | — |
 
 - **계정**(ADR-147) — 정해 둔 이메일만 들어오던 것을 누구나 신청 · 운영자가 승인 · 거절로 바꾼다. 역할은 지운다 — 운영자는 DB 에서 직접 한다(ADR-060). `4-account` step 0에서 `V9__migrate_account_schema.sql`로 옛 상태를 옮기고 이름 · 크레딧 잔액 · 채움 기록을 넣었다. `User.apply(provider, subject, email, name, creditBalance)` · `CreditEntry.refill(user, amount)`와 `CreditEntryRepository`를 두었고, 허용 목록 설정 · 역할 · 약관 칸은 제거했다. 로그인은 기존 회원 ID 또는 `LoginResult.NotApplied(ExternalAccount)`를 반환하며 행을 만들지 않는다. step 1에서 신청 전 콜백은 구글 신원만 JDBC 세션에 담고 화면의 `/`로 보내도록 바꿨다. 요청 인증은 `AccountPrincipal`로 통일하고 권한 없이 구성한다. 「나」의 구현 경로와 칸은 [05 §3](./05-api.md#3-읽기--화면마다-한-번)에 적었다.
-- **커리큘럼 모델**(ADR-148) — 단계를 두지 않고(ADR-070) 상태(ADR-136) · 입력(ADR-137) · 강의 한 줄(ADR-020 · ADR-138)이 달라 새로 만든다. 운영에 적용한 마이그레이션은 고치지 않고 새 마이그레이션으로 지우고 만든다 — 커리큘럼을 만드는 API 가 아직 없어 운영 DB 에 커리큘럼 데이터가 없다. 패키지 이름은 GLOSSARY, 테이블은 [02 §8](./02-domain-data.md#8-테이블)을 따른다.
+- **커리큘럼 모델**(ADR-148) — 단계를 두지 않고(ADR-070) 상태(ADR-136) · 입력(ADR-137) · 강의 한 줄(ADR-020 · ADR-138)이 달라 새로 만든다. 운영에 적용한 마이그레이션은 고치지 않고 새 마이그레이션으로 지우고 만든다 — 커리큘럼을 만드는 API 가 아직 없어 운영 DB 에 커리큘럼 데이터가 없다. 패키지 이름은 GLOSSARY, 테이블은 [02 §8](./02-domain-data.md#8-테이블)을 따른다. `5-learning-model` step 0에서 `V10__create_learning_model.sql`로 옛 네 테이블을 지우고 `roadmaps` · `courses` · `lessons` · `materials` · `cards` · `card_concepts` · `reviews` · `concepts` 여덟 테이블을 만들었다. 옛 `curriculum` 패키지의 코드와 테스트도 제거했다.
 
 ## 3. 배포
 
