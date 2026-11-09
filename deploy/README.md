@@ -439,6 +439,38 @@ docker logs --tail 50 mogum-postgres-1
 
 불변식과 명령 대체 테스트는 `WorkflowFilesTest`로 실행한다. 액션의 릴리스 · 커밋 SHA와 입력은 공식 저장소에서 확인했다(SHA는 2026-10-26 GitHub API로 각 `v5` 태그가 가리키는 커밋으로 확인). `WorkflowFilesTest`는 고정 SHA · 릴리스 주석과 주요 입력을 검사한다. [GitHub 러너 표](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories)에서 `ubuntu-24.04-arm`의 공개 저장소 무료 제공을 확인했고, [arm64 이미지 도구 목록](https://github.com/actions/partner-runner-images/blob/main/images/arm-ubuntu-24-image.md)에서 Docker · AWS CLI · jq · curl을 확인했다. 스크립트는 Bash · GNU 기본 도구 · tar · grep도 사용하며 `rg`에 의존하지 않는다. SSM 옵션/결과 필드는 [send-command](https://docs.aws.amazon.com/cli/latest/reference/ssm/send-command.html) · [get-command-invocation](https://docs.aws.amazon.com/cli/latest/reference/ssm/get-command-invocation.html) 공식 문서와 대조했다. 실제 GitHub Actions · AWS 실행은 아직 수행하지 않았다. 실제 실행 확인은 [첫 배포 때 확인](#첫-배포-때-확인) 1~3 · 8~13번에 모았다.
 
+## PR 검사
+
+[ci.yml](../.github/workflows/ci.yml)의 `CI`는 변경 경로와 상관없이 모든 PR에서 백엔드와 화면을 항상 검사한다. 경로 필터로 필수 검사 자체가 생기지 않으면 병합이 「대기 중」으로 막히므로 필터나 바뀐 파일을 판별하는 단계를 두지 않는다. 같은 PR의 새 실행은 이전 실행을 취소한다. 세 job은 모두 `ubuntu-24.04`에서 돌며 최상위 권한은 `contents: read` 하나다. Secrets · Variables · 배포 환경은 사용하지 않는다.
+
+| job | 명령과 결과 | 제한 시간 |
+|---|---|---|
+| `backend` | Temurin Java 21 · Gradle 설정 후 `./backend/gradlew -p backend test`. 실패할 때만 `backend/build/reports/tests/test`를 아티팩트로 7일 보관한다 | 30분 |
+| `frontend` | [frontend/.nvmrc](../frontend/.nvmrc)의 Node 22와 npm 캐시를 사용한다. `frontend/`에서 `npm ci` → `npm run lint` → `npm run test` → `npm run build`를 각각 별도 단계로 실행한다 | 15분 |
+| `ci-ok` | 두 job의 결과를 환경 변수로 받아 둘 다 `success`일 때만 통과하고, 그 외에는 `exit 1`로 실패한다 | 5분 |
+
+필수 상태 검사로 걸 이름은 **`ci-ok` 하나**다. job id가 검사 이름이 되도록 별도 `name`을 두지 않는다. `needs: [backend, frontend]`와 **`if: always()`**를 함께 유지한다. GitHub는 건너뛴 필수 검사를 통과로 친다. `always()`가 없으면 선행 job 실패 때 `ci-ok`가 건너뛰어져 실패한 PR이 병합될 수 있다. `failure` · `cancelled` · `skipped`도 모두 실패로 처리한다.
+
+러너에서 직접 쓰는 명령(S9)은 **Bash · `java`(setup-java) · Gradle Wrapper · `node` · `npm`**이며 그 밖의 명령 도구에 기대지 않는다. 백엔드 Testcontainers는 러너의 Docker 데몬을 사용한다. PR에서는 `imageTest`나 Docker 이미지 빌드를 실행하지 않는다. 병합 뒤 `deploy.yml`의 `build`(테스트 포함)와 같은 이미지 `imageTest`는 최종 확인으로 유지한다.
+
+액션은 아래 전체 40자 소문자 SHA로 고정하고 `uses:` 줄 끝에 릴리스를 주석으로 남긴다. **2026-11-09 GitHub API 조회값**이며, 확인 명령은 `gh api repos/{저장소}/commits/{태그} --jq .sha`다. `gradle/actions/setup-gradle`의 저장소는 `gradle/actions`다. 버전을 올릴 때는 태그의 SHA를 다시 확인하고 워크플로 · 주석 · 이 표 · 테스트 기대값을 함께 바꾼다.
+
+| 액션 | SHA | 릴리스 |
+|---|---|---|
+| `actions/checkout` | `fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09` | v5.1.0 |
+| `actions/setup-java` | `b6effb05e454b25005698d916606bdc6ffcbf961` | v5.7.0 |
+| `gradle/actions/setup-gradle` | `3f5f9adaf7d9fecd50b5935e54106014257a94e6` | v6.4.0 |
+| `actions/setup-node` | `949feb2413d6458794dcd2491c4babbbce0c15c1` | v7.1.0 |
+| `actions/upload-artifact` | `cf430e030ddbb5b0abf93d22962f4752f3646cd9` | v7.0.2 |
+
+불변식은 `CiWorkflowFilesTest`가 SnakeYAML로 검사하며, 집계 스크립트도 두 결과의 성공 · 실패 · 취소 · 건너뜀 조합으로 실행해 확인한다. 워크플로 폴더와 `frontend/.nvmrc`를 Gradle `test`의 입력으로 등록해 이 파일만 바뀌어도 검사를 다시 실행한다.
+
+**아직 하지 않은 것**은 다음 셋이다.
+
+1. 저장소 룰셋 **`main — PR 로만 병합`**에 `ci-ok`를 필수 상태 검사로 거는 일 — 사람이 첫 실행을 본 뒤 건다.
+2. 실제 GitHub Actions 실행.
+3. `frontend/.nvmrc`의 22가 Vercel 프로젝트의 Node.js 버전과 같은지 확인.
+
 ## Vercel(화면)
 
 프로젝트는 **2026-10-25에 Hobby 팀에서 이미 만들었다.** 다시 만들 때도 Vercel의 Git 가져오기에서 이 GitHub 저장소 **`f-lab-edu/Mogum`**을 연결하고 다음 값을 사용한다. 운영 브랜치는 **`main`**이며 병합마다 Vercel Git 연동이 화면을 빌드 · 배포한다([04 §3](../docs/04-jobs-and-cost.md#3-배포)).

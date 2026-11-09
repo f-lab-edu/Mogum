@@ -63,6 +63,7 @@ tasks.named('test') {
     exclude 'com/mogum/AppImageTest.class'
     inputs.dir('../deploy')
     inputs.dir('../.github/workflows')
+    inputs.file('../frontend/.nvmrc')
 }
 
 def suppliedAppImage = providers.gradleProperty('appImage')
