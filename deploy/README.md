@@ -471,6 +471,16 @@ docker logs --tail 50 mogum-postgres-1
 2. 실제 GitHub Actions 실행.
 3. `frontend/.nvmrc`의 22가 Vercel 프로젝트의 Node.js 버전과 같은지 확인.
 
+### SonarCloud · 백엔드 커버리지
+
+[Sonar 워크플로](../.github/workflows/sonarcloud-analyze.yml)는 같은 job에서 스캔 전에 Java 21 · Gradle을 준비하고 `./backend/gradlew -p backend test`를 실행한다. 따라서 PR마다 백엔드 테스트가 CI와 Sonar에서 **두 번** 돈다. 테스트 단계의 `continue-on-error: true`로 실패해도 스캔은 계속하며, 테스트 실패로 병합을 막는 검사는 `ci-ok`다.
+
+JaCoCo는 Gradle 9.1.0의 **기본 버전 0.8.13**을 사용한다. `test.finalizedBy(jacocoTestReport)`로 테스트가 실패해도 리포트를 만들며, XML만 켜고 HTML · CSV는 끈다. `imageTest`에는 리포트를 붙이지 않는다. 실제 생성 경로는 **`backend/build/reports/jacoco/test/jacocoTestReport.xml`**이며, 클래스 출력은 `backend/build/classes/java/main` · `backend/build/classes/java/test`다. 모두 기본 출력 경로를 그대로 사용하고 [sonar-project.properties](../sonar-project.properties)에 저장소 루트 기준으로 적었다. 이 설정 파일도 Gradle `test`의 입력이며, `SonarAnalysisFilesTest`가 워크플로 순서 · 추가 액션 SHA와 릴리스 주석 · 실패 후 스캔 계속 · 설정 값을 검사한다.
+
+백엔드 테스트 코드는 `sonar.tests=backend/src/test`로 구분하고 운영 코드 색인에서 `backend/src/test/**`를 제외해 이중 색인을 막는다. `sonar.sources`는 따로 정하지 않아 저장소 전체 분석 범위를 유지한다. 화면 테스트는 따로 구분하지 않고, **`sonar.coverage.exclusions=frontend/**`**로 화면을 커버리지 계산에서 뺀다. 품질 게이트의 커버리지 조건은 **`new_coverage`가 0 미만일 때만 실패**다([2026-11-09 API 조회 · PR #23](https://sonarcloud.io/api/qualitygates/project_status?projectKey=f-lab-edu_Mogum&pullRequest=23)).
+
+Sonar 워크플로는 **F-Lab 템플릿의 기존 줄을 유지**한다. 추가한 `setup-java` · `setup-gradle` 두 액션만 위 표의 SHA와 릴리스 주석으로 고정했고, 기존 `actions/checkout@v3` · `SonarSource/sonarcloud-github-action@master`는 그대로 둔다. **아직 확인하지 않은 것**은 실제 PR의 Sonar 실행에서 백엔드 테스트 파일이 테스트로 색인되는지와 커버리지 값이 올라가는지다.
+
 ## Vercel(화면)
 
 프로젝트는 **2026-10-25에 Hobby 팀에서 이미 만들었다.** 다시 만들 때도 Vercel의 Git 가져오기에서 이 GitHub 저장소 **`f-lab-edu/Mogum`**을 연결하고 다음 값을 사용한다. 운영 브랜치는 **`main`**이며 병합마다 Vercel Git 연동이 화면을 빌드 · 배포한다([04 §3](../docs/04-jobs-and-cost.md#3-배포)).

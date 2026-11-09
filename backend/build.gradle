@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'jacoco'
     id 'org.springframework.boot' version '4.1.1'
 }
 
@@ -61,9 +62,19 @@ tasks.withType(Test).configureEach {
 
 tasks.named('test') {
     exclude 'com/mogum/AppImageTest.class'
+    finalizedBy tasks.named('jacocoTestReport')
     inputs.dir('../deploy')
     inputs.dir('../.github/workflows')
     inputs.file('../frontend/.nvmrc')
+    inputs.file('../sonar-project.properties')
+}
+
+tasks.named('jacocoTestReport') {
+    reports {
+        xml.required = true
+        html.required = false
+        csv.required = false
+    }
 }
 
 def suppliedAppImage = providers.gradleProperty('appImage')
