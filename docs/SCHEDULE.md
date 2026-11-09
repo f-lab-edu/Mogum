@@ -11,7 +11,7 @@
 | **목표** | 02 ~ 06 에 정한 것 모두 · 공개 전 품질 점검 통과 — 정원제로 공개할 수 있는 상태(ADR-066) |
 | **밀리면** | **범위를 지키고 날짜를 미룬다**(ADR-151) |
 | **투입** | 1인 · 주 20시간 안팎으로 가정했다 — 사용자 확인(2026-11-08) |
-| **이미 끝난 것** | `0-skeleton` · `1-auth` · `2-deploy` · `2a-api-response` · `2b-ops-logging` · `3-curriculum-model` · `3a-test-conventions` — 무엇을 그대로 쓰고 바꾸고 버리는지는 [04 §2.3](./04-jobs-and-cost.md#23-기존-구현--그대로--바꾼다--버린다) |
+| **이미 끝난 것** | `0-skeleton` · `1-auth` · `2-deploy` · `2a-api-response` · `2b-ops-logging` · `3-curriculum-model` · `3a-test-conventions` · `3b-ci-checks`(PR 검사 · Sonar 커버리지 — [deploy 절차서 「PR 검사」](../deploy/README.md#pr-검사)) — 무엇을 그대로 쓰고 바꾸고 버리는지는 [04 §2.3](./04-jobs-and-cost.md#23-기존-구현--그대로--바꾼다--버린다) |
 
 ## 2. 마일스톤
 
@@ -24,7 +24,7 @@
 ## 3. 순서
 
 **한 바퀴가 먼저 돌게 쌓는다**(ADR-150). 각 TASK 는 그 기능의 API 와 화면까지 함께 만든다. TASK 이름(영어)은 시작할 때 정한다.
-**번호는 `phases/` 폴더 번호다** — 끝난 phase(`0-skeleton` ~ `3a-test-conventions`)에 이어 4 부터 매긴다. 폴더는 `{번호}-{TASK 이름}`, 수정 phase 는 `{번호}a-…` 다. 문서 교체는 phase 가 아니라 번호가 없다.
+**번호는 `phases/` 폴더 번호다** — 끝난 phase(`0-skeleton` ~ `3b-ci-checks`)에 이어 4 부터 매긴다. 폴더는 `{번호}-{TASK 이름}`, 수정 phase 는 `{번호}a-…` 다. 문서 교체는 phase 가 아니라 번호가 없다.
 
 | 번호 | TASK | 하는 것 | 마일스톤 |
 |---|---|---|---|
