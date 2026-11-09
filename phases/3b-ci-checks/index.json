@@ -2,7 +2,19 @@
   "project": "Mogum",
   "phase": "3b-ci-checks",
   "steps": [
-    { "step": 0, "name": "ci-workflow", "status": "pending" },
-    { "step": 1, "name": "sonar-coverage", "status": "pending" }
-  ]
+    {
+      "step": 0,
+      "name": "ci-workflow",
+      "status": "completed",
+      "summary": "ci.yml·frontend/.nvmrc·CiWorkflowFilesTest(새 테스트 9개) 추가, Gradle 입력과 PR 검사 문서 갱신; backend·frontend·ci-ok 세 job, ci-ok는 always()로 실행해 두 결과가 모두 success일 때만 통과; 액션 SHA: checkout=fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09, setup-java=b6effb05e454b25005698d916606bdc6ffcbf961, setup-gradle=3f5f9adaf7d9fecd50b5935e54106014257a94e6, setup-node=949feb2413d6458794dcd2491c4babbbce0c15c1, upload-artifact=cf430e030ddbb5b0abf93d22962f4752f3646cd9; AC 전부 통과",
+      "started_at": "2026-11-09T23:07:49+0900",
+      "completed_at": "2026-11-09T23:12:02+0900"
+    },
+    {
+      "step": 1,
+      "name": "sonar-coverage",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-11-09T23:07:49+0900"
 }
