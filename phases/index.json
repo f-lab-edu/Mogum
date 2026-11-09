@@ -43,7 +43,8 @@
     },
     {
       "dir": "5-learning-model",
-      "status": "pending"
+      "status": "completed",
+      "completed_at": "2026-11-10T07:14:46+0900"
     }
   ]
 }
