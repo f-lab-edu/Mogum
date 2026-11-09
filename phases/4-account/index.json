@@ -61,7 +61,10 @@
     {
       "step": 7,
       "name": "enum-comments",
-      "status": "pending"
+      "status": "completed",
+      "summary": "UserStatus(3)·CreditEntryType(3)·LoginResult.RejectionReason(1)·ErrorCode(8)·FieldViolation.Reason(2)의 총 17개 상수와 5개 enum 타입에 한국어 한 줄 Javadoc 추가; 계정 상태·크레딧 종류는 02 §8.7 표 그대로, 표에 없는 EMAIL_NOT_VERIFIED는 LoginService.login·OAuthLoginHandler.onAuthenticationSuccess, 오류 8개는 SecurityConfiguration.apiSecurity·SessionUserFilter.doFilterInternal·ApplyService.apply·ApiExceptionHandler·ApiErrorResponses.forStatus, TOO_LONG·REQUIRED는 ApiExceptionHandler.fieldViolation의 실제 분기에서 발생 조건 확인; CONSUME·RESTORE는 현재 운영 코드의 직접 참조가 없어 표 기반 설명으로 유지; 주석·줄 나눔 외 토큰 동일 및 지정 파일 외 변경 없음(index.json 상태 기록 제외), AGENTS 금지 목록 포함 아키텍처 체크리스트 확인; 지정 backend build 통과(811개, 실패·오류·건너뜀 0), 최종 주석 정리 후 동일 AC 재실행 통과(test UP-TO-DATE), docs·테스트·동작 변경 및 커밋 없음",
+      "started_at": "2026-11-09T20:44:23+0900",
+      "completed_at": "2026-11-09T20:47:21+0900"
     }
   ],
   "created_at": "2026-11-08T22:48:26+0900",
