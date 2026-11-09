@@ -31,8 +31,10 @@ test.each([
 ])('%s 화면은 계정과 처리방침 입구를 보여 주고 입력·상세 이유·추가 메뉴를 두지 않는다', async (status, heading) => {
   open(status, '/')
   const title = await screen.findByRole('heading', { level: 1, name: heading })
-  expect(title).toHaveFocus()
-  expect(document.title).toBe(`${heading} · 머금`)
+  await waitFor(() => {
+    expect(title).toHaveFocus()
+    expect(document.title).toBe(`${heading} · 머금`)
+  })
   expect(screen.getByText(identity.email)).toBeVisible()
   expect(screen.getByText(identity.name)).toBeVisible()
   expect(screen.getByRole('img', { name: '보라색 머그컵 안에서 책을 읽는 모구미' })).toBeVisible()
