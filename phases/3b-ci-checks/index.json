@@ -1,0 +1,48 @@
+{
+  "project": "Mogum",
+  "phase": "3b-ci-checks",
+  "steps": [
+    {
+      "step": 0,
+      "name": "ci-workflow",
+      "status": "completed",
+      "summary": "ci.yml·frontend/.nvmrc·CiWorkflowFilesTest(새 테스트 9개) 추가, Gradle 입력과 PR 검사 문서 갱신; backend·frontend·ci-ok 세 job, ci-ok는 always()로 실행해 두 결과가 모두 success일 때만 통과; 액션 SHA: checkout=fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09, setup-java=b6effb05e454b25005698d916606bdc6ffcbf961, setup-gradle=3f5f9adaf7d9fecd50b5935e54106014257a94e6, setup-node=949feb2413d6458794dcd2491c4babbbce0c15c1, upload-artifact=cf430e030ddbb5b0abf93d22962f4752f3646cd9; AC 전부 통과",
+      "started_at": "2026-11-09T23:07:49+0900",
+      "completed_at": "2026-11-09T23:12:02+0900"
+    },
+    {
+      "step": 1,
+      "name": "sonar-coverage",
+      "status": "completed",
+      "summary": "Gradle 기본 JaCoCo 0.8.13으로 test 종료 후 XML만 생성(backend/build/reports/jacoco/test/jacocoTestReport.xml), Sonar 스캔 앞 Java 21·Gradle 설정·실패 후에도 계속하는 백엔드 test 세 단계 추가; 테스트 색인·클래스·커버리지 설정과 PR 검사 문서 갱신, SonarAnalysisFilesTest 새 테스트 5개; AC 모두 통과(설정 검사 20개·전체 테스트 723개)",
+      "started_at": "2026-11-09T23:12:02+0900",
+      "completed_at": "2026-11-09T23:16:28+0900"
+    },
+    {
+      "step": 2,
+      "name": "sonar-sources",
+      "status": "completed",
+      "summary": "sonar.sources=.로 저장소 전체 운영 코드 범위를 명시하고 회귀 테스트·설정 주석·PR 검사 문서 수정; TDD 실패 확인 후 AC 모두 통과(설정 검사 5개·전체 빌드)",
+      "started_at": "2026-11-10T10:16:29+0900",
+      "completed_at": "2026-11-10T10:18:59+0900"
+    },
+    {
+      "step": 3,
+      "name": "npm-ignore-scripts",
+      "status": "completed",
+      "summary": "CI 화면 설치 명령을 npm ci --ignore-scripts로 변경하고 기대값·설치 스크립트 차단 이유 문서화; TDD 실패 확인 후 AC 네 가지 모두 통과(워크플로 검사 9개·백엔드 전체 테스트·화면 lint·테스트 174개)",
+      "started_at": "2026-11-10T10:26:45+0900",
+      "completed_at": "2026-11-10T10:29:27+0900"
+    },
+    {
+      "step": 4,
+      "name": "coverage-scope",
+      "status": "completed",
+      "summary": "sonar.coverage.exclusions를 frontend/**,scripts/**로 변경하고 회귀 테스트·설정 주석·PR 검사 문서 갱신; 하네스 정적 분석 유지, TDD 실패 확인 후 AC 모두 통과(설정 검사 5개·전체 빌드)",
+      "started_at": "2026-11-10T10:39:34+0900",
+      "completed_at": "2026-11-10T10:42:06+0900"
+    }
+  ],
+  "created_at": "2026-11-09T23:07:49+0900",
+  "completed_at": "2026-11-10T10:42:07+0900"
+}

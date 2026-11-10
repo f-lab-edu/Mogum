@@ -40,6 +40,11 @@
       "dir": "4-account",
       "status": "completed",
       "completed_at": "2026-11-09T20:47:21+0900"
+    },
+    {
+      "dir": "3b-ci-checks",
+      "status": "completed",
+      "completed_at": "2026-11-10T10:42:07+0900"
     }
   ]
 }
