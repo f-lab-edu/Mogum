@@ -136,6 +136,7 @@ public class IntegrationTestConfiguration {
         public static final String ORIGIN = "http://127.0.0.1:" + GOOGLE.getAddress().getPort();
         public static volatile String sub;
         public static volatile String email;
+        public static volatile String name;
         public static volatile boolean verified;
         public static volatile boolean tokenFailure;
         public static volatile boolean userInfoFailure;
@@ -158,8 +159,13 @@ public class IntegrationTestConfiguration {
                     exchange.close();
                 });
                 server.createContext("/userinfo", exchange -> {
+                    var identity = new java.util.LinkedHashMap<String, Object>();
+                    identity.put("sub", sub);
+                    identity.put("email", email);
+                    identity.put("email_verified", verified);
+                    if (name != null) identity.put("name", name);
                     String response = userInfoFailure ? "{\"error\":\"invalid_token\",\"error_description\":\"" + sub + "\"}"
-                            : "{\"sub\":\"" + sub + "\",\"email\":\"" + email + "\",\"email_verified\":" + verified + "}";
+                            : new tools.jackson.databind.ObjectMapper().writeValueAsString(identity);
                     byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
                     exchange.getResponseHeaders().set("Content-Type", "application/json");
                     exchange.sendResponseHeaders(userInfoFailure ? 400 : 200, bytes.length);

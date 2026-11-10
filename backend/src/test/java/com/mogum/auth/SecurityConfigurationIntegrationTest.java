@@ -1,7 +1,6 @@
 package com.mogum.auth;
 
 import com.mogum.account.domain.UserFixtures;
-import com.mogum.account.domain.UserRole;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.support.IntegrationTest;
 import com.mogum.support.TestRequests;
@@ -88,35 +87,84 @@ class SecurityConfigurationIntegrationTest extends SecurityScenario {
         assertThat(before.get("principal_name")).isEqualTo(users.findByProviderAndSubject("google", "session-sub").orElseThrow().getId().toString());
     }
 
-    @ParameterizedTest(name = "약관 동의 {0}")
-    @ValueSource(booleans = {false, true})
-    @DisplayName("현재 회원 응답은 data 하나 안의 다섯 필드와 최신 약관 동의를 반환한다")
-    void returnsPublicFieldsWithCurrentTerms(boolean agreed) {
+    @Test
+    @DisplayName("현재 회원 응답은 상태와 이메일과 이름만 반환한다")
+    void returnsPublicFields() {
         // given
         var cookie = session();
-        if (agreed) jdbc.update("UPDATE users SET terms_agreed_at = now(), terms_version = 'v1', updated_at = now()");
         // when
         var response = client(cookie).get().uri("/api/me").exchange();
         // then
         response.expectStatus().isOk().expectBody().json("""
-                {"data":{"email":"session@example.com","status":"ACTIVE","role":"ADMIN",
-                "termsAgreed":%s,"waitlistPosition":null}}
-                """.formatted(agreed), JsonCompareMode.STRICT);
+                {"data":{"status":"APPLIED","email":"session@example.com","name":"session"}}
+                """, JsonCompareMode.STRICT);
+    }
+
+    @Test
+    @DisplayName("구글 신원 도우미의 세션은 주인 색인과 회원 행 없이 내 정보를 읽는다")
+    void readsNotAppliedSessionOverHttp() {
+        // given
+        var identity = new AccountPrincipal.NotApplied("google", "new-sub", "new@example.com", "새 이름");
+        var helper = new TestSessions(sessions);
+        var cookie = helper.createNotApplied(identity);
+
+        // when
+        var response = client(cookie).get().uri("/api/me").exchange();
+
+        // then
+        response.expectStatus().isOk().expectBody().json("""
+                {"data":{"status":"NOT_APPLIED","email":"new@example.com","name":"새 이름"}}
+                """, JsonCompareMode.STRICT);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM users", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT principal_name FROM spring_session WHERE session_id = ?",
+                String.class, helper.id(cookie))).isNull();
+        org.springframework.session.Session stored = sessions.findById(helper.id(cookie));
+        assertThat(stored.getAttributeNames()).containsExactly(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE);
+        assertThat((Object) stored.getAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE)).isEqualTo(identity);
+    }
+
+    @ParameterizedTest(name = "깨진 세션 {0}")
+    @ValueSource(strings = {"empty", "wrong-type", "blank-name", "mixed"})
+    @DisplayName("JDBC에 저장된 깨진 신원은 실제 HTTP에서도 공통 JSON 401로 버린다")
+    void rejectsMalformedStoredIdentity(String condition) {
+        // given
+        var jdbcSession = sessions.createSession();
+        org.springframework.session.Session stored = jdbcSession;
+        if (condition.equals("wrong-type")) stored.setAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE, "broken");
+        if (condition.equals("blank-name") || condition.equals("mixed")) {
+            stored.setAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE,
+                    new AccountPrincipal.NotApplied("google", "sub", "me@example.com", condition.equals("blank-name") ? " " : "이름"));
+        }
+        if (condition.equals("mixed")) stored.setAttribute(org.springframework.session.FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, "17");
+        sessions.save(jdbcSession);
+        var cookie = new Cookie("SESSION", java.util.Base64.getEncoder().encodeToString(
+                stored.getId().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+        // when
+        var response = client(cookie).get().uri("/api/me").exchange().returnResult(String.class);
+
+        // then
+        assertError(response, 401, "UNAUTHORIZED");
+        assertThat(sessions.findById(stored.getId())).isNull();
     }
 
     @ParameterizedTest(name = "변경 후 상태 {0}")
-    @ValueSource(strings = {"WAITLISTED", "ACTIVE"})
-    @DisplayName("같은 세션의 역할과 상태는 DB에서 매 요청 다시 읽는다")
-    void reloadsUserRoleAndStatus(String status) {
+    @ValueSource(strings = {"APPLIED", "APPROVED", "REJECTED"})
+    @DisplayName("같은 세션의 상태는 DB에서 매 요청 다시 읽는다")
+    void reloadsUserStatus(String status) {
         // given
         var cookie = session();
-        client(cookie).get().uri("/api/me").exchange().expectBody().jsonPath("$.data.role").isEqualTo("ADMIN");
-        jdbc.update("UPDATE users SET role = 'USER', status = ?, updated_at = now()", status);
+        client(cookie).get().uri("/api/me").exchange().expectBody().jsonPath("$.data.status").isEqualTo("APPLIED");
+        jdbc.update("""
+                UPDATE users SET status = ?,
+                    approved_at = CASE WHEN ? = 'APPROVED' THEN now() END,
+                    credit_refill_at = CASE WHEN ? = 'APPROVED' THEN now() + interval '30 days' END,
+                    updated_at = now()
+                """, status, status, status);
         // when
         var response = client(cookie).get().uri("/api/me").exchange();
         // then
-        response.expectStatus().isOk().expectBody().jsonPath("$.data.role").isEqualTo("USER")
-                .jsonPath("$.data.status").isEqualTo(status);
+        response.expectStatus().isOk().expectBody().jsonPath("$.data.status").isEqualTo(status);
     }
 
     @ParameterizedTest(name = "삭제 후 세션 {0}")
@@ -169,7 +217,12 @@ abstract class SecurityScenario {
     @Autowired JdbcIndexedSessionRepository sessions;
 
     Cookie session() {
-        var user = users.save(UserFixtures.user("google", "session-sub", "session@example.com", UserRole.ADMIN));
+        var user = users.save(UserFixtures.user("google", "session-sub", "session@example.com"));
+        return new TestSessions(sessions).create(user.getId());
+    }
+
+    Cookie approvedSession() {
+        var user = users.save(UserFixtures.approved("google", "session-sub", "session@example.com"));
         return new TestSessions(sessions).create(user.getId());
     }
 

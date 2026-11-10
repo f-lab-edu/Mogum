@@ -12,6 +12,7 @@ AI 가 코스(강의 목록) · 강의 자료 · 플래시카드를 만들고, �
 | `docs/04-jobs-and-cost.md` | 작업 · 워커 · 비용 통제를 만들 때 — 코드 구조 · 기존 구현 대조 · 배포 · 만드는 작업 · 크레딧 · 관측 |
 | `docs/05-api.md` · `docs/06-screens.md` | API · 화면을 만들 때 — 인증(쿠키 세션) · 오류 묶음 · 화면마다 보이는 것과 할 수 있는 것 |
 | `docs/design/` | 화면 코드를 쓸 때 — Stitch 화면 시안. 방향이며 06 과 다르면 06 이 맞다 |
+| `docs/UI_GUIDE.md` | 화면 코드를 쓸 때 — 확정한 토큰 · 공통 컴포넌트 · 로그인 전 틀 · 모구미 사본 규격 |
 | `docs/07-testing.md` | 시험을 쓸 때 — 결정이 남긴 필수 시험 · LLM 스텁 · 공개 전 품질 점검 |
 | `docs/TEST_GUIDE.md` | 백엔드 테스트 코드를 쓸 때 — 종류 · 이름 · given/when/then · 픽스처 · Fake · DB 격리 · 요청 도구 |
 | `docs/SCHEDULE.md` | 다음 TASK 를 고를 때 — 순서 · 마일스톤 · 진행 기록 |
@@ -88,6 +89,7 @@ AI 가 코스(강의 목록) · 강의 자료 · 플래시카드를 만들고, �
 - CRITICAL: 새 기능은 **테스트를 먼저 쓰고**, 그 테스트가 통과하는 구현을 쓴다(TDD). 작업을 검증 가능한 목표로 바꾸고 통과할 때까지 반복한다.
     훅이 강제한다(`scripts/tdd_guard.py` — Claude · Codex 공통). 짝 테스트 없이 구현 파일을 쓰면 막히고, 구현만 바꾸고 끝내면 한 번 되돌려진다. 짝 테스트는 `backend/src/main/java/…/Foo.java` → 같은 패키지의 `backend/src/test/java/…/Foo*Test.java`(통합 테스트는 `Foo*IntegrationTest.java`), `frontend/src/…/foo.tsx` → 같은 폴더의 `foo.test.tsx` 또는 `__tests__/foo.test.tsx` 다. interface · record · enum · 예외 · `@Entity` · 타입 전용 파일은 검사하지 않는다.
 - **백엔드 테스트는 [`docs/TEST_GUIDE.md`](docs/TEST_GUIDE.md) 를 따른다**([ADR-179](docs/ADR.md)) — 컨트롤러 `@WebMvcTest` · 서비스 단위 + Fake · 레포지토리 `@RepositoryTest` · 통합 `@IntegrationTest`(DB 동작이 규칙인 서비스 포함). 이름은 `*Test` · `*IntegrationTest`(`IT` 약어 없음) · 영어 메서드 + 한국어 `@DisplayName`, 본문은 `// given` · `// when` · `// then`, 단언은 AssertJ, 데이터는 `{엔티티}Fixtures`. 테스트는 트랜잭션을 걸지 않고 정리기가 매번 DB 를 비운다. → 테스트 롤백은 지연 로딩 · flush 오류를 가리고, 클래스마다 설정을 더하면 컨텍스트가 클래스마다 새로 뜬다.
+- **Java enum 은 상수마다 한국어 Javadoc 한 줄(`/** … */`)로 그 값이 무엇인지 적는다** — 이름 · 뜻 · 언제는 문서의 값 표([02 §8](docs/02-domain-data.md#8-테이블) · [05 §1.2](docs/05-api.md#12-오류--묶음-이름과-서버가-정한-문구) · GLOSSARY)를 그대로 따르고, 표에 없는 값은 코드가 그 값을 쓰는 곳에서 확인한 사실만 적는다. → 코드 리뷰 · 다음 작업자가 값의 뜻을 찾으러 문서를 뒤지지 않는다. 지어낸 설명은 문서와 어긋난다.
 - 커밋 메시지는 conventional commits(`feat:` · `fix:` · `docs:` · `refactor:` · `test:`).
 - **`main` 은 PR 로만 바뀐다.** `main` 에서 커밋 · 병합하거나 `main` 으로 push 하지 않는다. GitHub 룰셋(PR 필수 · 강제 push/삭제 금지 · 예외 없음)이 서버에서 막고, `.githooks/` 가 로컬에서 먼저 막는다. PR 병합 뒤 로컬 `main` 은 `git pull --ff-only` 로만 따라간다.
 - 설계와 다르게 가야 하면 **코드보다 `docs/` 를 먼저 고친다.** 문서와 코드가 다르면 문서가 틀린 것으로 보고 묻는다. 결정이 바뀌면 ADR 을 먼저 고친다.
@@ -103,7 +105,7 @@ AI 가 코스(강의 목록) · 강의 자료 · 플래시카드를 만들고, �
 ```
 docker compose up -d --build       # 로컬 Postgres(pgvector) + 서버 컨테이너(backend/Dockerfile · 8080) — 저장소 루트에서. 서버는 루트 .env 를 읽는다
 docker compose up -d postgres       # DB 만 — 서버를 IDE · bootRun 으로 띄울 때(8080 이 겹치지 않게 서버 컨테이너는 띄우지 않는다)
-cd backend && ./gradlew bootRun     # 개발 서버 (API + 워커) — 기동에 GOOGLE_CLIENT_ID · GOOGLE_CLIENT_SECRET 필요(없으면 기동 거부) · 로그인 허용 계정은 APP_AUTH_ADMIN_EMAILS(신청 흐름으로 바뀌기 전까지 — ADR-147)
+cd backend && ./gradlew bootRun     # 개발 서버 (API + 워커) — 기동에 GOOGLE_CLIENT_ID · GOOGLE_CLIENT_SECRET 필요(없으면 기동 거부)
 cd backend && ./gradlew test        # 백엔드 테스트 (Testcontainers — Docker 필요)
 cd backend && ./gradlew build       # 백엔드 jar 생성 — 화면은 넣지 않는다
 ./backend/gradlew -p backend test   # 저장소 루트에서 같은 일 — step 의 AC · 리뷰어는 이 형태로 쓴다(cd 불가)

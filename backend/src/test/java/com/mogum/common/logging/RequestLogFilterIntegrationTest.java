@@ -45,7 +45,7 @@ class RequestLogFilterIntegrationTest {
 
     @BeforeEach
     void prepareSession() {
-        user = users.save(UserFixtures.user("request-log@example.com"));
+        user = users.save(UserFixtures.approved("request-log@example.com"));
         session = new TestSessions(sessions).create(user.getId());
     }
 

@@ -8,11 +8,19 @@ public final class UserFixtures {
     private UserFixtures() { }
 
     public static User user(String email) {
-        return user("google", email, email, UserRole.USER);
+        return user("google", email, email);
     }
 
-    public static User user(String provider, String subject, String email, UserRole role) {
-        return User.join(provider, subject, email, role);
+    public static User user(String provider, String subject, String email) {
+        return User.apply(provider, subject, email, email.split("@", 2)[0], 100);
+    }
+
+    public static User approved(String email) {
+        return withStatus(user(email), UserStatus.APPROVED);
+    }
+
+    public static User approved(String provider, String subject, String email) {
+        return withStatus(user(provider, subject, email), UserStatus.APPROVED);
     }
 
     public static User withId(User user, long id) {
@@ -22,11 +30,9 @@ public final class UserFixtures {
 
     public static User withStatus(User user, UserStatus status) {
         ReflectionTestUtils.setField(user, "status", status);
-        return user;
-    }
-
-    public static User withTermsAgreedAt(User user, Instant termsAgreedAt) {
-        ReflectionTestUtils.setField(user, "termsAgreedAt", termsAgreedAt);
+        Instant approvedAt = status == UserStatus.APPROVED ? Instant.parse("2026-11-08T00:00:00Z") : null;
+        ReflectionTestUtils.setField(user, "approvedAt", approvedAt);
+        ReflectionTestUtils.setField(user, "creditRefillAt", approvedAt == null ? null : approvedAt.plusSeconds(30L * 86400));
         return user;
     }
 

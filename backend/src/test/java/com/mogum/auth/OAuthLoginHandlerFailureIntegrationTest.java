@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(OutputCaptureExtension.class)
 class OAuthLoginHandlerFailureIntegrationTest extends OAuthScenario {
     @ParameterizedTest(name = "조건 {0}")
-    @ValueSource(strings = {"not-allowed", "unverified", "state", "no-cookie", "corrupt-cookie", "expired-cookie",
+    @ValueSource(strings = {"unverified", "state", "no-cookie", "corrupt-cookie", "expired-cookie",
             "cancel", "missing-code", "token", "userinfo", "unknown"})
     @DisplayName("로그인 실패는 고정된 분류만 남기고 원문을 남기지 않는다")
     void logsOnlyKnownFailureClassification(String condition, CapturedOutput output) throws Exception {
@@ -29,11 +29,6 @@ class OAuthLoginHandlerFailureIntegrationTest extends OAuthScenario {
         String level = "INFO";
         String result = "login_failed";
         switch (condition) {
-            case "not-allowed" -> {
-                email = marker + "@example.com";
-                result = "not_allowed";
-                reason = "not_allowed";
-            }
             case "unverified" -> {
                 email = marker + "@example.com";
                 verified = false;
@@ -72,25 +67,13 @@ class OAuthLoginHandlerFailureIntegrationTest extends OAuthScenario {
         var response = get(path, cookie);
         // then
         assertFailure(response, result);
-        assertThat(TOKEN_CALLS.get()).isEqualTo(condition.equals("not-allowed") || condition.equals("unverified")
+        assertThat(TOKEN_CALLS.get()).isEqualTo(condition.equals("unverified")
                 || condition.equals("token") || condition.equals("userinfo") ? 1 : 0);
         var line = loginLine(response, output);
         assertThat(line).contains(" " + level + " ");
         assertThat(line.endsWith("login result=" + result + " reason=" + reason)).isTrue();
         assertPrivate(output, marker, email, sub, start.state(), start.cookie(), verifier(start),
                 "fake-access-token", "fake-id-token");
-    }
-
-    @Test
-    @DisplayName("관리자 밖 계정은 행을 남기지 않고 not allowed로 보낸다")
-    void rejectsUnlistedAccountWithoutRows() throws Exception {
-        // given
-        email = "outside@example.com";
-        var start = start(null);
-        // when
-        var response = callback(start, "ok", null);
-        // then
-        assertFailure(response, "not_allowed");
     }
 
     @Test

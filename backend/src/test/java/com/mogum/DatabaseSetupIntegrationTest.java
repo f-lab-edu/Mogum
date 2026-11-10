@@ -110,7 +110,7 @@ class DatabaseSetupIntegrationTest {
                 "auth.SecurityConfigurationHealthIntegrationTest", "auth.OAuthLoginHandlerIntegrationTest",
                 "auth.OAuthLoginHandlerFailureIntegrationTest", "auth.OAuthLoginHandlerPkceIntegrationTest",
                 "common.api.RequestValidationIntegrationTest", "common.logging.RequestLogFilterIntegrationTest",
-                "account.service.LoginServiceConcurrencyIntegrationTest", "support.TestRequestsIntegrationTest");
+                "support.TestRequestsIntegrationTest");
         // when
         var contexts = new java.util.ArrayList<org.springframework.context.ApplicationContext>();
         for (String name : names) contexts.add(new TestContextManager(Class.forName("com.mogum." + name))

@@ -50,7 +50,7 @@ test('쿠키가 없으면 CSRF 헤더를 만들지 않는다', async () => {
   expect(new Headers(vi.mocked(fetch).mock.calls[0][1]?.headers).has('X-XSRF-TOKEN')).toBe(false)
 })
 
-test.each([[401, 'UNAUTHORIZED'], [403, 'CSRF_INVALID']])('실패 %s의 상태와 code, message를 보존하고 재전송하지 않는다', async (status, code) => {
+test.each([[401, 'UNAUTHORIZED'], [403, 'CSRF_INVALID'], [403, 'ACCOUNT_NOT_APPROVED']])('실패 %s의 상태와 code, message를 보존하고 재전송하지 않는다', async (status, code) => {
   vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code, message: '서버 문구' }), { status }))
   const error = await apiFetch('/example', { method: 'POST' }).catch((error: unknown) => error)
   expect(error).toBeInstanceOf(ApiError)

@@ -4,10 +4,8 @@ import { retryApiQuery } from './queryClient'
 
 export interface Me {
   email: string
-  status: 'PENDING' | 'ACTIVE' | 'WAITLISTED'
-  role: 'USER' | 'ADMIN'
-  termsAgreed: boolean
-  waitlistPosition: number | null
+  name: string
+  status: 'NOT_APPLIED' | 'APPLIED' | 'APPROVED' | 'REJECTED' | (string & Record<never, never>)
 }
 
 export function useMe() {

@@ -11,13 +11,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @IntegrationTest
 class SecurityConfigurationLogoutIntegrationTest extends SecurityScenario {
-    @Test
+    @ParameterizedTest(name = "세션 종류 {0}")
+    @ValueSource(strings = {"member", "not-applied"})
     @DisplayName("로그아웃은 현재 세션만 삭제하고 보안 속성을 유지한 만료 쿠키를 준다")
-    void logsOutOnlyCurrentDevice() {
+    void logsOutOnlyCurrentDevice(String kind) {
         // given
-        var cookie = session();
-        var userId = users.findByProviderAndSubject("google", "session-sub").orElseThrow().getId();
-        var second = new TestSessions(sessions).create(userId);
+        var helper = new TestSessions(sessions);
+        var identity = new AccountPrincipal.NotApplied("google", "sub", "new@example.com", "새 이름");
+        var cookie = kind.equals("member") ? session() : helper.createNotApplied(identity);
+        var second = kind.equals("member")
+                ? helper.create(users.findByProviderAndSubject("google", "session-sub").orElseThrow().getId())
+                : helper.createNotApplied(identity);
         var me = client(cookie).get().uri("/api/me").exchange().returnResult(String.class);
         var token = me.getResponseCookies().getFirst("XSRF-TOKEN");
         assertCsrfCookie(token);
