@@ -31,7 +31,7 @@ function TestRoutes() {
     <Routes>
       <Route element={<RequireAuth />}>
         <Route path="/" element={<ProtectedContent />} />
-        <Route path="/curriculums/:id" element={<ProtectedContent />} />
+        <Route path="/courses/:id" element={<ProtectedContent />} />
       </Route>
       <Route path="/login" element={<LoginPage />} />
     </Routes>
@@ -62,17 +62,17 @@ test('첫 로그인 확인 동안 회색 줄을 보여 준다', async () => {
 
 test('처음 연 주소의 401은 안내 없이 로그인으로, 로그인 성공은 기억한 주소로 한 번 돌아간다', async () => {
   vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 'UNAUTHORIZED', message: '서버 문구' }), { status: 401 }))
-  const first = renderAt('/curriculums/12?tab=1#lesson')
+  const first = renderAt('/courses/12?tab=1#lesson')
   await screen.findByRole('link', { name: 'Google 계정으로 계속하기' })
   expect(window.location.pathname).toBe('/login')
   expect(screen.getByRole('status')).toBeEmptyDOMElement()
-  expect(sessionStorage.getItem('mogum:return-path')).toBe('/curriculums/12?tab=1#lesson')
+  expect(sessionStorage.getItem('mogum:return-path')).toBe('/courses/12?tab=1#lesson')
   expect(fetch).toHaveBeenCalledTimes(1)
   first.unmount()
 
   vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: me }))))
   renderAt('/')
-  await waitFor(() => expect(window.location.pathname + window.location.search + window.location.hash).toBe('/curriculums/12?tab=1#lesson'))
+  await waitFor(() => expect(window.location.pathname + window.location.search + window.location.hash).toBe('/courses/12?tab=1#lesson'))
   expect(takeReturnPath()).toBeNull()
 })
 
@@ -85,14 +85,14 @@ test.each(['//evil.example', 'https://evil.example', '/login', '/login?error=x',
 })
 
 test.each(['사용자 다시 확인', '다른 조회', '변경 요청'])('확인 성공 뒤 %s의 401은 같은 로그인 만료 안내로 보낸다', async (button) => {
-  renderAt('/curriculums/12?tab=1#lesson')
+  renderAt('/courses/12?tab=1#lesson')
   await screen.findByRole('heading', { name: '보호된 화면' })
   vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ code: 'UNAUTHORIZED', message: '서버 문구' }), { status: 401 })))
   fireEvent.click(screen.getByRole('button', { name: button }))
   await screen.findByRole('link', { name: 'Google 계정으로 계속하기' })
   expect(window.location.pathname).toBe('/login')
   expect(screen.getByRole('status')).toHaveTextContent('다시 로그인해 주세요.')
-  expect(sessionStorage.getItem('mogum:return-path')).toBe('/curriculums/12?tab=1#lesson')
+  expect(sessionStorage.getItem('mogum:return-path')).toBe('/courses/12?tab=1#lesson')
   expect(fetch).toHaveBeenCalledTimes(2)
 })
 

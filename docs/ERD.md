@@ -73,7 +73,7 @@ erDiagram
         bigint id PK
         bigint user_id FK
         bigint roadmap_id FK "(빈 값) 단일 코스면 빈다"
-        integer position "(빈 값) 로드맵 안의 순서 — roadmap_id + position 고유"
+        integer position "(빈 값) 로드맵 안의 순서(1부터) — roadmap_id + position 고유"
         text title
         text status "NOT_PLANNED(짜기 전 — 로드맵의 코스만) · REVIEWING(검토 중) · LEARNING(학습 중) · COMPLETED(다 마침)"
         text topic "(빈 값) 입력 칸 묶음 — 단일 코스만"
@@ -85,7 +85,7 @@ erDiagram
         text plan_description "(빈 값) 로드맵의 코스만"
         jsonb plan_concepts "(빈 값) 로드맵의 코스만 — name, definition 목록"
         jsonb mastery_report "(빈 값) 숙련도 반영 내역"
-        timestamptz started_at "(빈 값) 이대로 시작한 때"
+        timestamptz started_at "(빈 값) 이대로 시작한 때 — LEARNING(학습 중) · COMPLETED(다 마침)일 때만"
         timestamptz last_lesson_opened_at "(빈 값)"
         timestamptz completed_at "(빈 값) 다 마친 때 — COMPLETED(다 마침)일 때만"
     }
