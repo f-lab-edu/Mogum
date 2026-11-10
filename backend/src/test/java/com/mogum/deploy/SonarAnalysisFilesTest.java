@@ -65,8 +65,8 @@ class SonarAnalysisFilesTest {
     }
 
     @Test
-    @DisplayName("백엔드 테스트와 클래스 및 XML 경로를 지정하고 기존 제외와 전체 소스 범위를 유지한다")
-    void separatesBackendTestsAndImportsXmlWithoutChangingSourceScope() throws Exception {
+    @DisplayName("운영 코드 범위를 저장소 전체로 명시하고 백엔드 테스트와 클래스 및 XML 경로를 지정한다")
+    void explicitlyIncludesAllSourcesAndSeparatesBackendTestsAndImportsXml() throws Exception {
         // when
         var properties = properties();
 
@@ -77,7 +77,7 @@ class SonarAnalysisFilesTest {
                 .containsEntry("sonar.java.test.binaries", "backend/build/classes/java/test")
                 .containsEntry("sonar.coverage.jacoco.xmlReportPaths", "backend/build/reports/jacoco/test/jacocoTestReport.xml")
                 .containsEntry("sonar.coverage.exclusions", "frontend/**")
-                .doesNotContainKey("sonar.sources");
+                .containsEntry("sonar.sources", ".");
         assertThat(properties.getProperty("sonar.exclusions").split(","))
                 .containsExactlyInAnyOrder("docs/design/**", "**/*.jar",
                         "backend/src/main/resources/db/migration/**", "backend/src/test/**");

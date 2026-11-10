@@ -477,7 +477,7 @@ docker logs --tail 50 mogum-postgres-1
 
 JaCoCo는 Gradle 9.1.0의 **기본 버전 0.8.13**을 사용한다. `test.finalizedBy(jacocoTestReport)`로 테스트가 실패해도 리포트를 만들며, XML만 켜고 HTML · CSV는 끈다. `imageTest`에는 리포트를 붙이지 않는다. 실제 생성 경로는 **`backend/build/reports/jacoco/test/jacocoTestReport.xml`**이며, 클래스 출력은 `backend/build/classes/java/main` · `backend/build/classes/java/test`다. 모두 기본 출력 경로를 그대로 사용하고 [sonar-project.properties](../sonar-project.properties)에 저장소 루트 기준으로 적었다. 이 설정 파일도 Gradle `test`의 입력이며, `SonarAnalysisFilesTest`가 워크플로 순서 · 추가 액션 SHA와 릴리스 주석 · 실패 후 스캔 계속 · 설정 값을 검사한다.
 
-백엔드 테스트 코드는 `sonar.tests=backend/src/test`로 구분하고 운영 코드 색인에서 `backend/src/test/**`를 제외해 이중 색인을 막는다. `sonar.sources`는 따로 정하지 않아 저장소 전체 분석 범위를 유지한다. 화면 테스트는 따로 구분하지 않고, **`sonar.coverage.exclusions=frontend/**`**로 화면을 커버리지 계산에서 뺀다. 품질 게이트의 커버리지 조건은 **`new_coverage`가 0 미만일 때만 실패**다([2026-11-09 API 조회 · PR #23](https://sonarcloud.io/api/qualitygates/project_status?projectKey=f-lab-edu_Mogum&pullRequest=23)).
+백엔드 테스트 코드는 `sonar.tests=backend/src/test`로 구분하고 운영 코드 색인에서 `backend/src/test/**`를 제외해 이중 색인을 막는다. `sonar.sources=.`로 저장소 전체를 운영 코드 범위로 명시한다 — 비워 두면 `sonar.tests`의 93 Test 파일만 색인됐다(PR #25 Sonar 로그). 화면 테스트는 따로 구분하지 않고, **`sonar.coverage.exclusions=frontend/**`**로 화면을 커버리지 계산에서 뺀다. 품질 게이트의 커버리지 조건은 **`new_coverage`가 0 미만일 때만 실패**다([2026-11-09 API 조회 · PR #23](https://sonarcloud.io/api/qualitygates/project_status?projectKey=f-lab-edu_Mogum&pullRequest=23)).
 
 Sonar 워크플로는 **F-Lab 템플릿의 기존 줄을 유지**한다. 추가한 `setup-java` · `setup-gradle` 두 액션만 위 표의 SHA와 릴리스 주석으로 고정했고, 기존 `actions/checkout@v3` · `SonarSource/sonarcloud-github-action@master`는 그대로 둔다. **아직 확인하지 않은 것**은 실제 PR의 Sonar 실행에서 백엔드 테스트 파일이 테스트로 색인되는지와 커버리지 값이 올라가는지다.
 
