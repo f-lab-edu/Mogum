@@ -76,7 +76,7 @@ class SonarAnalysisFilesTest {
                 .containsEntry("sonar.java.binaries", "backend/build/classes/java/main")
                 .containsEntry("sonar.java.test.binaries", "backend/build/classes/java/test")
                 .containsEntry("sonar.coverage.jacoco.xmlReportPaths", "backend/build/reports/jacoco/test/jacocoTestReport.xml")
-                .containsEntry("sonar.coverage.exclusions", "frontend/**")
+                .containsEntry("sonar.coverage.exclusions", "frontend/**,scripts/**")
                 .containsEntry("sonar.sources", ".");
         assertThat(properties.getProperty("sonar.exclusions").split(","))
                 .containsExactlyInAnyOrder("docs/design/**", "**/*.jar",
