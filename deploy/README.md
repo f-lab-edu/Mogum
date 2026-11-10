@@ -506,8 +506,10 @@ docker logs --tail 50 mogum-postgres-1
 | job | 명령과 결과 | 제한 시간 |
 |---|---|---|
 | `backend` | Temurin Java 21 · Gradle 설정 후 `./backend/gradlew -p backend test`. 실패할 때만 `backend/build/reports/tests/test`를 아티팩트로 7일 보관한다 | 30분 |
-| `frontend` | [frontend/.nvmrc](../frontend/.nvmrc)의 Node 22와 npm 캐시를 사용한다. `frontend/`에서 `npm ci` → `npm run lint` → `npm run test` → `npm run build`를 각각 별도 단계로 실행한다 | 15분 |
+| `frontend` | [frontend/.nvmrc](../frontend/.nvmrc)의 Node 22와 npm 캐시를 사용한다. `frontend/`에서 `npm ci --ignore-scripts` → `npm run lint` → `npm run test` → `npm run build`를 각각 별도 단계로 실행한다 | 15분 |
 | `ci-ok` | 두 job의 결과를 환경 변수로 받아 둘 다 `success`일 때만 통과하고, 그 외에는 `exit 1`로 실패한다 | 5분 |
+
+의존 패키지의 설치 스크립트를 CI에서 실행하지 않으며(SonarCloud `githubactions:S6505`), 현재 lockfile에서 설치 스크립트가 있는 것은 macOS 전용 선택 의존성 `fsevents`뿐이다.
 
 필수 상태 검사로 걸 이름은 **`ci-ok` 하나**다. job id가 검사 이름이 되도록 별도 `name`을 두지 않는다. `needs: [backend, frontend]`와 **`if: always()`**를 함께 유지한다. GitHub는 건너뛴 필수 검사를 통과로 친다. `always()`가 없으면 선행 job 실패 때 `ci-ok`가 건너뛰어져 실패한 PR이 병합될 수 있다. `failure` · `cancelled` · `skipped`도 모두 실패로 처리한다.
 

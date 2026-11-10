@@ -169,7 +169,7 @@ class CiWorkflowFilesTest {
     }
 
     @Test
-    @DisplayName("화면은 nvmrc의 Node와 npm 캐시를 쓰고 설치와 린트와 테스트와 빌드를 순서대로 실행한다")
+    @DisplayName("화면은 nvmrc의 Node와 npm 캐시를 쓰고 설치 스크립트 없이 설치 후 린트와 테스트와 빌드를 순서대로 실행한다")
     void checksFrontendInOrderUsingTheDeclaredNodeVersion() throws Exception {
         // when
         var frontend = job("frontend");
@@ -186,7 +186,7 @@ class CiWorkflowFilesTest {
                 "node-version-file", "frontend/.nvmrc", "cache", "npm",
                 "cache-dependency-path", "frontend/package-lock.json"));
         assertThat(steps.subList(2, 6).stream().map(step -> step.get("run")).toList())
-                .containsExactly("npm ci", "npm run lint", "npm run test", "npm run build");
+                .containsExactly("npm ci --ignore-scripts", "npm run lint", "npm run test", "npm run build");
         for (var step : steps) assertThat(step).doesNotContainKey("if");
     }
 
