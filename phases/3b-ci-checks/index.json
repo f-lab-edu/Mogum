@@ -17,6 +17,11 @@
       "summary": "Gradle 기본 JaCoCo 0.8.13으로 test 종료 후 XML만 생성(backend/build/reports/jacoco/test/jacocoTestReport.xml), Sonar 스캔 앞 Java 21·Gradle 설정·실패 후에도 계속하는 백엔드 test 세 단계 추가; 테스트 색인·클래스·커버리지 설정과 PR 검사 문서 갱신, SonarAnalysisFilesTest 새 테스트 5개; AC 모두 통과(설정 검사 20개·전체 테스트 723개)",
       "started_at": "2026-11-09T23:12:02+0900",
       "completed_at": "2026-11-09T23:16:28+0900"
+    },
+    {
+      "step": 2,
+      "name": "sonar-sources",
+      "status": "pending"
     }
   ],
   "created_at": "2026-11-09T23:07:49+0900",
