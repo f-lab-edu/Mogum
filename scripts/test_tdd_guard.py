@@ -161,11 +161,20 @@ class TestPre:
     @pytest.mark.parametrize("test_rel", [
         FOO_TEST,
         "backend/src/test/java/com/mogum/core/FooConcurrencyTest.java",
-        "backend/src/test/java/com/mogum/core/FooIT.java",
+        "backend/src/test/java/com/mogum/core/FooIntegrationTest.java",
     ])
     def test_claude_write_with_existing_test_is_allowed(self, repo, test_rel):
         put(repo, test_rel)
         assert tg.pre(claude_write(repo, FOO), repo) is None
+
+    @pytest.mark.parametrize("test_rel", [
+        "backend/src/test/java/com/mogum/core/FooIT.java",
+        "backend/src/test/java/com/mogum/core/FooTests.java",
+    ])
+    def test_names_outside_test_guide_do_not_count(self, repo, test_rel):
+        # TEST_GUIDE §2 — 클래스 이름은 *Test · *IntegrationTest 뿐이다. 다른 이름은 ArchUnit 이 빌드를 깬다.
+        put(repo, test_rel)
+        assert tg.pre(claude_write(repo, FOO), repo) is not None
 
     def test_test_in_other_package_does_not_count(self, repo):
         put(repo, "backend/src/test/java/com/mogum/api/FooTest.java")

@@ -83,7 +83,7 @@ def has_test(root: Path, rel: str, touched: Iterable[str]) -> bool:
     if rel.startswith(JAVA_MAIN):
         sub = rel[len(JAVA_MAIN):-len(".java")]
         test_dir, stem = (JAVA_TEST + sub).rsplit("/", 1)
-        pattern = re.compile(rf"^{re.escape(stem)}\w*(Test|Tests|IT)\.java$")
+        pattern = re.compile(rf"^{re.escape(stem)}\w*Test\.java$")
         dirs = [test_dir]
     else:
         src_dir, name = rel.rsplit("/", 1)
