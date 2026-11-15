@@ -1,9 +1,14 @@
-export default function PlaceholderPage() {
+import { useEffect, useRef } from 'react'
+
+export default function PlaceholderPage({ title = '머금' }: { title?: string }) {
+  const heading = useRef<HTMLHeadingElement>(null)
+
+  useEffect(() => {
+    document.title = `${title === '머금' ? '홈' : title} · 머금`
+    heading.current?.focus()
+  }, [title])
+
   return (
-    <main className="min-h-dvh bg-canvas px-4 py-8 font-sans text-text">
-      <div className="mx-auto max-w-content">
-        <h1 className="text-title font-semibold">머금</h1>
-      </div>
-    </main>
+    <h1 ref={heading} tabIndex={-1} className="text-title font-extrabold">{title}</h1>
   )
 }

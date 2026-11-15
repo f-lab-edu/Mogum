@@ -41,6 +41,7 @@
   --container-account: 27.5rem;
   --container-content: 48rem;
   --breakpoint-sm: 40rem;
+  --breakpoint-lg: 64rem;
 }
 
 @layer base {

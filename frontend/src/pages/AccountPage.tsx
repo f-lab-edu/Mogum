@@ -5,6 +5,7 @@ import { ApiError, apiFetch } from '../api/client'
 import type { Me } from '../api/useMe'
 import AccountIdentity from '../components/AccountIdentity'
 import AccountLayout from '../components/AccountLayout'
+import AppLayout from '../components/AppLayout'
 import Button from '../components/Button'
 import Mogumi from '../components/Mogumi'
 import { openGoogleLogin } from '../lib/authNavigation'
@@ -44,12 +45,13 @@ export default function AccountPage() {
   })
 
   useEffect(() => {
+    if (me.status === 'APPROVED') return
     document.title = `${screen.title} · 머금`
     heading.current?.focus()
-  }, [screen.title, pathname])
+  }, [me.status, screen.title, pathname])
 
   if (pathname !== screen.path) return <Navigate to={screen.path} replace />
-  if (me.status === 'APPROVED') return <PlaceholderPage />
+  if (me.status === 'APPROVED') return <AppLayout><PlaceholderPage /></AppLayout>
 
   const submit = (action: Action) => {
     if (!mutation.isPending) mutation.mutate(action)

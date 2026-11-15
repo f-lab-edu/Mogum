@@ -24,6 +24,15 @@ afterEach(() => {
   sessionStorage.clear()
 })
 
+test('승인된 계정의 홈은 계정 면 대신 앱 틀 안에 머금 자리 화면을 보인다', async () => {
+  open('APPROVED', '/')
+  const heading = await screen.findByRole('heading', { name: '머금' })
+  expect(screen.getByRole('main')).toContainElement(heading)
+  expect(screen.getAllByRole('navigation')).toHaveLength(2)
+  expect(screen.queryByText(identity.email)).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeInTheDocument()
+})
+
 test.each([
   ['NOT_APPLIED', '머금 이용 신청'],
   ['APPLIED', '가입 승인을 기다리고 있어요'],
