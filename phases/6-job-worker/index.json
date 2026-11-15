@@ -98,7 +98,17 @@
     {
       "step": 7,
       "name": "waiting-screen",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T18:08:14+0900",
+      "summary": "WaitingPage /jobs/:jobId를 승인 뒤 AppLayout 안에 구현, TanStack Query로 QUEUED·RUNNING을 2초마다 읽고 성공·실패·읽기 오류 뒤 중단하며 다시 시도 성공 뒤 재개; 모구미→주제·수준·목적 또는 대상 제목→종류별 상태→떠나도 된다는 안내, 실패 묶음 code별 다시 시도·버리기와 서버 문구 그대로 표시·요청 중 버튼 잠금·버리기 뒤 홈·NOT_FOUND/연결 실패 안내 구현; 성공은 /courses/:courseId·/roadmaps/:roadmapId·/courses/:courseId/lessons/:lessonId로 replace 이동하고 결과는 위 바 제목만 있는 자리, 새 공통 FailureNotice와 apiFetch 기반 useJob/readJob/retryJob/discardJob/useJobAction으로 동작 성공 시 늦은 읽기 취소·해당 캐시 교체/삭제; 05 §2/5·UI_GUIDE §3/4.1/8 반영, 화면 테스트 209→264개(+55), 지정 test/lint와 추가 build·diff 검사 통과, 실제 브라우저 레이아웃은 검증하지 않음.",
+      "completed_at": "2026-11-15T22:38:11+0900",
+      "review_notes": [
+        "frontend/src/api/useJob.ts:59 — After a successful discard, `removeQueries` drops the job from the cache, but the `useJob` observer is still mounted until the redirect home happens. It may send one extra `GET /api/jobs/{id}`, which returns 404 because the job is gone. This doesn't change what the user sees. The test can't catch it because the mocked GET always returns 200 → either set the query to `enabled: false` before removing it, or add a test that counts GET requests after a discard.",
+        "frontend/src/api/useJob.ts:45 — If a single re-read fails during polling (a brief network drop or a 5xx), `retry: false` and the error check stop polling at once, and the screen switches to the 'couldn't load the job' notice. This matches what 05 §2 now says, but a short drop on a mobile connection during a long generation will send people to the error screen often → when the real worker runs, consider whether to tolerate a few failed re-reads before stopping.",
+        "frontend/src/pages/WaitingPage.tsx:22 — When an error response has no JSON body (for example a proxy 502 HTML page), `apiFetch` uses the English fallback 'Request failed', and the screen shows it as-is. AccountPage has the same pattern, so this was not introduced here → consider replacing that fallback with the common connection-failure message in client.ts.",
+        "frontend/src/pages/WaitingPage.tsx:98 — If discard fails with `JOB_DISCARD_NOT_ALLOWED` (for example the job was already retried in another tab and is no longer failed), the server's message appears, but the cached job still says failed, so the old buttons stay on screen → consider re-reading the job when an action fails.",
+        "frontend/src/pages/WaitingPage.tsx:90 — A failed job with an unknown error code offers only 'go home', so the user can never discard it. This is the safe choice, but 05 §1.2 defines only these two failure codes. If a new failure code is added later, this branch needs to change too."
+      ]
     }
   ],
   "created_at": "2026-11-15T12:27:13+0900"
