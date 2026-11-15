@@ -42,6 +42,11 @@
       "completed_at": "2026-11-09T20:47:21+0900"
     },
     {
+      "dir": "3b-ci-checks",
+      "status": "completed",
+      "completed_at": "2026-11-10T10:42:07+0900"
+    },
+    {
       "dir": "5-learning-model",
       "status": "completed",
       "completed_at": "2026-11-10T07:14:46+0900"
