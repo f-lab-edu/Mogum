@@ -17,7 +17,15 @@
     {
       "step": 1,
       "name": "credit-ledger",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T12:36:24+0900",
+      "summary": "account.service.CreditLedger: void lock(long userId), void consume(long userId, long jobId, int amount), void restoreIfOwed(long userId, long jobId); UserRepository.findByIdForUpdate(long id)의 JPA PESSIMISTIC_WRITE로 users 행을 잠그고 기본 @Transactional(REQUIRED)로 호출자 트랜잭션에 참여해 잔액·기록을 함께 변경; 사용자 행 잠금 안에서 발급한 credit_entries.id 순서로 마지막 작업 기록과 마지막 REFILL을 비교해 같은 시각의 기록도 중복·지난 주기 복구 방지; CreditEntry.jobId(Long)와 consume/restore 팩토리(양수 크기를 받아 음수/양수 기록), User.consumeCredits/restoreCredits 추가; CREDIT_INSUFFICIENT(409), ApiException.withMessage(ErrorCode, String)·responseMessage() 및 ApiErrorResponses.of(ApiException)으로 한국 날짜의 다음 채움 날을 넣은 공통 오류 응답 지원; application.yml app.credit.new-course/new-roadmap/plan-roadmap-course/replan-course/replan-roadmap/material은 모두 임시 1이며 CreditProperties.newCourse()/newRoadmap()/planRoadmapCourse()/replanCourse()/replanRoadmap()/material()로 읽어 호출자가 consume의 amount로 전달; 04 §2.3·§7·§10, 05 §1.2에 구현 사실 반영; 기존 코드에서도 재현된 부분 AC의 JUL 연결 누락은 RequestLogFilterIntegrationTest가 필요한 연결을 준비·원상복구하도록 보완; 지정 AC 두 명령 통과(부분 313개, 전체 build 1177개), 서버 테스트 1146→1177개(+31, 실패·건너뜀 0).",
+      "completed_at": "2026-11-15T12:49:36+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/common/logging/RequestLogFilterIntegrationTest.java:47-62 — step 범위 밖에서 JUL 브리지를 설치 · 해제하는 코드가 더해졌다. 테스트 전용이고 기존 테스트를 지키려는 수정으로 보여 반려하지는 않는다. 다만 새 테스트 클래스가 실행 순서를 바꿔 드러난 순서 의존성으로 보인다 → 원인(어느 마이그레이션 테스트가 브리지를 닫는지)을 HARNESS-BACKLOG 나 TEST_GUIDE 에 한 줄 남기길 권한다.",
+        "backend/src/main/java/com/mogum/account/service/CreditLedger.java:37 — `CREDIT_INSUFFICIENT` 는 부르는 쪽 트랜잭션에 참여한 상태에서 던져진다. 그래서 그 트랜잭션은 rollback-only 로 표시된다 → step 2 받기는 이 예외를 잡아 삼키고 커밋하면 안 되며(UnexpectedRollbackException) 그대로 전파해야 한다. step 2 리뷰 때 확인한다.",
+        "backend/src/main/java/com/mogum/account/service/CreditLedger.java:36 — `credit_refill_at` 은 APPROVED 일 때만 NOT NULL 이다(V9 CHECK). 승인 전 사용자에게 consume 이 불리면 NPE 가 난다. 받기는 승인 게이트(`ACCOUNT_NOT_APPROVED`) 뒤에서만 부르므로 지금은 문제없다. step 2 에서 그 순서가 지켜지는지 본다."
+      ]
     },
     {
       "step": 2,
