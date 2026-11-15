@@ -103,7 +103,7 @@
 
 | 전이 | 기록되는 필드 | 기록 주체 |
 |------|-------------|----------|
-| → `completed` | `completed_at`, `summary` | Codex (summary), execute.py (Claude 리뷰 승인 후 timestamp) |
+| → `completed` | `completed_at`, `summary`, `review_notes` | Codex (summary), execute.py (Claude 리뷰 승인 후 timestamp · 승인 리뷰의 비차단 권고가 있을 때만 `review_notes`) |
 | → `error` | `failed_at`, `error_message` | Codex 또는 execute.py (리뷰 반려 3회 · 리뷰 실행 실패), execute.py (timestamp) |
 | → `blocked` | `blocked_at`, `blocked_reason` | Codex (reason) 또는 execute.py (Codex 사용 한도), execute.py (timestamp) |
 
@@ -172,8 +172,8 @@ python3 scripts/execute.py {task-name} --push  # 실행 후 push
 step 하나의 흐름:
 
 1. **Codex 구현** — `codex exec --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust`. 프롬프트는 작업 규칙 · 이전 step summary · step 파일이다. `AGENTS.md` 는 Codex 가 스스로 읽는다. 샌드박스를 끄는 이유는 Gradle(`~/.gradle` · 네트워크)과 Testcontainers(Docker 소켓)가 workspace-write 에서 막히기 때문이다. 되돌리기 어려운 명령은 `.codex/rules/harness.rules` 가 막는다. TDD 는 `.codex/hooks.json` 의 TDD 가드가 강제한다. 훅 신뢰 승인을 건너뛰는 이유는, 승인 전이거나 고친 뒤 재승인 전인 훅이 `exec` 에서 조용히 빠지기 때문이다.
-2. **Claude 리뷰** — Codex 가 `completed` 로 끝내면 `claude -p --permission-mode dontAsk` 가 읽기 전용으로 리뷰한다. 볼 수 있는 것은 이 step 시작 커밋 이후의 diff 와 untracked 파일이다. AC 를 다시 돌리고 `approve` / `request_changes` 를 JSON 으로 판정한다. 결과는 `phases/{task}/step{N}-review.json` 에 남는다.
-3. **승인** → 코드(`feat`)와 메타데이터(`chore`)를 나눠 커밋한다.
+2. **Claude 리뷰** — Codex 가 `completed` 로 끝내면 `claude -p --permission-mode dontAsk` 가 읽기 전용으로 리뷰한다. 볼 수 있는 것은 이 step 시작 커밋 이후의 diff 와 untracked 파일이다. AC 를 다시 돌리고 `approve` / `request_changes` 를 JSON 으로 판정한다. 승인을 막지 않는 권고는 `notes` 에 따로 적는다 — 핵심 흐름을 깰 수 있는데 확인하지 못한 위험은 권고가 아니라 반려다. 결과는 `phases/{task}/step{N}-review.json` 에 남는다.
+3. **승인** → 코드(`feat`)와 메타데이터(`chore`)를 나눠 커밋한다. 권고(`notes`)가 있으면 승인 줄 아래 `⚑ 권고:` 로 찍고 index 의 그 step 에 `review_notes` 로 남긴다 — 감시할 때 · `/review` 때 이것을 본다.
    **반려** → 지적 사항(findings)을 다음 Codex 시도의 프롬프트에 넣는다. 이전 시도의 변경은 작업 트리에 남긴 채로 고치게 한다. Codex 실패와 리뷰 반려를 합쳐 최대 3회 시도한다.
    **판정 없음**(리뷰 출력 파싱 실패 · 시간 초과) → Codex 를 다시 돌리지 않고 리뷰만 한 번 더 한다. 그래도 없으면 `error`. 리뷰가 사용 한도에 걸린 것은 판정 없음으로 세지 않는다(아래 「사용 한도」).
 

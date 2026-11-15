@@ -7,7 +7,7 @@
 - `docs/README.md` (문서 표 · 규칙)
 - `docs/04-jobs-and-cost.md` §1 · §2 (기술 선택 · 코드 구조 · 패키지 경계)
 - `docs/ADR.md`
-- phase 리뷰라면 `phases/{task}/index.json` 과 각 `step{N}.md` · `step{N}-review.json`(step 단위 리뷰 기록) · `step{N}-output.json`(Codex 실행 기록)
+- phase 리뷰라면 `phases/{task}/index.json`(step 별 `review_notes` — 승인 리뷰가 남긴 비차단 권고. 고칠지 이 리뷰에서 정한다)과 각 `step{N}.md` · `step{N}-review.json`(step 단위 리뷰 기록) · `step{N}-output.json`(Codex 실행 기록)
 - `phases/HARNESS-BACKLOG.md` (지금까지 나온 하네스 문제 · step 작성 교훈)
 
 그런 다음 변경을 확인한다: `git diff main...HEAD` (커밋되지 않은 변경이 있으면 `git status` 로 함께 본다). `phases/` 메타데이터는 제외한다.

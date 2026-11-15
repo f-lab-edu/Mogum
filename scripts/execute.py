@@ -82,8 +82,9 @@ class StepExecutor:
             "verdict": {"type": "string", "enum": ["approve", "request_changes"]},
             "summary": {"type": "string"},
             "findings": {"type": "array", "items": {"type": "string"}},
+            "notes": {"type": "array", "items": {"type": "string"}},
         },
-        "required": ["verdict", "summary", "findings"],
+        "required": ["verdict", "summary", "findings", "notes"],
     }
     # 리뷰어가 쓸 수 있는 도구 — 나머지는 dontAsk 모드가 거부한다. 파일 수정 도구는 넣지 않는다.
     # step 의 AC 커맨드는 아래 형태로 써야 리뷰어가 다시 돌려볼 수 있다.
@@ -383,7 +384,11 @@ class StepExecutor:
             f"## 판정\n\n"
             f"- approve: 위를 모두 통과. 취향 차이는 반려 사유가 아니다.\n"
             f"- request_changes: 하나라도 어김. findings 에 \"파일:줄 — 무엇이 왜 틀렸나 → 고칠 방향\" 형식으로 적는다. "
-            f"구현 담당은 이 목록만 보고 고친다.\n\n---\n\n"
+            f"구현 담당은 이 목록만 보고 고친다.\n"
+            f"- notes: 승인을 막지 않는 권고(동작 영향 없는 문서 · 이름 · 테스트 보강 등)는 summary 가 아니라 여기에 "
+            f"같은 형식으로 적는다. 사람이 읽는다. 없으면 빈 배열.\n"
+            f"- 핵심 흐름(로그인 · 결제 · 데이터 쓰기 등)을 깰 수 있는데 확인하지 못한 위험은 notes 가 아니라 "
+            f"request_changes 로 낸다 — findings 에 그 위험을 확인하는 테스트를 요구한다.\n\n---\n\n"
             f"{step_file.read_text()}"
         )
         exit_code, stdout, stderr, timed_out = self._run_agent(
@@ -532,12 +537,17 @@ class StepExecutor:
                     self._fail_step(step_num, step_name,
                                     f"Claude 리뷰 판정을 얻지 못했다 — phases/{self._phase_dir_name}/step{step_num}-review.json 확인")
                 if review["verdict"] == "approve":
+                    notes = review.get("notes") or []
                     for s in index["steps"]:
                         if s["step"] == step_num:
                             s["completed_at"] = self._stamp()
+                            if notes:
+                                s["review_notes"] = notes
                     self._write_json(self._index_file, index)
                     self._commit_step(step_num, step_name)
                     print(f"  ✓ Step {step_num}: {step_name} [{elapsed}s · 리뷰 {review_elapsed}s] — 리뷰 승인")
+                    for note in notes:
+                        print(f"    ⚑ 권고: {note}")
                     return True
                 err_msg = self._format_review(review)
                 last_review = err_msg

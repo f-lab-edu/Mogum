@@ -594,6 +594,29 @@ class TestReviewStep:
         assert "Bash(./gradlew:*)" not in allowed
         assert "./backend/gradlew -p backend" in mock_run.call_args[1]["input"]
 
+    def test_schema_requires_notes_for_non_blocking_advice(self, executor):
+        """승인하면서 남기는 권고는 summary 가 아니라 notes 에 따로 받는다(H7)."""
+        mock_result = MagicMock(returncode=0, stdout=_claude_json(self.APPROVE), stderr="")
+
+        with patch("subprocess.run", return_value=mock_result) as mock_run:
+            executor._review_step({"step": 2, "name": "ui"}, "abc123")
+
+        cmd = mock_run.call_args[0][0]
+        schema = json.loads(cmd[cmd.index("--json-schema") + 1])
+        assert "notes" in schema["required"]
+        assert schema["properties"]["notes"] == {"type": "array", "items": {"type": "string"}}
+
+    def test_prompt_treats_unverified_core_risk_as_blocking(self, executor):
+        """핵심 흐름을 깰 수 있는데 확인하지 못한 위험은 권고가 아니라 반려다 — 1-auth step 3 의 PKCE(H7)."""
+        mock_result = MagicMock(returncode=0, stdout=_claude_json(self.APPROVE), stderr="")
+
+        with patch("subprocess.run", return_value=mock_result) as mock_run:
+            executor._review_step({"step": 2, "name": "ui"}, "abc123")
+
+        prompt = mock_run.call_args[1]["input"]
+        assert "notes" in prompt
+        assert "확인하지 못한 위험" in prompt
+
     def test_returns_structured_output_and_saves(self, executor):
         mock_result = MagicMock(returncode=0, stdout=_claude_json(self.APPROVE), stderr="")
         step = {"step": 2, "name": "ui"}
@@ -718,6 +741,21 @@ class TestExecuteSingleStep:
         assert commits == [2]
         assert self._step2(executor)["status"] == "completed"
         assert "completed_at" in self._step2(executor)
+
+    def test_approval_notes_are_printed_and_kept_in_index(self, executor, capsys):
+        """승인 리뷰의 비차단 권고는 사람이 리뷰 파일을 열지 않아도 보인다(H7)."""
+        notes = ["deploy/README.md:12 — 옛 경로가 남았다(동작 영향 없음)"]
+        self._wire(executor, [{**self.APPROVE, "notes": notes}])
+
+        assert executor._execute_single_step(self._step2(executor)) is True
+        assert self._step2(executor)["review_notes"] == notes
+        assert "deploy/README.md:12 — 옛 경로가 남았다" in capsys.readouterr().out
+
+    def test_approval_without_notes_leaves_no_field(self, executor):
+        self._wire(executor, [{**self.APPROVE, "notes": []}])
+
+        assert executor._execute_single_step(self._step2(executor)) is True
+        assert "review_notes" not in self._step2(executor)
 
     def test_rejection_feeds_findings_to_next_codex_attempt(self, executor):
         preambles, commits = self._wire(executor, [self.REJECT, self.APPROVE])
