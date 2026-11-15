@@ -57,7 +57,16 @@
     {
       "step": 4,
       "name": "worker-run",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T17:38:58+0900",
+      "summary": "generation.JobGenerator: JobType type(), GenerationOutcome generate(JobSnapshot), ResultRef save(JobSnapshot, GeneratedResult); JobSnapshot와 Input은 ID·종류·입력·피드백·claimCount의 record, ResultRef(long id)는 새 결과/원래 대상 ID; GenerationOutcome.Success와 Failure(PROVIDER_UNAVAILABLE·INVALID_OUTPUT·PROVIDER_REJECTED·INPUT_TOO_LARGE), 앞 둘만 자동 다시 시도; worker.JobRunner의 boolean runOnce()는 외부 ScheduledExecutorService로 시한을 갱신하고 TransactionTemplate·EntityManager로 한 바퀴 처리, 운영 빈 조립과 실행 스레드는 step 5; PostgreSQL CTE의 ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1 → UPDATE RETURNING으로 QUEUED/시한 지난 RUNNING 하나를 원자적으로 꺼내 claim_count+1, 갱신·저장·실패 모두 같은 claim_count/RUNNING 조건과 updated_at, 저장 첫 쓰기로 소유권 확인 뒤 save·flush·성공을 함께 커밋, 실패와 restoreIfOwed도 원자적, 저장 예외는 롤백 후 RUNNING 유지; app.worker.lease-duration=5m·renewal-interval=30s·max-retries=2(추가 호출 수)·retry-delay=1s 임시 값을 WorkerProperties로 읽음; 공용 IntegrationTestConfiguration.JobGenerators의 중첩 static TestJobGenerator 여섯 빈, 종류별 plan(jobId).fail(Failure,N)/holdFirst()/awaitEntered()/release()/failSave(marker 또는 null)로 갈래·대기·저장 예외 설정, calls/saves/snapshots/outsideTransaction/mdc로 관찰하고 reset()으로 초기화(step 5 재사용); 안전한 세 로그 줄·MDC 정리와 실제 PostgreSQL 동시 꺼내기/잠긴 선두 건너뛰기/순서/시한 갱신·되찾기/늦은 성공·실패/삭제/재시도/결과·크레딧 롤백 검증, 04 §2.3·9.1·10과 07 §2·5·package-info 반영; 지정 AC 부분 531개·전체 build 1454개 통과, 서버 테스트 1423→1454개(+31, 실패·오류·건너뜀 0).",
+      "completed_at": "2026-11-15T17:50:10+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/worker/JobRunner.java:155 — 저장 예외를 감쌀 때 cause 를 통째로 버려서, 운영에서 DB 제약 위반 같은 근본 원인 타입이 스택에 남지 않는다. 금지 26 상 메시지를 빼는 것은 맞다 → 필요하면 cause 사슬의 예외 타입 이름 · 스택 위치만 같은 방식으로 이어 붙이는 것을 강의 목록 TASK 에서 검토한다. Hibernate SqlExceptionHelper 의 프레임워크 로그(제약 위반 상세에 입력값이 섞일 수 있다)도 실제 save 구현이 붙을 때 표식 테스트로 확인한다.",
+        "backend/src/main/java/com/mogum/worker/JobRunner.java:59 — 종류에 맞는 처리기가 없으면 예외를 던지고 작업을 RUNNING 으로 둔다. 그러면 시한이 지날 때마다 되찾아져 끝없이 돈다. 지금은 운영에서 어떤 종류도 받지 않아(README 2026-11-15) 문제가 없다 → step 5 가 워커를 띄울 때 이 상황을 어떻게 다룰지(처리기 없는 종류는 받지 않는다는 전제를 유지) 확인한다.",
+        "backend/src/main/java/com/mogum/worker/JobRunner.java:211 — 갱신 스케줄에서 DB 예외를 로그 없이 삼킨다. '0 rows 만 소유권 상실의 증거'라는 의도와 '정한 줄 외 로그 금지'에는 맞다. 다만 DB 가 끊긴 동안 아무 흔적이 없다 → step 5 · 관측 작업에서 메트릭(태그에 ID 없이)으로 볼지 검토한다.",
+        "backend/src/test/java/com/mogum/worker/JobRunnerIntegrationTest.java:496 — `// when & then` 으로 합쳐 썼다. TEST_GUIDE 의 given/when/then 세 칸 형식과 조금 다르다. 동작에는 영향이 없다."
+      ]
     },
     {
       "step": 5,
