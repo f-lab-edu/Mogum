@@ -41,6 +41,7 @@
 - 계정 TASK 구현: `ACCOUNT_NOT_APPROVED`(403)은 신청 전 · 신청 · 거절됨인 사람이 허용된 계정 동작 밖의 API를 부를 때 반환한다. 문구는 「승인된 계정이 필요합니다」이며, 화면은 「나」를 다시 읽어 상태 화면으로 간다.
 - 만드는 작업 TASK(`6-job-worker` step 1) 구현: 「크레딧 부족」은 `CREDIT_INSUFFICIENT`(409)이며 문구는 「크레딧이 부족합니다. {yyyy-MM-dd}에 다시 채워집니다」다. `{yyyy-MM-dd}`에는 `credit_refill_at`을 `Asia/Seoul`로 바꾼 한국 날짜를 넣는다. 서버 문구는 `ApiException.withMessage(ErrorCode, String)`로 넘기고 `ApiExceptionHandler` → `ApiErrorResponses.of(ApiException)`의 공통 경로로 응답한다. 기존 생성자는 고정 문구와 `retryAfterSeconds` 동작을 유지하며 예외 자체의 메시지는 code만 담는다.
 - 만드는 작업 TASK(`6-job-worker` step 2) 구현: 「만드는 중인 것이 많음」은 `TOO_MANY_IN_PROGRESS`(409), 문구는 「지금 만드는 것이 끝나면 다시 시도해 주세요」다. 입력이 너무 큰 실패의 다시 시도 거절은 `JOB_RETRY_NOT_ALLOWED`(409), 「주제를 좁혀 새로 만들어 주세요」다. 실패가 아닌 작업의 버리기 거절은 `JOB_DISCARD_NOT_ALLOWED`(409), 「실패한 만들기만 버릴 수 있습니다」다. 실패가 아닌 작업의 다시 시도는 현재 작업을 그대로 돌려준다.
+- 만드는 작업 TASK 구현: `6-job-worker` step 3의 작업 읽기는 실패한 작업도 HTTP 200의 `data.error`에 공통 `ApiError` 객체(`code` · `message`)를 싣는다. `INPUT_TOO_LARGE`는 `JOB_INPUT_FAILURE`, 「주제를 좁혀 새로 만들어 주세요」이며 버리기만 가능하다. 나머지 세 실패 까닭은 `JOB_TEMPORARY_FAILURE`, 「만들지 못했습니다. 다시 시도하거나 버려 주세요」이며 다시 시도 · 버리기가 가능하다. 원래 실패 까닭은 반환하지 않는다.
 - 기술적인 원인(응답이 잘림 · 서버 응답 없음 등)은 싣지 않는다(ADR-088).
 - 만들기 실패도 작업을 읽을 때 같은 모양으로 싣는다.
 
@@ -68,6 +69,37 @@
 - **강의 자료는 화면이 건다** — 강의를 열었을 때 자료도 작업도 없으면 화면이 받기를 부른다. 강의를 가져오는 것만으로는 만들지 않는다.
 - 기다리는 화면은 작업을 정한 간격으로 다시 읽고, 성공하면 작업이 가리키는 결과로 넘어간다(ADR-077).
 
+- 만드는 작업 TASK 구현: `6-job-worker` step 3의 네 주소는 아래와 같다. 받기와 다시 시도는 step 2의 트랜잭션이 커밋된 뒤 작업을 다시 읽어 같은 응답을 반환한다. 운영 받기 처리기는 아직 없어 여섯 종류의 받기 모두 `INVALID_REQUEST`(400)이며, 아래 성공 흐름은 테스트 전용 처리기로 검증했다.
+
+| 동작 | 메서드 · 경로 | 성공 |
+|---|---|---|
+| 받기 | `POST /api/jobs` | 200 · `ApiResponse<JobResponse>` |
+| 작업 하나 읽기 | `GET /api/jobs/{id}` | 200 · `ApiResponse<JobResponse>` |
+| 다시 시도 | `POST /api/jobs/{id}/retry` | 200 · `ApiResponse<JobResponse>` · 요청 본문 없음 |
+| 버리기 | `POST /api/jobs/{id}/discard` | 204 · 본문 없음 · 요청 본문 없음 |
+
+- 만드는 작업 TASK 구현: 받기 JSON은 입력을 중첩하지 않고 `type` · `courseId` · `roadmapId` · `lessonId` · `topic` · `level` · `levelOther` · `purpose` · `purposeOther` · `memo` · `feedback`을 최상위 칸으로 받는다. `JobReceiveRequest`의 `@ValidJobRequest`가 [02 §8.1](./02-domain-data.md#81-공통-규칙) · [§8.5](./02-domain-data.md#85-만들기--호출)의 길이 · 빈 글 · 칸 사이 CHECK를 검사하고, `toJobRequest()`가 step 2의 값으로 변환한다. 모르는 칸은 무시한다.
+
+| 종류 | 필수 칸 | 그 밖의 입력 |
+|---|---|---|
+| `NEW_COURSE` · `NEW_ROADMAP` | `topic` · `level` · `purpose` | `memo` · 수준이 `OTHER`이면 `levelOther` 필수 · 목적이 `OTHER`이면 `purposeOther` 필수 |
+| `PLAN_ROADMAP_COURSE` | `courseId` | — |
+| `REPLAN_COURSE` | `courseId` | `feedback` |
+| `REPLAN_ROADMAP` | `roadmapId` | `feedback` |
+| `MATERIAL` | `lessonId` | — |
+
+- 만드는 작업 TASK 구현: 위 종류에 해당하지 않는 입력 · 대상 · 피드백 칸과 `OTHER`가 아닌데 보낸 기타 글은 비어 있어야 한다. 칸 오류는 `FIELD_INVALID`(400), 「입력을 확인해 주십시오」와 `fields: [{"field":"칸 이름","reason":"까닭"}]`로 반환한다. 빠진 필수 값 · 빈 글은 `REQUIRED`, 글자 수 상한 초과는 `TOO_LONG`, 모르는 `type` · `level` · `purpose`는 `INVALID_VALUE`, 비어 있어야 할 칸은 `NOT_ALLOWED`다. 길이는 PostgreSQL `char_length`처럼 유니코드 코드 포인트 수로 센다. 깨진 JSON은 `INVALID_REQUEST`(400)이며 요청 원문은 응답 · 로그에 남기지 않는다.
+
+```json
+{"type":"NEW_COURSE","topic":"자바","level":"BEGINNER","purpose":"WORK","memo":"예제를 많이 보고 싶어요"}
+```
+
+- 만드는 작업 TASK 구현: 성공 응답의 `data`는 `id` · `type` · `status` · `subject`와, 성공일 때만 `result`, 실패일 때만 `error`를 싣는다. 비어 있는 칸은 생략한다. `subject`는 새로 배우기라면 `topic` · `level` · `purpose`와 해당하는 `levelOther` · `purposeOther`이고, 대상이 있는 종류라면 `title` 하나다(코스 · 로드맵 · 강의의 현재 제목). 메모 · 피드백 · 사용자 ID · 횟수 · 시한 · 시작/끝 시각은 반환하지 않는다. `result`는 코스면 `{"type":"COURSE","id":코스ID}`, 로드맵이면 `{"type":"ROADMAP","id":로드맵ID}`, 강의 자료면 `{"type":"LESSON","id":강의ID,"courseId":코스ID}`다. 실패 `error`의 두 code와 문구는 [§1.2](#12-오류--묶음-이름과-서버가-정한-문구)에 적었다.
+
+```json
+{"data":{"id":11,"type":"NEW_COURSE","status":"QUEUED","subject":{"topic":"자바","level":"BEGINNER","purpose":"WORK"}}}
+```
+
 ## 3. 읽기 — 화면마다 한 번
 
 **화면마다 읽기 한 번으로 그린다. 홈만 칸마다 따로 읽고, 고르는 규칙은 서버에 둔다**(ADR-144).
@@ -85,6 +117,7 @@
 | 오늘 복습할 카드 | 카드들 — 질문 · 답 · 평가마다 다음 간격(ADR-170) · 몇 장 남았는지(ADR-014 · ADR-017). 코스를 주면 그 코스의 카드만(ADR-172). 화면은 받은 카드를 다 보면 다시 읽는다 — 같은 날 다시 보는 카드가 돌아온다(ADR-164) | 복습 탭 |
 
 - 계정 TASK 구현: 「나」는 `GET /api/me`이며, 성공 응답 `data`에 `status` · `email` · `name`을 싣는다.
+- 만드는 작업 TASK 구현: 「작업 하나」는 `GET /api/jobs/{id}`이며, `job.service.JobReadService.read(userId, jobId)`가 주인을 확인한 뒤 [§2](#2-만드는-작업--받기-하나--다시-읽기)의 응답을 만든다. 남의 작업과 없는 작업 모두 `NOT_FOUND`(404), 「찾을 수 없습니다」다. 조회는 상태 · Auditing 시각 · 크레딧을 바꾸지 않는다.
 - 「나」의 크레딧(남은 크레딧 · 다음에 채워지는 날)은 내 정보 탭 TASK 에서 더한다 — 계정 TASK 의 「나」는 누구인지(이메일 · 이름)와 상태만 싣는다. 응답이 객체라 칸만 더하면 된다(§1 · 사용자 확인 2026-11-08).
 - 개인정보처리방침은 화면에 둔 글이라 읽기가 없다.
 
@@ -112,7 +145,7 @@
 
 | 것 | 근거 |
 |---|---|
-| 경로 · 칸 이름 · 오류 묶음의 목록과 문구 | ADR-143 · ADR-145 |
+| 경로 · 칸 이름 · 오류 묶음의 목록과 문구 — 만드는 작업 부분은 `6-job-worker` step 3에서 정했다(§1.2 · §2 · §3). 나머지는 각 TASK에서 정한다 | ADR-143 · ADR-145 |
 | 쿠키 설정 · 요청 위조 막기 | ADR-142 |
 | 기다리는 화면이 작업을 다시 읽는 간격(만드는 작업 TASK) · 대상이 없는 새로 배우기를 두 번 눌렀을 때(강의 목록 TASK — README 2026-11-15) — 대상이 있는 만들기는 하나만 둔다(ADR-157) | ADR-143 |
 | 목록을 나눠 받을지 — 정원 10명이라 MVP 에서 나눌 만큼 길지 않다 | ADR-061 |

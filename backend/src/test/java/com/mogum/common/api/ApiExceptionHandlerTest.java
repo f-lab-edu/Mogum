@@ -268,6 +268,24 @@ class ApiExceptionHandlerTest {
                 """);
     }
 
+    @Test
+    @DisplayName("칸 사이 제약도 값 원문 없이 안전한 reason과 칸 이름으로 반환한다")
+    void returnsCrossFieldReasons() throws Exception {
+        // given
+        var request = new com.mogum.job.dto.JobReceiveRequest("NEW_COURSE", null, null, null,
+                "자바", "BEGINNER", "private input", "WORK", null, null, null);
+        var exception = validationException(validate(request));
+
+        // when
+        var response = new ApiExceptionHandler().handleException(exception, webRequest());
+
+        // then
+        assertValidationResponse(response, """
+                {"code":"FIELD_INVALID","message":"입력을 확인해 주십시오",
+                 "fields":[{"field":"levelOther","reason":"NOT_ALLOWED"}]}
+                """);
+    }
+
     private MockMvcTester mvc(RuntimeException failure) {
         return MockMvcTester.of(List.of(new Controllers.FailingController(failure)), builder -> builder
                 .setControllerAdvice(new ApiExceptionHandler()).build());

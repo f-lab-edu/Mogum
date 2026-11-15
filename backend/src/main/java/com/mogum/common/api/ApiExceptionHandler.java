@@ -52,6 +52,13 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 && sizeOf(violation.getInvalidValue()) > max) {
             return new FieldViolation(fieldError.getField(), FieldViolation.Reason.TOO_LONG);
         }
+        // 사용자 입력이나 기본 검증 문구 대신, 서버 제약이 명시한 reason만 허용한다.
+        var template = violation.getMessageTemplate();
+        for (var reason : FieldViolation.Reason.values()) {
+            if (("field." + reason.name()).equals(template)) {
+                return new FieldViolation(fieldError.getField(), reason);
+            }
+        }
         return null;
     }
 

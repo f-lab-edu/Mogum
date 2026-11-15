@@ -22,6 +22,7 @@ import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.boot.web.servlet.AbstractFilterRegistrationBean;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -60,20 +61,26 @@ import java.util.concurrent.atomic.AtomicReference;
         IntegrationTestConfiguration.ServletErrors.class,
         IntegrationTestConfiguration.FilterFailure.class,
         IntegrationTestConfiguration.ErrorDispatchProbe.class,
-        IntegrationTestConfiguration.DomainFailureController.class})
+        IntegrationTestConfiguration.DomainFailureController.class,
+        IntegrationTestConfiguration.JobIntakeHandlers.class})
 public class IntegrationTestConfiguration {
-    @Bean
-    public JobIntakeHandler newCourseIntake() { return new TestJobIntakeHandler(JobType.NEW_COURSE); }
-    @Bean
-    public JobIntakeHandler newRoadmapIntake() { return new TestJobIntakeHandler(JobType.NEW_ROADMAP); }
-    @Bean
-    public JobIntakeHandler planRoadmapCourseIntake() { return new TestJobIntakeHandler(JobType.PLAN_ROADMAP_COURSE); }
-    @Bean
-    public JobIntakeHandler replanCourseIntake() { return new TestJobIntakeHandler(JobType.REPLAN_COURSE); }
-    @Bean
-    public JobIntakeHandler replanRoadmapIntake() { return new TestJobIntakeHandler(JobType.REPLAN_ROADMAP); }
-    @Bean
-    public JobIntakeHandler materialIntake() { return new TestJobIntakeHandler(JobType.MATERIAL); }
+    /** 기본 통합 시험은 여섯 종류를 허용하며, 처리기 없는 운영 구성 시험만 이 묶음을 뺀다. */
+    @TestConfiguration(proxyBeanMethods = false)
+    @ConditionalOnProperty(name = "test.job-intake-handlers", havingValue = "true", matchIfMissing = true)
+    public static class JobIntakeHandlers {
+        @Bean
+        public JobIntakeHandler newCourseIntake() { return new TestJobIntakeHandler(JobType.NEW_COURSE); }
+        @Bean
+        public JobIntakeHandler newRoadmapIntake() { return new TestJobIntakeHandler(JobType.NEW_ROADMAP); }
+        @Bean
+        public JobIntakeHandler planRoadmapCourseIntake() { return new TestJobIntakeHandler(JobType.PLAN_ROADMAP_COURSE); }
+        @Bean
+        public JobIntakeHandler replanCourseIntake() { return new TestJobIntakeHandler(JobType.REPLAN_COURSE); }
+        @Bean
+        public JobIntakeHandler replanRoadmapIntake() { return new TestJobIntakeHandler(JobType.REPLAN_ROADMAP); }
+        @Bean
+        public JobIntakeHandler materialIntake() { return new TestJobIntakeHandler(JobType.MATERIAL); }
+    }
 
     /** 만드는 작업 시험만 쓰는 확인 처리기. 원문을 로그나 예외에 넣지 않는다. */
     public static final class TestJobIntakeHandler implements JobIntakeHandler {
