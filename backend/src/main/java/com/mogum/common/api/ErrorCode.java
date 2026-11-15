@@ -20,6 +20,12 @@ public enum ErrorCode {
     FIELD_INVALID(HttpStatus.BAD_REQUEST, "입력을 확인해 주십시오"),
     /** 만들기를 받을 때 크레딧이 모자라면 409로 반환하며 문구에 다음에 채워지는 날을 넣는다. */
     CREDIT_INSUFFICIENT(HttpStatus.CONFLICT, "크레딧이 부족합니다"),
+    /** 한 사람의 기다림과 만드는 중 작업이 상한에 닿으면 409로 반환한다. */
+    TOO_MANY_IN_PROGRESS(HttpStatus.CONFLICT, "지금 만드는 것이 끝나면 다시 시도해 주세요"),
+    /** 입력이 너무 커 실패한 작업의 다시 시도를 거절할 때 409로 반환한다. */
+    JOB_RETRY_NOT_ALLOWED(HttpStatus.CONFLICT, "주제를 좁혀 새로 만들어 주세요"),
+    /** 실패가 아닌 작업의 버리기를 거절할 때 409로 반환한다. */
+    JOB_DISCARD_NOT_ALLOWED(HttpStatus.CONFLICT, "실패한 만들기만 버릴 수 있습니다"),
     /** 처리되지 않은 예외는 500으로 반환하고, 500 이상 오류 상태를 공통 변환할 때도 쓴다. */
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "요청을 처리할 수 없습니다");
 

@@ -4,6 +4,9 @@ import com.mogum.common.api.ApiResponse;
 import com.mogum.common.api.ApiException;
 import com.mogum.common.api.ErrorCode;
 import com.mogum.common.logging.RequestLogFilter;
+import com.mogum.job.JobIntakeHandler;
+import com.mogum.job.JobRequest;
+import com.mogum.job.domain.JobType;
 import com.sun.net.httpserver.HttpServer;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.Filter;
@@ -59,6 +62,34 @@ import java.util.concurrent.atomic.AtomicReference;
         IntegrationTestConfiguration.ErrorDispatchProbe.class,
         IntegrationTestConfiguration.DomainFailureController.class})
 public class IntegrationTestConfiguration {
+    @Bean
+    public JobIntakeHandler newCourseIntake() { return new TestJobIntakeHandler(JobType.NEW_COURSE); }
+    @Bean
+    public JobIntakeHandler newRoadmapIntake() { return new TestJobIntakeHandler(JobType.NEW_ROADMAP); }
+    @Bean
+    public JobIntakeHandler planRoadmapCourseIntake() { return new TestJobIntakeHandler(JobType.PLAN_ROADMAP_COURSE); }
+    @Bean
+    public JobIntakeHandler replanCourseIntake() { return new TestJobIntakeHandler(JobType.REPLAN_COURSE); }
+    @Bean
+    public JobIntakeHandler replanRoadmapIntake() { return new TestJobIntakeHandler(JobType.REPLAN_ROADMAP); }
+    @Bean
+    public JobIntakeHandler materialIntake() { return new TestJobIntakeHandler(JobType.MATERIAL); }
+
+    /** 만드는 작업 시험만 쓰는 확인 처리기. 원문을 로그나 예외에 넣지 않는다. */
+    public static final class TestJobIntakeHandler implements JobIntakeHandler {
+        public static final String REJECT_TOPIC = "test-intake-rejected";
+        private final JobType type;
+        public TestJobIntakeHandler(JobType type) { this.type = type; }
+        @Override
+        public JobType type() { return type; }
+        @Override
+        public void check(long userId, JobRequest request) {
+            if (request.input() != null && REJECT_TOPIC.equals(request.input().getTopic())) {
+                throw new ApiException(ErrorCode.INVALID_REQUEST);
+            }
+        }
+    }
+
     // 바깥 설정을 파싱할 때 단위 테스트 설정까지 자동 등록하지 않도록 비컴포넌트 안에 둔다.
     public static final class CookieUnitSupport {
         /** 세션 직렬화기 구성만 보는 단위 테스트용이며 공용 앱에는 가져오지 않는다. */

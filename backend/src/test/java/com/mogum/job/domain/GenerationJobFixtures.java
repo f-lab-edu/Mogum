@@ -33,6 +33,18 @@ public final class GenerationJobFixtures {
         return GenerationJob.material(userId, lessonId);
     }
 
+    public static void failed(GenerationJob job, JobErrorType error) {
+        withStatus(job, JobStatus.FAILED);
+        org.springframework.test.util.ReflectionTestUtils.setField(job, "errorType", error);
+        org.springframework.test.util.ReflectionTestUtils.setField(job, "finishedAt", Instant.parse("2026-11-15T00:00:00Z"));
+    }
+
+    public static void running(GenerationJob job) { withStatus(job, JobStatus.RUNNING); }
+
+    public static void withStatus(GenerationJob job, JobStatus status) {
+        org.springframework.test.util.ReflectionTestUtils.setField(job, "status", status);
+    }
+
     public static void running(JdbcTemplate jdbc, long id, int claimCount, Instant startedAt, Instant leaseUntil) {
         jdbc.update("""
                 UPDATE generation_jobs SET status = 'RUNNING', claim_count = ?, started_at = ?, lease_until = ?,

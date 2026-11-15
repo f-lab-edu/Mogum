@@ -106,6 +106,14 @@ public class GenerationJob extends AuditedEntity {
         return job;
     }
 
+    /** 실패한 작업을 원래 받은 순서를 유지한 채 기다림으로 돌린다. */
+    public void retry() {
+        if (status != JobStatus.FAILED) throw new IllegalStateException("Only failed jobs can be retried");
+        status = JobStatus.QUEUED;
+        errorType = null;
+        finishedAt = null;
+    }
+
     private static GenerationJob queued(long userId, JobType type) {
         var job = new GenerationJob();
         job.userId = userId;

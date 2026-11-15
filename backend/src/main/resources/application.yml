@@ -59,6 +59,8 @@ management:
         enabled: false
 
 app:
+  job:
+    max-in-progress-per-user: 3
   credit:
     monthly-amount: 100
     new-course: 1
