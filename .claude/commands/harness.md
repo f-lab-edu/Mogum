@@ -103,7 +103,7 @@
 
 | 전이 | 기록되는 필드 | 기록 주체 |
 |------|-------------|----------|
-| → `completed` | `completed_at`, `summary` | Codex (summary), execute.py (Claude 리뷰 승인 후 timestamp) |
+| → `completed` | `completed_at`, `summary`, `review_notes` | Codex (summary), execute.py (Claude 리뷰 승인 후 timestamp · 승인 리뷰의 비차단 권고가 있을 때만 `review_notes`) |
 | → `error` | `failed_at`, `error_message` | Codex 또는 execute.py (리뷰 반려 3회 · 리뷰 실행 실패), execute.py (timestamp) |
 | → `blocked` | `blocked_at`, `blocked_reason` | Codex (reason) 또는 execute.py (Codex 사용 한도), execute.py (timestamp) |
 
@@ -172,8 +172,8 @@ python3 scripts/execute.py {task-name} --push  # 실행 후 push
 step 하나의 흐름:
 
 1. **Codex 구현** — `codex exec --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust`. 프롬프트는 작업 규칙 · 이전 step summary · step 파일이다. `AGENTS.md` 는 Codex 가 스스로 읽는다. 샌드박스를 끄는 이유는 Gradle(`~/.gradle` · 네트워크)과 Testcontainers(Docker 소켓)가 workspace-write 에서 막히기 때문이다. 되돌리기 어려운 명령은 `.codex/rules/harness.rules` 가 막는다. TDD 는 `.codex/hooks.json` 의 TDD 가드가 강제한다. 훅 신뢰 승인을 건너뛰는 이유는, 승인 전이거나 고친 뒤 재승인 전인 훅이 `exec` 에서 조용히 빠지기 때문이다.
-2. **Claude 리뷰** — Codex 가 `completed` 로 끝내면 `claude -p --permission-mode dontAsk` 가 읽기 전용으로 리뷰한다. 볼 수 있는 것은 이 step 시작 커밋 이후의 diff 와 untracked 파일이다. AC 를 다시 돌리고 `approve` / `request_changes` 를 JSON 으로 판정한다. 결과는 `phases/{task}/step{N}-review.json` 에 남는다.
-3. **승인** → 코드(`feat`)와 메타데이터(`chore`)를 나눠 커밋한다.
+2. **Claude 리뷰** — Codex 가 `completed` 로 끝내면 `claude -p --permission-mode dontAsk` 가 읽기 전용으로 리뷰한다. 볼 수 있는 것은 이 step 시작 커밋 이후의 diff 와 untracked 파일이다. AC 를 다시 돌리고 `approve` / `request_changes` 를 JSON 으로 판정한다. 승인을 막지 않는 권고는 `notes` 에 따로 적는다 — 핵심 흐름을 깰 수 있는데 확인하지 못한 위험은 권고가 아니라 반려다. 결과는 `phases/{task}/step{N}-review.json` 에 남는다.
+3. **승인** → 코드(`feat`)와 메타데이터(`chore`)를 나눠 커밋한다. 권고(`notes`)가 있으면 승인 줄 아래 `⚑ 권고:` 로 찍고 index 의 그 step 에 `review_notes` 로 남긴다 — 감시할 때 · `/review` 때 이것을 본다.
    **반려** → 지적 사항(findings)을 다음 Codex 시도의 프롬프트에 넣는다. 이전 시도의 변경은 작업 트리에 남긴 채로 고치게 한다. Codex 실패와 리뷰 반려를 합쳐 최대 3회 시도한다.
    **판정 없음**(리뷰 출력 파싱 실패 · 시간 초과) → Codex 를 다시 돌리지 않고 리뷰만 한 번 더 한다. 그래도 없으면 `error`. 리뷰가 사용 한도에 걸린 것은 판정 없음으로 세지 않는다(아래 「사용 한도」).
 
@@ -183,7 +183,8 @@ execute.py가 자동으로 처리하는 것:
 - 컨텍스트 누적 — 완료된 step의 summary를 다음 step 프롬프트에 전달
 - 자가 교정 — Codex 에러 메시지나 Claude 리뷰 지적을 다음 시도에 피드백. 마지막 리뷰 반려 지적은 뒤이은 다른 실패(status 미갱신 · 시간 초과)에 덮이지 않고 다음 시도와 최종 `error_message` 에 함께 남는다
 - 시간 초과 — Codex · 리뷰 각각 1800초. 넘으면 하네스가 죽지 않고 실패한 시도로 처리한다(Codex 는 다음 시도에 "시간 초과" 를 알린다)
-- 사용 한도 — Codex 출력에서 사용 한도 오류(`usage limit`)를 알아보면 시도로 세지 않고 `blocked` 로 멈춘다. 사유에 오류 문구(다시 쓸 수 있는 시각)와 직전 리뷰 지적을 남긴다 — 한도가 풀린 뒤 `status` 만 `pending` 으로 바꿔 재실행한다. 리뷰(`claude -p`) 출력에서 사용 한도(`usage_limit_reached` · 429)를 알아보면 리뷰를 다시 하지 않고 다시 쓸 수 있는 시각을 찍은 뒤 멈춘다(종료 코드 2 · 상위 `phases/index.json` 은 `blocked`). step 은 `completed` · `completed_at` 없음 그대로라 **index 를 고치지 않고** 한도가 풀린 뒤 재실행하면 리뷰부터 한다 — `pending` 으로 바꾸면 끝난 Codex 를 다시 돌린다
+- 사용 한도 — Codex 출력의 사용 한도 오류(`usage limit`)와 리뷰(`claude -p`) 출력의 사용 한도(`usage_limit_reached` · 429)를 알아보면 **문구의 리셋 시각 +3분까지 기다렸다 같은 실행에서 이어 간다** — Codex 는 같은 시도를 다시 하고(시도로 세지 않는다), 리뷰는 리뷰부터 다시 한다. 시각을 못 읽으면 30분씩 기다린다. 멈추려면 Ctrl+C.
+  이어진 대기가 12시간을 넘게 되면(주간 한도 등) 기다리지 않고 멈춘다. Codex 는 `blocked` 로 멈추고 사유에 오류 문구와 직전 리뷰 지적을 남긴다 — 한도가 풀린 뒤 `status` 만 `pending` 으로 바꿔 재실행한다. 리뷰는 다시 쓸 수 있는 시각을 찍은 뒤 멈춘다(종료 코드 2 · 상위 `phases/index.json` 은 `blocked`). step 은 `completed` · `completed_at` 없음 그대로라 **index 를 고치지 않고** 한도가 풀린 뒤 재실행하면 리뷰부터 한다 — `pending` 으로 바꾸면 끝난 Codex 를 다시 돌린다
 - 리뷰 전 중단 복구 — `completed` 인데 `completed_at`(리뷰 승인 기록)이 없는 step 은 건너뛰지 않고 다음 실행에서 리뷰부터 다시 한다. Codex 가 `completed_at` 을 쓰면 Codex 가 끝나자마자 지운다
 - 타임스탬프 — started_at, completed_at, failed_at, blocked_at 자동 기록
 

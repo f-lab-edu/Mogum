@@ -11,6 +11,7 @@ import argparse
 import contextlib
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -25,6 +26,38 @@ ROOT = Path(__file__).resolve().parent.parent
 
 class ReviewUsageLimit(Exception):
     """리뷰(claude -p)가 Claude 사용 한도로 멈췄다. 메시지는 다시 쓸 수 있는 시각을 담는다."""
+
+
+_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+_RELATIVE = re.compile(r"\bin\s+((?:\d+\s*(?:hours?|minutes?|mins?)\s*)+)", re.I)
+_CLOCK = re.compile(r"\b(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\b", re.I)
+_DATE = re.compile(rf"\b({'|'.join(_MONTHS)})[a-z]*\.?\s+(\d{{1,2}})(?:st|nd|rd|th)?\b(?:,?\s+(\d{{4}})\b)?")
+
+
+def parse_reset_time(message: str, now: datetime) -> Optional[datetime]:
+    """사용 한도 문구에서 다시 쓸 수 있는 시각을 읽는다. 못 읽으면 None.
+    시각은 now 의 시간대(KST)로 본다 — Codex · Claude 모두 이 머신의 지역 시각으로 알려 준다.
+    날짜 없는 시각이 이미 지났으면 내일이다."""
+    rel = _RELATIVE.search(message)
+    if rel:
+        delta = timedelta()
+        for n, unit in re.findall(r"\b(\d+)\s*([hm])",rel.group(1), re.I):
+            delta += timedelta(hours=int(n)) if unit.lower() == "h" else timedelta(minutes=int(n))
+        return now + delta
+    clock = _CLOCK.search(message)
+    if not clock:
+        return None
+    hour = int(clock[1]) % 12 + (12 if clock[3].lower() == "p" else 0)
+    minute = int(clock[2] or 0)
+    date = _DATE.search(message)
+    try:
+        if date:
+            year = int(date[3]) if date[3] else now.year
+            return datetime(year, _MONTHS.index(date[1]) + 1, int(date[2]), hour, minute, tzinfo=now.tzinfo)
+        reset = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    except ValueError:
+        return None
+    return reset if reset > now else reset + timedelta(days=1)
 
 
 @contextlib.contextmanager
@@ -72,6 +105,11 @@ class StepExecutor:
     MAX_RETRIES = 3
     REVIEW_ATTEMPTS = 2  # 판정을 못 얻으면(파싱 실패 · 시간 초과) 리뷰만 한 번 더 — Codex 는 다시 돌리지 않는다. 사용 한도는 다시 하지 않는다
     CODEX_TIMEOUT = 1800
+    # 사용 한도 — 리셋 시각 +3분까지 기다렸다 이어 간다. 시각을 못 읽으면 30분씩.
+    # 이어진 대기가 12시간을 넘으면 기다리지 않고 멈춘다(주간 한도 등) (H24)
+    LIMIT_WAIT_MARGIN = 180
+    LIMIT_WAIT_FALLBACK = 1800
+    LIMIT_WAIT_MAX = 12 * 3600
     REVIEW_TIMEOUT = 1800
     FEAT_MSG = "feat({phase}): step {num} — {name}"
     CHORE_MSG = "chore({phase}): step {num} output"
@@ -82,8 +120,9 @@ class StepExecutor:
             "verdict": {"type": "string", "enum": ["approve", "request_changes"]},
             "summary": {"type": "string"},
             "findings": {"type": "array", "items": {"type": "string"}},
+            "notes": {"type": "array", "items": {"type": "string"}},
         },
-        "required": ["verdict", "summary", "findings"],
+        "required": ["verdict", "summary", "findings", "notes"],
     }
     # 리뷰어가 쓸 수 있는 도구 — 나머지는 dontAsk 모드가 거부한다. 파일 수정 도구는 넣지 않는다.
     # step 의 AC 커맨드는 아래 형태로 써야 리뷰어가 다시 돌려볼 수 있다.
@@ -117,6 +156,7 @@ class StepExecutor:
         self._project = idx.get("project", "project")
         self._phase_name = idx.get("phase", phase_dir_name)
         self._total = len(idx["steps"])
+        self._limit_waited = 0  # 이어진 사용 한도 대기(초) — 한도 없이 끝난 Codex · 리뷰가 0 으로 되돌린다
 
     def run(self):
         self._checkout_branch()
@@ -132,6 +172,30 @@ class StepExecutor:
 
     def _stamp(self) -> str:
         return datetime.now(self.TZ).strftime("%Y-%m-%dT%H:%M:%S%z")
+
+    def _now(self) -> datetime:
+        return datetime.now(self.TZ)
+
+    @staticmethod
+    def _sleep(seconds: int):
+        time.sleep(seconds)
+
+    def _wait_for_limit(self, message: str) -> bool:
+        """사용 한도 문구의 리셋 시각까지 기다린다. 이어진 대기가 LIMIT_WAIT_MAX 를 넘으면 기다리지 않고 False."""
+        now = self._now()
+        reset = parse_reset_time(message, now)
+        if reset is None:
+            seconds = self.LIMIT_WAIT_FALLBACK
+        else:
+            seconds = max(int((reset - now).total_seconds()), 0) + self.LIMIT_WAIT_MARGIN
+        if self._limit_waited + seconds > self.LIMIT_WAIT_MAX:
+            return False
+        self._limit_waited += seconds
+        until = (now + timedelta(seconds=seconds)).strftime("%m-%d %H:%M")
+        print(f"  ⏳ {message.splitlines()[0]}", flush=True)
+        print(f"    {until} 까지 기다렸다 이어 간다 — 멈추려면 Ctrl+C", flush=True)
+        self._sleep(seconds)
+        return True
 
     # --- JSON I/O ---
 
@@ -383,7 +447,11 @@ class StepExecutor:
             f"## 판정\n\n"
             f"- approve: 위를 모두 통과. 취향 차이는 반려 사유가 아니다.\n"
             f"- request_changes: 하나라도 어김. findings 에 \"파일:줄 — 무엇이 왜 틀렸나 → 고칠 방향\" 형식으로 적는다. "
-            f"구현 담당은 이 목록만 보고 고친다.\n\n---\n\n"
+            f"구현 담당은 이 목록만 보고 고친다.\n"
+            f"- notes: 승인을 막지 않는 권고(동작 영향 없는 문서 · 이름 · 테스트 보강 등)는 summary 가 아니라 여기에 "
+            f"같은 형식으로 적는다. 사람이 읽는다. 없으면 빈 배열.\n"
+            f"- 핵심 흐름(로그인 · 결제 · 데이터 쓰기 등)을 깰 수 있는데 확인하지 못한 위험은 notes 가 아니라 "
+            f"request_changes 로 낸다 — findings 에 그 위험을 확인하는 테스트를 요구한다.\n\n---\n\n"
             f"{step_file.read_text()}"
         )
         exit_code, stdout, stderr, timed_out = self._run_agent(
@@ -500,68 +568,23 @@ class StepExecutor:
             if review_only and attempt == 1:
                 print(f"  ↺ Step {step_num}: {step_name} — 리뷰 전에 멈춘 step 이다. 리뷰부터 다시 한다")
             else:
-                index = self._read_json(self._index_file)
-                step_context = self._build_step_context(index)
-                preamble = self._build_preamble(step_context, prev_error, resume_reason)
-
-                tag = f"Step {step_num}/{self._total - 1} ({done} done): {step_name}"
-                if attempt > 1:
-                    tag += f" [retry {attempt}/{self.MAX_RETRIES}]"
-
-                with progress_indicator(tag) as pi:
-                    output = self._invoke_codex(step, preamble)
-                elapsed = int(pi.elapsed)  # progress_indicator 는 블록이 끝날 때 elapsed 를 채운다
-                timed_out = bool(output and output.get("timedOut"))
-
-                # 사용 한도는 다시 시도해도 같다 — 남은 시도를 쓰지 않고 멈춘다
-                limit = self._usage_limit_message(output)
-                if limit:
-                    self._block_step(step_num, step_name, elapsed,
-                                     self._with_last_review(f"Codex 사용 한도 — {limit}", last_review))
-                self._drop_completed_at(step_num)
+                elapsed, timed_out = self._codex_attempt(step, attempt, done, prev_error, resume_reason, last_review)
 
             index = self._read_json(self._index_file)
             status = next((s.get("status", "pending") for s in index["steps"] if s["step"] == step_num), "pending")
 
             if status == "completed":
-                try:
-                    review, review_elapsed = self._review_with_retry(step, base)
-                except ReviewUsageLimit as e:
-                    self._pause_for_review(step_num, step_name, str(e))
-                if review is None:
-                    self._fail_step(step_num, step_name,
-                                    f"Claude 리뷰 판정을 얻지 못했다 — phases/{self._phase_dir_name}/step{step_num}-review.json 확인")
+                review, review_elapsed = self._review_verdict(step, base)
                 if review["verdict"] == "approve":
-                    for s in index["steps"]:
-                        if s["step"] == step_num:
-                            s["completed_at"] = self._stamp()
-                    self._write_json(self._index_file, index)
-                    self._commit_step(step_num, step_name)
-                    print(f"  ✓ Step {step_num}: {step_name} [{elapsed}s · 리뷰 {review_elapsed}s] — 리뷰 승인")
+                    self._approve_step(index, step_num, step_name, review, f"[{elapsed}s · 리뷰 {review_elapsed}s]")
                     return True
                 err_msg = self._format_review(review)
                 last_review = err_msg
-
-            elif status == "blocked":
-                self._block_step(step_num, step_name, elapsed)
-
-            elif timed_out:
-                err_msg = (f"Codex 가 {self.CODEX_TIMEOUT}초 안에 끝나지 않아 중단됐다 — "
-                           f"작업 트리에 남은 변경을 이어서 끝내고 status 를 갱신하라")
-
             else:
-                err_msg = next(
-                    (s.get("error_message", "Step did not update status") for s in index["steps"] if s["step"] == step_num),
-                    "Step did not update status",
-                )
+                err_msg = self._failure_message(index, step_num, step_name, status, timed_out, elapsed)
 
             if attempt < self.MAX_RETRIES:
-                for s in index["steps"]:
-                    if s["step"] == step_num:
-                        s["status"] = "pending"
-                        s.pop("error_message", None)
-                        s.pop("summary", None)
-                self._write_json(self._index_file, index)
+                self._reset_for_retry(index, step_num)
                 prev_error = self._with_last_review(err_msg, last_review)
                 print(f"  ↻ Step {step_num}: retry {attempt}/{self.MAX_RETRIES} — {err_msg.splitlines()[0]}")
             else:
@@ -569,6 +592,82 @@ class StepExecutor:
                                 f"[{self.MAX_RETRIES}회 시도 후 실패] {self._with_last_review(err_msg, last_review)}")
 
         return False  # unreachable
+
+    def _codex_attempt(self, step: dict, attempt: int, done: int, prev_error: Optional[str],
+                       resume_reason: Optional[str], last_review: Optional[str]) -> tuple:
+        """Codex 시도 하나. (걸린 초, 시간 초과 여부).
+        사용 한도는 시도로 세지 않는다 — 리셋 시각까지 기다렸다 같은 시도를 다시 한다.
+        너무 멀면(LIMIT_WAIT_MAX) 남은 시도를 쓰지 않고 멈춘다"""
+        step_num, step_name = step["step"], step["name"]
+        preamble = self._build_preamble(self._build_step_context(self._read_json(self._index_file)),
+                                        prev_error, resume_reason)
+        tag = f"Step {step_num}/{self._total - 1} ({done} done): {step_name}"
+        if attempt > 1:
+            tag += f" [retry {attempt}/{self.MAX_RETRIES}]"
+
+        while True:
+            with progress_indicator(tag) as pi:
+                output = self._invoke_codex(step, preamble)
+            elapsed = int(pi.elapsed)  # progress_indicator 는 블록이 끝날 때 elapsed 를 채운다
+            limit = self._usage_limit_message(output)
+            if not limit:
+                break
+            if not self._wait_for_limit(f"Codex 사용 한도 — {limit}"):
+                self._block_step(step_num, step_name, elapsed,
+                                 self._with_last_review(f"Codex 사용 한도 — {limit}", last_review))
+        self._limit_waited = 0
+        self._drop_completed_at(step_num)
+        return elapsed, bool(output and output.get("timedOut"))
+
+    def _review_verdict(self, step: dict, base: str) -> tuple:
+        """리뷰 판정과 리뷰에 쓴 초. 사용 한도면 기다렸다 리뷰부터 다시 하고, 너무 멀면 멈춘다.
+        판정을 끝내 얻지 못하면 error 로 멈춘다."""
+        step_num, step_name = step["step"], step["name"]
+        while True:
+            try:
+                review, review_elapsed = self._review_with_retry(step, base)
+                break
+            except ReviewUsageLimit as e:
+                if not self._wait_for_limit(f"Claude 리뷰 사용 한도 — {e}"):
+                    self._pause_for_review(step_num, step_name, str(e))
+        self._limit_waited = 0
+        if review is None:
+            self._fail_step(step_num, step_name,
+                            f"Claude 리뷰 판정을 얻지 못했다 — phases/{self._phase_dir_name}/step{step_num}-review.json 확인")
+        return review, review_elapsed
+
+    def _approve_step(self, index: dict, step_num: int, step_name: str, review: dict, timing: str):
+        """승인 기록(completed_at · 비차단 권고)을 남기고 커밋한다."""
+        notes = review.get("notes") or []
+        s = next(s for s in index["steps"] if s["step"] == step_num)
+        s["completed_at"] = self._stamp()
+        if notes:
+            s["review_notes"] = notes
+        self._write_json(self._index_file, index)
+        self._commit_step(step_num, step_name)
+        print(f"  ✓ Step {step_num}: {step_name} {timing} — 리뷰 승인")
+        for note in notes:
+            print(f"    ⚑ 권고: {note}")
+
+    def _failure_message(self, index: dict, step_num: int, step_name: str,
+                         status: str, timed_out: bool, elapsed: int) -> str:
+        """Codex 가 completed 로 끝내지 못한 시도의 실패 문구. Codex 가 blocked 로 남겼으면 멈춘다."""
+        if status == "blocked":
+            self._block_step(step_num, step_name, elapsed)
+        if timed_out:
+            return (f"Codex 가 {self.CODEX_TIMEOUT}초 안에 끝나지 않아 중단됐다 — "
+                    f"작업 트리에 남은 변경을 이어서 끝내고 status 를 갱신하라")
+        s = next((s for s in index["steps"] if s["step"] == step_num), {})
+        return s.get("error_message", "Step did not update status")
+
+    def _reset_for_retry(self, index: dict, step_num: int):
+        """다음 시도 전에 step 을 pending 으로 되돌리고 이번 시도의 error_message · summary 를 지운다."""
+        for s in index["steps"]:
+            if s["step"] == step_num:
+                s["status"] = "pending"
+                s.pop("error_message", None)
+                s.pop("summary", None)
+        self._write_json(self._index_file, index)
 
     def _drop_completed_at(self, step_num: int):
         """Codex 가 쓴 completed_at 을 지운다 — 리뷰 승인 기록이라 하네스만 쓴다.

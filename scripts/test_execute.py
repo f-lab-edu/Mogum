@@ -594,6 +594,29 @@ class TestReviewStep:
         assert "Bash(./gradlew:*)" not in allowed
         assert "./backend/gradlew -p backend" in mock_run.call_args[1]["input"]
 
+    def test_schema_requires_notes_for_non_blocking_advice(self, executor):
+        """승인하면서 남기는 권고는 summary 가 아니라 notes 에 따로 받는다(H7)."""
+        mock_result = MagicMock(returncode=0, stdout=_claude_json(self.APPROVE), stderr="")
+
+        with patch("subprocess.run", return_value=mock_result) as mock_run:
+            executor._review_step({"step": 2, "name": "ui"}, "abc123")
+
+        cmd = mock_run.call_args[0][0]
+        schema = json.loads(cmd[cmd.index("--json-schema") + 1])
+        assert "notes" in schema["required"]
+        assert schema["properties"]["notes"] == {"type": "array", "items": {"type": "string"}}
+
+    def test_prompt_treats_unverified_core_risk_as_blocking(self, executor):
+        """핵심 흐름을 깰 수 있는데 확인하지 못한 위험은 권고가 아니라 반려다 — 1-auth step 3 의 PKCE(H7)."""
+        mock_result = MagicMock(returncode=0, stdout=_claude_json(self.APPROVE), stderr="")
+
+        with patch("subprocess.run", return_value=mock_result) as mock_run:
+            executor._review_step({"step": 2, "name": "ui"}, "abc123")
+
+        prompt = mock_run.call_args[1]["input"]
+        assert "notes" in prompt
+        assert "확인하지 못한 위험" in prompt
+
     def test_returns_structured_output_and_saves(self, executor):
         mock_result = MagicMock(returncode=0, stdout=_claude_json(self.APPROVE), stderr="")
         step = {"step": 2, "name": "ui"}
@@ -682,10 +705,54 @@ class TestUsageLimitMessage:
         assert ex.StepExecutor._usage_limit_message(None) is None
 
 
+KST = timezone(timedelta(hours=9))
+
+
+class TestParseResetTime:
+    """사용 한도 문구에서 다시 쓸 수 있는 시각을 읽는다(H24). 문구는 실제로 본 것에서 옮겼다."""
+    NOW = datetime(2026, 11, 8, 23, 30, tzinfo=KST)
+
+    @pytest.mark.parametrize("message, expected", [
+        # 4-account step 0 — 날짜 있음
+        ("You've hit your usage limit. ... try again at Nov 9th, 2026 2:01 AM.", datetime(2026, 11, 9, 2, 1, tzinfo=KST)),
+        # 4-account step 4 — 날짜 없음 · 아직 오지 않은 오늘 시각
+        ("... or try again at 11:50 PM.", datetime(2026, 11, 8, 23, 50, tzinfo=KST)),
+        # 날짜 없음 · 이미 지난 시각이면 내일
+        ("... or try again at 7:04 AM.", datetime(2026, 11, 9, 7, 4, tzinfo=KST)),
+        # 상대 시각 — again 안의 in 에 걸리지 않는다
+        ("... try again in 2 hours.", datetime(2026, 11, 9, 1, 30, tzinfo=KST)),
+        ("... try again in 1 hour 15 minutes.", datetime(2026, 11, 9, 0, 45, tzinfo=KST)),
+        # 2b-ops-logging step 1 — Claude 리뷰 한도
+        ("You've hit your session limit · resets 2:20am (Asia/Seoul)", datetime(2026, 11, 9, 2, 20, tzinfo=KST)),
+        ("You've hit your weekly limit · resets Nov 12, 5am (Asia/Seoul)", datetime(2026, 11, 12, 5, 0, tzinfo=KST)),
+    ])
+    def test_reads_reset_time(self, message, expected):
+        assert ex.parse_reset_time(message, self.NOW) == expected
+
+    @pytest.mark.parametrize("message", [
+        "You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro).",
+        "usage_limit_reached",
+    ])
+    def test_unreadable_is_none(self, message):
+        assert ex.parse_reset_time(message, self.NOW) is None
+
+
 class TestExecuteSingleStep:
     REJECT = {"verdict": "request_changes", "summary": "테스트 없음",
               "findings": ["Foo.java:10 — 테스트가 없다 → FooTest 추가"]}
     APPROVE = {"verdict": "approve", "summary": "좋다", "findings": []}
+    # USAGE_LIMIT_STDOUT 의 "try again at 8:23 PM" · 리뷰 한도의 "resets 2:20am" 까지 —
+    # 12시간 안이면 기다리고, 넘으면 지금처럼 멈춘다
+    NEAR = datetime(2026, 11, 15, 20, 0, tzinfo=KST)   # 8:23 PM 까지 23분
+    FAR = datetime(2026, 11, 15, 8, 0, tzinfo=KST)     # 8:23 PM 까지 12시간 23분
+    REVIEW_FAR = datetime(2026, 11, 15, 14, 0, tzinfo=KST)  # 2:20am 까지 12시간 20분
+
+    def _clock(self, executor, now):
+        """시계를 고정하고 기다린 초를 모은다 — 실제로 자지 않는다."""
+        sleeps = []
+        executor._now = lambda: now
+        executor._sleep = sleeps.append
+        return sleeps
 
     def _wire(self, executor, reviews):
         """Codex 는 매번 step 을 completed 로 표시하고, 리뷰는 reviews 를 차례로 돌려준다."""
@@ -718,6 +785,21 @@ class TestExecuteSingleStep:
         assert commits == [2]
         assert self._step2(executor)["status"] == "completed"
         assert "completed_at" in self._step2(executor)
+
+    def test_approval_notes_are_printed_and_kept_in_index(self, executor, capsys):
+        """승인 리뷰의 비차단 권고는 사람이 리뷰 파일을 열지 않아도 보인다(H7)."""
+        notes = ["deploy/README.md:12 — 옛 경로가 남았다(동작 영향 없음)"]
+        self._wire(executor, [{**self.APPROVE, "notes": notes}])
+
+        assert executor._execute_single_step(self._step2(executor)) is True
+        assert self._step2(executor)["review_notes"] == notes
+        assert "deploy/README.md:12 — 옛 경로가 남았다" in capsys.readouterr().out
+
+    def test_approval_without_notes_leaves_no_field(self, executor):
+        self._wire(executor, [{**self.APPROVE, "notes": []}])
+
+        assert executor._execute_single_step(self._step2(executor)) is True
+        assert "review_notes" not in self._step2(executor)
 
     def test_rejection_feeds_findings_to_next_codex_attempt(self, executor):
         preambles, commits = self._wire(executor, [self.REJECT, self.APPROVE])
@@ -796,9 +878,93 @@ class TestExecuteSingleStep:
         assert seen_during_review == [False]
         assert self._step2(executor)["completed_at"] != "2026-10-26T00:00:00+0900"
 
-    def test_usage_limit_blocks_without_spending_retries(self, executor):
-        """사용 한도는 다시 시도해도 같다 — 시도로 세지 않고 blocked 로 멈춘다(H14)."""
+    def test_usage_limit_waits_until_reset_and_retries_same_attempt(self, executor):
+        """리셋이 12시간 안이면 그 시각 +3분까지 기다렸다 시도를 쓰지 않고 다시 한다(H24)."""
+        preambles, commits = self._wire(executor, [self.APPROVE])
+        sleeps = self._clock(executor, self.NEAR)
+        complete = executor._invoke_codex
+        attempts = {"n": 0}
+
+        def codex(step, preamble):
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                preambles.append(preamble)
+                return {"exitCode": 1, "timedOut": False, "stdout": USAGE_LIMIT_STDOUT, "stderr": ""}
+            return complete(step, preamble)
+
+        executor._invoke_codex = codex
+
+        assert executor._execute_single_step(self._step2(executor)) is True
+        assert sleeps == [(23 + 3) * 60]
+        assert len(preambles) == 2
+        assert preambles[1] == preambles[0]  # 재시도 문구가 붙지 않는다 — 시도로 세지 않았다
+        assert commits == [2]
+
+    def test_resume_reason_survives_a_usage_limit_wait(self, executor):
+        """재개한 첫 시도가 한도에 걸려도 기다린 뒤의 시도가 이전 사유를 받는다 — H22 의 대부분."""
+        ex.StepExecutor._write_json(executor._index_file, {"project": "TestProject", "phase": "mvp", "steps": [
+            {"step": 2, "name": "ui", "status": "pending", "blocked_reason": "Docker 데몬에 연결할 수 없다"},
+        ]})
+        preambles, _ = self._wire(executor, [self.APPROVE])
+        self._clock(executor, self.NEAR)
+        complete = executor._invoke_codex
+        attempts = {"n": 0}
+
+        def codex(step, preamble):
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                return {"exitCode": 1, "timedOut": False, "stdout": USAGE_LIMIT_STDOUT, "stderr": ""}
+            return complete(step, preamble)
+
+        executor._invoke_codex = codex
+
+        assert executor._execute_single_step(self._step2(executor)) is True
+        assert "Docker 데몬에 연결할 수 없다" in preambles[0]
+
+    def test_unreadable_usage_limit_waits_30_minutes_up_to_12_hours(self, executor):
+        """시각을 못 읽으면 30분씩 기다린다. 이어진 대기가 12시간을 넘으면 blocked 로 멈춘다."""
         preambles, commits = self._wire(executor, [])
+        sleeps = self._clock(executor, self.NEAR)
+        unreadable = json.dumps({"type": "turn.failed", "error": {"message": "You've hit your usage limit."}})
+
+        def codex(step, preamble):
+            preambles.append(preamble)
+            return {"exitCode": 1, "timedOut": False, "stdout": unreadable, "stderr": ""}
+
+        executor._invoke_codex = codex
+        step = self._step2(executor)
+
+        with pytest.raises(SystemExit) as exc_info:
+            executor._execute_single_step(step)
+
+        assert exc_info.value.code == 2
+        assert sleeps == [30 * 60] * 24
+        assert len(preambles) == 25
+        assert self._step2(executor)["status"] == "blocked"
+
+    def test_review_usage_limit_waits_and_reviews_again_without_codex(self, executor):
+        preambles, commits = self._wire(executor, [])
+        sleeps = self._clock(executor, datetime(2026, 11, 15, 1, 0, tzinfo=KST))
+        reviews = []
+
+        def review(step, base):
+            reviews.append(base)
+            if len(reviews) == 1:
+                raise ex.ReviewUsageLimit("You've hit your session limit · resets 2:20am (Asia/Seoul)")
+            return self.APPROVE
+
+        executor._review_step = review
+
+        assert executor._execute_single_step(self._step2(executor)) is True
+        assert sleeps == [(80 + 3) * 60]
+        assert len(preambles) == 1
+        assert len(reviews) == 2
+        assert commits == [2]
+
+    def test_usage_limit_blocks_without_spending_retries(self, executor):
+        """리셋이 12시간보다 멀면 기다리지 않는다 — 시도로 세지 않고 blocked 로 멈춘다(H14)."""
+        preambles, commits = self._wire(executor, [])
+        sleeps = self._clock(executor, self.FAR)
 
         def codex_hits_limit(step, preamble):
             preambles.append(preamble)
@@ -810,6 +976,7 @@ class TestExecuteSingleStep:
             executor._execute_single_step(self._step2(executor))
 
         assert exc_info.value.code == 2
+        assert sleeps == []
         assert len(preambles) == 1
         assert commits == []
         step = self._step2(executor)
@@ -820,6 +987,7 @@ class TestExecuteSingleStep:
     def test_usage_limit_after_rejection_keeps_review_findings(self, executor):
         """재개한 첫 시도가 고칠 것을 알도록 직전 리뷰 지적을 blocked_reason 에 남긴다(H14 · H15)."""
         preambles, commits = self._wire(executor, [self.REJECT])
+        self._clock(executor, self.FAR)
         complete = executor._invoke_codex
         attempts = {"n": 0}
 
@@ -841,8 +1009,9 @@ class TestExecuteSingleStep:
 
     def test_review_usage_limit_pauses_for_review_only_resume(self, executor, capsys):
         """리뷰 한도 — 리뷰를 다시 하거나 Codex 를 다시 돌리지 않고 멈춘다.
-        step 은 completed · completed_at 없음으로 남아 다시 실행하면 리뷰부터 한다(H21)."""
+        step 은 completed · completed_at 없음으로 남아 다시 실행하면 리뷰부터 한다(H21). 리셋이 12시간보다 먼 경우다."""
         preambles, commits = self._wire(executor, [])
+        sleeps = self._clock(executor, self.REVIEW_FAR)
         reviews = []
 
         def review_hits_limit(step, base):
@@ -855,6 +1024,7 @@ class TestExecuteSingleStep:
             executor._execute_single_step(self._step2(executor))
 
         assert exc_info.value.code == 2
+        assert sleeps == []
         assert len(preambles) == 1
         assert len(reviews) == 1
         assert commits == []
