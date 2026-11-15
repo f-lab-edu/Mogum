@@ -74,6 +74,7 @@
 | `Mogumi` · [components/Mogumi.tsx](../frontend/src/components/Mogumi.tsx) | 책 읽는 사본 한 장. 가로 128px·비율 유지·가운데 정렬. 대체 글 「보라색 머그컵 안에서 책을 읽는 모구미」. 변형·움직임 없음. |
 | `Button` · [components/Button.tsx](../frontend/src/components/Button.tsx) | 기본 `variant="primary"`는 보라·흰색 굵은 글자·4px 아래 두께. hover는 진한 보라, 누르면 3px 내려가 두께가 1px. `variant="secondary"`는 보조 동작용으로 안내 바탕·보조 글자·옅은 테두리이며 hover는 `surface-muted`, 아래 두께는 없다. 둘 다 최소 높이 52px·가로 여백 24px·세로 여백 12px·16px 모서리. `disabled`는 옅은 바탕·보조 글자·그림자 없음·클릭 차단·눌림 없음. `focus-visible`은 보라 2px outline과 2px offset. 기본 `type="button"`, 네이티브 버튼 속성을 전달한다. 신청·다시 시도는 기본형, 계정 전환·로그아웃은 보조형을 쓴다. |
 | `AccountIdentity` · [components/AccountIdentity.tsx](../frontend/src/components/AccountIdentity.tsx) | 신청·승인 대기·거절됨에서 공유하는 「신청 계정」 영역. 안내 바탕·옅은 테두리·16px 모서리·안쪽 여백 16px. 이름과 구글 이메일을 `dl`로 세로 표시한다. 긴 값은 자르지 않고 줄바꿈하며 사진·입력 칸은 없다. |
+| `FailureNotice` · [components/FailureNotice.tsx](../frontend/src/components/FailureNotice.tsx) | 무엇이 안 됐는지·안내·전달받은 동작을 함께 담는 `role="alert"` 영역. 안내 바탕·옅은 테두리·16px 모서리·안쪽 여백 16px·요소 사이 12px. 제목은 굵은 오류색, 안내는 작은 본문이며 동작은 공통 `Button`·링크를 쓴다. |
 
 각 컴포넌트는 같은 폴더의 `{이름}.test.tsx`에 짝 테스트가 있다. `Mogumi`의 공통 크기는 §7을 따른다.
 
@@ -85,7 +86,7 @@ Google 링크는 기존 Roboto 500·44px 높이·흰 바탕·1px 테두리·4px 
 
 ### 4.1 화면 주소와 계정 화면 구성
 
-`4-account` step 5의 계정 주소와 `6-job-worker` step 6의 탭 주소는 다음과 같다. 상태 흐름과 화면 내용은 [06 §2.2 · §3](./06-screens.md#3-로그인-전-화면), 통신 계약은 [05 §3 · §4](./05-api.md#3-읽기--화면마다-한-번)를 따른다.
+`4-account` step 5의 계정 주소와 `6-job-worker` step 6의 탭·step 7의 작업과 결과 주소는 다음과 같다. 상태 흐름과 화면 내용은 [06 §2.2 · §3](./06-screens.md#3-로그인-전-화면), 통신 계약은 [05 §3 · §4](./05-api.md#3-읽기--화면마다-한-번)를 따른다.
 
 | 주소 | 화면 · 표시 조건 |
 |---|---|
@@ -98,6 +99,10 @@ Google 링크는 기존 Roboto 500·44px 높이·흰 바탕·1px 테두리·4px 
 | `/roadmaps` | `APPROVED`의 로드맵 탭 자리 |
 | `/review` | `APPROVED`의 복습 탭 자리 |
 | `/profile` | `APPROVED`의 내 정보 탭 자리 |
+| `/jobs/:jobId` | `APPROVED`의 기다리는 화면. 위 바 제목 「기다리는 화면」·뒤로 가기 |
+| `/courses/:courseId` | 성공 결과의 코스 자리. 위 바 제목 「코스」·뒤로 가기만 표시 |
+| `/roadmaps/:roadmapId` | 성공 결과의 로드맵 자리. 위 바 제목 「로드맵」·뒤로 가기만 표시 |
+| `/courses/:courseId/lessons/:lessonId` | 성공 결과의 강의 자리. 위 바 제목 「강의」·뒤로 가기만 표시 |
 | `/privacy` | 개인정보처리방침 자리. 로그인·상태 읽기 없이 제목·준비 중·돌아가기만 표시 |
 
 계정 화면 세 개는 [AccountPage.tsx](../frontend/src/pages/AccountPage.tsx)에서 상태별로 구성한다. `/`와 계정 주소를 열 때 「나」를 읽어 현재 상태의 주소로 보낸다. 모르는 상태는 기존 불러오기 실패·다시 시도로 처리하며 값을 노출하지 않는다. 승인 대기에 폴링·새로고침 버튼을 두지 않는다. `ACCOUNT_NOT_APPROVED`를 받으면 「나」를 다시 읽어 현재 상태를 반영한다.
@@ -139,3 +144,21 @@ sips -Z 384 docs/design/assets/mogumi-reading.png --out frontend/src/assets/mogu
 뒤 TASK의 탭에서 들어간 화면은 `RequireAuth` 아래에서 `<AppLayout title="기다리는 화면">…본문…</AppLayout>`처럼 사용한다. 탭 첫 화면은 `title` 없이 감싸고 본문에서 제목을 제공한다. 승인 전 화면과 처리방침은 기존 `AccountLayout`을 유지한다.
 
 너비 분기는 jsdom에서 실제 레이아웃을 계산하지 않으므로 `lg`(1024px) 표시·숨김, `w-64` 사이드바, `h-14` 위 바, 본문 여백의 클래스·구조를 시험한다. 실제 브라우저의 너비별 배치·가림·포커스 테두리 렌더링을 검증한 것으로 보지는 않는다.
+
+## 8. 기다리는 화면
+
+`6-job-worker` step 7의 [WaitingPage.tsx](../frontend/src/pages/WaitingPage.tsx)는 §4.1의 작업 주소에서 §7의 `AppLayout`을 쓴다. 표시와 동작의 계약은 [06 §6](./06-screens.md#6-기다리는-화면), API와 다시 읽는 간격은 [05 §2](./05-api.md#2-만드는-작업--받기-하나--다시-읽기)가 출처다.
+
+모구미 → 만드는 대상 → 상태 한 줄 → 떠나도 된다는 안내 순서다. 흰 중앙 면은 최대 440px·24px 모서리·옅은 테두리·안쪽 여백 24px(640px부터 32px)이며, 대상 제목을 24px·800 굵기로 가장 강조한다. 새로 배우기의 수준·목적은 제목 뒤에 작은 보조 글자로 표시하며 [02 §8.7](./02-domain-data.md#87-값-목록)의 화면 글·기타 입력을 쓴다. 나머지 종류는 대상 제목을 쓴다. 모르는 수준·목적은 생략한다. 상태는 보라색 굵은 본문, 떠나도 된다는 안내는 중앙 면 아래의 안내 바탕·16px 여백이다. 기존 토큰과 모구미 사본을 재사용한다.
+
+| 상태 | 화면 동작 |
+|---|---|
+| 읽는 중 | 불러오는 중이라는 한 줄을 `role="status"`로 표시 |
+| 기다림·만드는 중 | 대상 아래 실제 작업 상태 한 줄을 `role="status"`로 표시. 간격 읽기로 갱신하며 안내 문구·종류별 상태 문구는 06 §6을 그대로 사용 |
+| 실패 | 대상 아래 `FailureNotice`로 실패한 것·서버 문구·동작을 함께 표시. `JOB_TEMPORARY_FAILURE`는 다시 시도·버리기, `JOB_INPUT_FAILURE`는 버리기만. 모르는 묶음은 서버 문구와 홈으로 링크를 표시 |
+| 성공 | 응답 `result`의 종류·ID로 §4.1의 결과 주소를 골라 `replace`로 이동. 뒤로 가면 기다리는 화면이 다시 열리지 않음 |
+| 없는 작업·연결 실패·모르는 상태/종류/결과 | 읽지 못했다는 안내와 다시 시도·홈으로를 함께 표시. 서버 오류는 서버 문구, 연결·해석 실패는 기술 상세 없는 공통 안내를 사용 |
+
+다시 시도·버리기 요청 중에는 두 버튼을 잠근다. 동작 실패는 별도 `FailureNotice`에서 무엇이 안 됐는지와 서버 문구(연결 실패는 공통 안내)를 보이고 원래 동작을 다시 할 수 있다. 버리기 성공은 현재 홈으로 이동하며, 종류별 돌아갈 화면은 뒤 TASK에서 연결한다. 같은 작업 주소의 ID가 바뀌면 동작 상태도 새로 시작한다. API 훅 [useJob.ts](../frontend/src/api/useJob.ts)는 공통 `apiFetch`를 쓰고, 동작 성공 시 진행 중인 읽기를 취소한 뒤 해당 작업 캐시를 교체하거나 지운다. 읽기 오류 뒤에는 수동으로 다시 읽을 수 있으며, 창 포커스·재연결로 따로 읽지 않는다.
+
+진행 단계·퍼센트·남은 시간·대기 순서·오래 걸릴 때 안내·기다리는 동안 복습·결과 자리·취소·크레딧·운영 정보는 두지 않는다. 모르는 응답 칸과 값은 화면에 그대로 내보내지 않는다. 위 바 제목의 포커스·문서 제목은 `AppLayout`이 관리하며, 성공 이동·뒤로 가기·폴링 중단/재개·버튼 잠금·확장 응답·실패 안내는 API 대역과 가짜 타이머로 시험한다.

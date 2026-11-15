@@ -2,6 +2,39 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, expect, test, vi } from 'vitest'
 import App from './App'
 
+test('작업 주소를 직접 열면 승인 뒤 작업을 읽고 기다리는 화면을 표시한다', async () => {
+  window.history.replaceState(null, '', '/jobs/12')
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+    ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
+    : { id: 12, type: 'MATERIAL', status: 'RUNNING', subject: { title: '자료를 만들 강의' } } })))))
+  render(<App />)
+  expect(await screen.findByRole('heading', { name: '자료를 만들 강의' })).toBeVisible()
+  expect(screen.getByRole('status')).toHaveTextContent('강의 자료를 만들고 있어요')
+  expect(fetch).toHaveBeenCalledWith('/api/jobs/12', expect.objectContaining({ method: 'GET' }))
+})
+
+test.each([
+  ['/courses/31', '코스'],
+  ['/roadmaps/41', '로드맵'],
+  ['/courses/31/lessons/51', '강의'],
+])('결과 주소 %s는 승인 뒤 제목 %s와 뒤로 가기만 있는 자리를 표시한다', async (path, title) => {
+  window.history.replaceState(null, '', path)
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
+  render(<App />)
+  expect(await screen.findByRole('heading', { name: title })).toBeVisible()
+  expect(screen.getByRole('main')).toHaveTextContent(/^$/)
+  expect(screen.getByRole('button', { name: '뒤로 가기' })).toBeVisible()
+  await waitFor(() => expect(screen.getByRole('heading', { name: title })).toHaveFocus())
+})
+
+test.each(['/jobs/12', '/courses/31', '/roadmaps/41', '/courses/31/lessons/51'])('승인 전에는 %s에서 작업이나 결과를 읽지 않는다', async (path) => {
+  window.history.replaceState(null, '', path)
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: { status: 'APPLIED', name: '민서', email: 'minseo@example.com' } })))))
+  render(<App />)
+  expect(await screen.findByRole('heading', { name: '가입 승인을 기다리고 있어요' })).toBeVisible()
+  expect(fetch).toHaveBeenCalledTimes(1)
+})
+
 afterEach(() => {
   vi.unstubAllGlobals()
   sessionStorage.clear()
