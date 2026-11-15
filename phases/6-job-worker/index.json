@@ -30,7 +30,15 @@
     {
       "step": 2,
       "name": "job-intake",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T12:49:36+0900",
+      "summary": "job.JobIntakeHandler: JobType type(), void check(long userId, JobRequest request); JobRequest(JobType type, Long targetId, LearningInput input, String feedback); job.service.JobIntakeService: JobResult receive(long userId, JobRequest request), JobResult retry(long userId, long jobId), void discard(long userId, long jobId), 반환 record는 JobResult(long id, JobStatus status); 세 동작 모두 CreditLedger.lock으로 users 행을 먼저 잠그며 받기는 주인→처리기→같은 대상 반환→건 수→작업 저장·크레딧 사용 순서, 운영 처리기는 없고 여섯 종류 모두 INVALID_REQUEST로 거절; GenerationJob.retry와 GenerationJobRepository.findSameTarget/countByUserIdAndStatusIn/delete 추가; 새 오류 code TOO_MANY_IN_PROGRESS·JOB_RETRY_NOT_ALLOWED·JOB_DISCARD_NOT_ALLOWED는 모두 409; app.job.max-in-progress-per-user 임시 3을 config.JobProperties.maxInProgressPerUser()로 읽음; MDC 상수 common.logging.RequestLogFilter.JOB_ID(jobId), 커밋 뒤 job received type={type}·job retried 두 INFO 줄만 남기고 finally에서 jobId 제거; 테스트 전용 처리기는 공용 @TestConfiguration인 support.IntegrationTestConfiguration의 중첩 static TestJobIntakeHandler로 여섯 종류 빈을 등록해 @IntegrationTest에서 추가 @Import 없이 재사용하며 NEW_* 입력 topic이 TestJobIntakeHandler.REJECT_TOPIC(test-intake-rejected)이면 INVALID_REQUEST, 나머지는 허용(step 4·5 처리기도 같은 공용 설정에 추가 가능); Fake 서비스 분기·처리기 빈 0개 구성·실제 PostgreSQL 동시 상한/같은 대상/다시 시도·버리기 경합·크레딧 롤백/기록 합/복구 1회·주인 확인·Auditing·안전한 로그 검증; 02 §9·04 §2.3/6/9.1/10·05 §1.2 반영; AC 부분 450개·전체 build 성공, 서버 테스트 1177→1253개(+76, 실패·오류·건너뜀 0).",
+      "completed_at": "2026-11-15T13:00:21+0900",
+      "review_notes": [
+        "docs/02-domain-data.md:518 — step은 「step 0 이 적은 줄 옆에」 더하라고 했다. step 0의 줄은 §8.5(369줄)에 있는데, 새 문장은 §9 「아직 정하지 않은 값」 표 위에 따로 들어갔다. 369줄 옆으로 옮기거나 §8.5를 가리키는 링크를 두면 찾기 쉽다.",
+        "backend/src/main/java/com/mogum/job/service/JobIntakeService.java:66,99 — 대상이 있는 종류에 targetId가 null로 오면 문제가 된다. findSameTarget(long)에서 언박싱 NPE가 나거나 findById(null)이 IllegalArgumentException을 던져 500이 된다. step 3의 요청 DTO 검증이 종류별 targetId 필수를 막도록 step 3 리뷰에서 확인한다.",
+        "backend/src/test/java/com/mogum/common/logging/RequestLogFilterTest.java:32 — 상수 값만 확인하는 시험이라 가치가 낮다. jobId가 실제로 붙는지는 JobIntakeServiceIntegrationTest가 이미 본다. 동작 영향은 없다."
+      ]
     },
     {
       "step": 3,
