@@ -71,7 +71,15 @@
     {
       "step": 5,
       "name": "worker-lifecycle",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T17:50:10+0900",
+      "summary": "config.WorkerConfiguration이 WorkerLifecycle(SmartLifecycle 자동 시작·종료 단계 Integer.MAX_VALUE)을 조립하고 각 워커가 전용 플랫폼 스레드·JobRunner·갱신 스케줄러로 한 건씩 실행; Spring 7.0.9 AbstractApplicationContext.doClose의 lifecycleProcessor.onClose→destroyBeans 및 DefaultLifecycleProcessor의 콜백 대기 소스 확인과 실제 컨텍스트/Hikari 종료 시험으로 DB 풀 파괴 전 반환을 검증; 종료 즉시 새 꺼내기를 막고 공통 시각까지 갱신하며 기다린 뒤 같은 claim_count/RUNNING 조건으로 QUEUED·lease_until NULL·updated_at 반환(반환 TransactionTemplate 제한 5초·크레딧 유지), 늦은 성공·실패 차단; app.worker.count=2·poll-interval=1s·shutdown-wait=100s·lease-duration=5m·renewal-interval=30s·max-retries=2(추가 호출)·retry-delay=1s는 임시 값, 배포는 기존 deploy/deploy.sh로 끄고 켬; 시한 > (R+1)×((C+1)×호출 제한+C×이어 쓰기 간격)+R×다시 시도 간격+DB 처리(현재 300초 > 3×((C+1)×호출 제한+C×이어 쓰기 간격)+2초+DB 처리), 미정 호출/이어 쓰기 값은 강의 목록 TASK에서 대입; WorkerProperties 생성자가 양수 시한·갱신/쉬는 간격·종료 대기, 갱신 간격<시한, count/maxRetries/retryDelay≥0, 종료 대기<120초를 검증해 잘못된 설정의 기동 거부, 실제 Spring 종료 설정>120초도 시험; 공용 IntegrationTestConfiguration.OAuthInitializer에서 app.worker.count=0으로 기본 자동 실행을 끄고 수명 시험은 직접 제어; job released(INFO·jobId/userId)·worker poll failed(ERROR·연속 같은 예외 타입은 첫 스택만)과 원문 미노출 검증; 04 §2.1/2.3/9.1/10·07 §2/4/5에 구현 사실 반영, 지정 AC 부분 114개·전체 build 1483개 통과, 서버 테스트 1454→1483개(+29, 실패·오류·건너뜀 0).",
+      "completed_at": "2026-11-15T18:02:02+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/worker/WorkerLifecycle.java:113 — 종료 스레드에서 `releaseCurrent` 가 실패할 때(DB 끊김, 반환 트랜잭션 5초 초과 등)도 `worker poll failed` 로 찍는다. 표의 정의는 '워커 루프가 한 바퀴 밖에서 받은 예외'라서, 운영자가 종료 중에 난 반환 실패를 루프 실패로 오해할 수 있다. 이름을 그대로 쓸 거라면 04 §9.1 에 '종료 반환 실패도 이 줄'이라고 한 줄 적어 두면 된다.",
+        "docs/04-jobs-and-cost.md §10 — 워커(단계 Integer.MAX_VALUE)는 Tomcat graceful shutdown(DEFAULT_PHASE-1024)보다 먼저, 별도 단계로 멈춘다. 그래서 종료에 걸리는 시간은 '종료 대기 100초 + 반환 5초 + Tomcat 정상 종료'를 더한 것이고, 이 합이 컨테이너의 150초 안에 들어와야 한다. 지금 API 요청은 짧아 문제는 없지만, 단계별 130초와 컨테이너 150초의 관계를 볼 때 이 합을 함께 적어 두면 다음에 값을 바꿀 때 덜 헷갈린다.",
+        "backend/src/main/java/com/mogum/config/WorkerProperties.java:18 — 120초 상한을 상수로 박아 두었다. 실제 `timeout-per-shutdown-phase` 와의 관계는 `WorkerPropertiesTest` 가 테스트로만 지킨다. 지금은 계약대로 잘 묶여 있으니, 나중에 130초를 바꿀 일이 생기면 이 상수도 함께 봐야 한다는 점만 기억해 두면 된다."
+      ]
     },
     {
       "step": 6,
