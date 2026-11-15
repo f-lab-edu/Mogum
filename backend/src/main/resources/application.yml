@@ -60,6 +60,9 @@ management:
 
 app:
   worker:
+    count: 2
+    poll-interval: 1s
+    shutdown-wait: 100s
     lease-duration: 5m
     renewal-interval: 30s
     max-retries: 2

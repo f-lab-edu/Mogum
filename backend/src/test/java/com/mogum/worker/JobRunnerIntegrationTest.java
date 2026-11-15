@@ -90,7 +90,8 @@ class JobRunnerIntegrationTest {
         var values = configured;
 
         // then
-        assertThat(values).isEqualTo(new WorkerProperties(LEASE, Duration.ofSeconds(30), 2, Duration.ofSeconds(1)));
+        assertThat(values).isEqualTo(new WorkerProperties(LEASE, Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
+                0, Duration.ofSeconds(1), Duration.ofSeconds(100)));
     }
 
     @ParameterizedTest
@@ -304,7 +305,8 @@ class JobRunnerIntegrationTest {
         long id = intake.receive(userId, request(userId, JobType.NEW_COURSE)).id();
         var plan = stub(JobType.NEW_COURSE).plan(id).fail(GenerationOutcome.Failure.PROVIDER_UNAVAILABLE, 10);
         var runner = new JobRunner(em, transactions, ledger, clock,
-                new WorkerProperties(LEASE, Duration.ofHours(1), 0, Duration.ZERO), generators, renewals);
+                new WorkerProperties(LEASE, Duration.ofMinutes(4), 0, Duration.ZERO,
+                        0, Duration.ofSeconds(1), Duration.ofSeconds(100)), generators, renewals);
 
         // when
         runner.runOnce();
@@ -432,7 +434,7 @@ class JobRunnerIntegrationTest {
         var plan = stub(JobType.NEW_COURSE).plan(id).holdFirst();
         if (fail) plan.fail(GenerationOutcome.Failure.PROVIDER_REJECTED, 1);
         try (var worker = Executors.newSingleThreadExecutor()) {
-            var result = worker.submit(() -> runner(renew ? Duration.ofMillis(5) : Duration.ofHours(1)).runOnce());
+            var result = worker.submit(() -> runner(renew ? Duration.ofMillis(5) : Duration.ofMinutes(4)).runOnce());
             try {
                 plan.awaitEntered();
                 jdbc.update("DELETE FROM generation_jobs WHERE id = ?", id);
@@ -498,10 +500,26 @@ class JobRunnerIntegrationTest {
                 .isInstanceOf(IllegalStateException.class);
     }
 
-    private JobRunner runner() { return runner(Duration.ofHours(1)); }
+    @Test
+    @DisplayName("종료를 요청한 실행기는 기다리는 작업을 새로 꺼내지 않는다")
+    void refusesClaimsAfterStop() {
+        // given
+        long userId = user();
+        long id = intake.receive(userId, request(userId, JobType.NEW_COURSE)).id();
+        var runner = runner();
+        runner.stopClaiming();
+        // when
+        boolean found = runner.runOnce();
+        // then
+        assertThat(found).isFalse();
+        assertThat(jobs.findById(id).orElseThrow().getClaimCount()).isZero();
+    }
+
+    private JobRunner runner() { return runner(Duration.ofMinutes(4)); }
     private JobRunner runner(Duration interval) {
         return new JobRunner(em, transactions, ledger, clock,
-                new WorkerProperties(LEASE, interval, 2, Duration.ofMillis(1)), generators, renewals);
+                new WorkerProperties(LEASE, interval, 2, Duration.ofMillis(1),
+                        0, Duration.ofSeconds(1), Duration.ofSeconds(100)), generators, renewals);
     }
 
     private TestJobGenerator stub(JobType type) {

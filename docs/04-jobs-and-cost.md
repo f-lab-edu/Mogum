@@ -24,7 +24,7 @@
 /
 ├── backend/                         # Spring Boot — 서버. 단일 Gradle 모듈
 │   ├── src/main/java/…/mogum/
-│   │   ├── config/                  # 설정 값 · 시계 · Auditing · 요청 로그 필터 · 역할별 빈 등록 — worker · generation 을 조립하는 곳
+│   │   ├── config/                  # 설정 값 · 시계 · Auditing · 요청 로그 필터 · API와 워커를 한 서버에 조립 — worker · generation 의 빈 등록
 │   │   ├── common/                  # api(성공 · 오류 응답) · time · logging · persistence — 그대로 쓴다
 │   │   ├── auth/                    # 구글 로그인 · 세션 → 사용자 — 그대로 쓴다
 │   │   ├── account/                 # 사용자 · 로그인 → 신청 · 승인 · 거절됨으로 바꾼다(ADR-147) · 크레딧도 여기서(ADR-153)
@@ -72,7 +72,10 @@
 - `6-job-worker` step 3 구현: `job.controller.JobController`가 받기 · 작업 하나 읽기 · 다시 시도 · 버리기를 HTTP에 연결한다. `job.dto.JobReceiveRequest`의 칸 사이 검증은 `FieldViolation.Reason`으로 공통 오류 경로에 전달한다. `job.service.JobReadService`는 `@Transactional(readOnly = true)`에서 작업 주인을 확인하고 `course` 패키지의 레포지토리로 대상 제목과 강의의 코스 ID를 읽어 값 객체만 반환한다. 경로 · 요청/응답 칸 · 실패 묶음은 [05 §2](./05-api.md#2-만드는-작업--받기-하나--다시-읽기)에 적었다.
 
 - `6-job-worker` step 4 구현: `generation.JobGenerator`는 `type()` · `generate(JobSnapshot)` · `save(JobSnapshot, GeneratedResult)` 자리만 두며 운영 구현은 없다. `JobSnapshot`과 그 안의 `Input`은 ID · 입력 · 피드백 · 이번 `claimCount`만 담는 record이고, 결과 값은 `GeneratedResult`로 전달한다. `GenerationOutcome.Success` 또는 `Failure`의 `PROVIDER_UNAVAILABLE` · `INVALID_OUTPUT` · `PROVIDER_REJECTED` · `INPUT_TOO_LARGE`를 반환한다. `ResultRef(long id)`는 새로 만든 결과 또는 원래 대상 ID다.
-- `worker.JobRunner`의 `boolean runOnce()`는 작업 하나를 집었는지 반환한다. `EntityManager` 네이티브 SQL과 `TransactionTemplate`으로 꺼내기 · 갱신 · 저장 · 실패의 경계를 두고, 만들기는 트랜잭션 밖에서 한다. 호출자 트랜잭션도 거절한다. 저장의 첫 조건부 쓰기로 소유권을 확인한 뒤 `save` · 명시적 `flush()` · 작업 성공을 함께 커밋한다. 실패 전환과 `CreditLedger.restoreIfOwed`도 한 트랜잭션이다. 시각은 주입받은 `Clock` 하나로 계산하고 비교한다. 시한 갱신은 외부에서 받은 `ScheduledExecutorService`에 한 바퀴 동안만 예약하고, 완료 전에 진행 중인 갱신을 마치고 취소한다. 이 step은 실행 스레드나 서버 수명에 연결하지 않았으며 빈 조립은 step 5에서 한다.
+- `worker.JobRunner`의 `boolean runOnce()`는 작업 하나를 집었는지 반환한다. `EntityManager` 네이티브 SQL과 `TransactionTemplate`으로 꺼내기 · 갱신 · 저장 · 실패의 경계를 두고, 만들기는 트랜잭션 밖에서 한다. 호출자 트랜잭션도 거절한다. 저장의 첫 조건부 쓰기로 소유권을 확인한 뒤 `save` · 명시적 `flush()` · 작업 성공을 함께 커밋한다. 실패 전환과 `CreditLedger.restoreIfOwed`도 한 트랜잭션이다. 시각은 주입받은 `Clock` 하나로 계산하고 비교한다. 시한 갱신은 외부에서 받은 `ScheduledExecutorService`에 한 바퀴 동안만 예약하고, 완료 전에 진행 중인 갱신을 마치고 취소한다.
+- `6-job-worker` step 5 구현: `config.WorkerConfiguration`이 `worker.WorkerLifecycle`을 조립한다. `SmartLifecycle`의 자동 시작에서 워커 수만큼 플랫폼 스레드와 각각의 `JobRunner` · 갱신 스케줄러를 만든다. 빈손과 한 바퀴 밖 예외 뒤에는 설정 간격을 쉰다. 워커 수 0은 실행기 · 스레드를 만들지 않는다. 운영 생성 처리기는 여전히 없고, 받기 처리기도 없어 어떤 종류도 받지 않는다.
+- 종료는 `SmartLifecycle`의 단계 `Integer.MAX_VALUE`에서 시작한다. 각 실행기에 새 꺼내기 금지를 먼저 알리고 빈손 대기를 깨운 뒤, 모든 워커에 같은 종료 시각을 적용한다. 진행 중 갱신은 기다리는 동안 유지한다. 한도를 넘긴 워커는 `releaseCurrent()`의 `TransactionTemplate`(반환 트랜잭션 제한 5초)에서 같은 `claim_count` · `RUNNING` 조건으로 `QUEUED` · `lease_until = NULL` · `updated_at`을 쓰며 크레딧은 건드리지 않는다. 반환은 워커별로 나란히 처리한다. 늦은 호출은 해당 시도의 시한 상실 표시와 DB 쓰기 조건으로 막는다. 실행 스레드는 데몬 플랫폼 스레드라 한도 뒤 외부 호출이 JVM 종료를 붙잡지 않는다. 각 실행기의 현재 시도와 종료 표시는 그 실행기의 수명 제어에만 쓰고, 워커 사이 작업 분배 · 소유권은 DB로만 판단한다.
+- 종료 순서의 근거: 로컬 의존성 `spring-context-7.0.9-sources.jar`의 `AbstractApplicationContext.doClose()`는 `lifecycleProcessor.onClose()` 뒤에 `destroyBeans()`를 호출하며, `DefaultLifecycleProcessor.stopBeans()`는 높은 단계부터 멈추고 `stop(Runnable)`의 콜백을 기다린다. `WorkerLifecycleTest.stopsBeforeConnectionPoolDestruction`은 실제 Spring 컨텍스트를 닫아 반환 시점에 Hikari 풀이 열려 있고, 콜백 뒤 풀의 `close()`가 끝나는 순서를 검증한다. 따라서 JPA · DB 풀의 singleton 파괴 전에 워커 반환을 마친다.
 
 ## 3. 배포
 
@@ -215,6 +218,15 @@
 
 `6-job-worker` step 4의 워커 줄은 커밋 뒤 `INFO`의 `job finished status={SUCCEEDED|FAILED}`, 소유권 확인이 0행이면 한 시도에 한 번 `WARN`의 `job lease lost`, 결과 저장 트랜잭션의 예외에는 스택과 함께 `ERROR`의 `job save failed`다. 처리와 갱신 중 `jobId` · `userId`를 넣고 끝나면 지운다. 저장 예외는 원래 메시지 · cause · suppressed를 넘기지 않고 예외 타입 이름과 스택 위치만 남긴다.
 
+`6-job-worker` step 5의 줄은 정상 종료 한도 뒤 조건부 반환이 커밋된 때 `INFO`의 `job released`(`jobId` · `userId`)와 한 바퀴 밖 예외의 `ERROR`인 `worker poll failed`다. 루프는 같은 예외 타입의 연속 실패에서 첫 번째만 스택을 남기고, 다음 실패는 같은 한 줄만 남긴다. 성공한 꺼내기(빈손 포함) 뒤에는 연속 실패 표시를 비운다. 스택에는 원래 메시지 · cause · suppressed 없이 타입 이름과 위치만 싣는다.
+
+`WorkerLifecycleIntegrationTest` · `WorkerLifecycleTest`의 `OutputCaptureExtension`이 캡처한 실제 출력:
+
+```text
+2026-11-15T17:55:06.072+09:00  INFO jobId=42, userId=38 68829 --- [mogum] [m-worker-1-stop] com.mogum.worker.JobRunner               : job released
+2026-11-15T17:55:07.928+09:00 ERROR  68829 --- [mogum] [ mogum-worker-0] com.mogum.worker.WorkerLifecycle         : worker poll failed
+```
+
 `JobRunnerIntegrationTest`의 `OutputCaptureExtension`이 캡처한 실제 출력:
 
 ```text
@@ -252,15 +264,15 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 | 값 | 근거 |
 |---|---|
 | 한 사람이 동시에 걸 수 있는 수 — `app.job.max-in-progress-per-user` 임시 값 3(`JobProperties.maxInProgressPerUser()`). `6-job-worker` step 2에서 사용자 행 잠금으로 동시 요청을 직렬화했다(§6). 실제 운영 값은 재 보고 정한다 | ADR-104 · ADR-133 |
-| 서버마다 워커 수 | ADR-105 · ADR-133 |
-| 시한 · 늘리는 간격은 아래 임시 설정. `ScheduledExecutorService.scheduleWithFixedDelay`로 갱신한다. 최장 시도 시간과 시한의 식 · 정상 종료 때 기다리는 한도 · 배포 방식은 step 5에서 정한다 | ADR-126 |
+| 서버마다 워커 수 · 빈손/예외 뒤 쉬는 간격 · 정상 종료 대기는 아래 임시 설정. 배포는 기존 `deploy/deploy.sh`의 Compose `up -d --no-build`로 옛 컨테이너를 끄고 새 컨테이너를 켠다. 겹치는 배포 장치는 없다 | ADR-105 · ADR-126 · ADR-133 |
+| 시한 · 늘리는 간격은 아래 임시 설정. 각 워커의 `ScheduledExecutorService.scheduleWithFixedDelay`로 만드는 동안과 정상 종료 대기 중에 갱신한다. 시한 식은 아래와 같고, 호출 시간 제한과 이어 쓰기 값은 강의 목록 TASK에서 정한 뒤 다시 대입한다 | ADR-126 |
 | 자동 다시 시도는 아래 임시 설정. 이어 쓰기 횟수 · 간격 · 프로바이더 오류 분류는 강의 목록 TASK에서 정한다(갈래 자체는 ADR-163) | ADR-127 |
 | 꺼내기는 PostgreSQL CTE 하나에서 `SELECT … ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1` → `UPDATE … RETURNING id`. `QUEUED` 또는 같은 `Clock`의 현재 시각보다 `lease_until`이 작은 `RUNNING` 하나를 집고 `claim_count + 1` · 시한 · 시작/수정 시각을 바꾼다 | ADR-129 |
 | 종류별 크레딧 값 · 한 달 몫 — 한 달 몫은 계정 TASK 가 설정 한 곳에 임시 값 100 으로 두고, 강의 목록 TASK 에서 토큰을 잰 뒤 정한다(사용자 확인 2026-11-08). 종류별 값은 `6-job-worker` step 1에서 아래 설정에 모두 임시 값 1로 두었다 | ADR-107 · ADR-115 |
 | 크레딧 채우기를 여러 서버에서 한 번만 일어나게 하는 방법 · 새벽 4시에 서버가 꺼져 있었을 때 따라잡는 방법 | ADR-133 · ADR-173 |
 | 패키지를 코스 · 로드맵 등으로 나누는 방식 — 테이블은 02 §8 에서 정했다 | ADR-148 |
 
-워커의 임시 값은 `application.yml`의 `app.worker` 한 곳이며 `config.WorkerProperties`로 읽는다(`6-job-worker` step 4). 테스트는 생성자로 짧은 간격 또는 0의 다시 시도 간격을 전달한다. 자동 다시 시도 횟수는 첫 호출 **뒤에 더 부르는 횟수**다.
+워커의 임시 값은 `application.yml`의 `app.worker` 한 곳이며 `config.WorkerProperties`로 읽는다(`6-job-worker` step 4 · 5). 테스트는 생성자로 짧은 간격 또는 0의 다시 시도 간격을 전달한다. 자동 다시 시도 횟수는 첫 호출 **뒤에 더 부르는 횟수**다.
 
 | 설정 키 | 읽는 메서드 | 임시 값 |
 |---|---|---|
@@ -268,6 +280,22 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 | `app.worker.renewal-interval` | `renewalInterval()` | `30s` |
 | `app.worker.max-retries` | `maxRetries()` | `2`(최대 호출 3번) |
 | `app.worker.retry-delay` | `retryDelay()` | `1s` |
+| `app.worker.count` | `count()` | `2`(0이면 API만 실행) |
+| `app.worker.poll-interval` | `pollInterval()` | `1s` |
+| `app.worker.shutdown-wait` | `shutdownWait()` | `100s` |
+
+시한은 **한 번 꺼낸 시도의 최장 시간보다 길어야 한다**. `R`은 추가 자동 다시 시도 횟수, `C`는 호출마다 허용한 이어 쓰기 횟수, `T호출`은 호출 시간 제한, `D이어쓰기`는 이어 쓰기 사이 간격, `D다시시도`는 자동 다시 시도 사이 간격이다. `T_DB`는 재료 읽기 · 시한 처리 · 결과/실패 쓰기를 포함한 DB 처리의 여유다.
+
+```text
+시한 > (R + 1) × ((C + 1) × T호출 + C × D이어쓰기) + R × D다시시도 + T_DB
+현재: 300초 > 3 × ((C + 1) × T호출 + C × D이어쓰기) + 2초 + T_DB
+```
+
+운영 생성 처리기와 유료 호출은 아직 없으므로 `T호출` · `C` · `D이어쓰기` · 실제 `T_DB` 상한을 확인한 것은 아니다. 강의 목록 TASK에서 이를 정하고 시한을 다시 계산한다. 호출 시간 제한 · 이어 쓰기 · 다시 시도 횟수/간격 중 하나를 바꿔도 식을 다시 확인한다.
+
+현재 계산할 수 있는 제약은 `WorkerProperties`의 생성자에서 검사해 설정 바인딩 실패로 기동을 거부한다: 시한 · 갱신/쉬는 간격 · 종료 대기는 양수, `갱신 간격 < 시한`, 워커 수 · 추가 다시 시도 횟수/간격은 0 이상, `종료 대기 < 120초`다. Spring의 130초와 컨테이너의 150초는 늘리지 않고, 반환 트랜잭션 제한 5초를 위한 여유를 남긴다. `WorkerPropertiesTest`는 잘못된 설정의 기동 거부와 실제 Spring 종료 설정이 120초보다 긴 것을 검사하고, 기존 배포 파일 시험이 컨테이너 대기와 Spring 대기의 관계를 검사한다.
+
+기본 통합 테스트는 공용 `IntegrationTestConfiguration.OAuthInitializer`가 `app.worker.count=0`을 적용한다. 별도 앱 컨텍스트를 늘리지 않고, 워커 시험이 `runOnce()` 또는 짧은 설정으로 직접 만든 `WorkerLifecycle`의 시작 · 종료를 제어한다.
 
 종류별 임시 값(`application.yml` · `config.CreditProperties`):
 

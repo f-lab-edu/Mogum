@@ -29,16 +29,23 @@ public final class JobRunner {
     private static final Logger log = LoggerFactory.getLogger(JobRunner.class);
     private final EntityManager em;
     private final TransactionTemplate tx;
+    private final TransactionTemplate releaseTx;
     private final CreditLedger ledger;
     private final Clock clock;
     private final WorkerProperties properties;
     private final Map<JobType, JobGenerator> generators;
     private final ScheduledExecutorService renewals;
+    // 이 실행기 한 개의 시작/종료 경계다. 다른 워커의 작업 분배는 DB만 결정한다.
+    private final Object admission = new Object();
+    private volatile boolean stopping;
+    private Lease current;
 
     public JobRunner(EntityManager em, PlatformTransactionManager transactions, CreditLedger ledger, Clock clock,
                      WorkerProperties properties, List<JobGenerator> generators, ScheduledExecutorService renewals) {
         this.em = em;
         this.tx = new TransactionTemplate(transactions);
+        this.releaseTx = new TransactionTemplate(transactions);
+        this.releaseTx.setTimeout(5);
         this.ledger = ledger;
         this.clock = clock;
         this.properties = properties;
@@ -51,10 +58,17 @@ public final class JobRunner {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("JobRunner requires no ambient transaction");
         }
-        var job = tx.execute(status -> claim());
-        if (job == null) return false;
+        final Lease lease;
+        synchronized (admission) {
+            if (stopping) return false;
+            var claimed = tx.execute(status -> claim());
+            if (claimed == null) return false;
+            lease = new Lease(claimed);
+            current = lease;
+        }
+        var job = lease.job;
         putMdc(job);
-        try (var lease = new Lease(job)) {
+        try (lease) {
             var generator = generators.get(job.type());
             if (generator == null) throw new IllegalStateException("No generator for claimed job type");
             lease.start();
@@ -85,6 +99,29 @@ public final class JobRunner {
                 fail(job, (GenerationOutcome.Failure) outcome, lease);
             }
             return true;
+        } finally {
+            clearMdc();
+            synchronized (admission) {
+                current = null;
+            }
+        }
+    }
+
+    /** 이미 꺼내기 시작한 한 바퀴는 마치되 그 다음 작업은 받지 않는다. */
+    public void stopClaiming() {
+        stopping = true;
+    }
+
+    /** 종료 한도 뒤에만 호출한다. DB 소유권이 아직 같을 때만 기다림으로 돌린다. */
+    public void releaseCurrent() {
+        final Lease lease;
+        synchronized (admission) {
+            lease = current;
+        }
+        if (lease == null) return;
+        putMdc(lease.job);
+        try {
+            lease.release();
         } finally {
             clearMdc();
         }
@@ -233,6 +270,17 @@ public final class JobRunner {
             if (lost) return;
             lost = true;
             log.warn("job lease lost");
+        }
+
+        private synchronized void release() {
+            close(); // 진행 중인 갱신을 마친 뒤 취소한다. 반환 뒤에는 늘리지 않는다.
+            boolean released = Boolean.TRUE.equals(releaseTx.execute(status -> em.createNativeQuery("""
+                    UPDATE generation_jobs SET status = 'QUEUED', lease_until = NULL, updated_at = :now
+                    WHERE id = :id AND claim_count = :claim AND status = 'RUNNING'
+                    """).setParameter("now", clock.instant()).setParameter("id", job.id())
+                    .setParameter("claim", job.claimCount()).executeUpdate() == 1));
+            lost = true; // 의도한 반환이다. 늦은 시도는 DB/유료 호출을 더 하지 않는다.
+            if (released) log.info("job released");
         }
 
         @Override

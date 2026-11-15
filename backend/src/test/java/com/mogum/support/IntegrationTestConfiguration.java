@@ -303,6 +303,7 @@ public class IntegrationTestConfiguration {
         @Override
         public void initialize(ConfigurableApplicationContext context) {
             TestPropertyValues.of(
+                    "app.worker.count=0",
                     "spring.security.oauth2.client.provider.google.authorization-uri=" + FakeGoogle.ORIGIN + "/authorize",
                     "spring.security.oauth2.client.provider.google.token-uri=" + FakeGoogle.ORIGIN + "/token",
                     "spring.security.oauth2.client.provider.google.user-info-uri=" + FakeGoogle.ORIGIN + "/userinfo")
