@@ -366,7 +366,7 @@ PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md)
 - **대상 칸은 `CHECK` 둘로 묶는다**(ADR-177) — `num_nonnulls(course_id, roadmap_id, lesson_id) <= 1` · `type` 마다 위 표의 칸만 찬다. 대상이 있는 만들기(`PLAN_ROADMAP_COURSE` · `REPLAN_*` · `MATERIAL`)는 그 칸이 늘 차 있고, 새로 배우기(`NEW_*`)는 `SUCCEEDED` 일 때만 찬다.
 - 화면에 보이는 오류 묶음([05 §1.2](./05-api.md#12-오류--묶음-이름과-서버가-정한-문구))은 서버가 `error_type` 로 고른다 — `INPUT_TOO_LARGE` 는 입력 문제, 나머지는 일시적(ADR-163).
 - 받은 순서는 `created_at` 이다(ADR-128). 색인 — `(status, created_at)` 꺼내기 · `(user_id, status)` 한 사람이 건 수 · 홈.
-- **같은 대상에 같은 만들기가 둘 생기지 않게 한다**(ADR-157) — `MATERIAL` 은 `lesson_id` 마다 하나, `PLAN_ROADMAP_COURSE` 는 `course_id` 마다 하나, `REPLAN_*` 는 대상마다 성공하지 않은 것 하나. 막는 방법(고유 색인 · 잠금)은 TASK 에서 정한다(§9).
+- **같은 대상에 같은 만들기가 둘 생기지 않게 한다**(ADR-157) — `MATERIAL` 은 `lesson_id` 마다 하나, `PLAN_ROADMAP_COURSE` 는 `course_id` 마다 하나, `REPLAN_*` 는 대상마다 성공하지 않은 것 하나. `V11`의 종류별 부분 고유 색인 네 개로 막는다 — `generation_jobs_material_lesson_id_key` · `generation_jobs_plan_roadmap_course_course_id_key` · `generation_jobs_replan_course_course_id_key` · `generation_jobs_replan_roadmap_roadmap_id_key`(뒤 둘은 `status <> 'SUCCEEDED'`인 행만).
 
 **`llm_calls`** — 호출 기록(ADR-139). 원문은 담지 않는다.
 
@@ -518,4 +518,3 @@ PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md)
 | 것 | 근거 |
 |---|---|
 | 같은 개념 판정의 기준값 — 임베딩 모델을 고른 뒤 실제 개념 쌍으로 잰다 | ADR-030 · ADR-161 |
-| 같은 대상에 같은 만들기가 둘 생기지 않게 막는 방법 — 고유 색인 · 잠근 뒤 확인 등. 서버가 여러 대여도 막아야 한다 | ADR-157 · ADR-133 |
