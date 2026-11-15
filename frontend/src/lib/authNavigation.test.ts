@@ -20,8 +20,8 @@ test('확인 이력은 이 탭의 화면 상태이며 사용자 정보는 저장
 })
 
 test('경로, 쿼리, 해시를 한 번만 되살린다', () => {
-  rememberReturnPath('/curriculums/12?tab=1#lesson')
-  expect(takeReturnPath()).toBe('/curriculums/12?tab=1#lesson')
+  rememberReturnPath('/courses/12?tab=1#lesson')
+  expect(takeReturnPath()).toBe('/courses/12?tab=1#lesson')
   expect(takeReturnPath()).toBeNull()
 })
 
@@ -32,10 +32,10 @@ test.each(['//evil.example', 'https://evil.example', '/login', '/login?error=x#a
 })
 
 test('이미 로그인에 도착한 뒤의 늦은 401은 원래 주소와 안내를 덮어쓰지 않는다', () => {
-  rememberReturnPath('/curriculums/12')
+  rememberReturnPath('/courses/12')
   window.history.replaceState(null, '', '/login')
   const navigate = vi.fn()
   redirectToLogin(navigate)
   expect(navigate).not.toHaveBeenCalled()
-  expect(takeReturnPath()).toBe('/curriculums/12')
+  expect(takeReturnPath()).toBe('/courses/12')
 })

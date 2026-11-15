@@ -87,6 +87,8 @@
 | 2026-11-07 | 주제마다 따로 쓰던 문서(문제와 사용자 ~ 개발 순서와 일정)와 요약 입구(PRD · ARCHITECTURE · UI_GUIDE)를 `docs/` 양식의 01 ~ 07 · SCHEDULE 로 합쳤다 — 같은 내용이 두세 벌 있어 함께 고치기 어려웠다(사용자 요청 · 묶는 방식은 Claude 결정). UI_GUIDE 는 디자인 값이 정해지면 새로 만든다 |
 | 2026-11-07 | 화면 시안(`design/` — Stitch)은 디자인과 구조의 방향이다 — 똑같이 옮기지 않는다. 화면마다 다른 아이콘 · 컴포넌트는 TASK 에서 공통 컴포넌트로 하나로 맞춰 만든다 — 처음 화면을 만드는 TASK 가 토큰 · 컴포넌트를 정하고 뒤 TASK 가 쌓는다(사용자 결정 · 맞추는 순서는 Claude 제안을 승인) |
 | 2026-11-07 | 모구미(캐릭터) 이미지는 사용자가 만든다 — 화면에 새 모습이 필요하면 [design 「모구미 이미지」](./design/README.md#모구미-이미지) 표에 요청으로 적고 사용자에게 요청한다(사용자 결정) |
+| 2026-11-10 | 배우는 단위 모델 TASK(`5-learning-model`) — 마이그레이션은 배우는 테이블 여덟 개(02 §8.3 · §8.4)만 만들고, `generation_jobs` · `credit_entries.job_id` 는 만드는 작업 TASK 가, `llm_calls` 는 강의 목록 TASK 가 만든다 · 패키지는 `course`(로드맵 · 코스 · 강의 · 강의 자료) · `card`(카드 · 복습 · 개념) 둘로 나눈다 · `courses` 에 `CHECK` 둘(`position >= 1` · `started_at` 은 학습 중 · 다 마침일 때만)을 더한다(사용자 결정 — Claude 추천) |
+| 2026-11-10 | 배우는 단위 모델 TASK(`5-learning-model`) — 엔티티는 생성 흐름마다 정적 팩토리만 두고 상태를 바꾸는 메서드는 쓰는 TASK 에서 더한다 · `courses.mastery_report` 는 칸만 만들고 매핑은 숙련도 고리 TASK 에서 한다 · 입력 칸 묶음 `LearningInput` · 다룰 개념 `PlannedConcept` 코드 이름(Claude 결정 — 사용자에게 보고) |
 
 ## 규칙
 

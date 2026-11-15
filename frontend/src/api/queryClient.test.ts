@@ -14,7 +14,7 @@ test('me 성공만 로그인 확인 이력으로 기록한다', async () => {
   client.clear()
 })
 
-test.each(['me', 'curriculums'])('%s 쿼리의 401은 재시도 없이 공통 콜백을 부른다', async (key) => {
+test.each(['me', 'courses'])('%s 쿼리의 401은 재시도 없이 공통 콜백을 부른다', async (key) => {
   const unauthorized = vi.fn()
   const client = createAuthQueryClient(unauthorized)
   const queryFn = vi.fn().mockRejectedValue(new ApiError(401, 'UNAUTHORIZED', '서버 문구'))
