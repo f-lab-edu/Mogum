@@ -1,0 +1,14 @@
+{
+  "project": "Mogum",
+  "phase": "6-job-worker",
+  "steps": [
+    { "step": 0, "name": "job-schema", "status": "pending" },
+    { "step": 1, "name": "credit-ledger", "status": "pending" },
+    { "step": 2, "name": "job-intake", "status": "pending" },
+    { "step": 3, "name": "job-api", "status": "pending" },
+    { "step": 4, "name": "worker-run", "status": "pending" },
+    { "step": 5, "name": "worker-lifecycle", "status": "pending" },
+    { "step": 6, "name": "app-shell", "status": "pending" },
+    { "step": 7, "name": "waiting-screen", "status": "pending" }
+  ]
+}
