@@ -902,10 +902,10 @@ class TestExecuteSingleStep:
 
     def test_resume_reason_survives_a_usage_limit_wait(self, executor):
         """재개한 첫 시도가 한도에 걸려도 기다린 뒤의 시도가 이전 사유를 받는다 — H22 의 대부분."""
-        index = json.loads(executor._index_file.read_text())
-        next(s for s in index["steps"] if s["step"] == 2)["blocked_reason"] = "Docker 데몬에 연결할 수 없다"
-        executor._index_file.write_text(json.dumps(index))
-        preambles, commits = self._wire(executor, [self.APPROVE])
+        ex.StepExecutor._write_json(executor._index_file, {"project": "TestProject", "phase": "mvp", "steps": [
+            {"step": 2, "name": "ui", "status": "pending", "blocked_reason": "Docker 데몬에 연결할 수 없다"},
+        ]})
+        preambles, _ = self._wire(executor, [self.APPROVE])
         self._clock(executor, self.NEAR)
         complete = executor._invoke_codex
         attempts = {"n": 0}
@@ -932,9 +932,10 @@ class TestExecuteSingleStep:
             return {"exitCode": 1, "timedOut": False, "stdout": unreadable, "stderr": ""}
 
         executor._invoke_codex = codex
+        step = self._step2(executor)
 
         with pytest.raises(SystemExit) as exc_info:
-            executor._execute_single_step(self._step2(executor))
+            executor._execute_single_step(step)
 
         assert exc_info.value.code == 2
         assert sleeps == [30 * 60] * 24
@@ -1023,6 +1024,7 @@ class TestExecuteSingleStep:
             executor._execute_single_step(self._step2(executor))
 
         assert exc_info.value.code == 2
+        assert sleeps == []
         assert len(preambles) == 1
         assert len(reviews) == 1
         assert commits == []

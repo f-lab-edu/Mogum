@@ -41,7 +41,7 @@ def parse_reset_time(message: str, now: datetime) -> Optional[datetime]:
     rel = _RELATIVE.search(message)
     if rel:
         delta = timedelta()
-        for n, unit in re.findall(r"(\d+)\s*(h|m)", rel.group(1), re.I):
+        for n, unit in re.findall(r"\b(\d+)\s*([hm])",rel.group(1), re.I):
             delta += timedelta(hours=int(n)) if unit.lower() == "h" else timedelta(minutes=int(n))
         return now + delta
     clock = _CLOCK.search(message)
