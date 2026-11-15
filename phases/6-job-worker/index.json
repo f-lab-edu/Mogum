@@ -2,13 +2,53 @@
   "project": "Mogum",
   "phase": "6-job-worker",
   "steps": [
-    { "step": 0, "name": "job-schema", "status": "pending" },
-    { "step": 1, "name": "credit-ledger", "status": "pending" },
-    { "step": 2, "name": "job-intake", "status": "pending" },
-    { "step": 3, "name": "job-api", "status": "pending" },
-    { "step": 4, "name": "worker-run", "status": "pending" },
-    { "step": 5, "name": "worker-lifecycle", "status": "pending" },
-    { "step": 6, "name": "app-shell", "status": "pending" },
-    { "step": 7, "name": "waiting-screen", "status": "pending" }
-  ]
+    {
+      "step": 0,
+      "name": "job-schema",
+      "status": "completed",
+      "started_at": "2026-11-15T12:27:13+0900",
+      "summary": "V11__create_generation_jobs.sql: generation_jobs의 계약 칸·CHECK 22개·FK·조회 색인 및 credit_entries.job_id(ON DELETE SET NULL)·credit_entries_job_id_idx 추가; 같은 대상 막기는 DB 부분 고유 색인 generation_jobs_material_lesson_id_key, generation_jobs_plan_roadmap_course_course_id_key, generation_jobs_replan_course_course_id_key, generation_jobs_replan_roadmap_roadmap_id_key(뒤 둘은 status <> SUCCEEDED)로 보장; GenerationJob(AuditedEntity·LearningInput @Embedded·사용자/대상 ID·QUEUED/claim_count 0)과 JobType·JobStatus·JobErrorType 추가; GenerationJob 및 GenerationJobFixtures의 생성 시그니처는 각각 newCourse(long userId, LearningInput input), newRoadmap(long userId, LearningInput input), planRoadmapCourse(long userId, long courseId), replanCourse(long userId, long courseId, String feedback), replanRoadmap(long userId, long roadmapId, String feedback), material(long userId, long lessonId); GenerationJobRepository는 <S extends GenerationJob> S save(S entity), Optional<GenerationJob> findById(Long id)만 선언; GenerationJobFixtures SQL 도우미는 void running(JdbcTemplate jdbc, long id, int claimCount, Instant startedAt, Instant leaseUntil), void failed(JdbcTemplate jdbc, long id, JobErrorType errorType, Instant finishedAt), void succeeded(JdbcTemplate jdbc, long id, Long courseId, Long roadmapId, Long lessonId, Instant finishedAt); 02 §8.5·§9와 04 §2.3에 구현 사실 반영(ERD는 계약과 일치), 기존 V9 전용 시험은 Flyway target 9로 고정; 지정 AC 두 명령 통과(대상 시험 364개·전체 build 성공), 서버 테스트 903→1146개(작업 시험 243개 추가, 실패·건너뜀 0).",
+      "completed_at": "2026-11-15T12:36:24+0900",
+      "review_notes": [
+        "backend/src/main/resources/db/migration/V11__create_generation_jobs.sql:72 — `course_id` · `roadmap_id` 를 덮는 색인은 종류를 한정한 부분 고유 색인뿐이다. 02 §8.6 순서대로 코스 · 로드맵을 지울 때 그 대상의 작업을 모두 찾는데(성공한 `NEW_COURSE` · `NEW_ROADMAP` 포함), 이 조회는 기존 색인을 타지 못한다. 대상 FK 를 확인할 때도 마찬가지다. 정원 10명 규모라 지금은 영향이 없다 → 지우기를 만드는 step 에서 대상 칸 색인을 더할지 판단한다.",
+        "backend/src/main/resources/db/migration/V11__create_generation_jobs.sql:41 — `generation_jobs_input_check` · `_target_count_check` · `_target_type_check` · `_feedback_length_check` · `_error_type_values_check` 는 `{테이블}_{칸}_{접미사}` 규칙에서 조금 벗어난다. 한 칸에 제약이 둘이거나 여러 칸을 묶는 제약이라 생긴 일이고, 테스트가 이 이름을 고정하므로 동작에는 영향이 없다 → 뒤 step 의 오류 처리가 제약 이름으로 분기하면 이 이름을 그대로 쓴다."
+      ]
+    },
+    {
+      "step": 1,
+      "name": "credit-ledger",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "job-intake",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "job-api",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "worker-run",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "worker-lifecycle",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "app-shell",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "waiting-screen",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-11-15T12:27:13+0900"
 }
