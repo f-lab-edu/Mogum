@@ -84,7 +84,16 @@
     {
       "step": 6,
       "name": "app-shell",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T18:02:02+0900",
+      "summary": "AppLayout(frontend/src/components/AppLayout.tsx)이 RequireAuth의 Me outlet context로 APPROVED만 감싸며 children으로 본문을 받고, title을 넘기면 위 바에 뒤로 가기(navigate(-1))·h1을 표시하고 제목 포커스·문서 제목을 갱신(기본은 모구미+머금 로고); 모바일 56px 위 바·고정 다섯 탭 바·본문 아래 96px 여백, 1024px 이상 256px 사이드바·위 바와 guide §3의 다섯 인라인 SVG·현재 탭 aria-current·44px 터치 영역·공통 포커스 규칙 구현; 탭 주소는 홈 /·코스 /courses·로드맵 /roadmaps·복습 /review·내 정보 /profile이며 모두 PlaceholderPage 제목 한 줄, 기존 AccountPage 승인 전 분기 유지; Mogumi size=logo(40px) 추가, 새 토큰 --breakpoint-lg=64rem, UI_GUIDE §2·4.1·6·7에 반영; 화면 테스트 174→209개(+35)·지정 test/lint 및 추가 build 통과, 너비 분기는 jsdom 클래스·구조(lg 표시/숨김·w-64·h-14·본문 여백)로 확인했고 실제 브라우저 레이아웃은 검증하지 않음.",
+      "completed_at": "2026-11-15T18:08:13+0900",
+      "review_notes": [
+        "docs/UI_GUIDE.md:74 — The `Mogumi` row in §3 still says 「가로 128px · 변형·움직임 없음」, but this step added `size=\"logo\"` (40px), which §7 and `Mogumi.tsx` describe, so §3 and §7 contradict each other → in the §3 row, either say the default is 128px and the variants are in §7, or remove 「변형 없음」.",
+        "frontend/src/pages/PlaceholderPage.tsx:7 — The document title is chosen with `title === '머금' ? '홈' : title`, so the home case depends on the title string being 「머금」. It works now, but changing the home title text would silently change the document title → if the tab screens are kept, consider passing the home case as its own value (for example, a label prop).",
+        "frontend/src/components/AppLayout.tsx:75 — Back is only `navigate(-1)`. If someone opens a screen inside a tab directly from its URL or refreshes it (06 §2.3 says course and roadmap screens have their own addresses), there is no history entry, so back leaves the app or does nothing → step 7 (waiting screen) or the course-screen TASK should decide on a fallback for this case, such as the tab's first screen.",
+        "frontend/src/components/AppLayout.tsx:73 — On desktop the logo appears in both the sidebar and the top bar. The design README lists small differences like this under 「맞추지 않는다」, so it does not block approval, but someone should look at it against the 05-home-desktop draft."
+      ]
     },
     {
       "step": 7,
