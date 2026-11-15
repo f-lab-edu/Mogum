@@ -76,6 +76,7 @@ void returnsExistingUserIdOnRelogin() {
 - **컨텍스트를 나누지 않는다** — 클래스마다 `@Import` · `properties` · `@MockitoBean` · `@MockitoSpyBean` 을 더하면 Spring 이 컨텍스트를 새로 띄운다. 그래서 더하지 않는다.
     - 테스트 전용 빈(검증용 · 실패용 컨트롤러 등)은 공용 `@TestConfiguration` 의 중첩 static 클래스로 두어 모든 통합 테스트에 함께 올린다. Spring Boot 4.1.1 의 `TestTypeExcludeFilter` 는 `@TestConfiguration` 클래스와 그 중첩 클래스를 컴포넌트 스캔에서 뺀다(`spring-boot-test-4.1.1-sources.jar` 의 `match` 로 확인).
     - 다른 설정값이 꼭 필요한 테스트는 이름 있는 묶음 어노테이션을 따로 만들고 이유를 그 어노테이션에 적는다.
+- **별도 앱을 띄웠다 닫는 테스트(마이그레이션 테스트 등)는 JVM 공용 JUL → SLF4J 연결(`SLF4JBridgeHandler`)도 닫는다** — 그 뒤에 도는 테스트가 컨테이너(Tomcat) 로그를 출력 캡처로 보면 줄이 없어 실패한다. 실행 순서에 따라 드러나므로, 그런 테스트는 시작할 때 연결이 없으면 설치하고 끝나면 되돌린다(`RequestLogFilterIntegrationTest` · `6-job-worker` step 1).
     - `@Entity` · Spring Data `Repository` 픽스처는 `com.mogum` 밖 패키지에 둔다 — `ddl-auto: validate` 라 테이블 없는 엔티티 하나로 모든 컨텍스트가 뜨지 않는다(`.claude/commands/harness.md` 원칙 22).
 
 ## 6. 요청 도구

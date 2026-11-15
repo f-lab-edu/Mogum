@@ -73,7 +73,7 @@
 
 - `6-job-worker` step 4 구현: `generation.JobGenerator`는 `type()` · `generate(JobSnapshot)` · `save(JobSnapshot, GeneratedResult)` 자리만 두며 운영 구현은 없다. `JobSnapshot`과 그 안의 `Input`은 ID · 입력 · 피드백 · 이번 `claimCount`만 담는 record이고, 결과 값은 `GeneratedResult`로 전달한다. `GenerationOutcome.Success` 또는 `Failure`의 `PROVIDER_UNAVAILABLE` · `INVALID_OUTPUT` · `PROVIDER_REJECTED` · `INPUT_TOO_LARGE`를 반환한다. `ResultRef(long id)`는 새로 만든 결과 또는 원래 대상 ID다.
 - `worker.JobRunner`의 `boolean runOnce()`는 작업 하나를 집었는지 반환한다. `EntityManager` 네이티브 SQL과 `TransactionTemplate`으로 꺼내기 · 갱신 · 저장 · 실패의 경계를 두고, 만들기는 트랜잭션 밖에서 한다. 호출자 트랜잭션도 거절한다. 저장의 첫 조건부 쓰기로 소유권을 확인한 뒤 `save` · 명시적 `flush()` · 작업 성공을 함께 커밋한다. 실패 전환과 `CreditLedger.restoreIfOwed`도 한 트랜잭션이다. 시각은 주입받은 `Clock` 하나로 계산하고 비교한다. 시한 갱신은 외부에서 받은 `ScheduledExecutorService`에 한 바퀴 동안만 예약하고, 완료 전에 진행 중인 갱신을 마치고 취소한다.
-- `6-job-worker` step 5 구현: `config.WorkerConfiguration`이 `worker.WorkerLifecycle`을 조립한다. `SmartLifecycle`의 자동 시작에서 워커 수만큼 플랫폼 스레드와 각각의 `JobRunner` · 갱신 스케줄러를 만든다. 빈손과 한 바퀴 밖 예외 뒤에는 설정 간격을 쉰다. 워커 수 0은 실행기 · 스레드를 만들지 않는다. 운영 생성 처리기는 여전히 없고, 받기 처리기도 없어 어떤 종류도 받지 않는다.
+- `6-job-worker` step 5 구현: `config.WorkerConfiguration`이 `worker.WorkerLifecycle`을 조립한다. `SmartLifecycle`의 자동 시작에서 워커 수만큼 플랫폼 스레드와 각각의 `JobRunner` · 갱신 스케줄러를 만든다. 빈손과 한 바퀴 밖 예외 뒤에는 설정 간격을 쉰다. 워커 수 0은 실행기 · 스레드를 만들지 않는다. 운영 생성 처리기는 여전히 없고, 받기 처리기도 없어 어떤 종류도 받지 않는다. **종류를 받기 시작하는 TASK 는 그 종류의 `job.JobIntakeHandler` 와 `generation.JobGenerator` 를 같은 step 에서 함께 더한다** — 받기 처리기만 있으면 `JobRunner` 가 처리기 없는 작업에서 예외를 던져 `RUNNING` 으로 남고, 시한마다 되찾아져 끝나지 않는다(크레딧도 돌아오지 않는다).
 - 종료는 `SmartLifecycle`의 단계 `Integer.MAX_VALUE`에서 시작한다. 각 실행기에 새 꺼내기 금지를 먼저 알리고 빈손 대기를 깨운 뒤, 모든 워커에 같은 종료 시각을 적용한다. 진행 중 갱신은 기다리는 동안 유지한다. 한도를 넘긴 워커는 `releaseCurrent()`의 `TransactionTemplate`(반환 트랜잭션 제한 5초)에서 같은 `claim_count` · `RUNNING` 조건으로 `QUEUED` · `lease_until = NULL` · `updated_at`을 쓰며 크레딧은 건드리지 않는다. 반환은 워커별로 나란히 처리한다. 늦은 호출은 해당 시도의 시한 상실 표시와 DB 쓰기 조건으로 막는다. 실행 스레드는 데몬 플랫폼 스레드라 한도 뒤 외부 호출이 JVM 종료를 붙잡지 않는다. 각 실행기의 현재 시도와 종료 표시는 그 실행기의 수명 제어에만 쓰고, 워커 사이 작업 분배 · 소유권은 DB로만 판단한다.
 - 종료 순서의 근거: 로컬 의존성 `spring-context-7.0.9-sources.jar`의 `AbstractApplicationContext.doClose()`는 `lifecycleProcessor.onClose()` 뒤에 `destroyBeans()`를 호출하며, `DefaultLifecycleProcessor.stopBeans()`는 높은 단계부터 멈추고 `stop(Runnable)`의 콜백을 기다린다. `WorkerLifecycleTest.stopsBeforeConnectionPoolDestruction`은 실제 Spring 컨텍스트를 닫아 반환 시점에 Hikari 풀이 열려 있고, 콜백 뒤 풀의 `close()`가 끝나는 순서를 검증한다. 따라서 JPA · DB 풀의 singleton 파괴 전에 워커 반환을 마친다.
 
@@ -218,7 +218,7 @@
 
 `6-job-worker` step 4의 워커 줄은 커밋 뒤 `INFO`의 `job finished status={SUCCEEDED|FAILED}`, 소유권 확인이 0행이면 한 시도에 한 번 `WARN`의 `job lease lost`, 결과 저장 트랜잭션의 예외에는 스택과 함께 `ERROR`의 `job save failed`다. 처리와 갱신 중 `jobId` · `userId`를 넣고 끝나면 지운다. 저장 예외는 원래 메시지 · cause · suppressed를 넘기지 않고 예외 타입 이름과 스택 위치만 남긴다.
 
-`6-job-worker` step 5의 줄은 정상 종료 한도 뒤 조건부 반환이 커밋된 때 `INFO`의 `job released`(`jobId` · `userId`)와 한 바퀴 밖 예외의 `ERROR`인 `worker poll failed`다. 루프는 같은 예외 타입의 연속 실패에서 첫 번째만 스택을 남기고, 다음 실패는 같은 한 줄만 남긴다. 성공한 꺼내기(빈손 포함) 뒤에는 연속 실패 표시를 비운다. 스택에는 원래 메시지 · cause · suppressed 없이 타입 이름과 위치만 싣는다.
+`6-job-worker` step 5의 줄은 정상 종료 한도 뒤 조건부 반환이 커밋된 때 `INFO`의 `job released`(`jobId` · `userId`)와 한 바퀴 밖 예외의 `ERROR`인 `worker poll failed`다. 정상 종료 중 반환(`releaseCurrent`)이 실패해도 같은 줄이다(`WorkerLifecycle` 의 종료 스레드). 루프는 같은 예외 타입의 연속 실패에서 첫 번째만 스택을 남기고, 다음 실패는 같은 한 줄만 남긴다. 성공한 꺼내기(빈손 포함) 뒤에는 연속 실패 표시를 비운다. 스택에는 원래 메시지 · cause · suppressed 없이 타입 이름과 위치만 싣는다.
 
 `WorkerLifecycleIntegrationTest` · `WorkerLifecycleTest`의 `OutputCaptureExtension`이 캡처한 실제 출력:
 
@@ -293,7 +293,7 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 
 운영 생성 처리기와 유료 호출은 아직 없으므로 `T호출` · `C` · `D이어쓰기` · 실제 `T_DB` 상한을 확인한 것은 아니다. 강의 목록 TASK에서 이를 정하고 시한을 다시 계산한다. 호출 시간 제한 · 이어 쓰기 · 다시 시도 횟수/간격 중 하나를 바꿔도 식을 다시 확인한다.
 
-현재 계산할 수 있는 제약은 `WorkerProperties`의 생성자에서 검사해 설정 바인딩 실패로 기동을 거부한다: 시한 · 갱신/쉬는 간격 · 종료 대기는 양수, `갱신 간격 < 시한`, 워커 수 · 추가 다시 시도 횟수/간격은 0 이상, `종료 대기 < 120초`다. Spring의 130초와 컨테이너의 150초는 늘리지 않고, 반환 트랜잭션 제한 5초를 위한 여유를 남긴다. `WorkerPropertiesTest`는 잘못된 설정의 기동 거부와 실제 Spring 종료 설정이 120초보다 긴 것을 검사하고, 기존 배포 파일 시험이 컨테이너 대기와 Spring 대기의 관계를 검사한다.
+현재 계산할 수 있는 제약은 `WorkerProperties`의 생성자에서 검사해 설정 바인딩 실패로 기동을 거부한다: 시한 · 갱신/쉬는 간격 · 종료 대기는 양수, `갱신 간격 < 시한`, 워커 수 · 추가 다시 시도 횟수/간격은 0 이상, `종료 대기 < 120초`다. Spring의 130초와 컨테이너의 150초는 늘리지 않고, 반환 트랜잭션 제한 5초를 위한 여유를 남긴다. 워커(단계 `Integer.MAX_VALUE`)는 Tomcat 정상 종료보다 먼저, 따로 멈춘다 — 그래서 실제 종료 시간은 `종료 대기(100초) + 반환(최대 5초) + Tomcat 정상 종료` 의 합이고, 이 합이 컨테이너의 150초 안에 들어와야 한다. 지금 API 요청은 짧아 여유가 있다. 종료 대기 상한 120초는 `WorkerProperties` 에 상수로 있으니 130초를 바꾸면 함께 본다. `WorkerPropertiesTest`는 잘못된 설정의 기동 거부와 실제 Spring 종료 설정이 120초보다 긴 것을 검사하고, 기존 배포 파일 시험이 컨테이너 대기와 Spring 대기의 관계를 검사한다.
 
 기본 통합 테스트는 공용 `IntegrationTestConfiguration.OAuthInitializer`가 `app.worker.count=0`을 적용한다. 별도 앱 컨텍스트를 늘리지 않고, 워커 시험이 `runOnce()` 또는 짧은 설정으로 직접 만든 `WorkerLifecycle`의 시작 · 종료를 제어한다.
 
