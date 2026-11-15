@@ -61,6 +61,12 @@ management:
 app:
   credit:
     monthly-amount: 100
+    new-course: 1
+    new-roadmap: 1
+    plan-roadmap-course: 1
+    replan-course: 1
+    replan-roadmap: 1
+    material: 1
   web:
     origin: ${APP_WEB_ORIGIN:http://localhost:5173}
     cookie-domain: ${APP_WEB_COOKIE_DOMAIN:}

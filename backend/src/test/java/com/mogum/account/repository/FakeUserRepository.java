@@ -30,6 +30,11 @@ public final class FakeUserRepository implements UserRepository {
     }
 
     @Override
+    public Optional<User> findByIdForUpdate(long id) {
+        return findById(id);
+    }
+
+    @Override
     public Optional<User> findByProviderAndSubject(String provider, String subject) {
         return users.values().stream()
                 .filter(user -> user.getProvider().equals(provider) && user.getSubject().equals(subject))

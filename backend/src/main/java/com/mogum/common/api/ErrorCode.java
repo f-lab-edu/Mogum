@@ -18,6 +18,8 @@ public enum ErrorCode {
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "요청을 확인할 수 없습니다"),
     /** 요청 검증 실패를 모두 지원하는 칸별 위반으로 분류할 수 있을 때 400으로 반환한다. */
     FIELD_INVALID(HttpStatus.BAD_REQUEST, "입력을 확인해 주십시오"),
+    /** 만들기를 받을 때 크레딧이 모자라면 409로 반환하며 문구에 다음에 채워지는 날을 넣는다. */
+    CREDIT_INSUFFICIENT(HttpStatus.CONFLICT, "크레딧이 부족합니다"),
     /** 처리되지 않은 예외는 500으로 반환하고, 500 이상 오류 상태를 공통 변환할 때도 쓴다. */
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "요청을 처리할 수 없습니다");
 

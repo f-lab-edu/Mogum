@@ -20,7 +20,12 @@ public final class ApiErrorResponses {
     }
 
     public static ResponseEntity<ApiError> of(ErrorCode code, Integer retryAfterSeconds, List<FieldViolation> fields) {
-        return create(code.status().value(), HttpHeaders.EMPTY, code, retryAfterSeconds, fields);
+        return create(code.status().value(), HttpHeaders.EMPTY, code, code.message(), retryAfterSeconds, fields);
+    }
+
+    public static ResponseEntity<ApiError> of(ApiException exception) {
+        return create(exception.errorCode().status().value(), HttpHeaders.EMPTY, exception.errorCode(),
+                exception.responseMessage(), exception.retryAfterSeconds(), null);
     }
 
     public static ResponseEntity<ApiError> forStatus(int status, HttpHeaders headers) {
@@ -29,7 +34,7 @@ public final class ApiErrorResponses {
             case 405 -> ErrorCode.METHOD_NOT_ALLOWED;
             default -> status >= 500 ? ErrorCode.INTERNAL_ERROR : ErrorCode.INVALID_REQUEST;
         };
-        return create(status, headers, code, null, null);
+        return create(status, headers, code, code.message(), null, null);
     }
 
     public static void write(HttpServletResponse response, ObjectMapper mapper,
@@ -49,7 +54,7 @@ public final class ApiErrorResponses {
     }
 
     private static ResponseEntity<ApiError> create(int status, HttpHeaders headers,
-                                                    ErrorCode code, Integer retryAfterSeconds, List<FieldViolation> fields) {
+                                                    ErrorCode code, String message, Integer retryAfterSeconds, List<FieldViolation> fields) {
         if (retryAfterSeconds != null && retryAfterSeconds <= 0) {
             throw new IllegalArgumentException("retryAfterSeconds must be positive");
         }
@@ -60,6 +65,6 @@ public final class ApiErrorResponses {
         var violations = code == ErrorCode.FIELD_INVALID && fields != null && !fields.isEmpty()
                 ? fields.stream().distinct().sorted(Comparator.comparing(FieldViolation::field)
                         .thenComparing(violation -> violation.reason().name())).toList() : null;
-        return response.body(new ApiError(code.name(), code.message(), retryAfterSeconds, violations));
+        return response.body(new ApiError(code.name(), message, retryAfterSeconds, violations));
     }
 }

@@ -25,6 +25,22 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ApiErrorResponsesTest {
     @Test
+    @DisplayName("공통 응답은 예외의 서버 문구를 사용한다")
+    void usesExceptionResponseMessage() {
+        // given
+        var exception = ApiException.withMessage(ErrorCode.CREDIT_INSUFFICIENT,
+                "크레딧이 부족합니다. 2026-12-08에 다시 채워집니다");
+
+        // when
+        var response = ApiErrorResponses.of(exception);
+
+        // then
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(response.getBody()).isEqualTo(new ApiError("CREDIT_INSUFFICIENT",
+                "크레딧이 부족합니다. 2026-12-08에 다시 채워집니다", null, null));
+    }
+
+    @Test
     @DisplayName("칸별 위반은 중복 없이 칸과 reason 이름순으로 직렬화한다")
     void serializesDistinctViolationsInFieldAndReasonOrder() {
         // given

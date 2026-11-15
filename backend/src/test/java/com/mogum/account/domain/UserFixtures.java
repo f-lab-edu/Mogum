@@ -23,6 +23,12 @@ public final class UserFixtures {
         return withStatus(user(provider, subject, email), UserStatus.APPROVED);
     }
 
+    public static User approved(String email, int balance, Instant refillAt) {
+        var user = withStatus(User.apply("google", email, email, email.split("@", 2)[0], balance), UserStatus.APPROVED);
+        ReflectionTestUtils.setField(user, "creditRefillAt", refillAt);
+        return user;
+    }
+
     public static User withId(User user, long id) {
         ReflectionTestUtils.setField(user, "id", id);
         return user;

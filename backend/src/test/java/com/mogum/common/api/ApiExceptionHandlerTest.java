@@ -33,6 +33,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ApiExceptionHandlerTest {
     @Test
+    @DisplayName("크레딧 부족은 공통 오류 경로로 409와 code와 서버가 채운 날짜 문구를 반환한다")
+    void returnsCreditInsufficientWithServerMessage() {
+        // given
+        var exception = ApiException.withMessage(ErrorCode.CREDIT_INSUFFICIENT,
+                "크레딧이 부족합니다. 2026-12-08에 다시 채워집니다");
+        var mvc = mvc(exception);
+
+        // when
+        var result = mvc.get().uri("/test/error").exchange();
+
+        // then
+        assertThat(result).hasStatus(409);
+        assertThat(result).bodyJson().isStrictlyEqualTo("""
+                {"code":"CREDIT_INSUFFICIENT","message":"크레딧이 부족합니다. 2026-12-08에 다시 채워집니다"}
+                """);
+        assertThat(exception.getMessage()).isEqualTo("CREDIT_INSUFFICIENT");
+    }
+
+    @Test
     @DisplayName("길이 위반만이면 넘친 칸과 reason을 싣는다")
     void returnsFieldReasonForLengthViolation() throws Exception {
         // given

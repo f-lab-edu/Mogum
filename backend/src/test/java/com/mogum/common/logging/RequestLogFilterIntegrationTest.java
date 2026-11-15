@@ -6,6 +6,7 @@ import com.mogum.support.TestSessions;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +19,7 @@ import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.Ordered;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
+import org.slf4j.bridge.SLF4JBridgeHandler;
 
 import java.time.Duration;
 import java.util.HashSet;
@@ -42,11 +44,21 @@ class RequestLogFilterIntegrationTest {
     @Autowired private TestRequests requests;
     private User user;
     private Cookie session;
+    private boolean installedJulBridge;
 
     @BeforeEach
     void prepareSession() {
+        // 별도 앱을 닫는 마이그레이션 테스트는 JVM 공용 JUL 연결도 닫는다.
+        // 컨테이너 로그를 보는 이 테스트에 필요한 연결을 준비하고 끝나면 원래 상태로 돌린다.
+        installedJulBridge = !SLF4JBridgeHandler.isInstalled();
+        if (installedJulBridge) SLF4JBridgeHandler.install();
         user = users.save(UserFixtures.approved("request-log@example.com"));
         session = new TestSessions(sessions).create(user.getId());
+    }
+
+    @AfterEach
+    void restoreJulBridge() {
+        if (installedJulBridge) SLF4JBridgeHandler.uninstall();
     }
 
     @org.junit.jupiter.params.ParameterizedTest(name = "{0} {1} 인증 {2} 상태 {3}")

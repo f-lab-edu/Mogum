@@ -39,6 +39,7 @@
 
 - 만들기 실패는 일시적(다시 시도 · 버리기) · 입력 문제(버리기만 — 다시 해도 같은 실패다. 문구로 「주제를 좁혀 새로 만들어 주세요」 같이 안내한다) 둘로 보인다 — 서버가 실패한 까닭([02 §8.5](./02-domain-data.md#85-만들기--호출))으로 고른다(ADR-163 · ADR-174). 나머지 묶음(요청 칸 검사 등)은 TASK 에서 맞춘다.
 - 계정 TASK 구현: `ACCOUNT_NOT_APPROVED`(403)은 신청 전 · 신청 · 거절됨인 사람이 허용된 계정 동작 밖의 API를 부를 때 반환한다. 문구는 「승인된 계정이 필요합니다」이며, 화면은 「나」를 다시 읽어 상태 화면으로 간다.
+- 만드는 작업 TASK(`6-job-worker` step 1) 구현: 「크레딧 부족」은 `CREDIT_INSUFFICIENT`(409)이며 문구는 「크레딧이 부족합니다. {yyyy-MM-dd}에 다시 채워집니다」다. `{yyyy-MM-dd}`에는 `credit_refill_at`을 `Asia/Seoul`로 바꾼 한국 날짜를 넣는다. 서버 문구는 `ApiException.withMessage(ErrorCode, String)`로 넘기고 `ApiExceptionHandler` → `ApiErrorResponses.of(ApiException)`의 공통 경로로 응답한다. 기존 생성자는 고정 문구와 `retryAfterSeconds` 동작을 유지하며 예외 자체의 메시지는 code만 담는다.
 - 기술적인 원인(응답이 잘림 · 서버 응답 없음 등)은 싣지 않는다(ADR-088).
 - 만들기 실패도 작업을 읽을 때 같은 모양으로 싣는다.
 

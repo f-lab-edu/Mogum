@@ -24,7 +24,7 @@ import java.util.Map;
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> apiException(ApiException exception) {
-        return ApiErrorResponses.of(exception.errorCode(), exception.retryAfterSeconds());
+        return ApiErrorResponses.of(exception);
     }
 
     @Override

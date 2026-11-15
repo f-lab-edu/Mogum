@@ -51,6 +51,16 @@ public class User extends AuditedEntity {
     @Column(name = "credit_refill_at")
     private Instant creditRefillAt;
 
+    public void consumeCredits(int amount) {
+        if (amount <= 0 || creditBalance < amount) throw new IllegalArgumentException("invalid credit consumption");
+        creditBalance -= amount;
+    }
+
+    public void restoreCredits(int amount) {
+        if (amount <= 0) throw new IllegalArgumentException("amount must be positive");
+        creditBalance = Math.addExact(creditBalance, amount);
+    }
+
     public static User apply(String provider, String subject, String email, String name, int creditBalance) {
         var user = new User();
         user.provider = provider;
