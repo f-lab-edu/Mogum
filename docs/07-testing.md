@@ -39,7 +39,11 @@
 - 생성은 서버가 정한 순서대로 부르므로(ADR-118) 스텁으로 흐름 전체를 시험한다 — 실제 LLM 은 부르지 않는다.
 - 흉내 낼 것 — 정상 응답 · 일시적 실패 · 형식 불합격 · 잘린 출력(이어 쓰기) · 다시 해도 같은 실패(ADR-127).
     - 만드는 작업 TASK 는 테스트 전용 처리기로 정상 · 일시적 실패 · 형식 불합격 · 다시 해도 같은 실패(거절 · 입력이 너무 큼) · 오래 걸림(시한 · 정상 종료 시험)을 흉내 낸다. 잘린 출력(이어 쓰기)은 LLM 호출 안의 일이라, 그 호출을 만드는 강의 목록 TASK 가 LLM 스텁으로 흉내 낸다(README 2026-11-15).
-- 응답 시간 분포 · 주입 방법 · 응답 모양은 만드는 작업 · 워커 TASK 에서 정한다.
+- `6-job-worker` step 4의 주입: 공용 `support.IntegrationTestConfiguration.JobGenerators`가 여섯 종류의 중첩 static `TestJobGenerator` 빈을 올린다. `@IntegrationTest`에서 `List<JobGenerator>`를 주입받아 종류별로 고르고 `plan(jobId)`로 작업마다 설정한다. 클래스별 `@Import`는 더하지 않는다. `reset()`으로 계획과 호출 기록을 비운다.
+    - 기본은 즉시 성공이다. `plan(id).fail(GenerationOutcome.Failure, N)`은 앞 N번을 그 실패로 돌려준 뒤 성공한다. 거절 · 입력이 너무 큼도 이 방식으로 정하며 워커가 한 번만 부르는지 본다.
+    - `plan(id).holdFirst()`는 첫 호출을 `awaitEntered()`로 관찰하고 `release()`할 때까지 붙잡는다(미해제 시험은 15초에 끝낸다). 같은 작업의 두 번째 호출은 기다리지 않아 되찾은 새 워커와 늦은 옛 워커를 따로 끝낼 수 있다. 시한 지남은 `TestClock.advance`로 만들고, 갱신 예약의 실행만 짧은 간격과 Awaitility로 기다린다. 응답 시간 확률 분포는 두지 않는다.
+    - `calls()` · `saves()` · `snapshots()`로 호출을 확인한다. `outsideTransaction()`은 만들기 중 트랜잭션과 바인딩된 EntityManager가 없는지, `mdc()`는 실행 중 키를 확인한다. `failSave(marker)`는 실제 결과 행을 만든 뒤 cause · suppressed에도 표식을 넣어 예외를 내며, `failSave(null)`로 해제한다. 결과 트랜잭션의 롤백과 안전한 스택 출력을 시험한다.
+    - 스텁 `save`는 실제 코스 · 로드맵 · 강의 · 강의 자료를 만들거나 대상 상태를 바꾼다. `JobRunnerIntegrationTest`는 `JobRunner`를 직접 구성해 `runOnce()`를 부른다. 운영용 생성 처리기나 실행 루프는 올리지 않는다.
 
 ## 3. 공개 전 품질 점검
 
@@ -58,6 +62,6 @@
 
 | 것 | 근거 |
 |---|---|
-| 스텁의 응답 시간 분포 · 주입 방법 | ADR-118 |
+| 만드는 작업의 스텁 주입과 수동 대기는 §2에 구현했다. 실제 LLM 스텁의 응답 시간 분포 · 이어 쓰기 응답 모양은 강의 목록 TASK에서 정한다 | ADR-118 |
 | 품질 점검의 방식 · 기준 · 표본 수 · 통과선 | ADR-067 |
 | 서버마다 워커 수 | ADR-105 |

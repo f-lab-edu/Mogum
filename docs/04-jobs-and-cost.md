@@ -71,6 +71,9 @@
 
 - `6-job-worker` step 3 구현: `job.controller.JobController`가 받기 · 작업 하나 읽기 · 다시 시도 · 버리기를 HTTP에 연결한다. `job.dto.JobReceiveRequest`의 칸 사이 검증은 `FieldViolation.Reason`으로 공통 오류 경로에 전달한다. `job.service.JobReadService`는 `@Transactional(readOnly = true)`에서 작업 주인을 확인하고 `course` 패키지의 레포지토리로 대상 제목과 강의의 코스 ID를 읽어 값 객체만 반환한다. 경로 · 요청/응답 칸 · 실패 묶음은 [05 §2](./05-api.md#2-만드는-작업--받기-하나--다시-읽기)에 적었다.
 
+- `6-job-worker` step 4 구현: `generation.JobGenerator`는 `type()` · `generate(JobSnapshot)` · `save(JobSnapshot, GeneratedResult)` 자리만 두며 운영 구현은 없다. `JobSnapshot`과 그 안의 `Input`은 ID · 입력 · 피드백 · 이번 `claimCount`만 담는 record이고, 결과 값은 `GeneratedResult`로 전달한다. `GenerationOutcome.Success` 또는 `Failure`의 `PROVIDER_UNAVAILABLE` · `INVALID_OUTPUT` · `PROVIDER_REJECTED` · `INPUT_TOO_LARGE`를 반환한다. `ResultRef(long id)`는 새로 만든 결과 또는 원래 대상 ID다.
+- `worker.JobRunner`의 `boolean runOnce()`는 작업 하나를 집었는지 반환한다. `EntityManager` 네이티브 SQL과 `TransactionTemplate`으로 꺼내기 · 갱신 · 저장 · 실패의 경계를 두고, 만들기는 트랜잭션 밖에서 한다. 호출자 트랜잭션도 거절한다. 저장의 첫 조건부 쓰기로 소유권을 확인한 뒤 `save` · 명시적 `flush()` · 작업 성공을 함께 커밋한다. 실패 전환과 `CreditLedger.restoreIfOwed`도 한 트랜잭션이다. 시각은 주입받은 `Clock` 하나로 계산하고 비교한다. 시한 갱신은 외부에서 받은 `ScheduledExecutorService`에 한 바퀴 동안만 예약하고, 완료 전에 진행 중인 갱신을 마치고 취소한다. 이 step은 실행 스레드나 서버 수명에 연결하지 않았으며 빈 조립은 step 5에서 한다.
+
 ## 3. 배포
 
 - **지금은 서버 1대 · 화면은 따로**(기존 `2-deploy` — ADR-146). 운영 절차는 `deploy/README.md`.
@@ -210,6 +213,17 @@
 | `INFO` | 흐름 한 줄 | 접근 줄 · 로그인 결과(신청 전 로그인 `login result=not_applied` 는 MDC 에 `userId` 가 없다) · 기동/종료 · 작업 받기 · 끝남 |
 | `DEBUG` 이하 | 운영에서 끈다 | — |
 
+`6-job-worker` step 4의 워커 줄은 커밋 뒤 `INFO`의 `job finished status={SUCCEEDED|FAILED}`, 소유권 확인이 0행이면 한 시도에 한 번 `WARN`의 `job lease lost`, 결과 저장 트랜잭션의 예외에는 스택과 함께 `ERROR`의 `job save failed`다. 처리와 갱신 중 `jobId` · `userId`를 넣고 끝나면 지운다. 저장 예외는 원래 메시지 · cause · suppressed를 넘기지 않고 예외 타입 이름과 스택 위치만 남긴다.
+
+`JobRunnerIntegrationTest`의 `OutputCaptureExtension`이 캡처한 실제 출력:
+
+```text
+2026-11-15T17:44:17.508+09:00  INFO jobId=1, userId=1 57664 --- [mogum] [    Test worker] com.mogum.worker.JobRunner               : job finished status=SUCCEEDED
+2026-11-15T17:44:17.938+09:00  INFO jobId=14, userId=13 57664 --- [mogum] [    Test worker] com.mogum.worker.JobRunner               : job finished status=FAILED
+2026-11-15T17:44:17.509+09:00  WARN jobId=1, userId=1 57664 --- [mogum] [pool-3-thread-1] com.mogum.worker.JobRunner               : job lease lost
+2026-11-15T17:44:17.589+09:00 ERROR jobId=2, userId=2 57664 --- [mogum] [    Test worker] com.mogum.worker.JobRunner               : job save failed
+```
+
 `6-job-worker` step 2의 작업 줄은 커밋 뒤 `INFO`로 남긴다. 새 작업은 `job received type={type}`, 실패에서 기다림으로 돌아간 작업은 `job retried`다. `common.logging.RequestLogFilter.JOB_ID`(`jobId`)를 줄을 쓰는 곳에서 넣고 `finally`에서 지운다. 요청의 `requestId` · `userId`는 그대로 둔다. 이미 있는 작업 반환 · 거절 · 버리기는 작업 줄을 남기지 않는다.
 
 `JobIntakeServiceIntegrationTest`의 `OutputCaptureExtension`이 캡처한 실제 출력:
@@ -239,12 +253,21 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 |---|---|
 | 한 사람이 동시에 걸 수 있는 수 — `app.job.max-in-progress-per-user` 임시 값 3(`JobProperties.maxInProgressPerUser()`). `6-job-worker` step 2에서 사용자 행 잠금으로 동시 요청을 직렬화했다(§6). 실제 운영 값은 재 보고 정한다 | ADR-104 · ADR-133 |
 | 서버마다 워커 수 | ADR-105 · ADR-133 |
-| 시한 값 · 늘리는 방법 · 정상 종료 때 기다리는 한도 · 배포를 끄고 켤지 겹칠지 | ADR-126 |
-| 자동 다시 시도 · 이어 쓰기 횟수 · 간격 · 프로바이더 오류를 일시적 · 다시 해도 같은 것 가운데 어디에 넣나(갈래 자체는 ADR-163) | ADR-127 |
-| 꺼낼 때 쓰는 DB 기능 | ADR-129 |
+| 시한 · 늘리는 간격은 아래 임시 설정. `ScheduledExecutorService.scheduleWithFixedDelay`로 갱신한다. 최장 시도 시간과 시한의 식 · 정상 종료 때 기다리는 한도 · 배포 방식은 step 5에서 정한다 | ADR-126 |
+| 자동 다시 시도는 아래 임시 설정. 이어 쓰기 횟수 · 간격 · 프로바이더 오류 분류는 강의 목록 TASK에서 정한다(갈래 자체는 ADR-163) | ADR-127 |
+| 꺼내기는 PostgreSQL CTE 하나에서 `SELECT … ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1` → `UPDATE … RETURNING id`. `QUEUED` 또는 같은 `Clock`의 현재 시각보다 `lease_until`이 작은 `RUNNING` 하나를 집고 `claim_count + 1` · 시한 · 시작/수정 시각을 바꾼다 | ADR-129 |
 | 종류별 크레딧 값 · 한 달 몫 — 한 달 몫은 계정 TASK 가 설정 한 곳에 임시 값 100 으로 두고, 강의 목록 TASK 에서 토큰을 잰 뒤 정한다(사용자 확인 2026-11-08). 종류별 값은 `6-job-worker` step 1에서 아래 설정에 모두 임시 값 1로 두었다 | ADR-107 · ADR-115 |
 | 크레딧 채우기를 여러 서버에서 한 번만 일어나게 하는 방법 · 새벽 4시에 서버가 꺼져 있었을 때 따라잡는 방법 | ADR-133 · ADR-173 |
 | 패키지를 코스 · 로드맵 등으로 나누는 방식 — 테이블은 02 §8 에서 정했다 | ADR-148 |
+
+워커의 임시 값은 `application.yml`의 `app.worker` 한 곳이며 `config.WorkerProperties`로 읽는다(`6-job-worker` step 4). 테스트는 생성자로 짧은 간격 또는 0의 다시 시도 간격을 전달한다. 자동 다시 시도 횟수는 첫 호출 **뒤에 더 부르는 횟수**다.
+
+| 설정 키 | 읽는 메서드 | 임시 값 |
+|---|---|---|
+| `app.worker.lease-duration` | `leaseDuration()` | `5m` |
+| `app.worker.renewal-interval` | `renewalInterval()` | `30s` |
+| `app.worker.max-retries` | `maxRetries()` | `2`(최대 호출 3번) |
+| `app.worker.retry-delay` | `retryDelay()` | `1s` |
 
 종류별 임시 값(`application.yml` · `config.CreditProperties`):
 

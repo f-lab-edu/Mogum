@@ -59,6 +59,11 @@ management:
         enabled: false
 
 app:
+  worker:
+    lease-duration: 5m
+    renewal-interval: 30s
+    max-retries: 2
+    retry-delay: 1s
   job:
     max-in-progress-per-user: 3
   credit:

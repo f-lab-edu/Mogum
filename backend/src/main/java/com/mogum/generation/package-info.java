@@ -1,2 +1,2 @@
-/** 생성 유스케이스 · resolveConcepts · 유료 호출(LlmClient · EmbeddingClient · GuardedLlmClient). worker 와 config 만 참조한다. */
+/** 종류별 만들기와 결과 저장의 인터페이스 · 불변 입력과 결과 값. worker와 config만 참조한다. */
 package com.mogum.generation;
