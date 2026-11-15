@@ -183,7 +183,8 @@ execute.py가 자동으로 처리하는 것:
 - 컨텍스트 누적 — 완료된 step의 summary를 다음 step 프롬프트에 전달
 - 자가 교정 — Codex 에러 메시지나 Claude 리뷰 지적을 다음 시도에 피드백. 마지막 리뷰 반려 지적은 뒤이은 다른 실패(status 미갱신 · 시간 초과)에 덮이지 않고 다음 시도와 최종 `error_message` 에 함께 남는다
 - 시간 초과 — Codex · 리뷰 각각 1800초. 넘으면 하네스가 죽지 않고 실패한 시도로 처리한다(Codex 는 다음 시도에 "시간 초과" 를 알린다)
-- 사용 한도 — Codex 출력에서 사용 한도 오류(`usage limit`)를 알아보면 시도로 세지 않고 `blocked` 로 멈춘다. 사유에 오류 문구(다시 쓸 수 있는 시각)와 직전 리뷰 지적을 남긴다 — 한도가 풀린 뒤 `status` 만 `pending` 으로 바꿔 재실행한다. 리뷰(`claude -p`) 출력에서 사용 한도(`usage_limit_reached` · 429)를 알아보면 리뷰를 다시 하지 않고 다시 쓸 수 있는 시각을 찍은 뒤 멈춘다(종료 코드 2 · 상위 `phases/index.json` 은 `blocked`). step 은 `completed` · `completed_at` 없음 그대로라 **index 를 고치지 않고** 한도가 풀린 뒤 재실행하면 리뷰부터 한다 — `pending` 으로 바꾸면 끝난 Codex 를 다시 돌린다
+- 사용 한도 — Codex 출력의 사용 한도 오류(`usage limit`)와 리뷰(`claude -p`) 출력의 사용 한도(`usage_limit_reached` · 429)를 알아보면 **문구의 리셋 시각 +3분까지 기다렸다 같은 실행에서 이어 간다** — Codex 는 같은 시도를 다시 하고(시도로 세지 않는다), 리뷰는 리뷰부터 다시 한다. 시각을 못 읽으면 30분씩 기다린다. 멈추려면 Ctrl+C.
+  이어진 대기가 12시간을 넘게 되면(주간 한도 등) 기다리지 않고 멈춘다. Codex 는 `blocked` 로 멈추고 사유에 오류 문구와 직전 리뷰 지적을 남긴다 — 한도가 풀린 뒤 `status` 만 `pending` 으로 바꿔 재실행한다. 리뷰는 다시 쓸 수 있는 시각을 찍은 뒤 멈춘다(종료 코드 2 · 상위 `phases/index.json` 은 `blocked`). step 은 `completed` · `completed_at` 없음 그대로라 **index 를 고치지 않고** 한도가 풀린 뒤 재실행하면 리뷰부터 한다 — `pending` 으로 바꾸면 끝난 Codex 를 다시 돌린다
 - 리뷰 전 중단 복구 — `completed` 인데 `completed_at`(리뷰 승인 기록)이 없는 step 은 건너뛰지 않고 다음 실행에서 리뷰부터 다시 한다. Codex 가 `completed_at` 을 쓰면 Codex 가 끝나자마자 지운다
 - 타임스탬프 — started_at, completed_at, failed_at, blocked_at 자동 기록
 
