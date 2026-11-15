@@ -43,7 +43,16 @@
     {
       "step": 3,
       "name": "job-api",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T13:00:21+0900",
+      "summary": "job.controller.JobController: POST /api/jobs(받기·200), GET /api/jobs/{id}(읽기·200), POST /api/jobs/{id}/retry(다시 시도·200), POST /api/jobs/{id}/discard(버리기·204 본문 없음); JobReceiveRequest는 최상위 type·courseId·roadmapId·lessonId·topic·level·levelOther·purpose·purposeOther·memo·feedback을 @ValidJobRequest로 종류별 필수/금지·OTHER 글·빈 글·DB와 같은 코드 포인트 길이 상한 검사 후 step 2 JobRequest로 변환하고 모르는 칸은 무시; FIELD_INVALID의 fields[{field,reason}]에 REQUIRED·TOO_LONG·INVALID_VALUE·NOT_ALLOWED 사용; 받기·읽기·다시 시도 응답은 ApiResponse의 data{id,type,status,subject,result?,error?}, subject는 NEW_*의 {topic,level,levelOther?,purpose,purposeOther?} 또는 대상의 {title}, 성공 result는 {type:COURSE|ROADMAP,id} 또는 {type:LESSON,id,courseId}, 실패 error는 공통 ApiError {code,message}, null 칸 생략·메모/피드백/크레딧/운영 정보 제외; job.service.JobReadService.read(userId,jobId)는 readOnly 트랜잭션에서 주인 확인·대상 제목/강의 코스 ID 조회, 남의 것과 없는 것은 NOT_FOUND; 새 실패 묶음 JOB_TEMPORARY_FAILURE(만들지 못했습니다. 다시 시도하거나 버려 주세요)·JOB_INPUT_FAILURE(주제를 좁혀 새로 만들어 주세요)는 각각 INPUT_TOO_LARGE 외 세 까닭·INPUT_TOO_LARGE로 선택하고 읽기 HTTP는 200; 여섯 종류×네 상태·실패 까닭 넷, 실제 HTTP 전체 수명/소유권/크레딧 부족/동시 상한/CSRF/승인/로그 원문 미노출 검증; 공용 테스트 처리기를 IntegrationTestConfiguration.JobIntakeHandlers로 묶고 NoJobHandlersIntegrationTest(test.job-intake-handlers=false)로 처리기 빈 0개인 여섯 종류의 HTTP 거절·DB 보존 검증; 05 §1.2/2/3/5·04 §2.3·TEST_GUIDE에 구현 사실 반영; 지정 AC 부분 691개·전체 build 1423개 통과, 서버 테스트 1253→1423개(+170, 실패·오류·건너뜀 0).",
+      "completed_at": "2026-11-15T17:38:58+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/common/api/ErrorCode.java:29-32 — `JOB_TEMPORARY_FAILURE` · `JOB_INPUT_FAILURE` 는 예외로 던지지 않고 작업 읽기의 `data.error` 에만 싣는데 `HttpStatus.CONFLICT` 가 붙어 있다. 누가 이 code 를 던지면 409 가 나간다는 오해를 줄 수 있다 → Javadoc 에 「던지지 않고 작업 읽기 본문에만 싣는다」를 밝혀 두면 다음 작업자가 헷갈리지 않는다.",
+        "backend/src/test/java/com/mogum/common/api/ApiExceptionHandlerTest.java:275 — `common.api` 테스트가 `com.mogum.job.dto.JobReceiveRequest` 에 기대고 있다. 그래서 job DTO 의 칸 순서가 바뀌면 common 테스트가 깨진다 → `field.*` 템플릿을 쓰는 테스트 전용 제약을 common 테스트 안에 두면 의존이 없어진다.",
+        "backend/src/main/java/com/mogum/job/service/JobReadService.java:55-60 — 대상(코스 · 로드맵 · 강의)이 없으면 작업이 있어도 읽기가 `NOT_FOUND` 다. 지우기가 작업을 함께 지우면(ADR-140) 생기지 않는 경우라 지금은 괜찮다. 다만 지우기 TASK 에서 이 순서를 테스트로 묶어 두면 기다리는 화면이 404 로 빠지는 경우를 막을 수 있다.",
+        "docs/TEST_GUIDE.md:6-10 — 통합 컨텍스트가 셋으로 늘었다(`test.job-intake-handlers=false` 묶음). 문서에는 적었다. 앞으로 처리기 없는 시험이 늘면 이 묶음에 모아 컨텍스트가 더 늘지 않게 한다."
+      ]
     },
     {
       "step": 4,
