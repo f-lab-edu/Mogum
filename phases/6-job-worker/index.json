@@ -124,7 +124,10 @@
     {
       "step": 9,
       "name": "sonar-await-result",
-      "status": "pending"
+      "status": "completed",
+      "summary": "WorkerLifecycle.Slot.poll()이 wakeup.await의 반환값이 true면 즉시 루프를 끝내도록 java:S899 수정; 기존 wakesIdleWorkerOnStop 테스트로 종료 신호 뒤 추가 꺼내기 없음과 즉시 종료를 검증하고 시간 초과·인터럽트 동작 유지; 지정 워커 수명 테스트 12개 및 전체 build 1483개 통과(실패·오류·건너뜀 0), 새 로그·@Transactional 추가 없음.",
+      "started_at": "2026-11-16T21:39:06+0900",
+      "completed_at": "2026-11-16T21:42:44+0900"
     }
   ],
   "created_at": "2026-11-15T12:27:13+0900",
