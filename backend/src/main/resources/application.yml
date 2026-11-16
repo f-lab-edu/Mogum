@@ -59,8 +59,24 @@ management:
         enabled: false
 
 app:
+  worker:
+    count: 2
+    poll-interval: 1s
+    shutdown-wait: 100s
+    lease-duration: 5m
+    renewal-interval: 30s
+    max-retries: 2
+    retry-delay: 1s
+  job:
+    max-in-progress-per-user: 3
   credit:
     monthly-amount: 100
+    new-course: 1
+    new-roadmap: 1
+    plan-roadmap-course: 1
+    replan-course: 1
+    replan-roadmap: 1
+    material: 1
   web:
     origin: ${APP_WEB_ORIGIN:http://localhost:5173}
     cookie-domain: ${APP_WEB_COOKIE_DOMAIN:}

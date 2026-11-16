@@ -34,7 +34,7 @@ class AccountSchemaMigrationTest {
             var earliest = jdbc.queryForObject("SELECT now()", Timestamp.class).toInstant();
 
             // when
-            database.flyway(null).migrate();
+            database.flyway("9").migrate();
 
             // then
             var latest = jdbc.queryForObject("SELECT now()", Timestamp.class).toInstant();

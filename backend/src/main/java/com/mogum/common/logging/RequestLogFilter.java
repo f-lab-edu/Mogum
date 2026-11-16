@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 public final class RequestLogFilter implements Filter, ServletRequestListener {
     public static final String REQUEST_ID = "requestId";
     public static final String USER_ID = "userId";
+    public static final String JOB_ID = "jobId";
     private static final String STATE = RequestLogFilter.class.getName() + ".state";
     private static final String HEADER = "X-Request-Id";
     private static final Logger log = LoggerFactory.getLogger(RequestLogFilter.class);

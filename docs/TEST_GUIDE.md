@@ -3,9 +3,11 @@
 > 백엔드 테스트 코드를 쓸 때 본다 — 종류 · 이름 · 본문 · 데이터 · 격리 · 요청 도구. **이 규칙의 단일 출처다**(요약 입구가 아니다). 무엇을 검증해야 하는지(장애 주입 · 규칙 테스트 · 용량 측정)는 [07](./07-testing.md)에 있다.
 > 2026-11-08 사용자 결정([ADR-179](./ADR.md)). 기존 테스트 이관은 `3a-test-conventions`에서 **2026-11-08 완료했다. §7의 네 규칙(JUnit `Assertions` 금지 · 픽스처/Fake 밖 리플렉션 금지 · `IT` 이름 금지 · 제품 레포지토리 상속 제한)을 위반 픽스처 검증과 함께 ArchUnit으로 빌드에 걸었다.** 화면(`frontend/`) 테스트는 화면 작업이 늘어날 때 따로 정한다.
 >
-> `3a` step 4에서 이관한 통합 테스트는 실제 포트 `RestTestClient`와 공용 컨텍스트를 사용한다. 현재 공용 값은 출처 `https://mogum.example` · 쿠키 도메인 `mogum.example` · Tomcat 스레드 최대/최소 1이다(`4-account` step 0에서 관리자 허용 목록 속성을 지웠다). 세션 쿠키 직렬화는 `SecurityConfigurationCookieTest`의 `ApplicationContextRunner`에서 두 도메인 설정을 확인한다. 로컬 XSRF 쿠키 발급/만료의 Domain 생략은 실제 필터 응답을 확인해야 하므로 `LocalCookieIntegrationTest` 묶음 하나만 도메인을 비워 **통합 컨텍스트는 총 2개**다(레포지토리 슬라이스 제외). 실패용 컨트롤러 · ERROR 관찰 필터 · DB 연결 실패 대역 · Google 가짜 서버는 공용 테스트 설정의 중첩 static 클래스에 있고, ERROR 관찰은 테스트 응답 헤더로 디스패치 종류와 실행 중 MDC의 요청 ID가 응답 요청 ID와 같은지 확인한다. 스파이와 클래스별 설정은 제거했다.
+> `3a` step 4에서 이관한 통합 테스트는 실제 포트 `RestTestClient`와 공용 컨텍스트를 사용한다. 현재 공용 값은 출처 `https://mogum.example` · 쿠키 도메인 `mogum.example` · Tomcat 스레드 최대/최소 1이다(`4-account` step 0에서 관리자 허용 목록 속성을 지웠다). 세션 쿠키 직렬화는 `SecurityConfigurationCookieTest`의 `ApplicationContextRunner`에서 두 도메인 설정을 확인한다. 로컬 XSRF 쿠키 발급/만료의 Domain 생략은 실제 필터 응답을 확인해야 하므로 `LocalCookieIntegrationTest` 묶음 하나만 도메인을 비운다. 실패용 컨트롤러 · ERROR 관찰 필터 · DB 연결 실패 대역 · Google 가짜 서버는 공용 테스트 설정의 중첩 static 클래스에 있고, ERROR 관찰은 테스트 응답 헤더로 디스패치 종류와 실행 중 MDC의 요청 ID가 응답 요청 ID와 같은지 확인한다. 스파이와 클래스별 설정은 제거했다.
 
 > `3a` step 5에서 인증 · 로그/시계 · 설정 · 배포 파일 · FSRS 학습 · `ArchitectureTest`의 단위 테스트 형식을 이관했다. 배포 파일 검사는 `DeployFilesTest` · `DeployFilesJournalTest` · `DeployFilesScriptTest`, 백업은 `BackupFilesTest` · `BackupFilesScriptTest`, 워크플로는 `WorkflowFilesTest` · `WorkflowFilesScriptTest`로 나눴다. 설정 바인딩의 레포지토리 대역은 기존 `FakeUserRepository`를 쓴다. 기존 검증 사실과 아키텍처 규칙 · 위반 픽스처 · 제품 클래스 검사 범위는 유지했다.
+
+> `6-job-worker` step 3에서 `NoJobHandlersIntegrationTest` 묶음을 더해 통합 컨텍스트는 총 3개다(레포지토리 슬라이스 제외). 운영과 같이 처리기가 없는 HTTP 받기의 거절과 DB 보존을 확인해야 하므로 이 묶음만 `test.job-intake-handlers=false`로 테스트 전용 처리기를 뺀다. 기본 묶음은 `IntegrationTestConfiguration.JobIntakeHandlers`의 여섯 처리기를 그대로 쓰며, Google 가짜 서버 · 시계 · 정리기 · HTTP 요청 도구는 모두 공유한다.
 
 ## 1. 종류 — 무엇으로 무엇을 보나
 
@@ -74,6 +76,7 @@ void returnsExistingUserIdOnRelogin() {
 - **컨텍스트를 나누지 않는다** — 클래스마다 `@Import` · `properties` · `@MockitoBean` · `@MockitoSpyBean` 을 더하면 Spring 이 컨텍스트를 새로 띄운다. 그래서 더하지 않는다.
     - 테스트 전용 빈(검증용 · 실패용 컨트롤러 등)은 공용 `@TestConfiguration` 의 중첩 static 클래스로 두어 모든 통합 테스트에 함께 올린다. Spring Boot 4.1.1 의 `TestTypeExcludeFilter` 는 `@TestConfiguration` 클래스와 그 중첩 클래스를 컴포넌트 스캔에서 뺀다(`spring-boot-test-4.1.1-sources.jar` 의 `match` 로 확인).
     - 다른 설정값이 꼭 필요한 테스트는 이름 있는 묶음 어노테이션을 따로 만들고 이유를 그 어노테이션에 적는다.
+- **별도 앱을 띄웠다 닫는 테스트(마이그레이션 테스트 등)는 JVM 공용 JUL → SLF4J 연결(`SLF4JBridgeHandler`)도 닫는다** — 그 뒤에 도는 테스트가 컨테이너(Tomcat) 로그를 출력 캡처로 보면 줄이 없어 실패한다. 실행 순서에 따라 드러나므로, 그런 테스트는 시작할 때 연결이 없으면 설치하고 끝나면 되돌린다(`RequestLogFilterIntegrationTest` · `6-job-worker` step 1).
     - `@Entity` · Spring Data `Repository` 픽스처는 `com.mogum` 밖 패키지에 둔다 — `ddl-auto: validate` 라 테이블 없는 엔티티 하나로 모든 컨텍스트가 뜨지 않는다(`.claude/commands/harness.md` 원칙 22).
 
 ## 6. 요청 도구

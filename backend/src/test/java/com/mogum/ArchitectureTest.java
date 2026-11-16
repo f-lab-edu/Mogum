@@ -210,7 +210,7 @@ class ArchitectureTest {
         assertViolation(ENTITIES_EXTEND_AUDITED_ENTITY, UnauditedEntity.class);
     }
 
-    // config 는 app.role 별 빈 등록에서 worker 와 generation 을 조립한다.
+    // config 는 API와 워커를 한 서버에 조립한다. 워커 수 0이면 API만 실행한다.
     private static final ArchRule GENERATION_ONLY_FROM_WORKER = noClasses().that()
             .resideOutsideOfPackages("..generation..", "..worker..", "..config..")
             .should().dependOnClassesThat().resideInAPackage("..generation..");

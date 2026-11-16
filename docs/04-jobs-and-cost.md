@@ -24,7 +24,7 @@
 /
 ├── backend/                         # Spring Boot — 서버. 단일 Gradle 모듈
 │   ├── src/main/java/…/mogum/
-│   │   ├── config/                  # 설정 값 · 시계 · Auditing · 요청 로그 필터 · 역할별 빈 등록 — worker · generation 을 조립하는 곳
+│   │   ├── config/                  # 설정 값 · 시계 · Auditing · 요청 로그 필터 · API와 워커를 한 서버에 조립 — worker · generation 의 빈 등록
 │   │   ├── common/                  # api(성공 · 오류 응답) · time · logging · persistence — 그대로 쓴다
 │   │   ├── auth/                    # 구글 로그인 · 세션 → 사용자 — 그대로 쓴다
 │   │   ├── account/                 # 사용자 · 로그인 → 신청 · 승인 · 거절됨으로 바꾼다(ADR-147) · 크레딧도 여기서(ADR-153)
@@ -64,8 +64,18 @@
 | `3a-test-conventions` | 테스트 작성 규칙과 지원 도구 · 레포지토리 `Repository<T, ID>` 상속 · ArchUnit 테스트 규칙(ADR-179 · [TEST_GUIDE](./TEST_GUIDE.md)) | — | 옛 커리큘럼 모델의 테스트 — 모델과 함께(ADR-148) |
 | `frontend/` | 스택 · 로그인 확인 · 요청 도구 | 화면 자체는 06 대로 새로 만든다 | — |
 
-- **계정**(ADR-147) — 정해 둔 이메일만 들어오던 것을 누구나 신청 · 운영자가 승인 · 거절로 바꾼다. 역할은 지운다 — 운영자는 DB 에서 직접 한다(ADR-060). `4-account` step 0에서 `V9__migrate_account_schema.sql`로 옛 상태를 옮기고 이름 · 크레딧 잔액 · 채움 기록을 넣었다. `User.apply(provider, subject, email, name, creditBalance)` · `CreditEntry.refill(user, amount)`와 `CreditEntryRepository`를 두었고, 허용 목록 설정 · 역할 · 약관 칸은 제거했다. 로그인은 기존 회원 ID 또는 `LoginResult.NotApplied(ExternalAccount)`를 반환하며 행을 만들지 않는다. step 1에서 신청 전 콜백은 구글 신원만 JDBC 세션에 담고 화면의 `/`로 보내도록 바꿨다. 요청 인증은 `AccountPrincipal`로 통일하고 권한 없이 구성한다. 「나」의 구현 경로와 칸은 [05 §3](./05-api.md#3-읽기--화면마다-한-번)에 적었다.
+- **계정**(ADR-147) — 정해 둔 이메일만 들어오던 것을 누구나 신청 · 운영자가 승인 · 거절로 바꾼다. 역할은 지운다 — 운영자는 DB 에서 직접 한다(ADR-060). `4-account` step 0에서 `V9__migrate_account_schema.sql`로 옛 상태를 옮기고 이름 · 크레딧 잔액 · 채움 기록을 넣었다. `User.apply(provider, subject, email, name, creditBalance)` · `CreditEntry.refill(user, amount)`와 `CreditEntryRepository`를 두었고, 허용 목록 설정 · 역할 · 약관 칸은 제거했다. 로그인은 기존 회원 ID 또는 `LoginResult.NotApplied(ExternalAccount)`를 반환하며 행을 만들지 않는다. step 1에서 신청 전 콜백은 구글 신원만 JDBC 세션에 담고 화면의 `/`로 보내도록 바꿨다. 요청 인증은 `AccountPrincipal`로 통일하고 권한 없이 구성한다. 「나」의 구현 경로와 칸은 [05 §3](./05-api.md#3-읽기--화면마다-한-번)에 적었다. `6-job-worker` step 1에서 `account.service.CreditLedger`의 `lock(long userId)` · `consume(long userId, long jobId, int amount)` · `restoreIfOwed(long userId, long jobId)`를 더했다. `UserRepository.findByIdForUpdate(long id)`의 JPA `PESSIMISTIC_WRITE`로 `users` 행을 잠그고, 기본 `@Transactional` 전파로 호출자의 트랜잭션에 참여한다. 잔액은 JPA 변경 감지와 Auditing으로 갱신한다. `CreditEntry.jobId`는 `Long` 값이며 `consume` · `restore` 팩토리는 크기를 양수로 받아 각각 음수 · 양수로 담는다. 같은 사용자 기록은 행 잠금 안에서 쓰므로 `created_at` 대신 증가하는 `id`로 최신 작업 기록과 마지막 채움의 앞뒤를 가른다.
 - **커리큘럼 모델**(ADR-148) — 단계를 두지 않고(ADR-070) 상태(ADR-136) · 입력(ADR-137) · 강의 한 줄(ADR-020 · ADR-138)이 달라 새로 만든다. 운영에 적용한 마이그레이션은 고치지 않고 새 마이그레이션으로 지우고 만든다 — 커리큘럼을 만드는 API 가 아직 없어 운영 DB 에 커리큘럼 데이터가 없다. 패키지 이름은 GLOSSARY, 테이블은 [02 §8](./02-domain-data.md#8-테이블)을 따른다. `5-learning-model` step 0에서 `V10__create_learning_model.sql`로 옛 네 테이블을 지우고 `roadmaps` · `courses` · `lessons` · `materials` · `cards` · `card_concepts` · `reviews` · `concepts` 여덟 테이블을 만들었다. 옛 `curriculum` 패키지의 코드와 테스트도 제거했다. step 1에서 `course.domain`에 `Roadmap` · `Course` · `Lesson` · `Material`과 `RoadmapStatus` · `CourseStatus` · `Level` · `Purpose`를 두었다. 생성 팩토리는 `Roadmap.plan(long userId, LearningInput input, String title, String description)` · `Course.single(long userId, LearningInput input, String title)` · `Course.inRoadmap(Roadmap roadmap, int position, String title, String planDescription, List<PlannedConcept> planConcepts)` · `Lesson.listed(Course course, int position, String title, String description, List<PlannedConcept> concepts)` · `Material.write(Lesson lesson, String body)`다. `LearningInput`은 여섯 입력 칸을 공유하는 변경 메서드 없는 `@Embeddable`이고, `PlannedConcept(String name, String definition)`은 record다. `List<PlannedConcept>`는 `@JdbcTypeCode(SqlTypes.JSON)` · `@Column(columnDefinition = "jsonb")`로 매핑한다. Hibernate 7.4.5의 소스 JAR(`SessionFactoryOptionsBuilder` · `JacksonIntegration` · `Jackson3JsonFormatMapper`)과 Gradle 의존성 조회로 기본 매퍼가 클래스패스에 따라 Jackson 2를 먼저 고름을 확인했다. FSRS 테스트 의존성의 Jackson 2와 운영의 Jackson 3가 달라지지 않도록 `application.yml`의 `spring.jpa.properties.hibernate.type.json_format_mapper: jackson3`로 Jackson 3.1.5를 명시했다. `LessonRepositoryTest`에서 실제 선택된 매퍼를 확인하고, `CourseRepositoryTest`와 함께 PostgreSQL 저장·재조회 및 SQL 비교로 한국어 · 목록 순서 · `name`/`definition` 키를 검증했다. 네 레포지토리는 `Repository<T, Long>`만 상속하고 `save` · `findById`만 선언한다. step 2에서 `card.domain`에 `Card` · `Concept` · `CardConcept` · `Review`와 `CardStatus` · `FsrsState` · `Rating`을 두었다. 생성 팩토리는 `Card.write(long userId, long lessonId, int position, String question, String answer)` · `Concept.add(long userId, String name, String definition, float[] embedding)` · `CardConcept.link(Card card, Concept concept)` · `Review.record(Card card, Rating rating)`다. `CardConceptId(Long cardId, Long conceptId)` record를 `@EmbeddedId`로 쓰고, 같은 칸의 부모 연관관계는 읽기 전용 LAZY 매핑으로 둔다. `CardConcept`는 `Persistable<CardConceptId>`를 구현해 공용 Auditing의 `createdAt`이 비었으면 새 연결로 판단한다 — 새 복합 키 연결의 `save`가 `merge`로 중복을 덮지 않고 `persist`하도록 하며, `CardConceptRepositoryTest`에서 중복 저장의 기본 키 제약 위반을 검증했다. 네 레포지토리는 `Repository<T, ID>`만 상속하고 `<S extends T> S save(S entity)` · `Optional<T> findById(ID id)`만 선언한다. 임베딩은 `org.hibernate.orm:hibernate-vector`를 버전 없이 추가하고 `float[]`에 `@JdbcTypeCode(SqlTypes.VECTOR)` · `@Column(columnDefinition = "vector")`를 붙여 차원을 고정하지 않는다. Boot 4.1.1 BOM · Hibernate BOM과 Gradle `dependencyInsight`로 7.4.5.Final 선택을 확인했고, 해당 버전 소스 JAR의 `PGVectorTypeContributor` · `PGVectorJdbcType` · `VectorDdlType`으로 PostgreSQL 타입 등록 · 저장/조회 · 차원 처리를 확인했다. `ConceptRepositoryTest`는 `ddl-auto: validate`에서 3차원과 5차원 값을 함께 저장·재조회하고, SQL의 `vector_dims` 및 실제 칸 타입 `vector`도 확인한다. 카드 초기 FSRS 값 · 부모 LAZY · 공용 `TestClock`의 생성/수정 시각도 레포지토리 테스트로 검증했다.
+
+- **만드는 작업** — `6-job-worker` step 0에서 `V11__create_generation_jobs.sql`로 `generation_jobs`와 `credit_entries.job_id`(작업 삭제 시 `SET NULL`)를 만들었다. 같은 대상 중복을 막는 부분 고유 색인은 [02 §8.5](./02-domain-data.md#85-만들기--호출)에 적었다. `job.domain.GenerationJob`은 `AuditedEntity`를 상속하고 사용자 · 대상은 ID 값, 입력은 기존 `LearningInput`의 `@Embedded` 매핑으로 둔다. 받기 팩토리는 `newCourse(long userId, LearningInput input)` · `newRoadmap(long userId, LearningInput input)` · `planRoadmapCourse(long userId, long courseId)` · `replanCourse(long userId, long courseId, String feedback)` · `replanRoadmap(long userId, long roadmapId, String feedback)` · `material(long userId, long lessonId)`이며 모두 `QUEUED` · `claim_count = 0`으로 시작한다. `JobType` · `JobStatus` · `JobErrorType`을 두었고, `job.repository.GenerationJobRepository`는 `Repository<GenerationJob, Long>`만 상속해 `<S extends GenerationJob> S save(S entity)` · `Optional<GenerationJob> findById(Long id)`만 선언했다. `6-job-worker` step 2에서 `GenerationJob.retry()`로 실패를 기다림으로 돌리고 오류와 끝난 때를 비운다. `job.JobIntakeHandler`는 `type()` · `check(long userId, JobRequest request)` 자리만 두며 운영 구현은 없다. 받기 값은 `JobRequest(JobType type, Long targetId, LearningInput input, String feedback)`다. `job.service.JobIntakeService`의 `receive(long userId, JobRequest request)` · `retry(long userId, long jobId)`는 `JobResult(long id, JobStatus status)`를 돌려주고, `discard(long userId, long jobId)`는 반환값이 없다. 세 동작은 한 `@Transactional` 안에서 `CreditLedger.lock(userId)`를 먼저 부른다. 받기는 주인 → 처리기 → 같은 대상 → 건 수 → 작업 저장 · 크레딧 사용 순서다. 처리기가 없으면 `INVALID_REQUEST`로 거절한다. 레포지토리에 같은 대상 조회(`findSameTarget`) · 사용자별 진행 건 수(`countByUserIdAndStatusIn`) · 버리기(`delete`)를 더했다.
+
+- `6-job-worker` step 3 구현: `job.controller.JobController`가 받기 · 작업 하나 읽기 · 다시 시도 · 버리기를 HTTP에 연결한다. `job.dto.JobReceiveRequest`의 칸 사이 검증은 `FieldViolation.Reason`으로 공통 오류 경로에 전달한다. `job.service.JobReadService`는 `@Transactional(readOnly = true)`에서 작업 주인을 확인하고 `course` 패키지의 레포지토리로 대상 제목과 강의의 코스 ID를 읽어 값 객체만 반환한다. 경로 · 요청/응답 칸 · 실패 묶음은 [05 §2](./05-api.md#2-만드는-작업--받기-하나--다시-읽기)에 적었다.
+
+- `6-job-worker` step 4 구현: `generation.JobGenerator`는 `type()` · `generate(JobSnapshot)` · `save(JobSnapshot, GeneratedResult)` 자리만 두며 운영 구현은 없다. `JobSnapshot`과 그 안의 `Input`은 ID · 입력 · 피드백 · 이번 `claimCount`만 담는 record이고, 결과 값은 `GeneratedResult`로 전달한다. `GenerationOutcome.Success` 또는 `Failure`의 `PROVIDER_UNAVAILABLE` · `INVALID_OUTPUT` · `PROVIDER_REJECTED` · `INPUT_TOO_LARGE`를 반환한다. `ResultRef(long id)`는 새로 만든 결과 또는 원래 대상 ID다.
+- `worker.JobRunner`의 `boolean runOnce()`는 작업 하나를 집었는지 반환한다. `EntityManager` 네이티브 SQL과 `TransactionTemplate`으로 꺼내기 · 갱신 · 저장 · 실패의 경계를 두고, 만들기는 트랜잭션 밖에서 한다. 호출자 트랜잭션도 거절한다. 저장의 첫 조건부 쓰기로 소유권을 확인한 뒤 `save` · 명시적 `flush()` · 작업 성공을 함께 커밋한다. 실패 전환과 `CreditLedger.restoreIfOwed`도 한 트랜잭션이다. 시각은 주입받은 `Clock` 하나로 계산하고 비교한다. 시한 갱신은 외부에서 받은 `ScheduledExecutorService`에 한 바퀴 동안만 예약하고, 완료 전에 진행 중인 갱신을 마치고 취소한다.
+- `6-job-worker` step 5 구현: `config.WorkerConfiguration`이 `worker.WorkerLifecycle`을 조립한다. `SmartLifecycle`의 자동 시작에서 워커 수만큼 플랫폼 스레드와 각각의 `JobRunner` · 갱신 스케줄러를 만든다. 빈손과 한 바퀴 밖 예외 뒤에는 설정 간격을 쉰다. 워커 수 0은 실행기 · 스레드를 만들지 않는다. 운영 생성 처리기는 여전히 없고, 받기 처리기도 없어 어떤 종류도 받지 않는다. **종류를 받기 시작하는 TASK 는 그 종류의 `job.JobIntakeHandler` 와 `generation.JobGenerator` 를 같은 step 에서 함께 더한다** — 받기 처리기만 있으면 `JobRunner` 가 처리기 없는 작업에서 예외를 던져 `RUNNING` 으로 남고, 시한마다 되찾아져 끝나지 않는다(크레딧도 돌아오지 않는다).
+- 종료는 `SmartLifecycle`의 단계 `Integer.MAX_VALUE`에서 시작한다. 각 실행기에 새 꺼내기 금지를 먼저 알리고 빈손 대기를 깨운 뒤, 모든 워커에 같은 종료 시각을 적용한다. 진행 중 갱신은 기다리는 동안 유지한다. 한도를 넘긴 워커는 `releaseCurrent()`의 `TransactionTemplate`(반환 트랜잭션 제한 5초)에서 같은 `claim_count` · `RUNNING` 조건으로 `QUEUED` · `lease_until = NULL` · `updated_at`을 쓰며 크레딧은 건드리지 않는다. 반환은 워커별로 나란히 처리한다. 늦은 호출은 해당 시도의 시한 상실 표시와 DB 쓰기 조건으로 막는다. 실행 스레드는 데몬 플랫폼 스레드라 한도 뒤 외부 호출이 JVM 종료를 붙잡지 않는다. 각 실행기의 현재 시도와 종료 표시는 그 실행기의 수명 제어에만 쓰고, 워커 사이 작업 분배 · 소유권은 DB로만 판단한다.
+- 종료 순서의 근거: 로컬 의존성 `spring-context-7.0.9-sources.jar`의 `AbstractApplicationContext.doClose()`는 `lifecycleProcessor.onClose()` 뒤에 `destroyBeans()`를 호출하며, `DefaultLifecycleProcessor.stopBeans()`는 높은 단계부터 멈추고 `stop(Runnable)`의 콜백을 기다린다. `WorkerLifecycleTest.stopsBeforeConnectionPoolDestruction`은 실제 Spring 컨텍스트를 닫아 반환 시점에 Hikari 풀이 열려 있고, 콜백 뒤 풀의 `close()`가 끝나는 순서를 검증한다. 따라서 JPA · DB 풀의 singleton 파괴 전에 워커 반환을 마친다.
 
 ## 3. 배포
 
@@ -119,6 +129,7 @@
 - **배포처럼 정상적으로 끌 때는 진행 중인 시도가 끝나기를 기다린다**(ADR-126) — 새 작업은 꺼내지 않고, 진행 중인 시도가 결과를 저장하기를 정한 한도까지 기다린 뒤 끈다. 한도를 넘기면 들고 있던 작업을 기다림으로 돌려놓는다. 기다리는 동안 시한은 그대로 늘린다.
     - 기다리는 한도는 Spring 의 종료 대기(`timeout-per-shutdown-phase` — 지금 130초)와 컨테이너의 강제 종료 대기(`deploy/compose.yaml` 의 `stop_grace_period` — 지금 150초)보다 짧게 둔다. 길면 기다리는 도중 강제로 죽어 시한으로 되찾는 길로 떨어진다.
 - 서버가 갑자기 죽으면 시한이 지날 때까지 그 작업이 멈춘다. 되찾은 작업에 이미 나간 호출 비용은 운영자가 낸다.
+- 처리하는 중에 서버를 계속 죽이는 작업은 시한이 지날 때마다 되찾아져 다시 돈다 — 꺼낸 횟수에 상한을 두지 않는다. 드물어 장치를 두지 않고, 운영자가 남은 작업의 `claim_count` 로 알아본다(ADR-102 · README 2026-11-15).
 
 ### 4.6 실패 · 다시 시도
 
@@ -156,6 +167,7 @@
 
 - 한 사람이 여럿을 걸 수 있게 한 것은 기다리는 화면을 떠나 다른 강의를 공부할 수 있게 하려는 것이다 — 새 강의를 열면 강의 자료를 만들어야 한다. 그래서 서비스 전체에 걸리는 만들기는 「10명 × 정한 수」까지다.
 - 한 사람이 건 수는 받을 때 DB 에서 세고, 같은 순간의 두 요청이 함께 넘지 않게 한다(ADR-133).
+- `6-job-worker` step 2 구현: `application.yml`의 `app.job.max-in-progress-per-user` 한 곳에서 임시 값 **3**을 읽는다(`config.JobProperties.maxInProgressPerUser()`). 받기와 실패의 다시 시도 모두 `CreditLedger.lock`의 `users` 행 `PESSIMISTIC_WRITE` 잠금 뒤 `QUEUED` · `RUNNING`을 DB에서 센다. 같은 사람의 동시 요청은 트랜잭션이 끝날 때까지 기다려 상한을 함께 넘지 않는다. 서버 메모리의 잠금 · 카운터는 없다.
 - 앞에 몇 명인지 같은 숫자는 보이지 않는다(ADR-089).
 
 ## 7. 비용 통제 — 크레딧
@@ -174,6 +186,7 @@
 | 모자라면 | 받지 않는다 — 「크레딧 부족」, 다음에 채워지는 날과 함께 | ADR-116 |
 
 - 한 달 몫의 구현 설정은 `application.yml`의 `app.credit.monthly-amount` 한 곳이며 `config.CreditProperties.monthlyAmount`로 읽는다. 현재 임시 값은 §10대로 두고, 신청 서비스와 검증도 이 설정을 사용한다.
+- 종류별 값도 `application.yml`의 `app.credit` 아래에 두고 `config.CreditProperties`로 읽는다. 받는 쪽이 종류에 맞는 값을 골라 `CreditLedger.consume`에 양수 `amount`로 넘긴다. 설정 키 · 읽는 메서드 · 임시 값은 §10에 적었다.
 - **담는 모양** — 남은 양과 움직인 기록(채움 · 씀 · 복구 — ADR-166)을 함께 둔다(ADR-131). 남은 양은 `users` 의 칸이고 계정 패키지가 다룬다(ADR-153). 나중에 충전을 더하면 충전 몫과 기록 종류를 하나씩 더해 채워 주는 크레딧과 나눈다.
 - 실패에 든 비용은 크레딧으로 묶이지 않는다 — 자동 다시 시도 횟수와 한 사람이 동시에 걸 수 있는 수로 묶는다(ADR-125).
 - 학습과 상관없는 요청은 따로 막지 않는다 — 그 사람의 크레딧 안에서 든다(ADR-114).
@@ -203,6 +216,35 @@
 | `INFO` | 흐름 한 줄 | 접근 줄 · 로그인 결과(신청 전 로그인 `login result=not_applied` 는 MDC 에 `userId` 가 없다) · 기동/종료 · 작업 받기 · 끝남 |
 | `DEBUG` 이하 | 운영에서 끈다 | — |
 
+`6-job-worker` step 4의 워커 줄은 커밋 뒤 `INFO`의 `job finished status={SUCCEEDED|FAILED}`, 소유권 확인이 0행이면 한 시도에 한 번 `WARN`의 `job lease lost`, 결과 저장 트랜잭션의 예외에는 스택과 함께 `ERROR`의 `job save failed`다. 처리와 갱신 중 `jobId` · `userId`를 넣고 끝나면 지운다. 저장 예외는 원래 메시지 · cause · suppressed를 넘기지 않고 예외 타입 이름과 스택 위치만 남긴다.
+
+`6-job-worker` step 5의 줄은 정상 종료 한도 뒤 조건부 반환이 커밋된 때 `INFO`의 `job released`(`jobId` · `userId`)와 한 바퀴 밖 예외의 `ERROR`인 `worker poll failed`다. 정상 종료 중 반환(`releaseCurrent`)이 실패해도 같은 줄이다(`WorkerLifecycle` 의 종료 스레드). 루프는 같은 예외 타입의 연속 실패에서 첫 번째만 스택을 남기고, 다음 실패는 같은 한 줄만 남긴다. 성공한 꺼내기(빈손 포함) 뒤에는 연속 실패 표시를 비운다. 스택에는 원래 메시지 · cause · suppressed 없이 타입 이름과 위치만 싣는다.
+
+`WorkerLifecycleIntegrationTest` · `WorkerLifecycleTest`의 `OutputCaptureExtension`이 캡처한 실제 출력:
+
+```text
+2026-11-15T17:55:06.072+09:00  INFO jobId=42, userId=38 68829 --- [mogum] [m-worker-1-stop] com.mogum.worker.JobRunner               : job released
+2026-11-15T17:55:07.928+09:00 ERROR  68829 --- [mogum] [ mogum-worker-0] com.mogum.worker.WorkerLifecycle         : worker poll failed
+```
+
+`JobRunnerIntegrationTest`의 `OutputCaptureExtension`이 캡처한 실제 출력:
+
+```text
+2026-11-15T17:44:17.508+09:00  INFO jobId=1, userId=1 57664 --- [mogum] [    Test worker] com.mogum.worker.JobRunner               : job finished status=SUCCEEDED
+2026-11-15T17:44:17.938+09:00  INFO jobId=14, userId=13 57664 --- [mogum] [    Test worker] com.mogum.worker.JobRunner               : job finished status=FAILED
+2026-11-15T17:44:17.509+09:00  WARN jobId=1, userId=1 57664 --- [mogum] [pool-3-thread-1] com.mogum.worker.JobRunner               : job lease lost
+2026-11-15T17:44:17.589+09:00 ERROR jobId=2, userId=2 57664 --- [mogum] [    Test worker] com.mogum.worker.JobRunner               : job save failed
+```
+
+`6-job-worker` step 2의 작업 줄은 커밋 뒤 `INFO`로 남긴다. 새 작업은 `job received type={type}`, 실패에서 기다림으로 돌아간 작업은 `job retried`다. `common.logging.RequestLogFilter.JOB_ID`(`jobId`)를 줄을 쓰는 곳에서 넣고 `finally`에서 지운다. 요청의 `requestId` · `userId`는 그대로 둔다. 이미 있는 작업 반환 · 거절 · 버리기는 작업 줄을 남기지 않는다.
+
+`JobIntakeServiceIntegrationTest`의 `OutputCaptureExtension`이 캡처한 실제 출력:
+
+```text
+2026-11-15T12:53:58.709+09:00  INFO jobId=27 37745 --- [mogum] [    Test worker] com.mogum.job.service.JobIntakeService   : job received type=NEW_COURSE
+2026-11-15T12:53:58.716+09:00  INFO jobId=27, userId=33, requestId=test-job-request 37745 --- [mogum] [    Test worker] com.mogum.job.service.JobIntakeService   : job retried
+```
+
 신청 전 로그인 줄의 실제 출력(`OAuthLoginHandlerIntegrationTest`의 `OutputCaptureExtension` 캡처):
 
 ```text
@@ -221,11 +263,49 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 
 | 값 | 근거 |
 |---|---|
-| 한 사람이 동시에 걸 수 있는 수(예: 2~3) · 같은 순간의 두 요청을 막는 방법 | ADR-104 · ADR-133 |
-| 서버마다 워커 수 | ADR-105 · ADR-133 |
-| 시한 값 · 늘리는 방법 · 정상 종료 때 기다리는 한도 · 배포를 끄고 켤지 겹칠지 | ADR-126 |
-| 자동 다시 시도 · 이어 쓰기 횟수 · 간격 · 프로바이더 오류를 일시적 · 다시 해도 같은 것 가운데 어디에 넣나(갈래 자체는 ADR-163) | ADR-127 |
-| 꺼낼 때 쓰는 DB 기능 | ADR-129 |
-| 종류별 크레딧 값 · 한 달 몫 — 한 달 몫은 계정 TASK 가 설정 한 곳에 임시 값 100 으로 두고, 강의 목록 TASK 에서 토큰을 잰 뒤 정한다(사용자 확인 2026-11-08) | ADR-107 · ADR-115 |
+| 한 사람이 동시에 걸 수 있는 수 — `app.job.max-in-progress-per-user` 임시 값 3(`JobProperties.maxInProgressPerUser()`). `6-job-worker` step 2에서 사용자 행 잠금으로 동시 요청을 직렬화했다(§6). 실제 운영 값은 재 보고 정한다 | ADR-104 · ADR-133 |
+| 서버마다 워커 수 · 빈손/예외 뒤 쉬는 간격 · 정상 종료 대기는 아래 임시 설정. 배포는 기존 `deploy/deploy.sh`의 Compose `up -d --no-build`로 옛 컨테이너를 끄고 새 컨테이너를 켠다. 겹치는 배포 장치는 없다 | ADR-105 · ADR-126 · ADR-133 |
+| 시한 · 늘리는 간격은 아래 임시 설정. 각 워커의 `ScheduledExecutorService.scheduleWithFixedDelay`로 만드는 동안과 정상 종료 대기 중에 갱신한다. 시한 식은 아래와 같고, 호출 시간 제한과 이어 쓰기 값은 강의 목록 TASK에서 정한 뒤 다시 대입한다 | ADR-126 |
+| 자동 다시 시도는 아래 임시 설정. 이어 쓰기 횟수 · 간격 · 프로바이더 오류 분류는 강의 목록 TASK에서 정한다(갈래 자체는 ADR-163) | ADR-127 |
+| 꺼내기는 PostgreSQL CTE 하나에서 `SELECT … ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1` → `UPDATE … RETURNING id`. `QUEUED` 또는 같은 `Clock`의 현재 시각보다 `lease_until`이 작은 `RUNNING` 하나를 집고 `claim_count + 1` · 시한 · 시작/수정 시각을 바꾼다 | ADR-129 |
+| 종류별 크레딧 값 · 한 달 몫 — 한 달 몫은 계정 TASK 가 설정 한 곳에 임시 값 100 으로 두고, 강의 목록 TASK 에서 토큰을 잰 뒤 정한다(사용자 확인 2026-11-08). 종류별 값은 `6-job-worker` step 1에서 아래 설정에 모두 임시 값 1로 두었다 | ADR-107 · ADR-115 |
 | 크레딧 채우기를 여러 서버에서 한 번만 일어나게 하는 방법 · 새벽 4시에 서버가 꺼져 있었을 때 따라잡는 방법 | ADR-133 · ADR-173 |
 | 패키지를 코스 · 로드맵 등으로 나누는 방식 — 테이블은 02 §8 에서 정했다 | ADR-148 |
+
+워커의 임시 값은 `application.yml`의 `app.worker` 한 곳이며 `config.WorkerProperties`로 읽는다(`6-job-worker` step 4 · 5). 테스트는 생성자로 짧은 간격 또는 0의 다시 시도 간격을 전달한다. 자동 다시 시도 횟수는 첫 호출 **뒤에 더 부르는 횟수**다.
+
+| 설정 키 | 읽는 메서드 | 임시 값 |
+|---|---|---|
+| `app.worker.lease-duration` | `leaseDuration()` | `5m` |
+| `app.worker.renewal-interval` | `renewalInterval()` | `30s` |
+| `app.worker.max-retries` | `maxRetries()` | `2`(최대 호출 3번) |
+| `app.worker.retry-delay` | `retryDelay()` | `1s` |
+| `app.worker.count` | `count()` | `2`(0이면 API만 실행) |
+| `app.worker.poll-interval` | `pollInterval()` | `1s` |
+| `app.worker.shutdown-wait` | `shutdownWait()` | `100s` |
+
+시한은 **한 번 꺼낸 시도의 최장 시간보다 길어야 한다**. `R`은 추가 자동 다시 시도 횟수, `C`는 호출마다 허용한 이어 쓰기 횟수, `T호출`은 호출 시간 제한, `D이어쓰기`는 이어 쓰기 사이 간격, `D다시시도`는 자동 다시 시도 사이 간격이다. `T_DB`는 재료 읽기 · 시한 처리 · 결과/실패 쓰기를 포함한 DB 처리의 여유다.
+
+```text
+시한 > (R + 1) × ((C + 1) × T호출 + C × D이어쓰기) + R × D다시시도 + T_DB
+현재: 300초 > 3 × ((C + 1) × T호출 + C × D이어쓰기) + 2초 + T_DB
+```
+
+운영 생성 처리기와 유료 호출은 아직 없으므로 `T호출` · `C` · `D이어쓰기` · 실제 `T_DB` 상한을 확인한 것은 아니다. 강의 목록 TASK에서 이를 정하고 시한을 다시 계산한다. 호출 시간 제한 · 이어 쓰기 · 다시 시도 횟수/간격 중 하나를 바꿔도 식을 다시 확인한다.
+
+현재 계산할 수 있는 제약은 `WorkerProperties`의 생성자에서 검사해 설정 바인딩 실패로 기동을 거부한다: 시한 · 갱신/쉬는 간격 · 종료 대기는 양수, `갱신 간격 < 시한`, 워커 수 · 추가 다시 시도 횟수/간격은 0 이상, `종료 대기 < 120초`다. Spring의 130초와 컨테이너의 150초는 늘리지 않고, 반환 트랜잭션 제한 5초를 위한 여유를 남긴다. 워커(단계 `Integer.MAX_VALUE`)는 Tomcat 정상 종료보다 먼저, 따로 멈춘다 — 그래서 실제 종료 시간은 `종료 대기(100초) + 반환(최대 5초) + Tomcat 정상 종료` 의 합이고, 이 합이 컨테이너의 150초 안에 들어와야 한다. 지금 API 요청은 짧아 여유가 있다. 종료 대기 상한 120초는 `WorkerProperties` 에 상수로 있으니 130초를 바꾸면 함께 본다. `WorkerPropertiesTest`는 잘못된 설정의 기동 거부와 실제 Spring 종료 설정이 120초보다 긴 것을 검사하고, 기존 배포 파일 시험이 컨테이너 대기와 Spring 대기의 관계를 검사한다.
+
+기본 통합 테스트는 공용 `IntegrationTestConfiguration.OAuthInitializer`가 `app.worker.count=0`을 적용한다. 별도 앱 컨텍스트를 늘리지 않고, 워커 시험이 `runOnce()` 또는 짧은 설정으로 직접 만든 `WorkerLifecycle`의 시작 · 종료를 제어한다.
+
+종류별 임시 값(`application.yml` · `config.CreditProperties`):
+
+| 종류 | 설정 키 | 읽는 메서드 | 임시 값 |
+|---|---|---|---|
+| `NEW_COURSE` | `app.credit.new-course` | `newCourse()` | 1 |
+| `NEW_ROADMAP` | `app.credit.new-roadmap` | `newRoadmap()` | 1 |
+| `PLAN_ROADMAP_COURSE` | `app.credit.plan-roadmap-course` | `planRoadmapCourse()` | 1 |
+| `REPLAN_COURSE` | `app.credit.replan-course` | `replanCourse()` | 1 |
+| `REPLAN_ROADMAP` | `app.credit.replan-roadmap` | `replanRoadmap()` | 1 |
+| `MATERIAL` | `app.credit.material` | `material()` | 1 |
+
+실제 토큰 측정에 따른 확정 값은 강의 목록 TASK에서 정한다.

@@ -33,6 +33,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ApiExceptionHandlerTest {
     @Test
+    @DisplayName("크레딧 부족은 공통 오류 경로로 409와 code와 서버가 채운 날짜 문구를 반환한다")
+    void returnsCreditInsufficientWithServerMessage() {
+        // given
+        var exception = ApiException.withMessage(ErrorCode.CREDIT_INSUFFICIENT,
+                "크레딧이 부족합니다. 2026-12-08에 다시 채워집니다");
+        var mvc = mvc(exception);
+
+        // when
+        var result = mvc.get().uri("/test/error").exchange();
+
+        // then
+        assertThat(result).hasStatus(409);
+        assertThat(result).bodyJson().isStrictlyEqualTo("""
+                {"code":"CREDIT_INSUFFICIENT","message":"크레딧이 부족합니다. 2026-12-08에 다시 채워집니다"}
+                """);
+        assertThat(exception.getMessage()).isEqualTo("CREDIT_INSUFFICIENT");
+    }
+
+    @Test
     @DisplayName("길이 위반만이면 넘친 칸과 reason을 싣는다")
     void returnsFieldReasonForLengthViolation() throws Exception {
         // given
@@ -246,6 +265,24 @@ class ApiExceptionHandlerTest {
         assertThat(result).hasStatus(500);
         assertThat(result).bodyJson().isStrictlyEqualTo("""
                 {"code":"INTERNAL_ERROR","message":"요청을 처리할 수 없습니다"}
+                """);
+    }
+
+    @Test
+    @DisplayName("칸 사이 제약도 값 원문 없이 안전한 reason과 칸 이름으로 반환한다")
+    void returnsCrossFieldReasons() throws Exception {
+        // given
+        var request = new com.mogum.job.dto.JobReceiveRequest("NEW_COURSE", null, null, null,
+                "자바", "BEGINNER", "private input", "WORK", null, null, null);
+        var exception = validationException(validate(request));
+
+        // when
+        var response = new ApiExceptionHandler().handleException(exception, webRequest());
+
+        // then
+        assertValidationResponse(response, """
+                {"code":"FIELD_INVALID","message":"입력을 확인해 주십시오",
+                 "fields":[{"field":"levelOther","reason":"NOT_ALLOWED"}]}
                 """);
     }
 

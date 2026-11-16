@@ -30,6 +30,15 @@ class RequestLogFilterTest {
     }
 
     @Test
+    @DisplayName("작업 MDC 키는 공통 로깅 상수로 jobId를 쓴다")
+    void exposesJobMdcKey() {
+        // when
+        var key = RequestLogFilter.JOB_ID;
+        // then
+        assertThat(key).isEqualTo("jobId");
+    }
+
+    @Test
     @DisplayName("필터 밖으로 나가는 예외는 원래 예외와 요청 및 회원 MDC를 유지한다")
     void preservesExceptionAndMdcUntilRequestCompletion() {
         // given

@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useOutletContext } from 'react-router-dom'
-import { ApiError, apiFetch } from '../api/client'
+import { ApiError, apiFetch, CONNECTION_ERROR_MESSAGE } from '../api/client'
 import type { Me } from '../api/useMe'
 import AccountIdentity from '../components/AccountIdentity'
 import AccountLayout from '../components/AccountLayout'
+import AppLayout from '../components/AppLayout'
 import Button from '../components/Button'
 import Mogumi from '../components/Mogumi'
 import { openGoogleLogin } from '../lib/authNavigation'
@@ -44,12 +45,13 @@ export default function AccountPage() {
   })
 
   useEffect(() => {
+    if (me.status === 'APPROVED') return
     document.title = `${screen.title} · 머금`
     heading.current?.focus()
-  }, [screen.title, pathname])
+  }, [me.status, screen.title, pathname])
 
   if (pathname !== screen.path) return <Navigate to={screen.path} replace />
-  if (me.status === 'APPROVED') return <PlaceholderPage />
+  if (me.status === 'APPROVED') return <AppLayout><PlaceholderPage /></AppLayout>
 
   const submit = (action: Action) => {
     if (!mutation.isPending) mutation.mutate(action)
@@ -84,7 +86,7 @@ export default function AccountPage() {
         <div className="mt-6 space-y-3">
           <div role="alert" className="text-small text-error">
             <p>{mutation.variables === 'apply' ? '신청하지 못했어요.' : '로그아웃하지 못했어요.'}</p>
-            <p>{mutation.error instanceof ApiError ? mutation.error.message : '연결하지 못했어요. 다시 시도해 주세요.'}</p>
+            <p>{mutation.error instanceof ApiError ? mutation.error.message : CONNECTION_ERROR_MESSAGE}</p>
           </div>
           <Button className="w-full" onClick={() => { if (mutation.variables) submit(mutation.variables) }}>다시 시도</Button>
         </div>

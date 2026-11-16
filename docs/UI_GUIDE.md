@@ -28,7 +28,7 @@
 | 색 토큰 (`--color-`) | 값 | 쓰는 곳 |
 |---|---|---|
 | `canvas` | `#fff7fe` | 화면 바탕 |
-| `surface` | `#ffffff` | 로그인 전 화면의 중앙 면·Google 버튼 |
+| `surface` | `#ffffff` | 로그인 전 화면의 중앙 면·Google 버튼·앱 위 바·탭 바·사이드바 |
 | `surface-soft` | `#fbf0ff` | 정원제·오류·만료 안내 |
 | `surface-muted` | `#f1e5f5` | 로딩 줄·disabled 버튼 |
 | `border` | `#e9d5ff` | 중앙 면·안내 테두리 |
@@ -60,8 +60,9 @@
 | `--shadow-button` | `0 4px 0 0 var(--color-primary-depth)` | 기본 버튼 아래 두께 |
 | `--shadow-button-pressed` | `0 1px 0 0 var(--color-primary-depth)` | 눌린 버튼의 남은 두께 |
 | `--container-account` | `27.5rem` (440px) | 로그인 전 중앙 면의 최대 폭 |
-| `--container-content` | `48rem` (768px) | 기존 자리 화면의 최대 폭 |
+| `--container-content` | `48rem` (768px) | 승인 뒤 틀의 본문 최대 폭 |
 | `--breakpoint-sm` | `40rem` (640px) | 넓은 화면에서 중앙 면 안쪽 여백 24→32px |
+| `--breakpoint-lg` | `64rem` (1024px) | 아래 탭 바에서 왼쪽 사이드바로 바뀌는 경계 |
 
 글자 굵기는 Tailwind 기본 토큰 `font-medium`(500, Google), `font-semibold`(600), `font-bold`(700), `font-extrabold`(800, 제목)를 쓴다. 포커스 테두리는 2px·바깥 간격 2px이다. `body`의 `word-break: keep-all`과 `overflow-wrap: break-word`를 유지한다. 한국어는 낱말을 지키고 긴 한 덩어리는 화면 안에서 줄바꿈한다. 다크 모드는 두지 않는다.
 
@@ -70,11 +71,12 @@
 | 이름 · 경로 | 모양 · 동작 · 상태 |
 |---|---|
 | `AccountLayout` · [components/AccountLayout.tsx](../frontend/src/components/AccountLayout.tsx) | `main` 하나. 바탕 위에 흰 중앙 면·24px 모서리·옅은 그림자. 모바일은 한 줄 세로 배치, 바깥 여백 가로 16px·세로 32px, 중앙 면 폭은 최대 440px. 안쪽 여백 24px, 640px부터 32px. 위 바·탭 바·사이드바 없음. 높이는 최소 화면 높이이며 내용이 길면 자연스럽게 스크롤한다. 로그인·로그인 확인 중·실패·신청·승인 대기·거절됨·처리방침 자리 화면이 같은 틀을 쓴다. |
-| `Mogumi` · [components/Mogumi.tsx](../frontend/src/components/Mogumi.tsx) | 책 읽는 사본 한 장. 가로 128px·비율 유지·가운데 정렬. 대체 글 「보라색 머그컵 안에서 책을 읽는 모구미」. 변형·움직임 없음. |
+| `Mogumi` · [components/Mogumi.tsx](../frontend/src/components/Mogumi.tsx) | 책 읽는 사본 한 장. 기본 가로 128px·비율 유지·가운데 정렬. 대체 글 「보라색 머그컵 안에서 책을 읽는 모구미」. 로고 크기(40px)는 §7. 움직임 없음. |
 | `Button` · [components/Button.tsx](../frontend/src/components/Button.tsx) | 기본 `variant="primary"`는 보라·흰색 굵은 글자·4px 아래 두께. hover는 진한 보라, 누르면 3px 내려가 두께가 1px. `variant="secondary"`는 보조 동작용으로 안내 바탕·보조 글자·옅은 테두리이며 hover는 `surface-muted`, 아래 두께는 없다. 둘 다 최소 높이 52px·가로 여백 24px·세로 여백 12px·16px 모서리. `disabled`는 옅은 바탕·보조 글자·그림자 없음·클릭 차단·눌림 없음. `focus-visible`은 보라 2px outline과 2px offset. 기본 `type="button"`, 네이티브 버튼 속성을 전달한다. 신청·다시 시도는 기본형, 계정 전환·로그아웃은 보조형을 쓴다. |
 | `AccountIdentity` · [components/AccountIdentity.tsx](../frontend/src/components/AccountIdentity.tsx) | 신청·승인 대기·거절됨에서 공유하는 「신청 계정」 영역. 안내 바탕·옅은 테두리·16px 모서리·안쪽 여백 16px. 이름과 구글 이메일을 `dl`로 세로 표시한다. 긴 값은 자르지 않고 줄바꿈하며 사진·입력 칸은 없다. |
+| `FailureNotice` · [components/FailureNotice.tsx](../frontend/src/components/FailureNotice.tsx) | 무엇이 안 됐는지·안내·전달받은 동작을 함께 담는 `role="alert"` 영역. 안내 바탕·옅은 테두리·16px 모서리·안쪽 여백 16px·요소 사이 12px. 제목은 굵은 오류색, 안내는 작은 본문이며 동작은 공통 `Button`·링크를 쓴다. |
 
-각 컴포넌트는 같은 폴더의 `{이름}.test.tsx`에 짝 테스트가 있다. 특정 화면만의 변형 prop은 없다.
+각 컴포넌트는 같은 폴더의 `{이름}.test.tsx`에 짝 테스트가 있다. `Mogumi`의 공통 크기는 §7을 따른다.
 
 ## 4. 로그인 화면
 
@@ -82,9 +84,9 @@
 
 Google 링크는 기존 Roboto 500·44px 높이·흰 바탕·1px 테두리·4px 모서리·18px 로고 SVG·「Google 계정으로 계속하기」를 유지한다. 브랜드 색은 별도 토큰으로 옮겼으며 기본 버튼의 그림자·눌림 효과를 쓰지 않는다. 오류·세션 만료 안내는 같은 중앙 면 안의 `role="status"`로 읽고 포커스를 받는다. 안내가 없으면 제목에 포커스를 둔다. 콜백의 `error`는 값에 관계없이 공통 로그인 실패 안내를 쓴다.
 
-### 4.1 계정 화면 주소와 구성
+### 4.1 화면 주소와 계정 화면 구성
 
-`4-account` step 5의 주소는 다음과 같다. 상태 흐름과 화면 내용은 [06 §2.2 · §3](./06-screens.md#3-로그인-전-화면), 통신 계약은 [05 §3 · §4](./05-api.md#3-읽기--화면마다-한-번)를 따른다.
+`4-account` step 5의 계정 주소와 `6-job-worker` step 6의 탭·step 7의 작업과 결과 주소는 다음과 같다. 상태 흐름과 화면 내용은 [06 §2.2 · §3](./06-screens.md#3-로그인-전-화면), 통신 계약은 [05 §3 · §4](./05-api.md#3-읽기--화면마다-한-번)를 따른다.
 
 | 주소 | 화면 · 표시 조건 |
 |---|---|
@@ -92,14 +94,22 @@ Google 링크는 기존 Roboto 500·44px 높이·흰 바탕·1px 테두리·4px 
 | `/apply` | 신청 · `NOT_APPLIED` |
 | `/waiting-approval` | 승인 대기 · `APPLIED` |
 | `/rejected` | 거절됨 · `REJECTED` |
-| `/` | `APPROVED`의 기존 `PlaceholderPage`. 홈은 뒤 TASK에서 만든다 |
+| `/` | `APPROVED`의 홈 자리(`PlaceholderPage`, 제목 「머금」). 처음 열리는 탭 |
+| `/courses` | `APPROVED`의 코스 탭 자리 |
+| `/roadmaps` | `APPROVED`의 로드맵 탭 자리 |
+| `/review` | `APPROVED`의 복습 탭 자리 |
+| `/profile` | `APPROVED`의 내 정보 탭 자리 |
+| `/jobs/:jobId` | `APPROVED`의 기다리는 화면. 위 바 제목 「기다리는 화면」·뒤로 가기 |
+| `/courses/:courseId` | 성공 결과의 코스 자리. 위 바 제목 「코스」·뒤로 가기만 표시 |
+| `/roadmaps/:roadmapId` | 성공 결과의 로드맵 자리. 위 바 제목 「로드맵」·뒤로 가기만 표시 |
+| `/courses/:courseId/lessons/:lessonId` | 성공 결과의 강의 자리. 위 바 제목 「강의」·뒤로 가기만 표시 |
 | `/privacy` | 개인정보처리방침 자리. 로그인·상태 읽기 없이 제목·준비 중·돌아가기만 표시 |
 
 계정 화면 세 개는 [AccountPage.tsx](../frontend/src/pages/AccountPage.tsx)에서 상태별로 구성한다. `/`와 계정 주소를 열 때 「나」를 읽어 현재 상태의 주소로 보낸다. 모르는 상태는 기존 불러오기 실패·다시 시도로 처리하며 값을 노출하지 않는다. 승인 대기에 폴링·새로고침 버튼을 두지 않는다. `ACCOUNT_NOT_APPROVED`를 받으면 「나」를 다시 읽어 현재 상태를 반영한다.
 
 시안의 핵심 순서를 맞춰 모구미·제목 → 계정 → 저장 정보 안내 → 신청·계정 전환으로 구성한다. 승인 대기는 제목 뒤에 알림 없음 안내를 먼저 두고, 계정 → 삭제 요청 안내 → 처리방침·로그아웃으로 이어진다. 거절됨은 제목 → 계정 → 남은 정보·삭제 요청 안내 → 처리방침·로그아웃 순서다. 처리방침 링크는 안내 영역에 두며 보라 글자·밑줄·최소 높이 44px·공통 포커스 outline을 쓴다. 처리방침의 돌아가기는 `/`에서 현재 상태를 다시 읽는 방식이다.
 
-제목은 진입 시 포커스를 받고 문서 제목도 바꾼다. 신청·로그아웃 요청 중에는 화면의 동작 버튼을 잠근다. 신청 성공 응답은 「나」 캐시에 반영하고, 로그아웃 성공은 캐시를 지운다. 동작 실패는 무엇이 안 됐는지·서버 문구 원문·다시 시도를 `role="alert"`와 함께 표시한다. 연결 실패는 기술 상세 없이 연결 안내를 쓴다. 처리방침 본문·요약·운영자 연락처는 넣지 않는다.
+제목은 진입 시 포커스를 받고 문서 제목도 바꾼다. 신청·로그아웃 요청 중에는 화면의 동작 버튼을 잠근다. 신청 성공 응답은 「나」 캐시에 반영하고, 로그아웃 성공은 캐시를 지운다. 동작 실패는 무엇이 안 됐는지·서버 문구 원문·다시 시도를 `role="alert"`와 함께 표시한다. 연결 실패는 기술 상세 없이 연결 안내를 쓴다. 「연결하지 못했어요. 다시 시도해 주세요.」는 [api/client.ts](../frontend/src/api/client.ts)의 공통 상수 `CONNECTION_ERROR_MESSAGE`이며, 서버 문구가 없거나 성공 응답의 본문 모양이 틀릴 때 `ApiError` 메시지로도 쓴다. 처리방침 본문·요약·운영자 연락처는 넣지 않는다.
 
 ## 5. 모구미 사본
 
@@ -114,4 +124,41 @@ sips -Z 384 docs/design/assets/mogumi-reading.png --out frontend/src/assets/mogu
 
 ## 6. 아직 정하지 않은 것 — 처음 쓰는 TASK가 정한다
 
-아이콘 세트·탭 바·사이드바·위 바·홈 배치·공통 카드·배지·진도 막대·확인 펼침·추가 버튼 모양·애니메이션은 처음 필요한 TASK에서 정한다. 지금의 중앙 면과 안내 문단을 미리 카드 컴포넌트로 만들지 않는다. 다크 모드는 미정 항목이 아니라 MVP에서 제외한 기능이다(ADR-064).
+홈 배치·공통 카드·배지·진도 막대·확인 펼침·추가 버튼 모양·애니메이션은 처음 필요한 TASK에서 정한다. 지금의 중앙 면과 안내 문단을 미리 카드 컴포넌트로 만들지 않는다. 다크 모드는 미정 항목이 아니라 MVP에서 제외한 기능이다(ADR-064).
+
+## 7. 승인 뒤 화면의 틀
+
+`6-job-worker` step 6에서 정한다. 주소는 §4.1, 화면 구분과 탭 순서는 [06 §2.1~2.3](./06-screens.md#21-형태와-모양의-원칙)을 따른다. 다섯 탭은 모두 제목 한 줄의 자리이며 내용은 해당 TASK에서 채운다.
+
+| 이름 · 경로 | 모양 · 동작 · 상태 |
+|---|---|
+| `AppLayout` · [components/AppLayout.tsx](../frontend/src/components/AppLayout.tsx) | `RequireAuth`가 전달한 `Me` outlet context를 읽어 `APPROVED`만 표시한다. 승인 전에는 `/`의 기존 계정 상태 분기를 거친다. 본문은 `children`으로 받고 틀이 `main` 하나를 제공한다. 바탕·기본 글꼴·색은 §2 공통 토큰. 본문은 가로 16px·위 24px 여백, 최대 폭 768px·가운데 정렬이며 자연스럽게 스크롤한다. 1024px부터 왼쪽에 사이드바 폭만큼 256px 여백, 본문 가로·아래 여백 32px. |
+| 아래 탭 바 · `AppLayout` 안 | 1024px 미만에서 화면 아래 고정, 흰 면·위 테두리·높이 80px·안쪽 여백 8px. 다섯 링크가 같은 폭으로 아이콘 위·글자 아래 배치된다. 본문 아래 96px 여백을 두어 가림을 막는다. |
+| 사이드바 · `AppLayout` 안 | 1024px부터 왼쪽 고정·폭 256px·전체 높이·흰 면·오른쪽 테두리·안쪽 여백 16px. 위에 모구미와 「머금」 로고, 아래 다섯 링크를 세로로 둔다. 아래 탭 바는 숨긴다. |
+| 탭 링크 · `AppLayout` 안 | 홈·코스·로드맵·복습·내 정보 순서. React Router `NavLink`로 같은 브라우저 탭에서 이동한다. 현재 탭은 `aria-current="page"`·보라 글자·굵은 글자·`surface-soft` 바탕, 나머지는 보조 글자·600 굵기이며 hover는 안내 바탕. 홈은 `/`에서만 활성, 다른 탭은 해당 주소의 하위 화면에서도 활성이다. 터치 영역 최소 44px, 공통 2px 포커스 outline·2px offset. |
+| 위 바 · `AppLayout` 안 | 높이 56px·흰 면·아래 테두리·스크롤 위에 붙는 바. 기본(탭 첫 화면)은 40px 모구미와 「머금」 로고. 1024px 부터 로고는 사이드바에만 둔다. 화면이 `title`을 넘기면 뒤로 가기 버튼과 해당 제목(`h1`)을 보인다. 뒤로 가기는 `navigate(-1)`로 브라우저의 이전 화면으로 간다. 버튼은 최소 44×44px·공통 포커스 outline. 제목은 진입 시 포커스를 받고 문서 제목을 `제목 · 머금`으로 바꾼다. |
+| 탭 아이콘 · `AppLayout` 안 | [guide §3](./design/guide.md#3-표준-내비게이션-5대-탭-아이콘-navigation-icons)의 홈·학사모·경로 노드·카드 덱·프로필 인라인 SVG를 그대로 사용한다. 24×24px·`currentColor`·선 두께 2, `aria-hidden`·`focusable="false"`로 장식 처리하며 접근 가능한 이름은 링크의 글자다. 아이콘 라이브러리는 없다. |
+| `Mogumi` · [components/Mogumi.tsx](../frontend/src/components/Mogumi.tsx) | 기본 `size="page"`는 기존 128px·가운데 정렬. `size="logo"`는 위 바·사이드바의 40px 표시다. 같은 로컬 사본·대체 글·원래 비율을 유지한다. |
+| `PlaceholderPage` · [pages/PlaceholderPage.tsx](../frontend/src/pages/PlaceholderPage.tsx) | 제목만 제공하며 `main`을 중복하지 않는다. 기본 홈 제목은 「머금」·문서 제목은 「홈 · 머금」, 다른 탭은 `title`을 받는다. 제목 진입·변경 시 포커스와 문서 제목을 갱신한다. |
+
+뒤 TASK의 탭에서 들어간 화면은 `RequireAuth` 아래에서 `<AppLayout title="기다리는 화면">…본문…</AppLayout>`처럼 사용한다. 탭 첫 화면은 `title` 없이 감싸고 본문에서 제목을 제공한다. 승인 전 화면과 처리방침은 기존 `AccountLayout`을 유지한다.
+
+너비 분기는 jsdom에서 실제 레이아웃을 계산하지 않으므로 `lg`(1024px) 표시·숨김, `w-64` 사이드바, `h-14` 위 바, 본문 여백의 클래스·구조를 시험한다. 실제 브라우저의 너비별 배치·가림·포커스 테두리 렌더링을 검증한 것으로 보지는 않는다.
+
+## 8. 기다리는 화면
+
+`6-job-worker` step 7의 [WaitingPage.tsx](../frontend/src/pages/WaitingPage.tsx)는 §4.1의 작업 주소에서 §7의 `AppLayout`을 쓴다. 표시와 동작의 계약은 [06 §6](./06-screens.md#6-기다리는-화면), API와 다시 읽는 간격은 [05 §2](./05-api.md#2-만드는-작업--받기-하나--다시-읽기)가 출처다.
+
+모구미 → 만드는 대상 → 상태 한 줄 → 떠나도 된다는 안내 순서다. 흰 중앙 면은 최대 440px·24px 모서리·옅은 테두리·안쪽 여백 24px(640px부터 32px)이며, 대상 제목을 24px·800 굵기로 가장 강조한다. 새로 배우기의 수준·목적은 제목 뒤에 작은 보조 글자로 표시하며 [02 §8.7](./02-domain-data.md#87-값-목록)의 화면 글·기타 입력을 쓴다. 나머지 종류는 대상 제목을 쓴다. 모르는 수준·목적은 생략한다. 상태는 보라색 굵은 본문, 떠나도 된다는 안내는 중앙 면 아래의 안내 바탕·16px 여백이다. 기존 토큰과 모구미 사본을 재사용한다.
+
+| 상태 | 화면 동작 |
+|---|---|
+| 읽는 중 | 불러오는 중이라는 한 줄을 `role="status"`로 표시 |
+| 기다림·만드는 중 | 대상 아래 실제 작업 상태 한 줄을 `role="status"`로 표시. 간격 읽기로 갱신하며 안내 문구·종류별 상태 문구는 06 §6을 그대로 사용 |
+| 실패 | 대상 아래 `FailureNotice`로 실패한 것·서버 문구·동작을 함께 표시. `JOB_TEMPORARY_FAILURE`는 다시 시도·버리기, `JOB_INPUT_FAILURE`는 버리기만. 모르는 묶음은 서버 문구와 홈으로 링크를 표시 |
+| 성공 | 응답 `result`의 종류·ID로 §4.1의 결과 주소를 골라 `replace`로 이동. 뒤로 가면 기다리는 화면이 다시 열리지 않음 |
+| 없는 작업·연결 실패·모르는 상태/종류/결과 | 읽지 못했다는 안내와 다시 시도·홈으로를 함께 표시. 서버 오류는 서버 문구, 연결·해석 실패는 기술 상세 없는 공통 안내를 사용 |
+
+다시 시도·버리기 요청 중에는 두 버튼을 잠근다. 동작 실패는 별도 `FailureNotice`에서 무엇이 안 됐는지와 서버 문구(연결 실패는 공통 안내)를 보이고 원래 동작을 다시 할 수 있다. 버리기 성공은 현재 홈으로 이동하며, 종류별 돌아갈 화면은 뒤 TASK에서 연결한다. 같은 작업 주소의 ID가 바뀌면 동작 상태도 새로 시작한다. API 훅 [useJob.ts](../frontend/src/api/useJob.ts)는 공통 `apiFetch`를 쓰고, 동작 성공 시 진행 중인 읽기를 취소한 뒤 해당 작업 캐시를 교체하거나 지운다. 읽기 오류 뒤에는 수동으로 다시 읽을 수 있으며, 창 포커스·재연결로 따로 읽지 않는다.
+
+진행 단계·퍼센트·남은 시간·대기 순서·오래 걸릴 때 안내·기다리는 동안 복습·결과 자리·취소·크레딧·운영 정보는 두지 않는다. 모르는 응답 칸과 값은 화면에 그대로 내보내지 않는다. 위 바 제목의 포커스·문서 제목은 `AppLayout`이 관리하며, 성공 이동·뒤로 가기·폴링 중단/재개·버튼 잠금·확장 응답·실패 안내는 API 대역과 가짜 타이머로 시험한다.

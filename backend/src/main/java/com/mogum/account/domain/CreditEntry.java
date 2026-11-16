@@ -36,6 +36,29 @@ public class CreditEntry extends AuditedEntity {
     @Column(nullable = false)
     private int amount;
 
+    @Column(name = "job_id")
+    private Long jobId;
+
+    /** amount는 쓸 크기를 양수로 받으며, 기록에는 음수로 담는다. */
+    public static CreditEntry consume(User user, long jobId, int amount) {
+        return movement(user, jobId, CreditEntryType.CONSUME, amount, -1);
+    }
+
+    /** amount는 돌려줄 크기를 양수로 받으며, 기록에도 양수로 담는다. */
+    public static CreditEntry restore(User user, long jobId, int amount) {
+        return movement(user, jobId, CreditEntryType.RESTORE, amount, 1);
+    }
+
+    private static CreditEntry movement(User user, long jobId, CreditEntryType type, int amount, int sign) {
+        if (amount <= 0) throw new IllegalArgumentException("amount must be positive");
+        var entry = new CreditEntry();
+        entry.user = user;
+        entry.jobId = jobId;
+        entry.type = type;
+        entry.amount = sign * amount;
+        return entry;
+    }
+
     public static CreditEntry refill(User user, int amount) {
         var entry = new CreditEntry();
         entry.user = user;

@@ -1,0 +1,135 @@
+{
+  "project": "Mogum",
+  "phase": "6-job-worker",
+  "steps": [
+    {
+      "step": 0,
+      "name": "job-schema",
+      "status": "completed",
+      "started_at": "2026-11-15T12:27:13+0900",
+      "summary": "V11__create_generation_jobs.sql: generation_jobs의 계약 칸·CHECK 22개·FK·조회 색인 및 credit_entries.job_id(ON DELETE SET NULL)·credit_entries_job_id_idx 추가; 같은 대상 막기는 DB 부분 고유 색인 generation_jobs_material_lesson_id_key, generation_jobs_plan_roadmap_course_course_id_key, generation_jobs_replan_course_course_id_key, generation_jobs_replan_roadmap_roadmap_id_key(뒤 둘은 status <> SUCCEEDED)로 보장; GenerationJob(AuditedEntity·LearningInput @Embedded·사용자/대상 ID·QUEUED/claim_count 0)과 JobType·JobStatus·JobErrorType 추가; GenerationJob 및 GenerationJobFixtures의 생성 시그니처는 각각 newCourse(long userId, LearningInput input), newRoadmap(long userId, LearningInput input), planRoadmapCourse(long userId, long courseId), replanCourse(long userId, long courseId, String feedback), replanRoadmap(long userId, long roadmapId, String feedback), material(long userId, long lessonId); GenerationJobRepository는 <S extends GenerationJob> S save(S entity), Optional<GenerationJob> findById(Long id)만 선언; GenerationJobFixtures SQL 도우미는 void running(JdbcTemplate jdbc, long id, int claimCount, Instant startedAt, Instant leaseUntil), void failed(JdbcTemplate jdbc, long id, JobErrorType errorType, Instant finishedAt), void succeeded(JdbcTemplate jdbc, long id, Long courseId, Long roadmapId, Long lessonId, Instant finishedAt); 02 §8.5·§9와 04 §2.3에 구현 사실 반영(ERD는 계약과 일치), 기존 V9 전용 시험은 Flyway target 9로 고정; 지정 AC 두 명령 통과(대상 시험 364개·전체 build 성공), 서버 테스트 903→1146개(작업 시험 243개 추가, 실패·건너뜀 0).",
+      "completed_at": "2026-11-15T12:36:24+0900",
+      "review_notes": [
+        "backend/src/main/resources/db/migration/V11__create_generation_jobs.sql:72 — `course_id` · `roadmap_id` 를 덮는 색인은 종류를 한정한 부분 고유 색인뿐이다. 02 §8.6 순서대로 코스 · 로드맵을 지울 때 그 대상의 작업을 모두 찾는데(성공한 `NEW_COURSE` · `NEW_ROADMAP` 포함), 이 조회는 기존 색인을 타지 못한다. 대상 FK 를 확인할 때도 마찬가지다. 정원 10명 규모라 지금은 영향이 없다 → 지우기를 만드는 step 에서 대상 칸 색인을 더할지 판단한다.",
+        "backend/src/main/resources/db/migration/V11__create_generation_jobs.sql:41 — `generation_jobs_input_check` · `_target_count_check` · `_target_type_check` · `_feedback_length_check` · `_error_type_values_check` 는 `{테이블}_{칸}_{접미사}` 규칙에서 조금 벗어난다. 한 칸에 제약이 둘이거나 여러 칸을 묶는 제약이라 생긴 일이고, 테스트가 이 이름을 고정하므로 동작에는 영향이 없다 → 뒤 step 의 오류 처리가 제약 이름으로 분기하면 이 이름을 그대로 쓴다."
+      ]
+    },
+    {
+      "step": 1,
+      "name": "credit-ledger",
+      "status": "completed",
+      "started_at": "2026-11-15T12:36:24+0900",
+      "summary": "account.service.CreditLedger: void lock(long userId), void consume(long userId, long jobId, int amount), void restoreIfOwed(long userId, long jobId); UserRepository.findByIdForUpdate(long id)의 JPA PESSIMISTIC_WRITE로 users 행을 잠그고 기본 @Transactional(REQUIRED)로 호출자 트랜잭션에 참여해 잔액·기록을 함께 변경; 사용자 행 잠금 안에서 발급한 credit_entries.id 순서로 마지막 작업 기록과 마지막 REFILL을 비교해 같은 시각의 기록도 중복·지난 주기 복구 방지; CreditEntry.jobId(Long)와 consume/restore 팩토리(양수 크기를 받아 음수/양수 기록), User.consumeCredits/restoreCredits 추가; CREDIT_INSUFFICIENT(409), ApiException.withMessage(ErrorCode, String)·responseMessage() 및 ApiErrorResponses.of(ApiException)으로 한국 날짜의 다음 채움 날을 넣은 공통 오류 응답 지원; application.yml app.credit.new-course/new-roadmap/plan-roadmap-course/replan-course/replan-roadmap/material은 모두 임시 1이며 CreditProperties.newCourse()/newRoadmap()/planRoadmapCourse()/replanCourse()/replanRoadmap()/material()로 읽어 호출자가 consume의 amount로 전달; 04 §2.3·§7·§10, 05 §1.2에 구현 사실 반영; 기존 코드에서도 재현된 부분 AC의 JUL 연결 누락은 RequestLogFilterIntegrationTest가 필요한 연결을 준비·원상복구하도록 보완; 지정 AC 두 명령 통과(부분 313개, 전체 build 1177개), 서버 테스트 1146→1177개(+31, 실패·건너뜀 0).",
+      "completed_at": "2026-11-15T12:49:36+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/common/logging/RequestLogFilterIntegrationTest.java:47-62 — step 범위 밖에서 JUL 브리지를 설치 · 해제하는 코드가 더해졌다. 테스트 전용이고 기존 테스트를 지키려는 수정으로 보여 반려하지는 않는다. 다만 새 테스트 클래스가 실행 순서를 바꿔 드러난 순서 의존성으로 보인다 → 원인(어느 마이그레이션 테스트가 브리지를 닫는지)을 HARNESS-BACKLOG 나 TEST_GUIDE 에 한 줄 남기길 권한다.",
+        "backend/src/main/java/com/mogum/account/service/CreditLedger.java:37 — `CREDIT_INSUFFICIENT` 는 부르는 쪽 트랜잭션에 참여한 상태에서 던져진다. 그래서 그 트랜잭션은 rollback-only 로 표시된다 → step 2 받기는 이 예외를 잡아 삼키고 커밋하면 안 되며(UnexpectedRollbackException) 그대로 전파해야 한다. step 2 리뷰 때 확인한다.",
+        "backend/src/main/java/com/mogum/account/service/CreditLedger.java:36 — `credit_refill_at` 은 APPROVED 일 때만 NOT NULL 이다(V9 CHECK). 승인 전 사용자에게 consume 이 불리면 NPE 가 난다. 받기는 승인 게이트(`ACCOUNT_NOT_APPROVED`) 뒤에서만 부르므로 지금은 문제없다. step 2 에서 그 순서가 지켜지는지 본다."
+      ]
+    },
+    {
+      "step": 2,
+      "name": "job-intake",
+      "status": "completed",
+      "started_at": "2026-11-15T12:49:36+0900",
+      "summary": "job.JobIntakeHandler: JobType type(), void check(long userId, JobRequest request); JobRequest(JobType type, Long targetId, LearningInput input, String feedback); job.service.JobIntakeService: JobResult receive(long userId, JobRequest request), JobResult retry(long userId, long jobId), void discard(long userId, long jobId), 반환 record는 JobResult(long id, JobStatus status); 세 동작 모두 CreditLedger.lock으로 users 행을 먼저 잠그며 받기는 주인→처리기→같은 대상 반환→건 수→작업 저장·크레딧 사용 순서, 운영 처리기는 없고 여섯 종류 모두 INVALID_REQUEST로 거절; GenerationJob.retry와 GenerationJobRepository.findSameTarget/countByUserIdAndStatusIn/delete 추가; 새 오류 code TOO_MANY_IN_PROGRESS·JOB_RETRY_NOT_ALLOWED·JOB_DISCARD_NOT_ALLOWED는 모두 409; app.job.max-in-progress-per-user 임시 3을 config.JobProperties.maxInProgressPerUser()로 읽음; MDC 상수 common.logging.RequestLogFilter.JOB_ID(jobId), 커밋 뒤 job received type={type}·job retried 두 INFO 줄만 남기고 finally에서 jobId 제거; 테스트 전용 처리기는 공용 @TestConfiguration인 support.IntegrationTestConfiguration의 중첩 static TestJobIntakeHandler로 여섯 종류 빈을 등록해 @IntegrationTest에서 추가 @Import 없이 재사용하며 NEW_* 입력 topic이 TestJobIntakeHandler.REJECT_TOPIC(test-intake-rejected)이면 INVALID_REQUEST, 나머지는 허용(step 4·5 처리기도 같은 공용 설정에 추가 가능); Fake 서비스 분기·처리기 빈 0개 구성·실제 PostgreSQL 동시 상한/같은 대상/다시 시도·버리기 경합·크레딧 롤백/기록 합/복구 1회·주인 확인·Auditing·안전한 로그 검증; 02 §9·04 §2.3/6/9.1/10·05 §1.2 반영; AC 부분 450개·전체 build 성공, 서버 테스트 1177→1253개(+76, 실패·오류·건너뜀 0).",
+      "completed_at": "2026-11-15T13:00:21+0900",
+      "review_notes": [
+        "docs/02-domain-data.md:518 — step은 「step 0 이 적은 줄 옆에」 더하라고 했다. step 0의 줄은 §8.5(369줄)에 있는데, 새 문장은 §9 「아직 정하지 않은 값」 표 위에 따로 들어갔다. 369줄 옆으로 옮기거나 §8.5를 가리키는 링크를 두면 찾기 쉽다.",
+        "backend/src/main/java/com/mogum/job/service/JobIntakeService.java:66,99 — 대상이 있는 종류에 targetId가 null로 오면 문제가 된다. findSameTarget(long)에서 언박싱 NPE가 나거나 findById(null)이 IllegalArgumentException을 던져 500이 된다. step 3의 요청 DTO 검증이 종류별 targetId 필수를 막도록 step 3 리뷰에서 확인한다.",
+        "backend/src/test/java/com/mogum/common/logging/RequestLogFilterTest.java:32 — 상수 값만 확인하는 시험이라 가치가 낮다. jobId가 실제로 붙는지는 JobIntakeServiceIntegrationTest가 이미 본다. 동작 영향은 없다."
+      ]
+    },
+    {
+      "step": 3,
+      "name": "job-api",
+      "status": "completed",
+      "started_at": "2026-11-15T13:00:21+0900",
+      "summary": "job.controller.JobController: POST /api/jobs(받기·200), GET /api/jobs/{id}(읽기·200), POST /api/jobs/{id}/retry(다시 시도·200), POST /api/jobs/{id}/discard(버리기·204 본문 없음); JobReceiveRequest는 최상위 type·courseId·roadmapId·lessonId·topic·level·levelOther·purpose·purposeOther·memo·feedback을 @ValidJobRequest로 종류별 필수/금지·OTHER 글·빈 글·DB와 같은 코드 포인트 길이 상한 검사 후 step 2 JobRequest로 변환하고 모르는 칸은 무시; FIELD_INVALID의 fields[{field,reason}]에 REQUIRED·TOO_LONG·INVALID_VALUE·NOT_ALLOWED 사용; 받기·읽기·다시 시도 응답은 ApiResponse의 data{id,type,status,subject,result?,error?}, subject는 NEW_*의 {topic,level,levelOther?,purpose,purposeOther?} 또는 대상의 {title}, 성공 result는 {type:COURSE|ROADMAP,id} 또는 {type:LESSON,id,courseId}, 실패 error는 공통 ApiError {code,message}, null 칸 생략·메모/피드백/크레딧/운영 정보 제외; job.service.JobReadService.read(userId,jobId)는 readOnly 트랜잭션에서 주인 확인·대상 제목/강의 코스 ID 조회, 남의 것과 없는 것은 NOT_FOUND; 새 실패 묶음 JOB_TEMPORARY_FAILURE(만들지 못했습니다. 다시 시도하거나 버려 주세요)·JOB_INPUT_FAILURE(주제를 좁혀 새로 만들어 주세요)는 각각 INPUT_TOO_LARGE 외 세 까닭·INPUT_TOO_LARGE로 선택하고 읽기 HTTP는 200; 여섯 종류×네 상태·실패 까닭 넷, 실제 HTTP 전체 수명/소유권/크레딧 부족/동시 상한/CSRF/승인/로그 원문 미노출 검증; 공용 테스트 처리기를 IntegrationTestConfiguration.JobIntakeHandlers로 묶고 NoJobHandlersIntegrationTest(test.job-intake-handlers=false)로 처리기 빈 0개인 여섯 종류의 HTTP 거절·DB 보존 검증; 05 §1.2/2/3/5·04 §2.3·TEST_GUIDE에 구현 사실 반영; 지정 AC 부분 691개·전체 build 1423개 통과, 서버 테스트 1253→1423개(+170, 실패·오류·건너뜀 0).",
+      "completed_at": "2026-11-15T17:38:58+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/common/api/ErrorCode.java:29-32 — `JOB_TEMPORARY_FAILURE` · `JOB_INPUT_FAILURE` 는 예외로 던지지 않고 작업 읽기의 `data.error` 에만 싣는데 `HttpStatus.CONFLICT` 가 붙어 있다. 누가 이 code 를 던지면 409 가 나간다는 오해를 줄 수 있다 → Javadoc 에 「던지지 않고 작업 읽기 본문에만 싣는다」를 밝혀 두면 다음 작업자가 헷갈리지 않는다.",
+        "backend/src/test/java/com/mogum/common/api/ApiExceptionHandlerTest.java:275 — `common.api` 테스트가 `com.mogum.job.dto.JobReceiveRequest` 에 기대고 있다. 그래서 job DTO 의 칸 순서가 바뀌면 common 테스트가 깨진다 → `field.*` 템플릿을 쓰는 테스트 전용 제약을 common 테스트 안에 두면 의존이 없어진다.",
+        "backend/src/main/java/com/mogum/job/service/JobReadService.java:55-60 — 대상(코스 · 로드맵 · 강의)이 없으면 작업이 있어도 읽기가 `NOT_FOUND` 다. 지우기가 작업을 함께 지우면(ADR-140) 생기지 않는 경우라 지금은 괜찮다. 다만 지우기 TASK 에서 이 순서를 테스트로 묶어 두면 기다리는 화면이 404 로 빠지는 경우를 막을 수 있다.",
+        "docs/TEST_GUIDE.md:6-10 — 통합 컨텍스트가 셋으로 늘었다(`test.job-intake-handlers=false` 묶음). 문서에는 적었다. 앞으로 처리기 없는 시험이 늘면 이 묶음에 모아 컨텍스트가 더 늘지 않게 한다."
+      ]
+    },
+    {
+      "step": 4,
+      "name": "worker-run",
+      "status": "completed",
+      "started_at": "2026-11-15T17:38:58+0900",
+      "summary": "generation.JobGenerator: JobType type(), GenerationOutcome generate(JobSnapshot), ResultRef save(JobSnapshot, GeneratedResult); JobSnapshot와 Input은 ID·종류·입력·피드백·claimCount의 record, ResultRef(long id)는 새 결과/원래 대상 ID; GenerationOutcome.Success와 Failure(PROVIDER_UNAVAILABLE·INVALID_OUTPUT·PROVIDER_REJECTED·INPUT_TOO_LARGE), 앞 둘만 자동 다시 시도; worker.JobRunner의 boolean runOnce()는 외부 ScheduledExecutorService로 시한을 갱신하고 TransactionTemplate·EntityManager로 한 바퀴 처리, 운영 빈 조립과 실행 스레드는 step 5; PostgreSQL CTE의 ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1 → UPDATE RETURNING으로 QUEUED/시한 지난 RUNNING 하나를 원자적으로 꺼내 claim_count+1, 갱신·저장·실패 모두 같은 claim_count/RUNNING 조건과 updated_at, 저장 첫 쓰기로 소유권 확인 뒤 save·flush·성공을 함께 커밋, 실패와 restoreIfOwed도 원자적, 저장 예외는 롤백 후 RUNNING 유지; app.worker.lease-duration=5m·renewal-interval=30s·max-retries=2(추가 호출 수)·retry-delay=1s 임시 값을 WorkerProperties로 읽음; 공용 IntegrationTestConfiguration.JobGenerators의 중첩 static TestJobGenerator 여섯 빈, 종류별 plan(jobId).fail(Failure,N)/holdFirst()/awaitEntered()/release()/failSave(marker 또는 null)로 갈래·대기·저장 예외 설정, calls/saves/snapshots/outsideTransaction/mdc로 관찰하고 reset()으로 초기화(step 5 재사용); 안전한 세 로그 줄·MDC 정리와 실제 PostgreSQL 동시 꺼내기/잠긴 선두 건너뛰기/순서/시한 갱신·되찾기/늦은 성공·실패/삭제/재시도/결과·크레딧 롤백 검증, 04 §2.3·9.1·10과 07 §2·5·package-info 반영; 지정 AC 부분 531개·전체 build 1454개 통과, 서버 테스트 1423→1454개(+31, 실패·오류·건너뜀 0).",
+      "completed_at": "2026-11-15T17:50:10+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/worker/JobRunner.java:155 — 저장 예외를 감쌀 때 cause 를 통째로 버려서, 운영에서 DB 제약 위반 같은 근본 원인 타입이 스택에 남지 않는다. 금지 26 상 메시지를 빼는 것은 맞다 → 필요하면 cause 사슬의 예외 타입 이름 · 스택 위치만 같은 방식으로 이어 붙이는 것을 강의 목록 TASK 에서 검토한다. Hibernate SqlExceptionHelper 의 프레임워크 로그(제약 위반 상세에 입력값이 섞일 수 있다)도 실제 save 구현이 붙을 때 표식 테스트로 확인한다.",
+        "backend/src/main/java/com/mogum/worker/JobRunner.java:59 — 종류에 맞는 처리기가 없으면 예외를 던지고 작업을 RUNNING 으로 둔다. 그러면 시한이 지날 때마다 되찾아져 끝없이 돈다. 지금은 운영에서 어떤 종류도 받지 않아(README 2026-11-15) 문제가 없다 → step 5 가 워커를 띄울 때 이 상황을 어떻게 다룰지(처리기 없는 종류는 받지 않는다는 전제를 유지) 확인한다.",
+        "backend/src/main/java/com/mogum/worker/JobRunner.java:211 — 갱신 스케줄에서 DB 예외를 로그 없이 삼킨다. '0 rows 만 소유권 상실의 증거'라는 의도와 '정한 줄 외 로그 금지'에는 맞다. 다만 DB 가 끊긴 동안 아무 흔적이 없다 → step 5 · 관측 작업에서 메트릭(태그에 ID 없이)으로 볼지 검토한다.",
+        "backend/src/test/java/com/mogum/worker/JobRunnerIntegrationTest.java:496 — `// when & then` 으로 합쳐 썼다. TEST_GUIDE 의 given/when/then 세 칸 형식과 조금 다르다. 동작에는 영향이 없다."
+      ]
+    },
+    {
+      "step": 5,
+      "name": "worker-lifecycle",
+      "status": "completed",
+      "started_at": "2026-11-15T17:50:10+0900",
+      "summary": "config.WorkerConfiguration이 WorkerLifecycle(SmartLifecycle 자동 시작·종료 단계 Integer.MAX_VALUE)을 조립하고 각 워커가 전용 플랫폼 스레드·JobRunner·갱신 스케줄러로 한 건씩 실행; Spring 7.0.9 AbstractApplicationContext.doClose의 lifecycleProcessor.onClose→destroyBeans 및 DefaultLifecycleProcessor의 콜백 대기 소스 확인과 실제 컨텍스트/Hikari 종료 시험으로 DB 풀 파괴 전 반환을 검증; 종료 즉시 새 꺼내기를 막고 공통 시각까지 갱신하며 기다린 뒤 같은 claim_count/RUNNING 조건으로 QUEUED·lease_until NULL·updated_at 반환(반환 TransactionTemplate 제한 5초·크레딧 유지), 늦은 성공·실패 차단; app.worker.count=2·poll-interval=1s·shutdown-wait=100s·lease-duration=5m·renewal-interval=30s·max-retries=2(추가 호출)·retry-delay=1s는 임시 값, 배포는 기존 deploy/deploy.sh로 끄고 켬; 시한 > (R+1)×((C+1)×호출 제한+C×이어 쓰기 간격)+R×다시 시도 간격+DB 처리(현재 300초 > 3×((C+1)×호출 제한+C×이어 쓰기 간격)+2초+DB 처리), 미정 호출/이어 쓰기 값은 강의 목록 TASK에서 대입; WorkerProperties 생성자가 양수 시한·갱신/쉬는 간격·종료 대기, 갱신 간격<시한, count/maxRetries/retryDelay≥0, 종료 대기<120초를 검증해 잘못된 설정의 기동 거부, 실제 Spring 종료 설정>120초도 시험; 공용 IntegrationTestConfiguration.OAuthInitializer에서 app.worker.count=0으로 기본 자동 실행을 끄고 수명 시험은 직접 제어; job released(INFO·jobId/userId)·worker poll failed(ERROR·연속 같은 예외 타입은 첫 스택만)과 원문 미노출 검증; 04 §2.1/2.3/9.1/10·07 §2/4/5에 구현 사실 반영, 지정 AC 부분 114개·전체 build 1483개 통과, 서버 테스트 1454→1483개(+29, 실패·오류·건너뜀 0).",
+      "completed_at": "2026-11-15T18:02:02+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/worker/WorkerLifecycle.java:113 — 종료 스레드에서 `releaseCurrent` 가 실패할 때(DB 끊김, 반환 트랜잭션 5초 초과 등)도 `worker poll failed` 로 찍는다. 표의 정의는 '워커 루프가 한 바퀴 밖에서 받은 예외'라서, 운영자가 종료 중에 난 반환 실패를 루프 실패로 오해할 수 있다. 이름을 그대로 쓸 거라면 04 §9.1 에 '종료 반환 실패도 이 줄'이라고 한 줄 적어 두면 된다.",
+        "docs/04-jobs-and-cost.md §10 — 워커(단계 Integer.MAX_VALUE)는 Tomcat graceful shutdown(DEFAULT_PHASE-1024)보다 먼저, 별도 단계로 멈춘다. 그래서 종료에 걸리는 시간은 '종료 대기 100초 + 반환 5초 + Tomcat 정상 종료'를 더한 것이고, 이 합이 컨테이너의 150초 안에 들어와야 한다. 지금 API 요청은 짧아 문제는 없지만, 단계별 130초와 컨테이너 150초의 관계를 볼 때 이 합을 함께 적어 두면 다음에 값을 바꿀 때 덜 헷갈린다.",
+        "backend/src/main/java/com/mogum/config/WorkerProperties.java:18 — 120초 상한을 상수로 박아 두었다. 실제 `timeout-per-shutdown-phase` 와의 관계는 `WorkerPropertiesTest` 가 테스트로만 지킨다. 지금은 계약대로 잘 묶여 있으니, 나중에 130초를 바꿀 일이 생기면 이 상수도 함께 봐야 한다는 점만 기억해 두면 된다."
+      ]
+    },
+    {
+      "step": 6,
+      "name": "app-shell",
+      "status": "completed",
+      "started_at": "2026-11-15T18:02:02+0900",
+      "summary": "AppLayout(frontend/src/components/AppLayout.tsx)이 RequireAuth의 Me outlet context로 APPROVED만 감싸며 children으로 본문을 받고, title을 넘기면 위 바에 뒤로 가기(navigate(-1))·h1을 표시하고 제목 포커스·문서 제목을 갱신(기본은 모구미+머금 로고); 모바일 56px 위 바·고정 다섯 탭 바·본문 아래 96px 여백, 1024px 이상 256px 사이드바·위 바와 guide §3의 다섯 인라인 SVG·현재 탭 aria-current·44px 터치 영역·공통 포커스 규칙 구현; 탭 주소는 홈 /·코스 /courses·로드맵 /roadmaps·복습 /review·내 정보 /profile이며 모두 PlaceholderPage 제목 한 줄, 기존 AccountPage 승인 전 분기 유지; Mogumi size=logo(40px) 추가, 새 토큰 --breakpoint-lg=64rem, UI_GUIDE §2·4.1·6·7에 반영; 화면 테스트 174→209개(+35)·지정 test/lint 및 추가 build 통과, 너비 분기는 jsdom 클래스·구조(lg 표시/숨김·w-64·h-14·본문 여백)로 확인했고 실제 브라우저 레이아웃은 검증하지 않음.",
+      "completed_at": "2026-11-15T18:08:13+0900",
+      "review_notes": [
+        "docs/UI_GUIDE.md:74 — The `Mogumi` row in §3 still says 「가로 128px · 변형·움직임 없음」, but this step added `size=\"logo\"` (40px), which §7 and `Mogumi.tsx` describe, so §3 and §7 contradict each other → in the §3 row, either say the default is 128px and the variants are in §7, or remove 「변형 없음」.",
+        "frontend/src/pages/PlaceholderPage.tsx:7 — The document title is chosen with `title === '머금' ? '홈' : title`, so the home case depends on the title string being 「머금」. It works now, but changing the home title text would silently change the document title → if the tab screens are kept, consider passing the home case as its own value (for example, a label prop).",
+        "frontend/src/components/AppLayout.tsx:75 — Back is only `navigate(-1)`. If someone opens a screen inside a tab directly from its URL or refreshes it (06 §2.3 says course and roadmap screens have their own addresses), there is no history entry, so back leaves the app or does nothing → step 7 (waiting screen) or the course-screen TASK should decide on a fallback for this case, such as the tab's first screen.",
+        "frontend/src/components/AppLayout.tsx:73 — On desktop the logo appears in both the sidebar and the top bar. The design README lists small differences like this under 「맞추지 않는다」, so it does not block approval, but someone should look at it against the 05-home-desktop draft."
+      ]
+    },
+    {
+      "step": 7,
+      "name": "waiting-screen",
+      "status": "completed",
+      "started_at": "2026-11-15T18:08:14+0900",
+      "summary": "WaitingPage /jobs/:jobId를 승인 뒤 AppLayout 안에 구현, TanStack Query로 QUEUED·RUNNING을 2초마다 읽고 성공·실패·읽기 오류 뒤 중단하며 다시 시도 성공 뒤 재개; 모구미→주제·수준·목적 또는 대상 제목→종류별 상태→떠나도 된다는 안내, 실패 묶음 code별 다시 시도·버리기와 서버 문구 그대로 표시·요청 중 버튼 잠금·버리기 뒤 홈·NOT_FOUND/연결 실패 안내 구현; 성공은 /courses/:courseId·/roadmaps/:roadmapId·/courses/:courseId/lessons/:lessonId로 replace 이동하고 결과는 위 바 제목만 있는 자리, 새 공통 FailureNotice와 apiFetch 기반 useJob/readJob/retryJob/discardJob/useJobAction으로 동작 성공 시 늦은 읽기 취소·해당 캐시 교체/삭제; 05 §2/5·UI_GUIDE §3/4.1/8 반영, 화면 테스트 209→264개(+55), 지정 test/lint와 추가 build·diff 검사 통과, 실제 브라우저 레이아웃은 검증하지 않음.",
+      "completed_at": "2026-11-15T22:38:11+0900",
+      "review_notes": [
+        "frontend/src/api/useJob.ts:59 — After a successful discard, `removeQueries` drops the job from the cache, but the `useJob` observer is still mounted until the redirect home happens. It may send one extra `GET /api/jobs/{id}`, which returns 404 because the job is gone. This doesn't change what the user sees. The test can't catch it because the mocked GET always returns 200 → either set the query to `enabled: false` before removing it, or add a test that counts GET requests after a discard.",
+        "frontend/src/api/useJob.ts:45 — If a single re-read fails during polling (a brief network drop or a 5xx), `retry: false` and the error check stop polling at once, and the screen switches to the 'couldn't load the job' notice. This matches what 05 §2 now says, but a short drop on a mobile connection during a long generation will send people to the error screen often → when the real worker runs, consider whether to tolerate a few failed re-reads before stopping.",
+        "frontend/src/pages/WaitingPage.tsx:22 — When an error response has no JSON body (for example a proxy 502 HTML page), `apiFetch` uses the English fallback 'Request failed', and the screen shows it as-is. AccountPage has the same pattern, so this was not introduced here → consider replacing that fallback with the common connection-failure message in client.ts.",
+        "frontend/src/pages/WaitingPage.tsx:98 — If discard fails with `JOB_DISCARD_NOT_ALLOWED` (for example the job was already retried in another tab and is no longer failed), the server's message appears, but the cached job still says failed, so the old buttons stay on screen → consider re-reading the job when an action fails.",
+        "frontend/src/pages/WaitingPage.tsx:90 — A failed job with an unknown error code offers only 'go home', so the user can never discard it. This is the safe choice, but 05 §1.2 defines only these two failure codes. If a new failure code is added later, this branch needs to change too."
+      ]
+    },
+    {
+      "step": 8,
+      "name": "shell-error-fixes",
+      "status": "completed",
+      "started_at": "2026-11-16T21:03:41+0900",
+      "summary": "AppLayout 탭 첫 화면의 위 바 로고만 lg:hidden으로 1024px부터 숨기고 사이드바·위 바·제목 화면 유지; client.ts의 CONNECTION_ERROR_MESSAGE로 서버 문구 없는 오류·잘못된 성공 본문과 AccountPage·WaitingPage의 기존 연결 안내를 통일하고 code·status·fields·retryAfterSeconds·화면 분기 유지; 회귀 테스트 먼저 실패 확인 후 구현, UI_GUIDE §4·7 반영, 화면 테스트 264→267개 및 지정 test·lint 통과, 로고 너비 분기는 jsdom 클래스·구조로 검증.",
+      "completed_at": "2026-11-16T21:05:59+0900",
+      "review_notes": [
+        "frontend/src/api/client.test.ts:91,167,172,181 · AccountPage.test.tsx:129 — 기대값에 문구를 문자열로 직접 적었다. 상수 값이 바뀌어도 시험이 그 변경을 잡아내므로 동작에는 문제가 없다. 다만 「연결 안내 상수를 쓴다」는 의도를 드러내려면 `CONNECTION_ERROR_MESSAGE` 를 import 해 비교하는 쪽도 고려할 만하다(취향 차이)."
+      ]
+    },
+    {
+      "step": 9,
+      "name": "sonar-await-result",
+      "status": "completed",
+      "summary": "WorkerLifecycle.Slot.poll()이 wakeup.await의 반환값이 true면 즉시 루프를 끝내도록 java:S899 수정; 기존 wakesIdleWorkerOnStop 테스트로 종료 신호 뒤 추가 꺼내기 없음과 즉시 종료를 검증하고 시간 초과·인터럽트 동작 유지; 지정 워커 수명 테스트 12개 및 전체 build 1483개 통과(실패·오류·건너뜀 0), 새 로그·@Transactional 추가 없음.",
+      "started_at": "2026-11-16T21:39:06+0900",
+      "completed_at": "2026-11-16T21:42:44+0900"
+    }
+  ],
+  "created_at": "2026-11-15T12:27:13+0900",
+  "completed_at": "2026-11-16T21:42:44+0900"
+}

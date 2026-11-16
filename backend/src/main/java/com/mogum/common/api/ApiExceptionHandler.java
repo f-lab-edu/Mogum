@@ -24,7 +24,7 @@ import java.util.Map;
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> apiException(ApiException exception) {
-        return ApiErrorResponses.of(exception.errorCode(), exception.retryAfterSeconds());
+        return ApiErrorResponses.of(exception);
     }
 
     @Override
@@ -51,6 +51,13 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         if (annotationType == Size.class && descriptor.getAttributes().get("max") instanceof Integer max
                 && sizeOf(violation.getInvalidValue()) > max) {
             return new FieldViolation(fieldError.getField(), FieldViolation.Reason.TOO_LONG);
+        }
+        // 사용자 입력이나 기본 검증 문구 대신, 서버 제약이 명시한 reason만 허용한다.
+        var template = violation.getMessageTemplate();
+        for (var reason : FieldViolation.Reason.values()) {
+            if (("field." + reason.name()).equals(template)) {
+                return new FieldViolation(fieldError.getField(), reason);
+            }
         }
         return null;
     }
