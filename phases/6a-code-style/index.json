@@ -45,7 +45,14 @@
     {
       "step": 3,
       "name": "layout-main",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-17T05:16:05+0900",
+      "summary": "운영 Java 58개 파일의 문맥 단위 빈 줄·줄 나누기·들여쓰기를 공백만으로 정리하고 리뷰 지적 5곳(조건식·빌더 체인 안 빈 줄 2곳, 중괄호 없는 if 본문 들여쓰기 2곳, SQL 연결 연산자 이어쓰기 1곳)을 수정. ./backend/gradlew -p backend build 통과(97개 클래스·1,494개 테스트, 실패·오류·건너뛰기 0개); HEAD 기준 word diff 변경 표시 없음 및 공백 외 문자 동일 확인. 120자 넘는 줄 없음.",
+      "completed_at": "2026-11-17T05:25:22+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/auth/SecurityConfiguration.java:171-180 — `authorizeHttpRequests` 안에서 `.requestMatchers(...)`와 `.permitAll()` · `.authenticated()` · `.denyAll()`을 줄마다 하나씩 나눴다. 한 줄에 호출 하나라는 규칙을 그대로 따른 결과다. 하지만 이 DSL에서는 매처와 접근 규칙 한 쌍이 뜻 하나라서, 나눠 두면 어느 규칙이 어느 경로에 걸리는지 오히려 읽기 어렵다 → CODE_STYLE §2에 'Spring Security DSL처럼 호출 둘이 뜻 하나를 이루면 한 줄에 둔다' 같은 예외를 둘지 사람이 판단한다(phase `/review` 때).",
+        "backend/src/main/java/com/mogum/auth/SecurityConfiguration.java:115-117 · backend/src/main/java/com/mogum/job/dto/JobReceiveRequestValidator.java:88-89 — 중괄호 없는 `if`가 두세 줄에 걸쳐 남았다. CODE_STYLE §6은 '한 줄에 들어가지 않으면 중괄호를 쓴다'고 하지만, 이 step은 글자를 바꾸면 안 되므로 지금 고치지 않은 것이 맞다 → 글자 변경을 허용하는 다음 step이나 수정 step에서 중괄호 블록으로 바꾼다."
+      ]
     },
     {
       "step": 4,
