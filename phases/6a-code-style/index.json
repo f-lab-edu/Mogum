@@ -1,0 +1,41 @@
+{
+  "project": "Mogum",
+  "phase": "6a-code-style",
+  "steps": [
+    {
+      "step": 0,
+      "name": "main-naming",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "test-naming-a",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "test-naming-b",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "layout-main",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "layout-test-a",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "layout-test-b",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "layout-test-c",
+      "status": "pending"
+    }
+  ]
+}
