@@ -109,6 +109,11 @@
         "frontend/src/pages/WaitingPage.tsx:98 — If discard fails with `JOB_DISCARD_NOT_ALLOWED` (for example the job was already retried in another tab and is no longer failed), the server's message appears, but the cached job still says failed, so the old buttons stay on screen → consider re-reading the job when an action fails.",
         "frontend/src/pages/WaitingPage.tsx:90 — A failed job with an unknown error code offers only 'go home', so the user can never discard it. This is the safe choice, but 05 §1.2 defines only these two failure codes. If a new failure code is added later, this branch needs to change too."
       ]
+    },
+    {
+      "step": 8,
+      "name": "shell-error-fixes",
+      "status": "pending"
     }
   ],
   "created_at": "2026-11-15T12:27:13+0900",
