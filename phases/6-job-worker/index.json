@@ -120,6 +120,11 @@
       "review_notes": [
         "frontend/src/api/client.test.ts:91,167,172,181 · AccountPage.test.tsx:129 — 기대값에 문구를 문자열로 직접 적었다. 상수 값이 바뀌어도 시험이 그 변경을 잡아내므로 동작에는 문제가 없다. 다만 「연결 안내 상수를 쓴다」는 의도를 드러내려면 `CONNECTION_ERROR_MESSAGE` 를 import 해 비교하는 쪽도 고려할 만하다(취향 차이)."
       ]
+    },
+    {
+      "step": 9,
+      "name": "sonar-await-result",
+      "status": "pending"
     }
   ],
   "created_at": "2026-11-15T12:27:13+0900",
