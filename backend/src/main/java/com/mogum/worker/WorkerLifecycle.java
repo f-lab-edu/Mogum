@@ -91,7 +91,9 @@ public final class WorkerLifecycle implements SmartLifecycle {
                 }
                 if (!found && !stopping) {
                     try {
-                        wakeup.await(properties.pollInterval().toNanos(), TimeUnit.NANOSECONDS);
+                        if (wakeup.await(properties.pollInterval().toNanos(), TimeUnit.NANOSECONDS)) {
+                            break;
+                        }
                     } catch (InterruptedException exception) {
                         Thread.currentThread().interrupt();
                         return;
