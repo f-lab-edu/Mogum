@@ -37,11 +37,15 @@ import entityfixture.UnauditedEntity;
 import jakarta.persistence.Entity;
 import jakarta.validation.Valid;
 import namingfixture.NamedDependencies;
+import namingfixture.NamedTestDependencies;
+import namingfixture.ShortAutowiredDependency;
 import namingfixture.ShortDependency;
+import namingfixture.ShortFakeDependency;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.ListCrudRepository;
@@ -63,6 +67,7 @@ import repositoryfixture.BroadUserRepository;
 import java.lang.reflect.AccessibleObject;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
@@ -126,6 +131,89 @@ class ArchitectureTest {
 
         // when
         var result = COMPONENT_DEPENDENCIES_USE_TYPE_NAMES.evaluate(classes);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
+    }
+
+    private static final ArchRule TEST_DEPENDENCIES_USE_TYPE_NAMES = fields().that(
+            new DescribedPredicate<JavaField>("are Autowired fields or have Fake raw types") {
+                @Override
+                public boolean test(JavaField field) {
+                    return field.isAnnotatedWith(Autowired.class) || field.getRawType().getSimpleName().startsWith("Fake");
+                }
+            }).should(new ArchCondition<JavaField>("name test dependencies after their types without the Fake prefix") {
+                @Override
+                public void check(JavaField field, ConditionEvents events) {
+                    var rawType = field.getRawType();
+                    if (rawType.isPrimitive() || rawType.getPackageName().startsWith("java.")) return;
+                    String typeName = rawType.getSimpleName();
+                    if (typeName.startsWith("Fake")) typeName = typeName.substring(4);
+                    String camelCaseName = Character.toLowerCase(typeName.charAt(0)) + typeName.substring(1);
+                    boolean matches = field.getName().equals(camelCaseName) || field.getName().endsWith(typeName);
+                    events.add(new SimpleConditionEvent(field, matches,
+                            field.getFullName() + " must be named " + camelCaseName + " or end with " + typeName));
+                }
+            });
+
+    @Test
+    @DisplayName("테스트 컴포넌트의 final 의존 필드도 타입 이름을 쓴다")
+    void requiresDependencyTypeNamesInTestComponents() {
+        // when
+        var result = COMPONENT_DEPENDENCIES_USE_TYPE_NAMES.evaluate(TEST_CLASSES);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
+    }
+
+    @ParameterizedTest(name = "위반 클래스 {0}")
+    @ValueSource(classes = {ShortAutowiredDependency.class, ShortFakeDependency.class})
+    @DisplayName("테스트 설정과 컨트롤러의 타입 이름을 줄인 final 의존 필드를 거부한다")
+    void rejectsShortTestComponentDependencyNames(Class<?> fixture) {
+        // when & then
+        assertViolation(COMPONENT_DEPENDENCIES_USE_TYPE_NAMES, fixture);
+    }
+
+    @Test
+    @DisplayName("중첩 테스트 설정과 컨트롤러의 타입 이름과 역할 접두를 허용한다")
+    void acceptsTypeNamesInNestedTestComponents() {
+        // given
+        var classes = new ClassFileImporter().importClasses(
+                NamedTestDependencies.NamedConfiguration.class, NamedTestDependencies.NamedController.class);
+
+        // when
+        var result = COMPONENT_DEPENDENCIES_USE_TYPE_NAMES.evaluate(classes);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
+    }
+
+    @Test
+    @DisplayName("테스트의 Autowired와 Fake 필드는 타입 이름에서 Fake 접두를 뗀 이름을 쓴다")
+    void requiresDependencyTypeNamesInTests() {
+        // when
+        var result = TEST_DEPENDENCIES_USE_TYPE_NAMES.evaluate(TEST_CLASSES);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
+    }
+
+    @ParameterizedTest(name = "위반 클래스 {0}")
+    @ValueSource(classes = {ShortAutowiredDependency.class, ShortFakeDependency.class})
+    @DisplayName("타입 이름을 줄인 Autowired 필드와 Fake 필드를 거부한다")
+    void rejectsShortTestDependencyNames(Class<?> fixture) {
+        // when & then
+        assertViolation(TEST_DEPENDENCIES_USE_TYPE_NAMES, fixture);
+    }
+
+    @Test
+    @DisplayName("테스트 의존 필드의 타입 이름과 역할 접두를 허용하고 java 타입과 원시형은 제외한다")
+    void acceptsTestTypeNamesAndIgnoresExcludedFields() {
+        // given
+        var classes = new ClassFileImporter().importClasses(NamedTestDependencies.class);
+
+        // when
+        var result = TEST_DEPENDENCIES_USE_TYPE_NAMES.evaluate(classes);
 
         // then
         assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
@@ -223,6 +311,9 @@ class ArchitectureTest {
         assertThat(classes.contain(MogumApplication.class)).isFalse();
         assertThat(classes.contain(ShortDependency.class)).isFalse();
         assertThat(classes.contain(NamedDependencies.class)).isFalse();
+        assertThat(classes.contain(ShortAutowiredDependency.class)).isFalse();
+        assertThat(classes.contain(ShortFakeDependency.class)).isFalse();
+        assertThat(classes.contain(NamedTestDependencies.class)).isFalse();
         assertThat(classes.stream()).noneMatch(type -> type.getPackageName().startsWith("com.mogum.archfixture"));
     }
 

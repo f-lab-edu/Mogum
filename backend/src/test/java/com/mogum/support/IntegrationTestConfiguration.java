@@ -1,13 +1,26 @@
 package com.mogum.support;
 
-import com.mogum.common.api.ApiResponse;
+import com.mogum.auth.SecurityConfiguration;
 import com.mogum.common.api.ApiException;
+import com.mogum.common.api.ApiResponse;
 import com.mogum.common.api.ErrorCode;
 import com.mogum.common.logging.RequestLogFilter;
+import com.mogum.config.WebProperties;
+import com.mogum.course.domain.Course;
+import com.mogum.course.domain.LearningInput;
+import com.mogum.course.domain.Lesson;
+import com.mogum.course.domain.Material;
+import com.mogum.course.domain.Roadmap;
+import com.mogum.generation.GeneratedResult;
+import com.mogum.generation.GenerationOutcome;
+import com.mogum.generation.JobGenerator;
+import com.mogum.generation.JobSnapshot;
+import com.mogum.generation.ResultRef;
 import com.mogum.job.JobIntakeHandler;
 import com.mogum.job.JobRequest;
 import com.mogum.job.domain.JobType;
 import com.sun.net.httpserver.HttpServer;
+import jakarta.persistence.EntityManager;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.Filter;
 import jakarta.servlet.ServletException;
@@ -18,11 +31,13 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import javax.sql.DataSource;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.config.BeanPostProcessor;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.boot.web.servlet.AbstractFilterRegistrationBean;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -33,23 +48,34 @@ import org.springframework.context.annotation.Import;
 import org.springframework.core.Ordered;
 import org.springframework.jdbc.datasource.DelegatingDataSource;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
+import org.springframework.session.web.http.CookieSerializer;
+import org.springframework.session.web.http.DefaultCookieSerializer;
 import org.springframework.test.web.servlet.client.RestTestClient;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
+import tools.jackson.databind.ObjectMapper;
 
-import javax.sql.DataSource;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -86,10 +112,10 @@ public class IntegrationTestConfiguration {
     /** 만드는 작업 시험만 쓰는 확인 처리기. 원문을 로그나 예외에 넣지 않는다. */
     public static final class TestJobIntakeHandler implements JobIntakeHandler {
         public static final String REJECT_TOPIC = "test-intake-rejected";
-        private final JobType type;
-        public TestJobIntakeHandler(JobType type) { this.type = type; }
+        private final JobType jobType;
+        public TestJobIntakeHandler(JobType jobType) { this.jobType = jobType; }
         @Override
-        public JobType type() { return type; }
+        public JobType type() { return jobType; }
         @Override
         public void check(long userId, JobRequest request) {
             if (request.input() != null && REJECT_TOPIC.equals(request.input().getTopic())) {
@@ -100,99 +126,99 @@ public class IntegrationTestConfiguration {
 
     @TestConfiguration(proxyBeanMethods = false)
     public static class JobGenerators {
-        @Bean public TestJobGenerator newCourseGenerator(jakarta.persistence.EntityManager em, TestClock clock) {
+        @Bean public TestJobGenerator newCourseGenerator(EntityManager em, TestClock clock) {
             return new TestJobGenerator(JobType.NEW_COURSE, em, clock);
         }
-        @Bean public TestJobGenerator newRoadmapGenerator(jakarta.persistence.EntityManager em, TestClock clock) {
+        @Bean public TestJobGenerator newRoadmapGenerator(EntityManager em, TestClock clock) {
             return new TestJobGenerator(JobType.NEW_ROADMAP, em, clock);
         }
-        @Bean public TestJobGenerator planRoadmapCourseGenerator(jakarta.persistence.EntityManager em, TestClock clock) {
+        @Bean public TestJobGenerator planRoadmapCourseGenerator(EntityManager em, TestClock clock) {
             return new TestJobGenerator(JobType.PLAN_ROADMAP_COURSE, em, clock);
         }
-        @Bean public TestJobGenerator replanCourseGenerator(jakarta.persistence.EntityManager em, TestClock clock) {
+        @Bean public TestJobGenerator replanCourseGenerator(EntityManager em, TestClock clock) {
             return new TestJobGenerator(JobType.REPLAN_COURSE, em, clock);
         }
-        @Bean public TestJobGenerator replanRoadmapGenerator(jakarta.persistence.EntityManager em, TestClock clock) {
+        @Bean public TestJobGenerator replanRoadmapGenerator(EntityManager em, TestClock clock) {
             return new TestJobGenerator(JobType.REPLAN_ROADMAP, em, clock);
         }
-        @Bean public TestJobGenerator materialGenerator(jakarta.persistence.EntityManager em, TestClock clock) {
+        @Bean public TestJobGenerator materialGenerator(EntityManager em, TestClock clock) {
             return new TestJobGenerator(JobType.MATERIAL, em, clock);
         }
     }
 
     /** 작업 ID별 계획. 첫 호출만 붙잡으므로 되찾은 새 호출은 옛 호출과 따로 끝낼 수 있다. */
-    public static final class TestJobGenerator implements com.mogum.generation.JobGenerator {
-        private final JobType type;
-        private final jakarta.persistence.EntityManager em;
-        private final TestClock clock;
-        private final java.util.concurrent.ConcurrentMap<Long, Plan> plans = new java.util.concurrent.ConcurrentHashMap<>();
+    public static final class TestJobGenerator implements JobGenerator {
+        private final JobType jobType;
+        private final EntityManager entityManager;
+        private final TestClock testClock;
+        private final ConcurrentMap<Long, Plan> plans = new ConcurrentHashMap<>();
 
-        public TestJobGenerator(JobType type, jakarta.persistence.EntityManager em, TestClock clock) {
-            this.type = type;
-            this.em = em;
-            this.clock = clock;
+        public TestJobGenerator(JobType jobType, EntityManager entityManager, TestClock testClock) {
+            this.jobType = jobType;
+            this.entityManager = entityManager;
+            this.testClock = testClock;
         }
-        @Override public JobType type() { return type; }
+        @Override public JobType type() { return jobType; }
         public Plan plan(long id) { return plans.computeIfAbsent(id, ignored -> new Plan()); }
         public void reset() { plans.clear(); }
 
         @Override
-        public com.mogum.generation.GenerationOutcome generate(com.mogum.generation.JobSnapshot job) {
+        public GenerationOutcome generate(JobSnapshot job) {
             var plan = plan(job.id());
             int call = plan.calls.incrementAndGet();
             plan.snapshots.add(job);
-            plan.outsideTransaction &= !org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
-                    && !org.springframework.transaction.support.TransactionSynchronizationManager.hasResource(em.getEntityManagerFactory());
+            plan.outsideTransaction &= !TransactionSynchronizationManager.isActualTransactionActive()
+                    && !TransactionSynchronizationManager.hasResource(entityManager.getEntityManagerFactory());
             plan.mdc = "jobId=" + MDC.get(RequestLogFilter.JOB_ID) + ",userId=" + MDC.get(RequestLogFilter.USER_ID);
             if (call == 1 && plan.holding) {
                 plan.entered.countDown();
                 try {
-                    if (!plan.released.await(15, java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException("Stub not released");
+                    if (!plan.released.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("Stub not released");
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
                     throw new IllegalStateException("Stub interrupted");
                 }
             }
             return call <= plan.failures ? plan.failure
-                    : new com.mogum.generation.GenerationOutcome.Success(new TestResult("LEAKCHECK-result"));
+                    : new GenerationOutcome.Success(new TestResult("LEAKCHECK-result"));
         }
 
         @Override
-        public com.mogum.generation.ResultRef save(com.mogum.generation.JobSnapshot job, com.mogum.generation.GeneratedResult result) {
-            if (!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+        public ResultRef save(JobSnapshot job, GeneratedResult result) {
+            if (!TransactionSynchronizationManager.isActualTransactionActive()) {
                 throw new IllegalStateException("Stub save requires transaction");
             }
             var plan = plan(job.id());
             plan.saves.incrementAndGet();
             String text = ((TestResult) result).text();
-            long id = switch (type) {
+            long id = switch (jobType) {
                 case NEW_COURSE -> {
-                    var course = com.mogum.course.domain.Course.single(job.userId(), input(job.input()), text);
-                    em.persist(course);
+                    var course = Course.single(job.userId(), input(job.input()), text);
+                    entityManager.persist(course);
                     yield course.getId();
                 }
                 case NEW_ROADMAP -> {
-                    var roadmap = com.mogum.course.domain.Roadmap.plan(job.userId(), input(job.input()), text, text);
-                    em.persist(roadmap);
+                    var roadmap = Roadmap.plan(job.userId(), input(job.input()), text, text);
+                    entityManager.persist(roadmap);
                     yield roadmap.getId();
                 }
                 case MATERIAL -> {
-                    var lesson = em.find(com.mogum.course.domain.Lesson.class, job.targetId());
-                    em.persist(com.mogum.course.domain.Material.write(lesson, text));
+                    var lesson = entityManager.find(Lesson.class, job.targetId());
+                    entityManager.persist(Material.write(lesson, text));
                     yield lesson.getId();
                 }
                 case PLAN_ROADMAP_COURSE -> {
-                    var course = em.find(com.mogum.course.domain.Course.class, job.targetId());
-                    em.persist(com.mogum.course.domain.Lesson.listed(course, 1, text, text, java.util.List.of()));
-                    em.flush();
-                    em.createNativeQuery("UPDATE courses SET status = 'REVIEWING', updated_at = :now WHERE id = :id")
-                            .setParameter("now", clock.instant()).setParameter("id", course.getId()).executeUpdate();
+                    var course = entityManager.find(Course.class, job.targetId());
+                    entityManager.persist(Lesson.listed(course, 1, text, text, List.of()));
+                    entityManager.flush();
+                    entityManager.createNativeQuery("UPDATE courses SET status = 'REVIEWING', updated_at = :now WHERE id = :id")
+                            .setParameter("now", testClock.instant()).setParameter("id", course.getId()).executeUpdate();
                     yield course.getId();
                 }
                 case REPLAN_COURSE, REPLAN_ROADMAP -> {
-                    String table = type == JobType.REPLAN_COURSE ? "courses" : "roadmaps";
-                    em.createNativeQuery("UPDATE " + table + " SET title = :title, updated_at = :now WHERE id = :id")
-                            .setParameter("title", text).setParameter("now", clock.instant()).setParameter("id", job.targetId()).executeUpdate();
+                    String table = jobType == JobType.REPLAN_COURSE ? "courses" : "roadmaps";
+                    entityManager.createNativeQuery("UPDATE " + table + " SET title = :title, updated_at = :now WHERE id = :id")
+                            .setParameter("title", text).setParameter("now", testClock.instant()).setParameter("id", job.targetId()).executeUpdate();
                     yield job.targetId();
                 }
             };
@@ -201,28 +227,28 @@ public class IntegrationTestConfiguration {
                 exception.addSuppressed(new IllegalArgumentException(plan.saveFailure));
                 throw exception;
             }
-            return new com.mogum.generation.ResultRef(id);
+            return new ResultRef(id);
         }
 
-        private static com.mogum.course.domain.LearningInput input(com.mogum.generation.JobSnapshot.Input input) {
-            return new com.mogum.course.domain.LearningInput(input.topic(), input.level(), input.levelOther(),
+        private static LearningInput input(JobSnapshot.Input input) {
+            return new LearningInput(input.topic(), input.level(), input.levelOther(),
                     input.purpose(), input.purposeOther(), input.memo());
         }
-        public record TestResult(String text) implements com.mogum.generation.GeneratedResult { }
+        public record TestResult(String text) implements GeneratedResult { }
 
         public static final class Plan {
             private final AtomicInteger calls = new AtomicInteger();
             private final AtomicInteger saves = new AtomicInteger();
-            private final java.util.List<com.mogum.generation.JobSnapshot> snapshots = new java.util.concurrent.CopyOnWriteArrayList<>();
-            private final java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(1);
-            private final java.util.concurrent.CountDownLatch released = new java.util.concurrent.CountDownLatch(1);
-            private volatile com.mogum.generation.GenerationOutcome.Failure failure;
+            private final List<JobSnapshot> snapshots = new CopyOnWriteArrayList<>();
+            private final CountDownLatch entered = new CountDownLatch(1);
+            private final CountDownLatch released = new CountDownLatch(1);
+            private volatile GenerationOutcome.Failure failure;
             private volatile int failures;
             private volatile boolean holding;
             private volatile String saveFailure;
             private volatile boolean outsideTransaction = true;
             private volatile String mdc;
-            public Plan fail(com.mogum.generation.GenerationOutcome.Failure failure, int count) {
+            public Plan fail(GenerationOutcome.Failure failure, int count) {
                 this.failure = failure;
                 this.failures = count;
                 return this;
@@ -230,12 +256,12 @@ public class IntegrationTestConfiguration {
             public Plan holdFirst() { holding = true; return this; }
             public Plan failSave(String message) { saveFailure = message; return this; }
             public void awaitEntered() throws InterruptedException {
-                if (!entered.await(5, java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException("Stub not entered");
+                if (!entered.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("Stub not entered");
             }
             public void release() { released.countDown(); }
             public int calls() { return calls.get(); }
             public int saves() { return saves.get(); }
-            public java.util.List<com.mogum.generation.JobSnapshot> snapshots() { return java.util.List.copyOf(snapshots); }
+            public List<JobSnapshot> snapshots() { return List.copyOf(snapshots); }
             public boolean outsideTransaction() { return outsideTransaction; }
             public String mdc() { return mdc; }
         }
@@ -245,12 +271,12 @@ public class IntegrationTestConfiguration {
     public static final class CookieUnitSupport {
         /** 세션 직렬화기 구성만 보는 단위 테스트용이며 공용 앱에는 가져오지 않는다. */
         @TestConfiguration(proxyBeanMethods = false)
-        @org.springframework.boot.context.properties.EnableConfigurationProperties(com.mogum.config.WebProperties.class)
+        @EnableConfigurationProperties(WebProperties.class)
         public static class SessionCookieConfiguration {
             @Bean
-            public org.springframework.session.web.http.CookieSerializer cookieSerializer() {
-                var serializer = new org.springframework.session.web.http.DefaultCookieSerializer();
-                new com.mogum.auth.SecurityConfiguration().sessionCookieSecurity().customize(serializer);
+            public CookieSerializer cookieSerializer() {
+                var serializer = new DefaultCookieSerializer();
+                new SecurityConfiguration().sessionCookieSecurity().customize(serializer);
                 return serializer;
             }
         }
@@ -331,7 +357,7 @@ public class IntegrationTestConfiguration {
                     String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                     var form = UriComponentsBuilder.fromUriString("http://localhost/?" + body).build().getQueryParams();
                     String verifier = form.getFirst("code_verifier");
-                    if (verifier != null) verifier = java.net.URLDecoder.decode(verifier, StandardCharsets.UTF_8);
+                    if (verifier != null) verifier = URLDecoder.decode(verifier, StandardCharsets.UTF_8);
                     boolean bad = tokenFailure || "bad-token".equals(form.getFirst("code")) || verifier == null
                             || CODE_CHALLENGE.get() == null || !CODE_CHALLENGE.get().equals(challenge(verifier));
                     String response = bad ? "{\"error\":\"invalid_grant\",\"error_description\":\"" + form.getFirst("code") + "\"}" : "{\"access_token\":\"fake-access-token\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"id_token\":\"fake-id-token\"}";
@@ -342,13 +368,13 @@ public class IntegrationTestConfiguration {
                     exchange.close();
                 });
                 server.createContext("/userinfo", exchange -> {
-                    var identity = new java.util.LinkedHashMap<String, Object>();
+                    var identity = new LinkedHashMap<String, Object>();
                     identity.put("sub", sub);
                     identity.put("email", email);
                     identity.put("email_verified", verified);
                     if (name != null) identity.put("name", name);
                     String response = userInfoFailure ? "{\"error\":\"invalid_token\",\"error_description\":\"" + sub + "\"}"
-                            : new tools.jackson.databind.ObjectMapper().writeValueAsString(identity);
+                            : new ObjectMapper().writeValueAsString(identity);
                     byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
                     exchange.getResponseHeaders().set("Content-Type", "application/json");
                     exchange.sendResponseHeaders(userInfoFailure ? 400 : 200, bytes.length);

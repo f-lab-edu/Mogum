@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -33,7 +34,7 @@ class AwsFilesTest {
         // when
         try (var files = Files.list(AWS)) {
             // then
-            assertThat(files.map(path -> path.getFileName().toString()).collect(java.util.stream.Collectors.toSet()))
+            assertThat(files.map(path -> path.getFileName().toString()).collect(Collectors.toSet()))
                     .isEqualTo(FILES);
         }
     }

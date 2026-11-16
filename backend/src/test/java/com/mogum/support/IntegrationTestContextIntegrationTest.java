@@ -15,8 +15,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @IntegrationTest
 class IntegrationTestContextIntegrationTest {
-    @Autowired private ApplicationContext context;
-    @Autowired private TestClock clock;
+    @Autowired private ApplicationContext applicationContext;
+    @Autowired private TestClock testClock;
     @Autowired private SeoulClock seoulClock;
 
     @Test
@@ -27,22 +27,22 @@ class IntegrationTestContextIntegrationTest {
                 .getTestContext().getApplicationContext();
 
         // then
-        assertThat(other).isSameAs(context);
+        assertThat(other).isSameAs(applicationContext);
     }
 
     @Test
     @DisplayName("운영 시계 빈을 덮어쓰지 않고 공용 테스트 시계가 서울 날짜에도 적용된다")
     void suppliesPrimaryClockToSeoulClock() {
         // given
-        clock.set(Instant.parse("2026-11-09T16:00:00Z"));
+        testClock.set(Instant.parse("2026-11-09T16:00:00Z"));
 
         // when
         var today = seoulClock.today();
 
         // then
         assertThat(today).isEqualTo(LocalDate.of(2026, 11, 10));
-        assertThat(context.getBean(Clock.class)).isSameAs(clock);
-        assertThat(context.getBean("testClock")).isSameAs(clock);
-        assertThat(context.getBean("clock")).isNotSameAs(clock);
+        assertThat(applicationContext.getBean(Clock.class)).isSameAs(testClock);
+        assertThat(applicationContext.getBean("testClock")).isSameAs(testClock);
+        assertThat(applicationContext.getBean("clock")).isNotSameAs(testClock);
     }
 }

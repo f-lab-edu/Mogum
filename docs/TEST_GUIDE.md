@@ -90,5 +90,6 @@ void returnsExistingUserIdOnRelogin() {
 - `ReflectionTestUtils` · `setAccessible` 은 픽스처(`*Fixtures`) · Fake(`Fake*`) 안에서만 쓴다.
 - 테스트 클래스 이름이 `IT` 로 끝나지 않는다.
 - 제품 코드의 레포지토리는 `JpaRepository` · `CrudRepository` 계열을 상속하지 않는다.
+- 테스트의 `@Autowired` · Fake 필드와 테스트 컴포넌트의 final 필드는 타입 이름을 쓴다([CODE_STYLE §3](./CODE_STYLE.md#3-이름--의존-필드는-타입-이름-그대로)).
 
-규칙마다 위반 픽스처(`archfixture` · `repositoryfixture`)로 실제로 걸리는지 `ArchitectureTest` 가 확인한다.
+규칙마다 위반 픽스처(`archfixture` · `repositoryfixture` · `namingfixture`)로 실제로 걸리는지 `ArchitectureTest` 가 확인한다.

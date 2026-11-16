@@ -1,7 +1,10 @@
 package com.mogum.job.repository;
 
-import com.mogum.job.domain.*;
+import com.mogum.job.domain.GenerationJob;
+import com.mogum.job.domain.JobStatus;
+import com.mogum.job.domain.JobType;
 import org.springframework.test.util.ReflectionTestUtils;
+
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;

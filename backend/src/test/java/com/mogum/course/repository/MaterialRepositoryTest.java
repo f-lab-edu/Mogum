@@ -2,7 +2,9 @@ package com.mogum.course.repository;
 
 import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.UserRepository;
-import com.mogum.course.domain.*;
+import com.mogum.course.domain.CourseFixtures;
+import com.mogum.course.domain.LessonFixtures;
+import com.mogum.course.domain.MaterialFixtures;
 import com.mogum.support.RepositoryTest;
 import org.hibernate.Hibernate;
 import org.junit.jupiter.api.DisplayName;
@@ -13,22 +15,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @RepositoryTest
 class MaterialRepositoryTest {
-    @Autowired private UserRepository users;
-    @Autowired private CourseRepository courses;
-    @Autowired private LessonRepository lessons;
-    @Autowired private MaterialRepository materials;
+    @Autowired private UserRepository userRepository;
+    @Autowired private CourseRepository courseRepository;
+    @Autowired private LessonRepository lessonRepository;
+    @Autowired private MaterialRepository materialRepository;
 
     @Test
     @DisplayName("강의 자료는 강의 연결과 한국어 마크다운 본문을 저장한다")
     void reloadsMaterialWithLessonAndMarkdown() {
         // given
-        var user = users.save(UserFixtures.user("me@example.com"));
-        var course = courses.save(CourseFixtures.single(user.getId()));
-        var lesson = lessons.save(LessonFixtures.lesson(course, 1));
-        var saved = materials.save(MaterialFixtures.material(lesson, "# 변수\n값을 담는 이름이에요."));
+        var user = userRepository.save(UserFixtures.user("me@example.com"));
+        var course = courseRepository.save(CourseFixtures.single(user.getId()));
+        var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
+        var saved = materialRepository.save(MaterialFixtures.material(lesson, "# 변수\n값을 담는 이름이에요."));
 
         // when
-        var actual = materials.findById(saved.getId()).orElseThrow();
+        var actual = materialRepository.findById(saved.getId()).orElseThrow();
 
         // then
         assertThat(actual).isNotSameAs(saved);

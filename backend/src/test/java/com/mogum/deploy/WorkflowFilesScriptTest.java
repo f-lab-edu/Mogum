@@ -9,6 +9,7 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -225,7 +226,7 @@ class WorkflowFilesScriptTest {
     }
 
     private static Map<String, String> baseEnvironment() {
-        return new java.util.HashMap<>(Map.ofEntries(
+        return new HashMap<>(Map.ofEntries(
                 Map.entry("AWS_REGION", "ap-northeast-2"), Map.entry("AWS_DEPLOY_ROLE_ARN", "arn:aws:iam::000000000000:role/mogum-deploy"),
                 Map.entry("DEPLOY_BUCKET", "test-bucket"), Map.entry("DEPLOY_INSTANCE_ID", "i-00000000000000000"),
                 Map.entry("API_ORIGIN", "https://api.example.invalid"), Map.entry("COMMIT_SHA", SHA),

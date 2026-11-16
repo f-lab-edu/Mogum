@@ -2,7 +2,12 @@ package com.mogum.card.repository;
 
 import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.UserRepository;
-import com.mogum.card.domain.*;
+import com.mogum.card.domain.Card;
+import com.mogum.card.domain.CardFixtures;
+import com.mogum.card.domain.CardStatus;
+import com.mogum.card.domain.FsrsState;
+import com.mogum.card.domain.Rating;
+import com.mogum.card.domain.ReviewFixtures;
 import com.mogum.course.domain.CourseFixtures;
 import com.mogum.course.domain.LessonFixtures;
 import com.mogum.course.repository.CourseRepository;
@@ -24,12 +29,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @RepositoryTest
 class ReviewRepositoryTest {
-    @Autowired private UserRepository users;
-    @Autowired private CourseRepository courses;
-    @Autowired private LessonRepository lessons;
-    @Autowired private CardRepository cards;
-    @Autowired private ReviewRepository reviews;
-    @Autowired private TestClock clock;
+    @Autowired private UserRepository userRepository;
+    @Autowired private CourseRepository courseRepository;
+    @Autowired private LessonRepository lessonRepository;
+    @Autowired private CardRepository cardRepository;
+    @Autowired private ReviewRepository reviewRepository;
+    @Autowired private TestClock testClock;
 
     @ParameterizedTest(name = "평가 {0}")
     @EnumSource(Rating.class)
@@ -38,11 +43,11 @@ class ReviewRepositoryTest {
         // given
         var card = savedCard();
         var reviewedAt = Instant.parse("2026-11-10T03:04:05Z");
-        clock.set(reviewedAt);
-        var saved = reviews.save(ReviewFixtures.review(card, rating));
+        testClock.set(reviewedAt);
+        var saved = reviewRepository.save(ReviewFixtures.review(card, rating));
 
         // when
-        var actual = reviews.findById(saved.getId()).orElseThrow();
+        var actual = reviewRepository.findById(saved.getId()).orElseThrow();
 
         // then
         assertThat(actual).isNotSameAs(saved);
@@ -51,7 +56,7 @@ class ReviewRepositoryTest {
         assertThat(actual.getRating()).isEqualTo(rating);
         assertThat(actual.getCreatedAt()).isEqualTo(reviewedAt);
         assertThat(actual.getUpdatedAt()).isEqualTo(reviewedAt);
-        var unchanged = cards.findById(card.getId()).orElseThrow();
+        var unchanged = cardRepository.findById(card.getId()).orElseThrow();
         assertThat(unchanged.getFsrsState()).isEqualTo(FsrsState.LEARNING);
         assertThat(unchanged.getFsrsStep()).isZero();
         assertThat(unchanged.getStatus()).isEqualTo(CardStatus.ACTIVE);
@@ -67,8 +72,8 @@ class ReviewRepositoryTest {
     void rejectsLazyCardAccessOutsideTransaction() {
         // given
         var card = savedCard();
-        var saved = reviews.save(ReviewFixtures.review(card, Rating.GOOD));
-        var reloaded = reviews.findById(saved.getId()).orElseThrow();
+        var saved = reviewRepository.save(ReviewFixtures.review(card, Rating.GOOD));
+        var reloaded = reviewRepository.findById(saved.getId()).orElseThrow();
         assertThat(Hibernate.isInitialized(reloaded.getCard())).isFalse();
 
         // when & then
@@ -76,9 +81,9 @@ class ReviewRepositoryTest {
     }
 
     private Card savedCard() {
-        var user = users.save(UserFixtures.user("me@example.com"));
-        var course = courses.save(CourseFixtures.single(user.getId()));
-        var lesson = lessons.save(LessonFixtures.lesson(course, 1));
-        return cards.save(CardFixtures.card(user.getId(), lesson.getId(), 2, "질문", "답"));
+        var user = userRepository.save(UserFixtures.user("me@example.com"));
+        var course = courseRepository.save(CourseFixtures.single(user.getId()));
+        var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
+        return cardRepository.save(CardFixtures.card(user.getId(), lesson.getId(), 2, "질문", "답"));
     }
 }

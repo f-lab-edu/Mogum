@@ -16,6 +16,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
+import org.testcontainers.containers.Container;
 import org.testcontainers.images.builder.Transferable;
 
 import java.nio.charset.StandardCharsets;
@@ -30,10 +31,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @IntegrationTest
 class OperatorSqlIntegrationTest {
     private static final Path SQL = Path.of("../deploy/sql");
-    @Autowired private UserRepository users;
-    @Autowired private CreditEntryRepository entries;
-    @Autowired private JdbcTemplate jdbc;
-    @Autowired private JdbcIndexedSessionRepository sessionRepository;
+    @Autowired private UserRepository userRepository;
+    @Autowired private CreditEntryRepository creditEntryRepository;
+    @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private JdbcIndexedSessionRepository jdbcIndexedSessionRepository;
 
     @Test
     @DisplayName("신청 목록은 승인된 수와 신청 및 거절된 사람의 ID 이메일 이름 상태 신청 시각을 보인다")
@@ -74,26 +75,26 @@ class OperatorSqlIntegrationTest {
         // given
         var user = saveUser(UserStatus.APPLIED, "me@example.com");
         var other = saveUser(UserStatus.APPLIED, "other@example.com");
-        var otherBefore = jdbc.queryForMap("SELECT * FROM users WHERE id = ?", other.getId());
-        var before = jdbc.queryForMap("SELECT provider, subject, email, name, created_at, credit_balance FROM users WHERE id = ?",
+        var otherBefore = jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", other.getId());
+        var before = jdbcTemplate.queryForMap("SELECT provider, subject, email, name, created_at, credit_balance FROM users WHERE id = ?",
                 user.getId());
-        var credits = jdbc.queryForList("SELECT * FROM credit_entries");
+        var credits = jdbcTemplate.queryForList("SELECT * FROM credit_entries");
         var earliest = databaseNow();
 
         // when
         var output = execute("approve-account.sql", user.getId(), null);
 
         // then
-        var approved = users.findById(user.getId()).orElseThrow();
+        var approved = userRepository.findById(user.getId()).orElseThrow();
         assertThat(output).contains("UPDATE 1");
         assertThat(approved.getStatus()).isEqualTo(UserStatus.APPROVED);
         assertThat(approved.getApprovedAt()).isBetween(earliest, databaseNow());
         assertThat(approved.getCreditRefillAt()).isAfter(approved.getApprovedAt());
         assertThat(approved.getUpdatedAt()).isEqualTo(approved.getApprovedAt()).isAfter(user.getUpdatedAt());
-        assertThat(jdbc.queryForMap("SELECT provider, subject, email, name, created_at, credit_balance FROM users WHERE id = ?",
+        assertThat(jdbcTemplate.queryForMap("SELECT provider, subject, email, name, created_at, credit_balance FROM users WHERE id = ?",
                 user.getId())).isEqualTo(before);
-        assertThat(jdbc.queryForList("SELECT * FROM credit_entries")).isEqualTo(credits);
-        assertThat(jdbc.queryForMap("SELECT * FROM users WHERE id = ?", other.getId())).isEqualTo(otherBefore);
+        assertThat(jdbcTemplate.queryForList("SELECT * FROM credit_entries")).isEqualTo(credits);
+        assertThat(jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", other.getId())).isEqualTo(otherBefore);
     }
 
     @ParameterizedTest(name = "승인 시각 {0} → 다음 채움 {1}")
@@ -108,7 +109,7 @@ class OperatorSqlIntegrationTest {
         var output = execute("approve-account.sql", user.getId(), approval);
 
         // then
-        var approved = users.findById(user.getId()).orElseThrow();
+        var approved = userRepository.findById(user.getId()).orElseThrow();
         assertThat(output).contains("UPDATE 1");
         assertThat(approved.getApprovedAt()).isEqualTo(Instant.parse(approval));
         assertThat(approved.getUpdatedAt()).isEqualTo(Instant.parse(approval));
@@ -121,16 +122,16 @@ class OperatorSqlIntegrationTest {
     void preservesAccountsThatCannotBeApproved(UserStatus status) throws Exception {
         // given
         var user = saveUser(status, "me@example.com");
-        var before = jdbc.queryForList("SELECT * FROM users");
-        var credits = jdbc.queryForList("SELECT * FROM credit_entries");
+        var before = jdbcTemplate.queryForList("SELECT * FROM users");
+        var credits = jdbcTemplate.queryForList("SELECT * FROM credit_entries");
 
         // when
         var output = execute("approve-account.sql", user.getId(), null);
 
         // then
         assertThat(output).contains("UPDATE 0");
-        assertThat(jdbc.queryForList("SELECT * FROM users")).isEqualTo(before);
-        assertThat(jdbc.queryForList("SELECT * FROM credit_entries")).isEqualTo(credits);
+        assertThat(jdbcTemplate.queryForList("SELECT * FROM users")).isEqualTo(before);
+        assertThat(jdbcTemplate.queryForList("SELECT * FROM credit_entries")).isEqualTo(credits);
     }
 
     @ParameterizedTest(name = "{0}: {1} → {2}")
@@ -140,24 +141,24 @@ class OperatorSqlIntegrationTest {
         // given
         var user = saveUser(initial, "me@example.com");
         var other = saveUser(initial, "other@example.com");
-        var otherBefore = jdbc.queryForMap("SELECT * FROM users WHERE id = ?", other.getId());
-        var before = jdbc.queryForMap("SELECT provider, subject, email, name, created_at, approved_at, credit_balance, credit_refill_at FROM users WHERE id = ?",
+        var otherBefore = jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", other.getId());
+        var before = jdbcTemplate.queryForMap("SELECT provider, subject, email, name, created_at, approved_at, credit_balance, credit_refill_at FROM users WHERE id = ?",
                 user.getId());
-        var credits = jdbc.queryForList("SELECT * FROM credit_entries");
+        var credits = jdbcTemplate.queryForList("SELECT * FROM credit_entries");
         var earliest = databaseNow();
 
         // when
         var output = execute(file, user.getId(), null);
 
         // then
-        var changed = users.findById(user.getId()).orElseThrow();
+        var changed = userRepository.findById(user.getId()).orElseThrow();
         assertThat(output).contains("UPDATE 1");
         assertThat(changed.getStatus()).isEqualTo(expected);
         assertThat(changed.getUpdatedAt()).isBetween(earliest, databaseNow()).isAfter(user.getUpdatedAt());
-        assertThat(jdbc.queryForMap("SELECT * FROM users WHERE id = ?", other.getId())).isEqualTo(otherBefore);
-        assertThat(jdbc.queryForMap("SELECT provider, subject, email, name, created_at, approved_at, credit_balance, credit_refill_at FROM users WHERE id = ?",
+        assertThat(jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", other.getId())).isEqualTo(otherBefore);
+        assertThat(jdbcTemplate.queryForMap("SELECT provider, subject, email, name, created_at, approved_at, credit_balance, credit_refill_at FROM users WHERE id = ?",
                 user.getId())).isEqualTo(before);
-        assertThat(jdbc.queryForList("SELECT * FROM credit_entries")).isEqualTo(credits);
+        assertThat(jdbcTemplate.queryForList("SELECT * FROM credit_entries")).isEqualTo(credits);
     }
 
     @ParameterizedTest(name = "{0}: 기존 상태 {1}")
@@ -167,14 +168,14 @@ class OperatorSqlIntegrationTest {
     void preservesAccountsOutsideRejectionTransition(String file, UserStatus status) throws Exception {
         // given
         var user = saveUser(status, "me@example.com");
-        var before = jdbc.queryForList("SELECT * FROM users");
+        var before = jdbcTemplate.queryForList("SELECT * FROM users");
 
         // when
         var output = execute(file, user.getId(), null);
 
         // then
         assertThat(output).contains("UPDATE 0");
-        assertThat(jdbc.queryForList("SELECT * FROM users")).isEqualTo(before);
+        assertThat(jdbcTemplate.queryForList("SELECT * FROM users")).isEqualTo(before);
     }
 
     @ParameterizedTest(name = "대상 상태 {0}")
@@ -184,13 +185,13 @@ class OperatorSqlIntegrationTest {
         // given
         var user = saveUser(status, "me@example.com");
         var other = saveUser(UserStatus.APPLIED, "other@example.com");
-        var sessions = new TestSessions(sessionRepository);
+        var sessions = new TestSessions(jdbcIndexedSessionRepository);
         var first = sessions.id(sessions.create(user.getId()));
         var second = sessions.id(sessions.create(user.getId()));
         var remaining = sessions.id(sessions.create(other.getId()));
-        var otherUser = jdbc.queryForMap("SELECT * FROM users WHERE id = ?", other.getId());
-        var otherCredits = jdbc.queryForList("SELECT * FROM credit_entries WHERE user_id = ?", other.getId());
-        var otherSessions = jdbc.queryForList("SELECT * FROM spring_session WHERE principal_name = ?", other.getId().toString());
+        var otherUser = jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", other.getId());
+        var otherCredits = jdbcTemplate.queryForList("SELECT * FROM credit_entries WHERE user_id = ?", other.getId());
+        var otherSessions = jdbcTemplate.queryForList("SELECT * FROM spring_session WHERE principal_name = ?", other.getId().toString());
         var attributesBefore = count("spring_session_attributes");
 
         // when
@@ -198,16 +199,16 @@ class OperatorSqlIntegrationTest {
 
         // then
         assertThat(output).contains("DELETE 1", "DELETE 2", "COMMIT");
-        assertThat(users.findById(user.getId())).isEmpty();
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM credit_entries WHERE user_id = ?", Integer.class,
+        assertThat(userRepository.findById(user.getId())).isEmpty();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries WHERE user_id = ?", Integer.class,
                 user.getId())).isZero();
-        assertThat(sessionRepository.findById(first)).isNull();
-        assertThat(sessionRepository.findById(second)).isNull();
-        assertThat(sessionRepository.findById(remaining)).isNotNull();
+        assertThat(jdbcIndexedSessionRepository.findById(first)).isNull();
+        assertThat(jdbcIndexedSessionRepository.findById(second)).isNull();
+        assertThat(jdbcIndexedSessionRepository.findById(remaining)).isNotNull();
         assertThat(count("spring_session_attributes")).isEqualTo(attributesBefore - 2);
-        assertThat(jdbc.queryForMap("SELECT * FROM users WHERE id = ?", other.getId())).isEqualTo(otherUser);
-        assertThat(jdbc.queryForList("SELECT * FROM credit_entries WHERE user_id = ?", other.getId())).isEqualTo(otherCredits);
-        assertThat(jdbc.queryForList("SELECT * FROM spring_session WHERE principal_name = ?", other.getId().toString()))
+        assertThat(jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", other.getId())).isEqualTo(otherUser);
+        assertThat(jdbcTemplate.queryForList("SELECT * FROM credit_entries WHERE user_id = ?", other.getId())).isEqualTo(otherCredits);
+        assertThat(jdbcTemplate.queryForList("SELECT * FROM spring_session WHERE principal_name = ?", other.getId().toString()))
                 .isEqualTo(otherSessions);
     }
 
@@ -216,11 +217,11 @@ class OperatorSqlIntegrationTest {
     void preservesApprovedAccountOnDeletion() throws Exception {
         // given
         var user = saveUser(UserStatus.APPROVED, "me@example.com");
-        new TestSessions(sessionRepository).create(user.getId());
-        var before = jdbc.queryForList("SELECT * FROM users");
-        var credits = jdbc.queryForList("SELECT * FROM credit_entries");
-        var sessions = jdbc.queryForList("SELECT * FROM spring_session");
-        var attributes = jdbc.queryForList("SELECT * FROM spring_session_attributes");
+        new TestSessions(jdbcIndexedSessionRepository).create(user.getId());
+        var before = jdbcTemplate.queryForList("SELECT * FROM users");
+        var credits = jdbcTemplate.queryForList("SELECT * FROM credit_entries");
+        var sessions = jdbcTemplate.queryForList("SELECT * FROM spring_session");
+        var attributes = jdbcTemplate.queryForList("SELECT * FROM spring_session_attributes");
 
         // when
         var output = execute("delete-account.sql", user.getId(), null);
@@ -228,10 +229,10 @@ class OperatorSqlIntegrationTest {
         // then
         assertThat(output.lines().filter(line -> line.startsWith("DELETE")).toList())
                 .containsExactly("DELETE 0", "DELETE 0", "DELETE 0");
-        assertThat(jdbc.queryForList("SELECT * FROM users")).isEqualTo(before);
-        assertThat(jdbc.queryForList("SELECT * FROM credit_entries")).isEqualTo(credits);
-        assertThat(jdbc.queryForList("SELECT * FROM spring_session")).isEqualTo(sessions);
-        assertThat(jdbc.queryForList("SELECT * FROM spring_session_attributes"))
+        assertThat(jdbcTemplate.queryForList("SELECT * FROM users")).isEqualTo(before);
+        assertThat(jdbcTemplate.queryForList("SELECT * FROM credit_entries")).isEqualTo(credits);
+        assertThat(jdbcTemplate.queryForList("SELECT * FROM spring_session")).isEqualTo(sessions);
+        assertThat(jdbcTemplate.queryForList("SELECT * FROM spring_session_attributes"))
                 .usingRecursiveComparison().isEqualTo(attributes);
     }
 
@@ -240,18 +241,18 @@ class OperatorSqlIntegrationTest {
     void rollsBackEntireDeletionOnFailure() throws Exception {
         // given
         var user = saveUser(UserStatus.APPLIED, "me@example.com");
-        var sessions = new TestSessions(sessionRepository);
+        var sessions = new TestSessions(jdbcIndexedSessionRepository);
         var sessionId = sessions.id(sessions.create(user.getId()));
-        var before = jdbc.queryForList("SELECT * FROM users");
-        var credits = jdbc.queryForList("SELECT * FROM credit_entries");
-        var attributes = jdbc.queryForList("SELECT * FROM spring_session_attributes");
+        var before = jdbcTemplate.queryForList("SELECT * FROM users");
+        var credits = jdbcTemplate.queryForList("SELECT * FROM credit_entries");
+        var attributes = jdbcTemplate.queryForList("SELECT * FROM spring_session_attributes");
         // 마지막 DELETE 실패를 주입한다. 앱 스키마와 컨텍스트는 시험 뒤 원상복구한다.
-        jdbc.execute("""
+        jdbcTemplate.execute("""
                 CREATE FUNCTION fail_operator_delete() RETURNS trigger LANGUAGE plpgsql AS $$
                 BEGIN RAISE EXCEPTION 'operator deletion test failure'; END $$
                 """);
         try {
-            jdbc.execute("""
+            jdbcTemplate.execute("""
                     CREATE TRIGGER fail_operator_delete BEFORE DELETE ON users
                     FOR EACH ROW EXECUTE FUNCTION fail_operator_delete()
                     """);
@@ -263,29 +264,29 @@ class OperatorSqlIntegrationTest {
             assertThat(result.getExitCode()).isNotZero();
             assertThat(result.getStderr()).contains("operator deletion test failure");
             assertThat(result.getStdout()).contains("DELETE 1").doesNotContain("COMMIT");
-            assertThat(jdbc.queryForList("SELECT * FROM users")).isEqualTo(before);
-            assertThat(jdbc.queryForList("SELECT * FROM credit_entries")).isEqualTo(credits);
-            assertThat(sessionRepository.findById(sessionId)).isNotNull();
-            assertThat(jdbc.queryForList("SELECT * FROM spring_session_attributes"))
+            assertThat(jdbcTemplate.queryForList("SELECT * FROM users")).isEqualTo(before);
+            assertThat(jdbcTemplate.queryForList("SELECT * FROM credit_entries")).isEqualTo(credits);
+            assertThat(jdbcIndexedSessionRepository.findById(sessionId)).isNotNull();
+            assertThat(jdbcTemplate.queryForList("SELECT * FROM spring_session_attributes"))
                     .usingRecursiveComparison().isEqualTo(attributes);
         } finally {
-            jdbc.execute("DROP TRIGGER IF EXISTS fail_operator_delete ON users");
-            jdbc.execute("DROP FUNCTION fail_operator_delete()");
+            jdbcTemplate.execute("DROP TRIGGER IF EXISTS fail_operator_delete ON users");
+            jdbcTemplate.execute("DROP FUNCTION fail_operator_delete()");
         }
     }
 
     private User saveUser(UserStatus status, String email) {
-        var user = users.save(UserFixtures.withStatus(UserFixtures.user(email), status));
-        entries.save(CreditEntry.refill(user, user.getCreditBalance()));
+        var user = userRepository.save(UserFixtures.withStatus(UserFixtures.user(email), status));
+        creditEntryRepository.save(CreditEntry.refill(user, user.getCreditBalance()));
         return user;
     }
 
     private Instant databaseNow() {
-        return jdbc.queryForObject("SELECT now()", Timestamp.class).toInstant();
+        return jdbcTemplate.queryForObject("SELECT now()", Timestamp.class).toInstant();
     }
 
     private int count(String table) {
-        return jdbc.queryForObject("SELECT count(*) FROM " + table, Integer.class);
+        return jdbcTemplate.queryForObject("SELECT count(*) FROM " + table, Integer.class);
     }
 
     private String execute(String file, long userId, String fixedNow) throws Exception {
@@ -294,7 +295,7 @@ class OperatorSqlIntegrationTest {
         return result.getStdout();
     }
 
-    private org.testcontainers.containers.Container.ExecResult run(String file, long userId, String fixedNow) throws Exception {
+    private Container.ExecResult run(String file, long userId, String fixedNow) throws Exception {
         var sql = Files.readString(SQL.resolve(file));
         // 사람과 같은 파일과 psql -v 치환을 쓴다. 경계 시험에서만 now()를 고정 시각으로 바꾼다.
         if (fixedNow != null) sql = sql.replace("now()", "TIMESTAMPTZ '" + fixedNow + "'");

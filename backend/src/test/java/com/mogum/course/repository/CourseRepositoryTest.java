@@ -2,7 +2,13 @@ package com.mogum.course.repository;
 
 import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.UserRepository;
-import com.mogum.course.domain.*;
+import com.mogum.course.domain.CourseFixtures;
+import com.mogum.course.domain.CourseStatus;
+import com.mogum.course.domain.LearningInput;
+import com.mogum.course.domain.Level;
+import com.mogum.course.domain.PlannedConcept;
+import com.mogum.course.domain.Purpose;
+import com.mogum.course.domain.RoadmapFixtures;
 import com.mogum.support.RepositoryTest;
 import org.hibernate.Hibernate;
 import org.junit.jupiter.api.DisplayName;
@@ -18,10 +24,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @RepositoryTest
 class CourseRepositoryTest {
-    @Autowired private UserRepository users;
-    @Autowired private RoadmapRepository roadmaps;
-    @Autowired private CourseRepository courses;
-    @Autowired private JdbcTemplate jdbc;
+    @Autowired private UserRepository userRepository;
+    @Autowired private RoadmapRepository roadmapRepository;
+    @Autowired private CourseRepository courseRepository;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     @ParameterizedTest(name = "수준 {0}, 목적 {2}, 메모 {4}")
     @CsvSource({"BEGINNER,,WORK,,자바 예제", "BASICS,,INTERVIEW,,", "FAMILIAR,,GENERAL,,",
@@ -30,12 +36,12 @@ class CourseRepositoryTest {
     void reloadsSingleCourseWithInput(Level level, String levelOther, Purpose purpose,
                                      String purposeOther, String memo) {
         // given
-        var user = users.save(UserFixtures.user("me@example.com"));
+        var user = userRepository.save(UserFixtures.user("me@example.com"));
         var input = new LearningInput("자바", level, levelOther, purpose, purposeOther, memo);
-        var saved = courses.save(CourseFixtures.single(user.getId(), input, "자바 기초"));
+        var saved = courseRepository.save(CourseFixtures.single(user.getId(), input, "자바 기초"));
 
         // when
-        var actual = courses.findById(saved.getId()).orElseThrow();
+        var actual = courseRepository.findById(saved.getId()).orElseThrow();
 
         // then
         assertThat(actual).isNotSameAs(saved);
@@ -57,13 +63,13 @@ class CourseRepositoryTest {
     @DisplayName("로드맵의 코스는 입력 없이 계획의 개념을 한국어와 순서 및 계약의 JSON 키 그대로 저장한다")
     void reloadsRoadmapCourseWithOrderedPlanConcepts() {
         // given
-        var user = users.save(UserFixtures.user("me@example.com"));
-        var roadmap = roadmaps.save(RoadmapFixtures.roadmap(user.getId()));
+        var user = userRepository.save(UserFixtures.user("me@example.com"));
+        var roadmap = roadmapRepository.save(RoadmapFixtures.roadmap(user.getId()));
         var concepts = List.of(new PlannedConcept("변수", "값을 담는 이름"), new PlannedConcept("타입", "값의 종류"));
-        var saved = courses.save(CourseFixtures.inRoadmap(roadmap, 2, "자바 문법", "기본 문법을 익혀요", concepts));
+        var saved = courseRepository.save(CourseFixtures.inRoadmap(roadmap, 2, "자바 문법", "기본 문법을 익혀요", concepts));
 
         // when
-        var actual = courses.findById(saved.getId()).orElseThrow();
+        var actual = courseRepository.findById(saved.getId()).orElseThrow();
 
         // then
         assertThat(actual).isNotSameAs(saved);
@@ -80,7 +86,7 @@ class CourseRepositoryTest {
         assertThat(actual.getStartedAt()).isNull();
         assertThat(actual.getLastLessonOpenedAt()).isNull();
         assertThat(actual.getCompletedAt()).isNull();
-        assertThat(jdbc.queryForObject("""
+        assertThat(jdbcTemplate.queryForObject("""
                 SELECT plan_concepts = '[{"name":"변수","definition":"값을 담는 이름"},
                   {"name":"타입","definition":"값의 종류"}]'::jsonb FROM courses WHERE id = ?
                 """, Boolean.class, actual.getId())).isTrue();

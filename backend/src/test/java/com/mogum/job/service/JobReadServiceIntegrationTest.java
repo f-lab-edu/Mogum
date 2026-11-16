@@ -4,12 +4,23 @@ import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.common.api.ApiException;
 import com.mogum.common.api.ErrorCode;
-import com.mogum.course.domain.*;
-import com.mogum.course.repository.*;
-import com.mogum.job.domain.*;
+import com.mogum.course.domain.CourseFixtures;
+import com.mogum.course.domain.LearningInput;
+import com.mogum.course.domain.LessonFixtures;
+import com.mogum.course.domain.Level;
+import com.mogum.course.domain.Purpose;
+import com.mogum.course.domain.RoadmapFixtures;
+import com.mogum.course.repository.CourseRepository;
+import com.mogum.course.repository.LessonRepository;
+import com.mogum.course.repository.RoadmapRepository;
+import com.mogum.job.domain.GenerationJobFixtures;
+import com.mogum.job.domain.JobErrorType;
+import com.mogum.job.domain.JobStatus;
+import com.mogum.job.domain.JobType;
 import com.mogum.job.repository.GenerationJobRepository;
 import com.mogum.support.IntegrationTest;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,13 +35,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @IntegrationTest
 class JobReadServiceIntegrationTest {
-    @Autowired JobReadService service;
-    @Autowired GenerationJobRepository jobs;
-    @Autowired UserRepository users;
-    @Autowired CourseRepository courses;
-    @Autowired RoadmapRepository roadmaps;
-    @Autowired LessonRepository lessons;
-    @Autowired JdbcTemplate jdbc;
+    @Autowired JobReadService jobReadService;
+    @Autowired GenerationJobRepository generationJobRepository;
+    @Autowired UserRepository userRepository;
+    @Autowired CourseRepository courseRepository;
+    @Autowired RoadmapRepository roadmapRepository;
+    @Autowired LessonRepository lessonRepository;
+    @Autowired JdbcTemplate jdbcTemplate;
 
     static Stream<Object[]> typesAndStates() {
         return Arrays.stream(JobType.values()).flatMap(type -> Arrays.stream(JobStatus.values()).map(status -> new Object[]{type, status}));
@@ -41,12 +52,12 @@ class JobReadServiceIntegrationTest {
     @DisplayName("여섯 종류의 모든 상태를 요약과 성공 결과 또는 실패 묶음으로 읽고 DB를 보존한다")
     void readsAllTypesAndStates(JobType type, JobStatus status) {
         // given
-        long owner = users.save(UserFixtures.approved("me@example.com")).getId();
+        long owner = userRepository.save(UserFixtures.approved("me@example.com")).getId();
         var input = new LearningInput("물리", Level.OTHER, "수학은 알아요", Purpose.OTHER, "연구", "비공개 메모");
-        var course = courses.save(CourseFixtures.single(owner));
-        var roadmap = roadmaps.save(RoadmapFixtures.roadmap(owner));
-        var lesson = lessons.save(LessonFixtures.lesson(course, 1));
-        var job = jobs.save(switch (type) {
+        var course = courseRepository.save(CourseFixtures.single(owner));
+        var roadmap = roadmapRepository.save(RoadmapFixtures.roadmap(owner));
+        var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
+        var job = generationJobRepository.save(switch (type) {
             case NEW_COURSE -> GenerationJobFixtures.newCourse(owner, input);
             case NEW_ROADMAP -> GenerationJobFixtures.newRoadmap(owner, input);
             case PLAN_ROADMAP_COURSE -> GenerationJobFixtures.planRoadmapCourse(owner, course.getId());
@@ -57,18 +68,18 @@ class JobReadServiceIntegrationTest {
         var now = Instant.parse("2026-11-15T00:00:00Z");
         switch (status) {
             case QUEUED -> { }
-            case RUNNING -> GenerationJobFixtures.running(jdbc, job.getId(), 3, now, now.plusSeconds(100));
-            case FAILED -> GenerationJobFixtures.failed(jdbc, job.getId(), JobErrorType.PROVIDER_REJECTED, now);
-            case SUCCEEDED -> GenerationJobFixtures.succeeded(jdbc, job.getId(), switch (type) {
+            case RUNNING -> GenerationJobFixtures.running(jdbcTemplate, job.getId(), 3, now, now.plusSeconds(100));
+            case FAILED -> GenerationJobFixtures.failed(jdbcTemplate, job.getId(), JobErrorType.PROVIDER_REJECTED, now);
+            case SUCCEEDED -> GenerationJobFixtures.succeeded(jdbcTemplate, job.getId(), switch (type) {
                 case NEW_COURSE, PLAN_ROADMAP_COURSE, REPLAN_COURSE -> course.getId();
                 default -> null;
             }, switch (type) { case NEW_ROADMAP, REPLAN_ROADMAP -> roadmap.getId(); default -> null; },
                     type == JobType.MATERIAL ? lesson.getId() : null, now);
         }
-        var before = jdbc.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", job.getId());
+        var before = jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", job.getId());
 
         // when
-        var result = service.read(owner, job.getId());
+        var result = jobReadService.read(owner, job.getId());
 
         // then
         assertThat(result.id()).isEqualTo(job.getId());
@@ -106,7 +117,7 @@ class JobReadServiceIntegrationTest {
             assertThat(result.error().code()).isEqualTo("JOB_TEMPORARY_FAILURE");
             assertThat(result.error().message()).isEqualTo("만들지 못했습니다. 다시 시도하거나 버려 주세요");
         } else assertThat(result.error()).isNull();
-        assertThat(jdbc.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", job.getId())).isEqualTo(before);
+        assertThat(jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", job.getId())).isEqualTo(before);
     }
 
     static Stream<Object[]> typesAndErrors() {
@@ -119,12 +130,12 @@ class JobReadServiceIntegrationTest {
     @DisplayName("실패 까닭 넷을 사용자 행동이 같은 두 묶음으로 반환한다")
     void groupsFailureCauses(JobType type, JobErrorType error) {
         // given
-        long owner = users.save(UserFixtures.approved("me@example.com")).getId();
+        long owner = userRepository.save(UserFixtures.approved("me@example.com")).getId();
         var input = new LearningInput("자바", Level.BEGINNER, null, Purpose.WORK, null, null);
-        var course = courses.save(CourseFixtures.single(owner));
-        var roadmap = roadmaps.save(RoadmapFixtures.roadmap(owner));
-        var lesson = lessons.save(LessonFixtures.lesson(course, 1));
-        var job = jobs.save(switch (type) {
+        var course = courseRepository.save(CourseFixtures.single(owner));
+        var roadmap = roadmapRepository.save(RoadmapFixtures.roadmap(owner));
+        var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
+        var job = generationJobRepository.save(switch (type) {
             case NEW_COURSE -> GenerationJobFixtures.newCourse(owner, input);
             case NEW_ROADMAP -> GenerationJobFixtures.newRoadmap(owner, input);
             case PLAN_ROADMAP_COURSE -> GenerationJobFixtures.planRoadmapCourse(owner, course.getId());
@@ -132,10 +143,10 @@ class JobReadServiceIntegrationTest {
             case REPLAN_ROADMAP -> GenerationJobFixtures.replanRoadmap(owner, roadmap.getId(), null);
             case MATERIAL -> GenerationJobFixtures.material(owner, lesson.getId());
         });
-        GenerationJobFixtures.failed(jdbc, job.getId(), error, Instant.parse("2026-11-15T00:00:00Z"));
+        GenerationJobFixtures.failed(jdbcTemplate, job.getId(), error, Instant.parse("2026-11-15T00:00:00Z"));
 
         // when
-        var result = service.read(owner, job.getId());
+        var result = jobReadService.read(owner, job.getId());
 
         // then
         boolean inputProblem = error == JobErrorType.INPUT_TOO_LARGE;
@@ -145,18 +156,18 @@ class JobReadServiceIntegrationTest {
         assertThat(result.error().retryAfterSeconds()).isNull();
     }
 
-    @org.junit.jupiter.api.Test
+    @Test
     @DisplayName("남의 작업과 없는 작업은 같은 오류로 반환한다")
     void rejectsForeignAndMissingJobs() {
         // given
-        long owner = users.save(UserFixtures.approved("owner@example.com")).getId();
-        var job = jobs.save(GenerationJobFixtures.newCourse(owner,
+        long owner = userRepository.save(UserFixtures.approved("owner@example.com")).getId();
+        var job = generationJobRepository.save(GenerationJobFixtures.newCourse(owner,
                 new LearningInput("비공개 주제", Level.BEGINNER, null, Purpose.WORK, null, null)));
 
         // when & then
-        assertThatThrownBy(() -> service.read(owner + 1, job.getId())).isInstanceOfSatisfying(ApiException.class,
+        assertThatThrownBy(() -> jobReadService.read(owner + 1, job.getId())).isInstanceOfSatisfying(ApiException.class,
                 error -> assertThat(error.errorCode()).isEqualTo(ErrorCode.NOT_FOUND));
-        assertThatThrownBy(() -> service.read(owner, 999L)).isInstanceOfSatisfying(ApiException.class,
+        assertThatThrownBy(() -> jobReadService.read(owner, 999L)).isInstanceOfSatisfying(ApiException.class,
                 error -> assertThat(error.errorCode()).isEqualTo(ErrorCode.NOT_FOUND));
     }
 }

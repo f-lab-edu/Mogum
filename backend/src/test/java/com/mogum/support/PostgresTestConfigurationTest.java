@@ -3,6 +3,7 @@ package com.mogum.support;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.GenericApplicationContext;
+import org.testcontainers.containers.Container;
 
 import java.sql.DriverManager;
 
@@ -19,7 +20,7 @@ class PostgresTestConfigurationTest {
             context.refresh();
             assertThat(context.getEnvironment().getProperty("spring.datasource.url"))
                     .isEqualTo(PostgresTestConfiguration.POSTGRES.getJdbcUrl());
-            assertThat(context.getBeansOfType(org.testcontainers.containers.Container.class)).isEmpty();
+            assertThat(context.getBeansOfType(Container.class)).isEmpty();
         }
 
         // when

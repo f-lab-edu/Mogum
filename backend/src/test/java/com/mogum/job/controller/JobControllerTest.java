@@ -14,7 +14,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -23,8 +25,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
+import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,10 +43,10 @@ import static org.mockito.BDDMockito.then;
 @WebMvcTest(JobController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class JobControllerTest {
-    @Autowired MockMvcTester mvc;
-    @MockitoBean JobIntakeService intake;
-    @MockitoBean JobReadService reads;
-    private final JsonMapper json = JsonMapper.builder().build();
+    @Autowired MockMvcTester mockMvcTester;
+    @MockitoBean JobIntakeService jobIntakeService;
+    @MockitoBean JobReadService jobReadService;
+    private final JsonMapper jsonMapper = JsonMapper.builder().build();
 
     @BeforeEach
     void authenticate() {
@@ -60,20 +64,20 @@ class JobControllerTest {
     @DisplayName("잘못된 요청은 서비스 전에 칸과 reason으로 반환한다")
     void rejectsInvalidFields(String description, Map<String, Object> body, String field, String reason) {
         // when
-        var result = mvc.post().uri("/api/jobs").contentType(MediaType.APPLICATION_JSON)
-                .content(json.writeValueAsString(body)).exchange();
+        var result = mockMvcTester.post().uri("/api/jobs").contentType(MediaType.APPLICATION_JSON)
+                .content(jsonMapper.writeValueAsString(body)).exchange();
 
         // then
         assertThat(result).hasStatus(400).bodyJson().isStrictlyEqualTo("""
                 {"code":"FIELD_INVALID","message":"입력을 확인해 주십시오",
                  "fields":[{"field":"%s","reason":"%s"}]}
                 """.formatted(field, reason));
-        then(intake).shouldHaveNoInteractions();
-        then(reads).shouldHaveNoInteractions();
+        then(jobIntakeService).shouldHaveNoInteractions();
+        then(jobReadService).shouldHaveNoInteractions();
     }
 
     static Stream<Object[]> invalidRequests() {
-        var cases = new java.util.ArrayList<Object[]>();
+        var cases = new ArrayList<Object[]>();
         for (var field : List.of("topic", "level", "purpose", "type")) {
             cases.add(new Object[]{field + " 누락", changed(field, null), field, "REQUIRED"});
             cases.add(new Object[]{field + " 빈 글", changed(field, " \t\n"), field, "REQUIRED"});
@@ -116,19 +120,19 @@ class JobControllerTest {
     @DisplayName("받기는 모르는 칸을 무시하고 입력과 메모를 서비스에 넘기며 읽기와 같은 응답을 낸다")
     void receivesAndReturnsReadShape() {
         // given
-        given(intake.receive(eq(7L), any())).willReturn(new JobResult(11L, JobStatus.QUEUED));
-        given(reads.read(7L, 11L)).willReturn(response());
+        given(jobIntakeService.receive(eq(7L), any())).willReturn(new JobResult(11L, JobStatus.QUEUED));
+        given(jobReadService.read(7L, 11L)).willReturn(response());
         var body = changed("memo", "비공개 메모");
         body.put("future", Map.of("value", 1));
 
         // when
-        var result = mvc.post().uri("/api/jobs").contentType(MediaType.APPLICATION_JSON)
-                .content(json.writeValueAsString(body)).exchange();
+        var result = mockMvcTester.post().uri("/api/jobs").contentType(MediaType.APPLICATION_JSON)
+                .content(jsonMapper.writeValueAsString(body)).exchange();
 
         // then
         assertReadShape(result);
-        var captor = org.mockito.ArgumentCaptor.forClass(JobRequest.class);
-        then(intake).should().receive(eq(7L), captor.capture());
+        var captor = ArgumentCaptor.forClass(JobRequest.class);
+        then(jobIntakeService).should().receive(eq(7L), captor.capture());
         var request = captor.getValue();
         assertThat(request.type()).isEqualTo(JobType.NEW_COURSE);
         assertThat(request.targetId()).isNull();
@@ -137,12 +141,12 @@ class JobControllerTest {
     }
 
     @ParameterizedTest(name = "종류={0}")
-    @org.junit.jupiter.params.provider.EnumSource(JobType.class)
+    @EnumSource(JobType.class)
     @DisplayName("여섯 종류를 각각 입력 또는 대상과 선택 피드백으로 변환한다")
     void mapsEveryJobType(JobType type) {
         // given
-        given(intake.receive(eq(7L), any())).willReturn(new JobResult(11L, JobStatus.QUEUED));
-        given(reads.read(7L, 11L)).willReturn(response());
+        given(jobIntakeService.receive(eq(7L), any())).willReturn(new JobResult(11L, JobStatus.QUEUED));
+        given(jobReadService.read(7L, 11L)).willReturn(response());
         Map<String, Object> body = switch (type) {
             case NEW_COURSE, NEW_ROADMAP -> changed("type", type.name());
             case PLAN_ROADMAP_COURSE, REPLAN_COURSE -> target(type.name(), "courseId", 23L, "feedback", null);
@@ -152,12 +156,12 @@ class JobControllerTest {
         if (type.name().startsWith("REPLAN")) body.put("feedback", "바꿔 주세요");
 
         // when
-        var result = mvc.post().uri("/api/jobs").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body)).exchange();
+        var result = mockMvcTester.post().uri("/api/jobs").contentType(MediaType.APPLICATION_JSON).content(jsonMapper.writeValueAsString(body)).exchange();
 
         // then
         assertThat(result).hasStatusOk();
-        var captor = org.mockito.ArgumentCaptor.forClass(JobRequest.class);
-        then(intake).should().receive(eq(7L), captor.capture());
+        var captor = ArgumentCaptor.forClass(JobRequest.class);
+        then(jobIntakeService).should().receive(eq(7L), captor.capture());
         assertThat(captor.getValue().type()).isEqualTo(type);
         assertThat(captor.getValue().targetId()).isEqualTo(type.name().startsWith("NEW") ? null : 23L);
         assertThat(captor.getValue().feedback()).isEqualTo(type.name().startsWith("REPLAN") ? "바꿔 주세요" : null);
@@ -167,25 +171,25 @@ class JobControllerTest {
     @DisplayName("읽기는 주인 ID와 작업 ID를 넘기고 입력 요약만 반환한다")
     void readsJob() {
         // given
-        given(reads.read(7L, 11L)).willReturn(response());
+        given(jobReadService.read(7L, 11L)).willReturn(response());
 
         // when
-        var result = mvc.get().uri("/api/jobs/11").exchange();
+        var result = mockMvcTester.get().uri("/api/jobs/11").exchange();
 
         // then
         assertReadShape(result);
-        then(intake).shouldHaveNoInteractions();
+        then(jobIntakeService).shouldHaveNoInteractions();
     }
 
     @Test
     @DisplayName("다시 시도도 작업 읽기와 같은 응답을 반환한다")
     void retriesJob() {
         // given
-        given(intake.retry(7L, 11L)).willReturn(new JobResult(11L, JobStatus.QUEUED));
-        given(reads.read(7L, 11L)).willReturn(response());
+        given(jobIntakeService.retry(7L, 11L)).willReturn(new JobResult(11L, JobStatus.QUEUED));
+        given(jobReadService.read(7L, 11L)).willReturn(response());
 
         // when
-        var result = mvc.post().uri("/api/jobs/11/retry").exchange();
+        var result = mockMvcTester.post().uri("/api/jobs/11/retry").exchange();
 
         // then
         assertReadShape(result);
@@ -195,12 +199,12 @@ class JobControllerTest {
     @DisplayName("실패 버리기는 POST 뒤 본문 없는 204를 반환한다")
     void discardsJob() {
         // when
-        var result = mvc.post().uri("/api/jobs/11/discard").exchange();
+        var result = mockMvcTester.post().uri("/api/jobs/11/discard").exchange();
 
         // then
         assertThat(result).hasStatus(204).body().isEmpty();
-        then(intake).should().discard(7L, 11L);
-        then(reads).shouldHaveNoInteractions();
+        then(jobIntakeService).should().discard(7L, 11L);
+        then(jobReadService).shouldHaveNoInteractions();
     }
 
     private JobResponse response() {
@@ -208,7 +212,7 @@ class JobControllerTest {
                 new JobResponse.Subject("자바", "BEGINNER", null, "WORK", null, null), null, null);
     }
 
-    private void assertReadShape(org.springframework.test.web.servlet.assertj.MvcTestResult result) {
+    private void assertReadShape(MvcTestResult result) {
         assertThat(result).hasStatusOk().bodyJson().isStrictlyEqualTo("""
                 {"data":{"id":11,"type":"NEW_COURSE","status":"QUEUED",
                  "subject":{"topic":"자바","level":"BEGINNER","purpose":"WORK"}}}
