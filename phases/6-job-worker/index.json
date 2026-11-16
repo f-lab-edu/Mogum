@@ -113,7 +113,13 @@
     {
       "step": 8,
       "name": "shell-error-fixes",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-16T21:03:41+0900",
+      "summary": "AppLayout 탭 첫 화면의 위 바 로고만 lg:hidden으로 1024px부터 숨기고 사이드바·위 바·제목 화면 유지; client.ts의 CONNECTION_ERROR_MESSAGE로 서버 문구 없는 오류·잘못된 성공 본문과 AccountPage·WaitingPage의 기존 연결 안내를 통일하고 code·status·fields·retryAfterSeconds·화면 분기 유지; 회귀 테스트 먼저 실패 확인 후 구현, UI_GUIDE §4·7 반영, 화면 테스트 264→267개 및 지정 test·lint 통과, 로고 너비 분기는 jsdom 클래스·구조로 검증.",
+      "completed_at": "2026-11-16T21:05:59+0900",
+      "review_notes": [
+        "frontend/src/api/client.test.ts:91,167,172,181 · AccountPage.test.tsx:129 — 기대값에 문구를 문자열로 직접 적었다. 상수 값이 바뀌어도 시험이 그 변경을 잡아내므로 동작에는 문제가 없다. 다만 「연결 안내 상수를 쓴다」는 의도를 드러내려면 `CONNECTION_ERROR_MESSAGE` 를 import 해 비교하는 쪽도 고려할 만하다(취향 차이)."
+      ]
     }
   ],
   "created_at": "2026-11-15T12:27:13+0900",
