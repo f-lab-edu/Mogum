@@ -1,5 +1,6 @@
 package com.mogum.common.api;
 
+import com.mogum.job.dto.JobReceiveRequest;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.ServletWebRequest;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -107,7 +109,7 @@ class ApiExceptionHandlerTest {
     @DisplayName("객체 위반이 섞이면 fields를 생략한다")
     void omitsFieldsWhenObjectViolationIsPresent() throws Exception {
         // given
-        var errors = new java.util.ArrayList<>(validate(new ValidationRequest("private-topic", "학습")));
+        var errors = new ArrayList<>(validate(new ValidationRequest("private-topic", "학습")));
         errors.add(new ObjectError("request", new String[]{"Consistency"}, null, "private constraint message"));
         var exception = validationException(errors);
         var request = webRequest();
@@ -272,7 +274,7 @@ class ApiExceptionHandlerTest {
     @DisplayName("칸 사이 제약도 값 원문 없이 안전한 reason과 칸 이름으로 반환한다")
     void returnsCrossFieldReasons() throws Exception {
         // given
-        var request = new com.mogum.job.dto.JobReceiveRequest("NEW_COURSE", null, null, null,
+        var request = new JobReceiveRequest("NEW_COURSE", null, null, null,
                 "자바", "BEGINNER", "private input", "WORK", null, null, null);
         var exception = validationException(validate(request));
 

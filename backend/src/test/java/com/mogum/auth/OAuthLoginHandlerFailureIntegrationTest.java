@@ -9,7 +9,12 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
-import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.*;
+import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.TOKEN_CALLS;
+import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.email;
+import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.sub;
+import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.tokenFailure;
+import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.userInfoFailure;
+import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.verified;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @IntegrationTest

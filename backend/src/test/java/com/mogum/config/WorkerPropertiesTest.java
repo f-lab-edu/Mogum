@@ -15,7 +15,7 @@ import java.time.Duration;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class WorkerPropertiesTest {
-    private final ApplicationContextRunner runner = new ApplicationContextRunner()
+    private final ApplicationContextRunner applicationContextRunner = new ApplicationContextRunner()
             .withInitializer(new ConfigDataApplicationContextInitializer())
             .withUserConfiguration(PropertiesConfiguration.class);
 
@@ -23,7 +23,7 @@ class WorkerPropertiesTest {
     @DisplayName("워커 수와 시한 및 종료 임시 값은 application 설정에서 읽는다")
     void bindsProvisionalSettings() {
         // when
-        runner.run(context -> {
+        applicationContextRunner.run(context -> {
             // then
             assertThat(context).hasNotFailed();
             assertThat(context.getBean(WorkerProperties.class)).isEqualTo(new WorkerProperties(
@@ -46,7 +46,7 @@ class WorkerPropertiesTest {
     @DisplayName("시한 및 종료 대기 여유를 깨거나 음수인 설정은 기동을 거부한다")
     void rejectsInvalidSettings(String property) {
         // given
-        var invalid = runner.withPropertyValues(property);
+        var invalid = applicationContextRunner.withPropertyValues(property);
         // when
         invalid.run(context -> {
             // then
@@ -59,7 +59,7 @@ class WorkerPropertiesTest {
     @DisplayName("워커 수 0과 자동 다시 시도 간격 0은 허용한다")
     void acceptsDisabledWorkersAndImmediateRetry() {
         // given
-        var disabled = runner.withPropertyValues("app.worker.count=0", "app.worker.retry-delay=0s");
+        var disabled = applicationContextRunner.withPropertyValues("app.worker.count=0", "app.worker.retry-delay=0s");
         // when
         disabled.run(context -> {
             // then

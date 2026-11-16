@@ -5,13 +5,13 @@ import com.mogum.account.domain.UserStatus;
 import com.mogum.support.IntegrationTest;
 import com.mogum.support.TestSessions;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.json.JsonAssert;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
@@ -88,7 +88,7 @@ class SecurityConfigurationApprovalIntegrationTest extends SecurityScenario {
     @DisplayName("비로그인은 승인 검사와 CSRF보다 먼저 기존 인증 오류로 응답한다")
     void keepsUnauthorizedPrecedence(String method) {
         // when
-        var response = requests.anonymous().method(HttpMethod.valueOf(method))
+        var response = testRequests.anonymous().method(HttpMethod.valueOf(method))
                 .uri("/api/account/apply").exchange().returnResult(String.class);
         // then
         assertError(response, 401, "UNAUTHORIZED");
@@ -102,7 +102,7 @@ class SecurityConfigurationApprovalIntegrationTest extends SecurityScenario {
         var cookie = accountSession(status);
         var client = client(cookie);
         client.get().uri("/api/test-domain-error").exchange().expectStatus().isForbidden();
-        jdbc.update("UPDATE users SET status = 'APPROVED', approved_at = now(), credit_refill_at = now() + interval '30 days', updated_at = now()");
+        jdbcTemplate.update("UPDATE users SET status = 'APPROVED', approved_at = now(), credit_refill_at = now() + interval '30 days', updated_at = now()");
 
         // when
         var response = client.get().uri("/api/test-domain-error").exchange().returnResult(String.class);
@@ -112,9 +112,9 @@ class SecurityConfigurationApprovalIntegrationTest extends SecurityScenario {
     }
 
     private Cookie accountSession(String status) {
-        var helper = new TestSessions(sessions);
+        var helper = new TestSessions(jdbcIndexedSessionRepository);
         if (status.equals("NOT_APPLIED")) return helper.createNotApplied(new AccountPrincipal.NotApplied("google", "new", "new@example.com", "새 이름"));
-        var user = users.save(UserFixtures.withStatus(UserFixtures.user("approval@example.com"), UserStatus.valueOf(status)));
+        var user = userRepository.save(UserFixtures.withStatus(UserFixtures.user("approval@example.com"), UserStatus.valueOf(status)));
         return helper.create(user.getId());
     }
 

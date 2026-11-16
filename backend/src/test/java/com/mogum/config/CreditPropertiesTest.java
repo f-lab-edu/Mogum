@@ -14,7 +14,7 @@ class CreditPropertiesTest {
     @DisplayName("종류별 크레딧은 각각의 설정 키에서 임시 값 1을 읽는다")
     void readsTemporaryJobAmounts() {
         // when
-        runner.run(context -> {
+        applicationContextRunner.run(context -> {
             // then
             var credit = context.getBean(CreditProperties.class);
             assertThat(credit.newCourse()).isEqualTo(1);
@@ -30,7 +30,7 @@ class CreditPropertiesTest {
     @DisplayName("종류별 크레딧은 서로 다른 설정 값을 각각 바인딩한다")
     void bindsEachJobAmount() {
         // given
-        var configured = runner.withPropertyValues("app.credit.new-course=2", "app.credit.new-roadmap=3",
+        var configured = applicationContextRunner.withPropertyValues("app.credit.new-course=2", "app.credit.new-roadmap=3",
                 "app.credit.plan-roadmap-course=4", "app.credit.replan-course=5", "app.credit.replan-roadmap=6",
                 "app.credit.material=7");
 
@@ -47,7 +47,7 @@ class CreditPropertiesTest {
         });
     }
 
-    private final ApplicationContextRunner runner = new ApplicationContextRunner()
+    private final ApplicationContextRunner applicationContextRunner = new ApplicationContextRunner()
             .withInitializer(new ConfigDataApplicationContextInitializer())
             .withUserConfiguration(PropertiesConfiguration.class);
 
@@ -55,7 +55,7 @@ class CreditPropertiesTest {
     @DisplayName("한 달 몫은 application 설정의 단일 키에서 읽는다")
     void readsMonthlyAmountFromApplicationConfiguration() {
         // when
-        runner.run(context -> {
+        applicationContextRunner.run(context -> {
             // then
             assertThat(context).hasNotFailed();
             assertThat(context.getBean(CreditProperties.class).monthlyAmount())
@@ -68,7 +68,7 @@ class CreditPropertiesTest {
     @DisplayName("한 달 몫 설정을 바꾸면 바인딩 값도 바뀐다")
     void bindsConfiguredMonthlyAmount() {
         // given
-        var configured = runner.withPropertyValues("app.credit.monthly-amount=37");
+        var configured = applicationContextRunner.withPropertyValues("app.credit.monthly-amount=37");
         // when
         configured.run(context -> {
             // then

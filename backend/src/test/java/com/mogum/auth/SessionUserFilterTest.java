@@ -8,11 +8,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.Arguments;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.MDC;
@@ -23,13 +22,14 @@ import org.springframework.session.FindByIndexNameSessionRepository;
 
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.then;
 
 @ExtendWith(MockitoExtension.class)
 class SessionUserFilterTest {
-    @Mock private UserRepository untouchedUsers;
+    @Mock private UserRepository userRepository;
 
     // 다른 테스트가 같은 스레드에 남긴 요청 상태도 제거한다.
     @BeforeEach
@@ -76,7 +76,7 @@ class SessionUserFilterTest {
     @DisplayName("세션이 없으면 DB를 조회하거나 세션을 만들지 않고 다음 필터로 진행한다")
     void skipsDatabaseAndSessionCreationWithoutSession() throws Exception {
         // given
-        var filter = filter(untouchedUsers);
+        var filter = filter(userRepository);
         var request = new MockHttpServletRequest("GET", "/api/me");
         var chainCalled = new AtomicBoolean();
 
@@ -88,7 +88,7 @@ class SessionUserFilterTest {
 
         // then
         assertThat(chainCalled).isTrue();
-        then(untouchedUsers).shouldHaveNoInteractions();
+        then(userRepository).shouldHaveNoInteractions();
         assertThat(request.getSession(false)).isNull();
         assertThat(MDC.get(RequestLogFilter.USER_ID)).isNull();
     }
@@ -97,7 +97,7 @@ class SessionUserFilterTest {
     @DisplayName("잘못된 ID는 DB 조회 없이 세션을 무효화하고 요청을 401로 중단한다")
     void invalidatesMalformedSessionWithoutDatabaseAccess() throws Exception {
         // given
-        var filter = filter(untouchedUsers);
+        var filter = filter(userRepository);
         var request = new MockHttpServletRequest("GET", "/api/me");
         request.getSession().setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, "invalid");
         var response = new MockHttpServletResponse();
@@ -110,7 +110,7 @@ class SessionUserFilterTest {
         assertThat(chainCalled).isFalse();
         assertThat(response.getStatus()).isEqualTo(401);
         assertThat(request.getSession(false)).isNull();
-        then(untouchedUsers).shouldHaveNoInteractions();
+        then(userRepository).shouldHaveNoInteractions();
         assertThat(MDC.get(RequestLogFilter.USER_ID)).isNull();
     }
 
@@ -144,7 +144,7 @@ class SessionUserFilterTest {
         var chainCalled = new AtomicBoolean();
 
         // when
-        filter(untouchedUsers).doFilter(request, new MockHttpServletResponse(), (req, res) -> {
+        filter(userRepository).doFilter(request, new MockHttpServletResponse(), (req, res) -> {
             chainCalled.set(true);
             var authentication = SecurityContextHolder.getContext().getAuthentication();
             assertThat(authentication.getPrincipal()).isEqualTo(identity);
@@ -155,7 +155,7 @@ class SessionUserFilterTest {
 
         // then
         assertThat(chainCalled).isTrue();
-        then(untouchedUsers).shouldHaveNoInteractions();
+        then(userRepository).shouldHaveNoInteractions();
         assertThat(Collections.list(request.getSession().getAttributeNames()))
                 .containsExactly(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE);
     }
@@ -173,13 +173,13 @@ class SessionUserFilterTest {
         var chainCalled = new AtomicBoolean();
 
         // when
-        filter(untouchedUsers).doFilter(request, response, (req, res) -> chainCalled.set(true));
+        filter(userRepository).doFilter(request, response, (req, res) -> chainCalled.set(true));
 
         // then
         assertThat(response.getStatus()).isEqualTo(401);
         assertThat(chainCalled).isFalse();
         assertThat(request.getSession(false)).isNull();
-        then(untouchedUsers).shouldHaveNoInteractions();
+        then(userRepository).shouldHaveNoInteractions();
         assertThat(MDC.get(RequestLogFilter.USER_ID)).isNull();
     }
 

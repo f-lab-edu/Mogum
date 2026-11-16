@@ -4,15 +4,20 @@ import com.mogum.support.IntegrationTest;
 import com.mogum.support.TestSessions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.json.JsonCompareMode;
+
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @IntegrationTest
-@org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
+@ExtendWith(OutputCaptureExtension.class)
 class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
     @ParameterizedTest(name = "오류 경로 {0} 상태 {1}")
     @CsvSource({"/api/does-not-exist,404,NOT_FOUND", "/api/test-servlet-errors/bad-request,400,INVALID_REQUEST",
@@ -26,7 +31,7 @@ class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
         var response = client(cookie).get().uri(path).exchange().returnResult(String.class);
         // then
         assertError(response, status, code);
-        assertThat(sessions.findById(new TestSessions(sessions).id(cookie))).isNotNull();
+        assertThat(jdbcIndexedSessionRepository.findById(new TestSessions(jdbcIndexedSessionRepository).id(cookie))).isNotNull();
     }
 
     @Test
@@ -34,8 +39,8 @@ class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
     void returnsMethodNotAllowedAfterAuthentication() {
         // given
         var cookie = approvedSession();
-        var user = users.findByProviderAndSubject("google", "session-sub").orElseThrow();
-        var client = requests.asUser(user.getId());
+        var user = userRepository.findByProviderAndSubject("google", "session-sub").orElseThrow();
+        var client = testRequests.asUser(user.getId());
         // when
         var response = client.post().uri("/api/me").exchange().returnResult(String.class);
         // then
@@ -63,10 +68,10 @@ class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
     @ValueSource(booleans = {false, true})
     @DisplayName("미등록 로그인 경로는 ERROR 디스패치로 JSON 404를 주고 오류 로그가 없다")
     void dispatchesUnknownRegistrationWithoutErrorLog(boolean authenticated,
-            org.springframework.boot.test.system.CapturedOutput output) throws Exception {
+            CapturedOutput output) throws Exception {
         // given
         int logOffset = output.getAll().length();
-        var client = authenticated ? client(approvedSession()) : requests.anonymous();
+        var client = authenticated ? client(approvedSession()) : testRequests.anonymous();
         // when
         var response = client.get().uri("/auth/foo").exchange().returnResult(String.class);
         // then
@@ -75,7 +80,7 @@ class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
         var id = response.getResponseHeaders().getFirst("X-Request-Id");
         assertThat(response.getResponseHeaders().getOrEmpty("X-Test-Dispatch-Request-Id"))
                 .containsExactly(id);
-        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(3).toNanos();
+        long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
         while (output.getOut().lines().noneMatch(line -> line.contains("requestId=" + id) && line.contains("access method="))
                 && System.nanoTime() < deadline) Thread.sleep(10);
         assertThat(output.getAll().substring(logOffset).lines()).noneMatch(line -> line.contains(" ERROR "));

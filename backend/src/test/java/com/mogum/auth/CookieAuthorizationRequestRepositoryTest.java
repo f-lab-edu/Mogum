@@ -13,11 +13,11 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import tools.jackson.databind.ObjectMapper;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Base64;
-import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -25,7 +25,7 @@ class CookieAuthorizationRequestRepositoryTest {
     private static final Instant NOW = Instant.parse("2026-10-12T00:00:00Z");
     private static final String STATE = "random-state-known-only-to-browser";
     private static final String VERIFIER = "aB09-._~".repeat(8);
-    private final ClientRegistration registration = ClientRegistration.withRegistrationId("google")
+    private final ClientRegistration clientRegistration = ClientRegistration.withRegistrationId("google")
             .clientId("test-client").clientSecret("test-secret")
             .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE).scope("email")
             .authorizationUri("https://provider.example/authorize").tokenUri("https://provider.example/token")
@@ -68,8 +68,8 @@ class CookieAuthorizationRequestRepositoryTest {
 
         // then
         assertThat(restored).isNotNull();
-        assertThat(restored.getRedirectUri()).isEqualTo(registration.getRedirectUri());
-        assertThat(restored.getClientId()).isEqualTo(registration.getClientId());
+        assertThat(restored.getRedirectUri()).isEqualTo(clientRegistration.getRedirectUri());
+        assertThat(restored.getClientId()).isEqualTo(clientRegistration.getClientId());
         assertThat(restored.<String>getAttribute("registration_id")).isEqualTo("google");
         assertThat(restored.<String>getAttribute("code_verifier")).isEqualTo(VERIFIER);
     }
@@ -211,13 +211,13 @@ class CookieAuthorizationRequestRepositoryTest {
     }
 
     private CookieAuthorizationRequestRepository repository(Instant instant) {
-        return new CookieAuthorizationRequestRepository(new InMemoryClientRegistrationRepository(registration),
+        return new CookieAuthorizationRequestRepository(new InMemoryClientRegistrationRepository(clientRegistration),
                 new ObjectMapper(), Clock.fixed(instant, ZoneOffset.UTC));
     }
 
     private OAuth2AuthorizationRequest authorization() {
-        return OAuth2AuthorizationRequest.authorizationCode().authorizationUri(registration.getProviderDetails().getAuthorizationUri())
-                .clientId(registration.getClientId()).redirectUri(registration.getRedirectUri()).scopes(registration.getScopes())
+        return OAuth2AuthorizationRequest.authorizationCode().authorizationUri(clientRegistration.getProviderDetails().getAuthorizationUri())
+                .clientId(clientRegistration.getClientId()).redirectUri(clientRegistration.getRedirectUri()).scopes(clientRegistration.getScopes())
                 .state(STATE).attributes(attributes -> {
                     attributes.put("registration_id", "google");
                     attributes.put("code_verifier", VERIFIER);

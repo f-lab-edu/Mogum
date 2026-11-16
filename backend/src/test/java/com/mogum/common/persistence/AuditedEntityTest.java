@@ -21,10 +21,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @RepositoryTest
 class AuditedEntityTest {
-    @Autowired private UserRepository users;
-    @Autowired private JdbcTemplate jdbc;
-    @Autowired private TestClock clock;
-    @Autowired private PlatformTransactionManager transactionManager;
+    @Autowired private UserRepository userRepository;
+    @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private TestClock testClock;
+    @Autowired private PlatformTransactionManager platformTransactionManager;
     @PersistenceContext private EntityManager entityManager;
 
     @Test
@@ -32,10 +32,10 @@ class AuditedEntityTest {
     void fillsCreationAndModificationTimesOnSave() {
         // given
         var created = Instant.parse("2026-10-28T01:02:03.123456Z");
-        clock.set(created);
+        testClock.set(created);
 
         // when
-        var saved = users.save(UserFixtures.user("audit@example.com"));
+        var saved = userRepository.save(UserFixtures.user("audit@example.com"));
 
         // then
         assertTimes(saved.getId(), created, created);
@@ -46,25 +46,25 @@ class AuditedEntityTest {
     void updatesOnlyModificationTimeOnCommit() {
         // given
         var created = Instant.parse("2026-10-28T01:02:03.123456Z");
-        clock.set(created);
-        var saved = users.save(UserFixtures.user("audit@example.com"));
-        clock.advance(Duration.ofSeconds(60));
-        var transactions = new TransactionTemplate(transactionManager);
+        testClock.set(created);
+        var saved = userRepository.save(UserFixtures.user("audit@example.com"));
+        testClock.advance(Duration.ofSeconds(60));
+        var transactions = new TransactionTemplate(platformTransactionManager);
 
         // when
         transactions.executeWithoutResult(status ->
                 UserFixtures.withEmail(entityManager.find(User.class, saved.getId()), "changed@example.com"));
 
         // then
-        assertThat(users.findById(saved.getId()).orElseThrow().getEmail()).isEqualTo("changed@example.com");
+        assertThat(userRepository.findById(saved.getId()).orElseThrow().getEmail()).isEqualTo("changed@example.com");
         assertTimes(saved.getId(), created, created.plusSeconds(60));
     }
 
     private void assertTimes(long id, Instant created, Instant updated) {
-        var reloaded = users.findById(id).orElseThrow();
+        var reloaded = userRepository.findById(id).orElseThrow();
         assertThat(reloaded.getCreatedAt()).isEqualTo(created);
         assertThat(reloaded.getUpdatedAt()).isEqualTo(updated);
-        jdbc.queryForObject("SELECT created_at, updated_at FROM users WHERE id = ?", (row, index) -> {
+        jdbcTemplate.queryForObject("SELECT created_at, updated_at FROM users WHERE id = ?", (row, index) -> {
             assertThat(row.getTimestamp("created_at").toInstant()).isEqualTo(created);
             assertThat(row.getTimestamp("updated_at").toInstant()).isEqualTo(updated);
             return id;

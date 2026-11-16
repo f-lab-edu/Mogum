@@ -4,11 +4,12 @@ import com.mogum.account.domain.CreditEntry;
 import com.mogum.account.domain.CreditEntryType;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.Comparator;
 
 public final class FakeCreditEntryRepository implements CreditEntryRepository {
     private final Map<Long, CreditEntry> entries = new LinkedHashMap<>();
@@ -26,7 +27,7 @@ public final class FakeCreditEntryRepository implements CreditEntryRepository {
     @Override
     public Optional<CreditEntry> findFirstByUserIdAndJobIdOrderByIdDesc(long userId, long jobId) {
         return entries.values().stream()
-                .filter(entry -> entry.getUser().getId() == userId && java.util.Objects.equals(entry.getJobId(), jobId))
+                .filter(entry -> entry.getUser().getId() == userId && Objects.equals(entry.getJobId(), jobId))
                 .max(Comparator.comparing(CreditEntry::getId));
     }
 

@@ -1,49 +1,54 @@
 package com.mogum.common.logging;
 
 import com.mogum.account.domain.User;
+import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.UserRepository;
+import com.mogum.support.IntegrationTest;
+import com.mogum.support.TestRequests;
 import com.mogum.support.TestSessions;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.Cookie;
-import org.junit.jupiter.api.BeforeEach;
+import org.apache.catalina.Context;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.bridge.SLF4JBridgeHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
-import org.springframework.boot.web.servlet.AbstractFilterRegistrationBean;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.boot.tomcat.TomcatWebServer;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
+import org.springframework.boot.web.servlet.AbstractFilterRegistrationBean;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.Ordered;
+import org.springframework.http.HttpMethod;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
-import org.slf4j.bridge.SLF4JBridgeHandler;
+import org.springframework.test.web.servlet.client.EntityExchangeResult;
 
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.TimeZone;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.mogum.support.IntegrationTest;
-import com.mogum.support.TestRequests;
-import com.mogum.account.domain.UserFixtures;
-import org.junit.jupiter.api.DisplayName;
-import org.springframework.test.web.servlet.client.EntityExchangeResult;
-
 @IntegrationTest
 @ExtendWith(OutputCaptureExtension.class)
 class RequestLogFilterIntegrationTest {
-    @Autowired private UserRepository users;
-    @Autowired private JdbcIndexedSessionRepository sessions;
-    @Autowired private ApplicationContext context;
-    @Autowired private TestRequests requests;
+    @Autowired private UserRepository userRepository;
+    @Autowired private JdbcIndexedSessionRepository jdbcIndexedSessionRepository;
+    @Autowired private ApplicationContext applicationContext;
+    @Autowired private TestRequests testRequests;
     private User user;
-    private Cookie session;
+    private Cookie cookie;
     private boolean installedJulBridge;
 
     @BeforeEach
@@ -52,8 +57,8 @@ class RequestLogFilterIntegrationTest {
         // 컨테이너 로그를 보는 이 테스트에 필요한 연결을 준비하고 끝나면 원래 상태로 돌린다.
         installedJulBridge = !SLF4JBridgeHandler.isInstalled();
         if (installedJulBridge) SLF4JBridgeHandler.install();
-        user = users.save(UserFixtures.approved("request-log@example.com"));
-        session = new TestSessions(sessions).create(user.getId());
+        user = userRepository.save(UserFixtures.approved("request-log@example.com"));
+        cookie = new TestSessions(jdbcIndexedSessionRepository).create(user.getId());
     }
 
     @AfterEach
@@ -61,8 +66,8 @@ class RequestLogFilterIntegrationTest {
         if (installedJulBridge) SLF4JBridgeHandler.uninstall();
     }
 
-    @org.junit.jupiter.params.ParameterizedTest(name = "{0} {1} 인증 {2} 상태 {3}")
-    @org.junit.jupiter.params.provider.CsvSource({"GET,/api/me,false,401,false", "GET,/api/me,true,200,false",
+    @ParameterizedTest(name = "{0} {1} 인증 {2} 상태 {3}")
+    @CsvSource({"GET,/api/me,false,401,false", "GET,/api/me,true,200,false",
             "POST,/api/auth/logout,true,403,false", "GET,/api/log-test-missing,true,404,false", "POST,/api/me,true,405,true"})
     @DisplayName("인증 CSRF MVC 오류는 최종 상태로 접근 줄 하나를 남긴다")
     void logsFinalStatusOnce(String method, String path, boolean authenticated, int status, boolean csrf, CapturedOutput output) throws Exception {
@@ -130,8 +135,8 @@ class RequestLogFilterIntegrationTest {
                 .containsExactly(requestId(response));
     }
 
-    @org.junit.jupiter.params.ParameterizedTest(name = "연속 비로그인 요청 {0}")
-    @org.junit.jupiter.params.provider.ValueSource(ints = {1, 2, 3, 4, 5, 6, 7, 8})
+    @ParameterizedTest(name = "연속 비로그인 요청 {0}")
+    @ValueSource(ints = {1, 2, 3, 4, 5, 6, 7, 8})
     @DisplayName("같은 서버 스레드에서 연속 비로그인 요청에도 회원 MDC가 남지 않는다")
     void cleansUserMdcForNextAnonymousRequests(int sequence, CapturedOutput output) throws Exception {
         // given
@@ -159,7 +164,7 @@ class RequestLogFilterIntegrationTest {
         // given
         var marker = "private-marker-fixed";
         // when
-        var response = requests.anonymous().get().uri("/auth/google/callback?code=" + marker + "&state=" + marker)
+        var response = testRequests.anonymous().get().uri("/auth/google/callback?code=" + marker + "&state=" + marker)
                 .header("X-Request-Id", marker).header("X-Private-Test", marker)
                 .header("Cookie", "PRIVATE_TEST=" + marker).exchange().returnResult(String.class);
         // then
@@ -185,26 +190,26 @@ class RequestLogFilterIntegrationTest {
     @DisplayName("등록된 순서는 세션과 보안보다 바깥이며 ERROR도 포함한다")
     void registersLoggingOutsideSecurityAndSession() {
         // given
-        var sessionFilter = context.getBean("sessionRepositoryFilterRegistration", AbstractFilterRegistrationBean.class);
-        var security = context.getBean("securityFilterChainRegistration", AbstractFilterRegistrationBean.class);
+        var sessionFilter = applicationContext.getBean("sessionRepositoryFilterRegistration", AbstractFilterRegistrationBean.class);
+        var security = applicationContext.getBean("securityFilterChainRegistration", AbstractFilterRegistrationBean.class);
         // when
-        var logging = context.getBean("requestLogFilter", FilterRegistrationBean.class);
+        var logging = applicationContext.getBean("requestLogFilter", FilterRegistrationBean.class);
         // then
         assertThat(logging.getOrder()).isEqualTo(Ordered.HIGHEST_PRECEDENCE);
         assertThat(logging.getOrder() < sessionFilter.getOrder()).isTrue();
         assertThat(logging.getOrder() < security.getOrder()).isTrue();
         assertThat(logging.determineDispatcherTypes().contains(DispatcherType.ERROR)).isTrue();
-        context.getBeansOfType(AbstractFilterRegistrationBean.class).values()
+        applicationContext.getBeansOfType(AbstractFilterRegistrationBean.class).values()
                 .forEach(filter -> assertThat(logging.getOrder() <= filter.getOrder()).isTrue());
-        var server = (TomcatWebServer) ((WebServerApplicationContext) context).getWebServer();
-        var servletContext = (org.apache.catalina.Context) server.getTomcat().getHost().findChildren()[0];
+        var server = (TomcatWebServer) ((WebServerApplicationContext) applicationContext).getWebServer();
+        var servletContext = (Context) server.getTomcat().getHost().findChildren()[0];
         // 같은 최솟값을 쓰는 Boot 필터도 있으므로 실제 컨테이너 매핑의 첫 자리까지 확인한다.
         assertThat(servletContext.findFilterMaps()[0].getFilterName()).isEqualTo(logging.getFilterName());
     }
 
     private EntityExchangeResult<String> send(String method, String path, boolean authenticated, String token) {
-        var builder = requests.anonymous().method(org.springframework.http.HttpMethod.valueOf(method)).uri(path);
-        if (authenticated) builder.cookie("SESSION", session.getValue());
+        var builder = testRequests.anonymous().method(HttpMethod.valueOf(method)).uri(path);
+        if (authenticated) builder.cookie("SESSION", cookie.getValue());
         if (token != null) builder.cookie("XSRF-TOKEN", token).header("X-XSRF-TOKEN", token);
         return builder.exchange().returnResult(String.class);
     }
@@ -226,8 +231,8 @@ class RequestLogFilterIntegrationTest {
         assertThat(line.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\+09:00 .*")).isTrue();
         if (authenticated) assertThat(line).contains("userId=" + user.getId());
         else assertThat(line).doesNotContain("userId=");
-        assertThat(java.util.Optional.ofNullable(response.getResponseBody()).orElse("")).doesNotContain("requestId");
-        assertThat(java.util.Optional.ofNullable(response.getResponseHeaders().getFirst("Access-Control-Expose-Headers")).orElse("").contains("X-Request-Id")).isFalse();
+        assertThat(Optional.ofNullable(response.getResponseBody()).orElse("")).doesNotContain("requestId");
+        assertThat(Optional.ofNullable(response.getResponseHeaders().getFirst("Access-Control-Expose-Headers")).orElse("").contains("X-Request-Id")).isFalse();
         return line;
     }
 

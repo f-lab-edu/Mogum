@@ -3,38 +3,48 @@ package com.mogum.auth;
 import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.support.IntegrationTest;
-import com.mogum.support.TestRequests;
 import com.mogum.support.IntegrationTestConfiguration;
+import com.mogum.support.TestRequests;
 import com.mogum.support.TestSessions;
 import jakarta.servlet.http.Cookie;
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.session.FindByIndexNameSessionRepository;
+import org.springframework.session.Session;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
-import org.springframework.test.web.servlet.client.RestTestClient;
-import org.springframework.test.web.servlet.client.EntityExchangeResult;
-import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.json.JsonAssert;
+import org.springframework.test.json.JsonCompareMode;
+import org.springframework.test.web.servlet.client.EntityExchangeResult;
+import org.springframework.test.web.servlet.client.RestTestClient;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @IntegrationTest
 class SecurityConfigurationIntegrationTest extends SecurityScenario {
-    @Autowired org.springframework.context.ApplicationContext context;
-    @Autowired org.flywaydb.core.Flyway flyway;
+    @Autowired ApplicationContext applicationContext;
+    @Autowired Flyway flyway;
 
     @ParameterizedTest(name = "요청 {0} {1} 쿠키 {2}")
     @CsvSource({"GET,/api/me,''", "GET,/api/me,unknown", "POST,/api/missing,''"})
     @DisplayName("로그인 없거나 모르는 쿠키는 리다이렉트 없는 JSON 401이다")
     void rejectsMissingOrUnknownSession(String method, String path, String value) {
         // given
-        var client = requests.anonymous();
+        var client = testRequests.anonymous();
         // when
-        var response = client.method(org.springframework.http.HttpMethod.valueOf(method)).uri(path)
+        var response = client.method(HttpMethod.valueOf(method)).uri(path)
                 .cookie("SESSION", value).exchange().returnResult(String.class);
         // then
         assertError(response, 401, "UNAUTHORIZED");
@@ -45,7 +55,7 @@ class SecurityConfigurationIntegrationTest extends SecurityScenario {
     void rejectsExpiredSession() {
         // given
         var cookie = session();
-        jdbc.update("UPDATE spring_session SET last_access_time = 0, expiry_time = 0 WHERE session_id = ?", new TestSessions(sessions).id(cookie));
+        jdbcTemplate.update("UPDATE spring_session SET last_access_time = 0, expiry_time = 0 WHERE session_id = ?", new TestSessions(jdbcIndexedSessionRepository).id(cookie));
         // when
         var response = client(cookie).get().uri("/api/me").exchange().returnResult(String.class);
         // then
@@ -56,7 +66,7 @@ class SecurityConfigurationIntegrationTest extends SecurityScenario {
     @DisplayName("세션 마이그레이션은 Spring Session 공식 PostgreSQL 스키마와 같다")
     void appliesOfficialSessionSchema() throws Exception {
         // when
-        var migrations = java.util.Arrays.stream(flyway.info().applied()).map(m -> m.getScript()).toList();
+        var migrations = Arrays.stream(flyway.info().applied()).map(m -> m.getScript()).toList();
         // then
         assertThat(migrations).contains("V3__create_spring_session.sql");
         try (var schema = getClass().getResourceAsStream("/org/springframework/session/jdbc/schema-postgresql.sql");
@@ -72,19 +82,19 @@ class SecurityConfigurationIntegrationTest extends SecurityScenario {
     void storesOnlyUserIdWithSevenDayExpiry() {
         // given
         var cookie = session();
-        var id = new TestSessions(sessions).id(cookie);
-        var before = jdbc.queryForMap("SELECT principal_name, max_inactive_interval FROM spring_session WHERE session_id = ?", id);
+        var id = new TestSessions(jdbcIndexedSessionRepository).id(cookie);
+        var before = jdbcTemplate.queryForMap("SELECT principal_name, max_inactive_interval FROM spring_session WHERE session_id = ?", id);
         // when
         var response = client(cookie).get().uri("/api/me").exchange();
         // then
         response.expectStatus().isOk();
         assertThat(before.get("max_inactive_interval")).isEqualTo(604800);
-        org.springframework.session.Session stored = sessions.findById(id);
+        Session stored = jdbcIndexedSessionRepository.findById(id);
         assertThat(stored).isNotNull();
-        assertThat(stored.getAttributeNames()).containsExactly(org.springframework.session.FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME);
-        assertThat((String) stored.getAttribute(org.springframework.session.FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME))
+        assertThat(stored.getAttributeNames()).containsExactly(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME);
+        assertThat((String) stored.getAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME))
                 .isEqualTo(before.get("principal_name"));
-        assertThat(before.get("principal_name")).isEqualTo(users.findByProviderAndSubject("google", "session-sub").orElseThrow().getId().toString());
+        assertThat(before.get("principal_name")).isEqualTo(userRepository.findByProviderAndSubject("google", "session-sub").orElseThrow().getId().toString());
     }
 
     @Test
@@ -105,7 +115,7 @@ class SecurityConfigurationIntegrationTest extends SecurityScenario {
     void readsNotAppliedSessionOverHttp() {
         // given
         var identity = new AccountPrincipal.NotApplied("google", "new-sub", "new@example.com", "새 이름");
-        var helper = new TestSessions(sessions);
+        var helper = new TestSessions(jdbcIndexedSessionRepository);
         var cookie = helper.createNotApplied(identity);
 
         // when
@@ -115,10 +125,10 @@ class SecurityConfigurationIntegrationTest extends SecurityScenario {
         response.expectStatus().isOk().expectBody().json("""
                 {"data":{"status":"NOT_APPLIED","email":"new@example.com","name":"새 이름"}}
                 """, JsonCompareMode.STRICT);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM users", Integer.class)).isZero();
-        assertThat(jdbc.queryForObject("SELECT principal_name FROM spring_session WHERE session_id = ?",
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM users", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT principal_name FROM spring_session WHERE session_id = ?",
                 String.class, helper.id(cookie))).isNull();
-        org.springframework.session.Session stored = sessions.findById(helper.id(cookie));
+        Session stored = jdbcIndexedSessionRepository.findById(helper.id(cookie));
         assertThat(stored.getAttributeNames()).containsExactly(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE);
         assertThat((Object) stored.getAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE)).isEqualTo(identity);
     }
@@ -128,24 +138,24 @@ class SecurityConfigurationIntegrationTest extends SecurityScenario {
     @DisplayName("JDBC에 저장된 깨진 신원은 실제 HTTP에서도 공통 JSON 401로 버린다")
     void rejectsMalformedStoredIdentity(String condition) {
         // given
-        var jdbcSession = sessions.createSession();
-        org.springframework.session.Session stored = jdbcSession;
+        var jdbcSession = jdbcIndexedSessionRepository.createSession();
+        Session stored = jdbcSession;
         if (condition.equals("wrong-type")) stored.setAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE, "broken");
         if (condition.equals("blank-name") || condition.equals("mixed")) {
             stored.setAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE,
                     new AccountPrincipal.NotApplied("google", "sub", "me@example.com", condition.equals("blank-name") ? " " : "이름"));
         }
-        if (condition.equals("mixed")) stored.setAttribute(org.springframework.session.FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, "17");
-        sessions.save(jdbcSession);
-        var cookie = new Cookie("SESSION", java.util.Base64.getEncoder().encodeToString(
-                stored.getId().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        if (condition.equals("mixed")) stored.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, "17");
+        jdbcIndexedSessionRepository.save(jdbcSession);
+        var cookie = new Cookie("SESSION", Base64.getEncoder().encodeToString(
+                stored.getId().getBytes(StandardCharsets.UTF_8)));
 
         // when
         var response = client(cookie).get().uri("/api/me").exchange().returnResult(String.class);
 
         // then
         assertError(response, 401, "UNAUTHORIZED");
-        assertThat(sessions.findById(stored.getId())).isNull();
+        assertThat(jdbcIndexedSessionRepository.findById(stored.getId())).isNull();
     }
 
     @ParameterizedTest(name = "변경 후 상태 {0}")
@@ -155,7 +165,7 @@ class SecurityConfigurationIntegrationTest extends SecurityScenario {
         // given
         var cookie = session();
         client(cookie).get().uri("/api/me").exchange().expectBody().jsonPath("$.data.status").isEqualTo("APPLIED");
-        jdbc.update("""
+        jdbcTemplate.update("""
                 UPDATE users SET status = ?,
                     approved_at = CASE WHEN ? = 'APPROVED' THEN now() END,
                     credit_refill_at = CASE WHEN ? = 'APPROVED' THEN now() + interval '30 days' END,
@@ -173,15 +183,15 @@ class SecurityConfigurationIntegrationTest extends SecurityScenario {
     void invalidatesDeletedUserSessions(int device) {
         // given
         var first = session();
-        var userId = users.findByProviderAndSubject("google", "session-sub").orElseThrow().getId();
-        var second = new TestSessions(sessions).create(userId);
-        jdbc.update("DELETE FROM users");
+        var userId = userRepository.findByProviderAndSubject("google", "session-sub").orElseThrow().getId();
+        var second = new TestSessions(jdbcIndexedSessionRepository).create(userId);
+        jdbcTemplate.update("DELETE FROM users");
         var cookie = device == 0 ? first : second;
         // when
         var response = client(cookie).get().uri("/api/me").exchange().returnResult(String.class);
         // then
         assertError(response, 401, "UNAUTHORIZED");
-        assertThat(sessions.findById(new TestSessions(sessions).id(cookie))).isNull();
+        assertThat(jdbcIndexedSessionRepository.findById(new TestSessions(jdbcIndexedSessionRepository).id(cookie))).isNull();
     }
 
     @Test
@@ -189,20 +199,20 @@ class SecurityConfigurationIntegrationTest extends SecurityScenario {
     void rejectsLoginStartForDeletedUser() {
         // given
         var cookie = session();
-        jdbc.update("DELETE FROM users");
+        jdbcTemplate.update("DELETE FROM users");
         // when
         var response = client(cookie).get().uri("/auth/google").exchange().returnResult(String.class);
         // then
         assertError(response, 401, "UNAUTHORIZED");
-        assertThat(sessions.findById(new TestSessions(sessions).id(cookie))).isNull();
+        assertThat(jdbcIndexedSessionRepository.findById(new TestSessions(jdbcIndexedSessionRepository).id(cookie))).isNull();
     }
 
     @Test
     @DisplayName("아키텍처 위반 픽스처는 공용 앱 컨텍스트에 등록되지 않는다")
     void excludesArchitectureFixtureControllers() {
         // when
-        var types = java.util.Arrays.stream(context.getBeanNamesForAnnotation(org.springframework.web.bind.annotation.RestController.class))
-                .map(context::getType).map(Class::getName).toList();
+        var types = Arrays.stream(applicationContext.getBeanNamesForAnnotation(RestController.class))
+                .map(applicationContext::getType).map(Class::getName).toList();
         // then
         assertThat(types).noneMatch(name -> name.startsWith("com.mogum.ArchitectureTest$"));
         assertThat(types).contains(IntegrationTestConfiguration.ValidationController.class.getName());
@@ -211,23 +221,23 @@ class SecurityConfigurationIntegrationTest extends SecurityScenario {
 }
 
 abstract class SecurityScenario {
-    @Autowired TestRequests requests;
-    @Autowired UserRepository users;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired JdbcIndexedSessionRepository sessions;
+    @Autowired TestRequests testRequests;
+    @Autowired UserRepository userRepository;
+    @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired JdbcIndexedSessionRepository jdbcIndexedSessionRepository;
 
     Cookie session() {
-        var user = users.save(UserFixtures.user("google", "session-sub", "session@example.com"));
-        return new TestSessions(sessions).create(user.getId());
+        var user = userRepository.save(UserFixtures.user("google", "session-sub", "session@example.com"));
+        return new TestSessions(jdbcIndexedSessionRepository).create(user.getId());
     }
 
     Cookie approvedSession() {
-        var user = users.save(UserFixtures.approved("google", "session-sub", "session@example.com"));
-        return new TestSessions(sessions).create(user.getId());
+        var user = userRepository.save(UserFixtures.approved("google", "session-sub", "session@example.com"));
+        return new TestSessions(jdbcIndexedSessionRepository).create(user.getId());
     }
 
     RestTestClient client(Cookie cookie) {
-        return requests.anonymous().mutate().defaultCookie(cookie.getName(), cookie.getValue()).build();
+        return testRequests.anonymous().mutate().defaultCookie(cookie.getName(), cookie.getValue()).build();
     }
 
     static void assertError(EntityExchangeResult<String> result, int status, String code) {

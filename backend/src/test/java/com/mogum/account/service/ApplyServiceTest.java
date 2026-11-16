@@ -19,14 +19,14 @@ import org.springframework.context.annotation.Configuration;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ApplyServiceTest {
-    private final ApplicationContextRunner runner = new ApplicationContextRunner()
+    private final ApplicationContextRunner applicationContextRunner = new ApplicationContextRunner()
             .withInitializer(new ConfigDataApplicationContextInitializer())
             .withUserConfiguration(PropertiesConfiguration.class);
 
     @Test
     @DisplayName("신청 전 신원으로 신청하면 한 달 몫의 잔액과 채움 기록을 함께 만든다")
     void createsAppliedUserAndInitialRefill() {
-        runner.withPropertyValues("app.credit.monthly-amount=37").run(context -> {
+        applicationContextRunner.withPropertyValues("app.credit.monthly-amount=37").run(context -> {
             // given
             var credit = context.getBean(CreditProperties.class);
             var users = new FakeUserRepository();
@@ -73,7 +73,7 @@ class ApplyServiceTest {
     }
 
     private void assertExistingAccountPreserved(UserStatus status, boolean identitySession) {
-        runner.run(context -> {
+        applicationContextRunner.run(context -> {
             // given
             var users = new FakeUserRepository();
             var entries = new FakeCreditEntryRepository();

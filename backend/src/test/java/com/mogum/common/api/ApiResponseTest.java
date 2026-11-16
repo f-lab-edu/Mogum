@@ -2,6 +2,7 @@ package com.mogum.common.api;
 
 import com.mogum.account.domain.UserStatus;
 import jakarta.persistence.EntityManagerFactory;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,7 +11,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.test.json.JsonContent;
 import tools.jackson.databind.ObjectMapper;
 
-import javax.sql.DataSource;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,8 +18,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @JsonTest
 class ApiResponseTest {
-    @Autowired private ObjectMapper mapper;
-    @Autowired private ApplicationContext context;
+    @Autowired private ObjectMapper objectMapper;
+    @Autowired private ApplicationContext applicationContext;
 
     @Test
     @DisplayName("성공 DTO는 값이 없는 필드도 null로 싣고 최상위는 data 하나뿐이다")
@@ -28,14 +28,14 @@ class ApiResponseTest {
         var response = ApiResponse.of(new OptionalResponse("me@example.com", null));
 
         // when
-        var json = mapper.writeValueAsString(response);
+        var json = objectMapper.writeValueAsString(response);
 
         // then
         assertThat(new JsonContent(json)).isStrictlyEqualTo("""
                 {"data":{"email":"me@example.com","optional":null}}
                 """);
-        assertThat(context.getBeansOfType(DataSource.class)).isEmpty();
-        assertThat(context.getBeansOfType(EntityManagerFactory.class)).isEmpty();
+        assertThat(applicationContext.getBeansOfType(DataSource.class)).isEmpty();
+        assertThat(applicationContext.getBeansOfType(EntityManagerFactory.class)).isEmpty();
     }
 
     @Test
@@ -45,7 +45,7 @@ class ApiResponseTest {
         var response = ApiResponse.of(new TimestampResponse(Instant.parse("2026-12-14T15:00:00Z")));
 
         // when
-        var json = mapper.writeValueAsString(response);
+        var json = objectMapper.writeValueAsString(response);
 
         // then
         assertThat(new JsonContent(json)).isStrictlyEqualTo("""
@@ -60,7 +60,7 @@ class ApiResponseTest {
         var response = ApiResponse.of(new StatusResponse(UserStatus.APPLIED));
 
         // when
-        var json = mapper.writeValueAsString(response);
+        var json = objectMapper.writeValueAsString(response);
 
         // then
         assertThat(new JsonContent(json)).isStrictlyEqualTo("""
@@ -75,7 +75,7 @@ class ApiResponseTest {
         var response = ApiErrorResponses.of(ErrorCode.NOT_FOUND, null).getBody();
 
         // when
-        var json = mapper.writeValueAsString(response);
+        var json = objectMapper.writeValueAsString(response);
 
         // then
         assertThat(new JsonContent(json)).isStrictlyEqualTo("""

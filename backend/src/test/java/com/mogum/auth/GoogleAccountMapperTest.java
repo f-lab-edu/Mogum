@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class GoogleAccountMapperTest {
-    private final GoogleAccountMapper mapper = new GoogleAccountMapper();
+    private final GoogleAccountMapper googleAccountMapper = new GoogleAccountMapper();
 
     @Test
     @DisplayName("서버 등록 ID와 구글 응답을 로그인 입력으로 변환하고 원문을 보존한다")
@@ -28,7 +28,7 @@ class GoogleAccountMapperTest {
         var authentication = authentication("google", attributes());
 
         // when
-        var account = mapper.map(authentication);
+        var account = googleAccountMapper.map(authentication);
 
         // then
         assertThat(account).isEqualTo(new ExternalAccount("google", " Case-Sensitive-Sub ", "Admin@Example.com", "test", true));
@@ -41,7 +41,7 @@ class GoogleAccountMapperTest {
         var authentication = authentication("kakao", attributes());
 
         // when & then
-        assertThatThrownBy(() -> mapper.map(authentication)).isInstanceOf(OAuth2AuthenticationException.class);
+        assertThatThrownBy(() -> googleAccountMapper.map(authentication)).isInstanceOf(OAuth2AuthenticationException.class);
     }
 
     @ParameterizedTest(name = "필드 {0} 값 [{1}]")
@@ -55,7 +55,7 @@ class GoogleAccountMapperTest {
         var authentication = authentication("google", values);
 
         // when & then
-        assertThatThrownBy(() -> mapper.map(authentication)).isInstanceOf(OAuth2AuthenticationException.class);
+        assertThatThrownBy(() -> googleAccountMapper.map(authentication)).isInstanceOf(OAuth2AuthenticationException.class);
     }
 
     @ParameterizedTest(name = "인증 표시 [{0}]")
@@ -69,7 +69,7 @@ class GoogleAccountMapperTest {
         var authentication = authentication("google", values);
 
         // when
-        var account = mapper.map(authentication);
+        var account = googleAccountMapper.map(authentication);
 
         // then
         assertThat(account.emailVerified()).isFalse();
@@ -86,7 +86,7 @@ class GoogleAccountMapperTest {
         var authentication = authentication("google", values);
 
         // when
-        var account = mapper.map(authentication);
+        var account = googleAccountMapper.map(authentication);
 
         // then
         assertThat(account.name()).isEqualTo("Admin");

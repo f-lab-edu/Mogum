@@ -13,7 +13,7 @@ class SecurityConfigurationLocalCookieIntegrationTest extends SecurityScenario {
     @DisplayName("로컬 CSRF 쿠키도 Domain 없이 발급된다")
     void issuesHostOnlyCsrfCookie() {
         // when
-        var response = requests.anonymous().get().uri("/api/me").exchange().returnResult(String.class);
+        var response = testRequests.anonymous().get().uri("/api/me").exchange().returnResult(String.class);
         // then
         assertError(response, 401, "UNAUTHORIZED");
         assertCookie(response.getResponseCookies().getFirst("XSRF-TOKEN"));

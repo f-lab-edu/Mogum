@@ -10,7 +10,8 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import tools.jackson.databind.ObjectMapper;
 
-import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.*;
+import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.ORIGIN;
+import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.TOKEN_CALLS;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @IntegrationTest

@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.client.RestTestClient;
 import java.io.ByteArrayOutputStream;
 import java.io.ObjectOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -38,7 +39,7 @@ class LoginIdentityMigrationTest {
         // given
         try (var database = new MigrationDatabase()) {
             var legacy = database.prepareUsersAndSession(version);
-            var jdbc = database.jdbc;
+            var jdbc = database.jdbcTemplate;
 
             // when
             database.migrateTo("8");
@@ -121,7 +122,7 @@ class LoginIdentityMigrationTest {
                 // then
                 assertThat(result).isEqualTo(new LoginResult.Success(id));
                 assertThat(database.users()).isEqualTo(legacy.users());
-                assertThat(database.jdbc.queryForList("SELECT subject FROM users ORDER BY id", String.class))
+                assertThat(database.jdbcTemplate.queryForList("SELECT subject FROM users ORDER BY id", String.class))
                         .containsExactly("Original-Sub", "other-sub");
             }
         }
@@ -134,7 +135,7 @@ class LoginIdentityMigrationTest {
         // given
         try (var database = new MigrationDatabase()) {
             database.migrateTo("4");
-            var jdbc = database.jdbc;
+            var jdbc = database.jdbcTemplate;
             long id = jdbc.queryForObject("""
                     INSERT INTO users (email, status, role, created_at)
                     VALUES ('old@example.com', 'ACTIVE', 'USER', now()) RETURNING id
@@ -163,43 +164,43 @@ class LoginIdentityMigrationTest {
     }
 
     private static final class MigrationDatabase implements AutoCloseable {
-        private final JdbcTemplate admin = new JdbcTemplate(new DriverManagerDataSource(
+        private final JdbcTemplate adminJdbcTemplate = new JdbcTemplate(new DriverManagerDataSource(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
         private final String schema = "migration_" + UUID.randomUUID().toString().replace("-", "");
         private final String url = POSTGRES.getJdbcUrl() + (POSTGRES.getJdbcUrl().contains("?") ? "&" : "?")
                 + "currentSchema=" + schema + ",public";
-        private final JdbcTemplate jdbc = new JdbcTemplate(
+        private final JdbcTemplate jdbcTemplate = new JdbcTemplate(
                 new DriverManagerDataSource(url, POSTGRES.getUsername(), POSTGRES.getPassword()));
 
         private MigrationDatabase() {
             // V1의 확장은 테스트 스키마를 삭제해도 공유 DB에 남도록 public에 설치한다.
-            admin.execute("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public");
-            admin.execute("CREATE SCHEMA " + schema);
+            adminJdbcTemplate.execute("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public");
+            adminJdbcTemplate.execute("CREATE SCHEMA " + schema);
         }
 
         private LegacyData prepareUsersAndSession(String version) throws Exception {
             migrateTo("3");
             var created = Instant.parse("2026-10-12T03:00:00Z");
-            jdbc.update("""
+            jdbcTemplate.update("""
                     INSERT INTO users (google_sub, email, status, role, terms_agreed_at, terms_version, created_at)
                     VALUES ('Original-Sub', 'old@example.com', 'WAITLISTED', 'USER', ?, 'v1', ?),
                            ('other-sub', 'old@example.com', 'ACTIVE', 'ADMIN', NULL, NULL, ?)
-                    """, java.sql.Timestamp.from(created.plusSeconds(10)), java.sql.Timestamp.from(created),
-                    java.sql.Timestamp.from(created));
-            var users = jdbc.queryForList("SELECT id, email, created_at FROM users ORDER BY id");
+                    """, Timestamp.from(created.plusSeconds(10)), Timestamp.from(created),
+                    Timestamp.from(created));
+            var users = jdbcTemplate.queryForList("SELECT id, email, created_at FROM users ORDER BY id");
             String primaryId = UUID.randomUUID().toString();
             String sessionId = UUID.randomUUID().toString();
             long now = System.currentTimeMillis();
-            jdbc.update("INSERT INTO spring_session VALUES (?, ?, ?, ?, 604800, ?, ?)",
+            jdbcTemplate.update("INSERT INTO spring_session VALUES (?, ?, ?, ?, 604800, ?, ?)",
                     primaryId, sessionId, now, now, now + 604800000, users.getFirst().get("id").toString());
             var serialized = new ByteArrayOutputStream();
             try (var output = new ObjectOutputStream(serialized)) {
                 output.writeObject(users.getFirst().get("id").toString());
             }
             byte[] attribute = serialized.toByteArray();
-            jdbc.update("INSERT INTO spring_session_attributes VALUES (?, ?, ?)", primaryId,
+            jdbcTemplate.update("INSERT INTO spring_session_attributes VALUES (?, ?, ?)", primaryId,
                     FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, attribute);
-            var sessions = jdbc.queryForList("SELECT * FROM spring_session");
+            var sessions = jdbcTemplate.queryForList("SELECT * FROM spring_session");
             if (!version.equals("3")) {
                 migrateTo(version);
             }
@@ -208,7 +209,7 @@ class LoginIdentityMigrationTest {
         }
 
         private List<Map<String, Object>> users() {
-            return jdbc.queryForList("SELECT id, email, created_at FROM users ORDER BY id");
+            return jdbcTemplate.queryForList("SELECT id, email, created_at FROM users ORDER BY id");
         }
 
         private void migrateTo(String version) {
@@ -233,7 +234,7 @@ class LoginIdentityMigrationTest {
 
         @Override
         public void close() {
-            admin.execute("DROP SCHEMA " + schema + " CASCADE");
+            adminJdbcTemplate.execute("DROP SCHEMA " + schema + " CASCADE");
         }
     }
 }

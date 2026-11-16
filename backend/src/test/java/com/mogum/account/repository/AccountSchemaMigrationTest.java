@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -26,7 +27,7 @@ class AccountSchemaMigrationTest {
     void migratesLegacyAccountsAndCredits() {
         // given
         try (var database = new MigrationDatabase()) {
-            var jdbc = database.jdbc;
+            var jdbc = database.jdbcTemplate;
             for (String status : new String[]{"ACTIVE", "PENDING", "WAITLISTED"}) {
                 database.insertLegacyUser(status);
             }
@@ -81,15 +82,15 @@ class AccountSchemaMigrationTest {
     void rejectsUnknownLegacyStatusWithoutPartialMigration() {
         // given
         try (var database = new MigrationDatabase()) {
-            database.jdbc.execute("ALTER TABLE users DROP CONSTRAINT users_status_check");
+            database.jdbcTemplate.execute("ALTER TABLE users DROP CONSTRAINT users_status_check");
             database.insertLegacyUser("UNKNOWN");
-            var before = database.jdbc.queryForList("SELECT * FROM users");
+            var before = database.jdbcTemplate.queryForList("SELECT * FROM users");
             var flyway = database.flyway(null);
 
             // when & then
             assertThatThrownBy(flyway::migrate).isInstanceOf(FlywayException.class)
                     .hasStackTraceContaining("Unsupported legacy user status");
-            assertThat(database.jdbc.queryForList("SELECT * FROM users")).isEqualTo(before);
+            assertThat(database.jdbcTemplate.queryForList("SELECT * FROM users")).isEqualTo(before);
             assertThat(flyway.info().current().getVersion().toString()).isEqualTo("8");
         }
     }
@@ -111,7 +112,7 @@ class AccountSchemaMigrationTest {
             var expression = matcher.group(1).replace("now()", "CAST(? AS timestamptz)");
 
             // when
-            var actual = database.jdbc.queryForObject("SELECT " + expression, Timestamp.class, approval);
+            var actual = database.jdbcTemplate.queryForObject("SELECT " + expression, Timestamp.class, approval);
 
             // then
             assertThat(actual.toInstant()).isEqualTo(Instant.parse(expected));
@@ -119,25 +120,25 @@ class AccountSchemaMigrationTest {
     }
 
     private static final class MigrationDatabase implements AutoCloseable {
-        private final JdbcTemplate admin = new JdbcTemplate(new DriverManagerDataSource(
+        private final JdbcTemplate adminJdbcTemplate = new JdbcTemplate(new DriverManagerDataSource(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
         private final String schema = "account_migration_" + UUID.randomUUID().toString().replace("-", "");
         private final String url = POSTGRES.getJdbcUrl() + (POSTGRES.getJdbcUrl().contains("?") ? "&" : "?")
                 + "currentSchema=" + schema + ",public";
-        private final JdbcTemplate jdbc = new JdbcTemplate(new DriverManagerDataSource(
+        private final JdbcTemplate jdbcTemplate = new JdbcTemplate(new DriverManagerDataSource(
                 url, POSTGRES.getUsername(), POSTGRES.getPassword()));
 
         private MigrationDatabase() {
-            admin.execute("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public");
-            admin.execute("CREATE SCHEMA " + schema);
+            adminJdbcTemplate.execute("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public");
+            adminJdbcTemplate.execute("CREATE SCHEMA " + schema);
             flyway("8").migrate();
         }
 
         private void insertLegacyUser(String status) {
-            jdbc.update("""
+            jdbcTemplate.update("""
                     INSERT INTO users (provider, subject, email, status, role, created_at, updated_at)
                     VALUES ('google', ?, ?, ?, 'USER', '2026-10-01T00:00:00Z', '2026-10-01T00:00:00Z')
-                    """, status, status.toLowerCase(java.util.Locale.ROOT) + "@example.com", status);
+                    """, status, status.toLowerCase(Locale.ROOT) + "@example.com", status);
         }
 
         private Flyway flyway(String target) {
@@ -149,7 +150,7 @@ class AccountSchemaMigrationTest {
 
         @Override
         public void close() {
-            admin.execute("DROP SCHEMA " + schema + " CASCADE");
+            adminJdbcTemplate.execute("DROP SCHEMA " + schema + " CASCADE");
         }
     }
 }

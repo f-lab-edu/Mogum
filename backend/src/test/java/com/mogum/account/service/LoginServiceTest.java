@@ -18,20 +18,20 @@ import static org.mockito.BDDMockito.then;
 
 @ExtendWith(MockitoExtension.class)
 class LoginServiceTest {
-    @Mock private UserRepository untouchedUsers;
+    @Mock private UserRepository userRepository;
 
     @Test
     @DisplayName("이메일 미인증은 DB 접근 전에 거절한다")
     void rejectsUnverifiedEmailBeforeQueryingDatabase() {
         // given
-        var login = new LoginService(untouchedUsers);
+        var login = new LoginService(userRepository);
 
         // when
         var result = login.login(new ExternalAccount("google", "sub", "me@example.com", "Google name", false));
 
         // then
         assertThat(result).isEqualTo(new LoginResult.Rejected(LoginResult.RejectionReason.EMAIL_NOT_VERIFIED));
-        then(untouchedUsers).shouldHaveNoInteractions();
+        then(userRepository).shouldHaveNoInteractions();
     }
 
     @Test
