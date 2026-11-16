@@ -1,3 +1,5 @@
+export const CONNECTION_ERROR_MESSAGE = '연결하지 못했어요. 다시 시도해 주세요.'
+
 export type ApiErrorCode =
   | 'UNAUTHORIZED'
   | 'CSRF_INVALID'
@@ -72,7 +74,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     const code = isObject(body) && typeof body.code === 'string'
       ? body.code : fallbackCode
     const message = isObject(body) && typeof body.message === 'string'
-      ? body.message : 'Request failed'
+      ? body.message : CONNECTION_ERROR_MESSAGE
     const retryAfterSeconds = isObject(body) && typeof body.retryAfterSeconds === 'number'
       ? body.retryAfterSeconds : undefined
     const fields = isObject(body) && Array.isArray(body.fields) && body.fields.every(
@@ -85,7 +87,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   if (response.status === 204 || method === 'HEAD') return undefined as T
   const body: unknown = await response.json().catch(() => null)
   if (!isObject(body) || !isObject(body.data)) {
-    throw new ApiError(response.status, 'INTERNAL_ERROR', 'Invalid API response')
+    throw new ApiError(response.status, 'INTERNAL_ERROR', CONNECTION_ERROR_MESSAGE)
   }
   return body.data as T
 }

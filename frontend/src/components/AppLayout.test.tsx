@@ -52,6 +52,12 @@ test('1024px에서 바뀌는 바·사이드바와 본문 아래 여백을 구조
 
 test('탭 첫 화면의 위 바와 사이드바는 작은 모구미와 머금 로고를 쓴다', () => {
   open(<AppLayout><h1>자리 화면</h1></AppLayout>)
+  const header = screen.getByRole('banner')
+  const sidebar = screen.getByRole('complementary')
+  expect(within(header).getByText('머금').parentElement).toHaveClass('lg:hidden')
+  expect(within(sidebar).getByText('머금').parentElement).not.toHaveClass('lg:hidden')
+  expect(header).not.toHaveClass('lg:hidden')
+  expect(header).toHaveClass('h-14', 'bg-surface', 'border-b', 'border-border')
   for (const region of [screen.getByRole('banner'), screen.getByRole('complementary')]) {
     expect(within(region).getByText('머금')).toBeVisible()
     expect(within(region).getByRole('img', { name: '보라색 머그컵 안에서 책을 읽는 모구미' })).toHaveClass('w-10')

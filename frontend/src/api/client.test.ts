@@ -88,7 +88,7 @@ test.each([
   vi.mocked(fetch).mockResolvedValue(new Response(body, { status }))
   const error = await apiFetch('/me').catch((error: unknown) => error)
   expect(error).toBeInstanceOf(ApiError)
-  expect(error).toMatchObject({ status, code: 'INTERNAL_ERROR' })
+  expect(error).toMatchObject({ status, code: 'INTERNAL_ERROR', message: '연결하지 못했어요. 다시 시도해 주세요.' })
   expect(fetch).toHaveBeenCalledTimes(1)
 })
 
@@ -164,10 +164,20 @@ test('모르는 오류 code도 원문대로 보존한다', async () => {
 
 test('code와 message 타입이 틀리면 대체값을 쓴다', async () => {
   vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 1, message: [] }), { status: 400 }))
-  await expect(apiFetch('/example')).rejects.toMatchObject({ status: 400, code: 'INVALID_REQUEST', message: 'Request failed' })
+  await expect(apiFetch('/example')).rejects.toMatchObject({ status: 400, code: 'INVALID_REQUEST', message: '연결하지 못했어요. 다시 시도해 주세요.' })
 })
 
-test.each([[401, 'UNAUTHORIZED'], [403, 'INVALID_REQUEST'], [404, 'INVALID_REQUEST'], [502, 'INTERNAL_ERROR']])('JSON이 아닌 실패 %s도 HTTP 상태를 보존한다', async (status, code) => {
-  vi.mocked(fetch).mockResolvedValue(new Response('Bad gateway', { status }))
-  await expect(apiFetch('/me')).rejects.toMatchObject({ status, code })
+test.each([[401, 'UNAUTHORIZED'], [403, 'INVALID_REQUEST'], [404, 'INVALID_REQUEST'], [502, 'INTERNAL_ERROR']])('JSON이 아닌 실패 %s는 공통 연결 안내와 기존 상태·code를 쓴다', async (status, code) => {
+  vi.mocked(fetch).mockResolvedValue(new Response('<html>Bad gateway</html>', { status, headers: { 'Content-Type': 'text/html' } }))
+  await expect(apiFetch('/me')).rejects.toMatchObject({ status, code, message: '연결하지 못했어요. 다시 시도해 주세요.' })
+})
+
+test.each([
+  [{}, 'INVALID_REQUEST'],
+  [{ code: 'FUTURE_ERROR', retryAfterSeconds: 30, fields: [{ field: 'topic', reason: 'REQUIRED' }] }, 'FUTURE_ERROR'],
+])('message가 없는 JSON 오류는 공통 연결 안내와 기존 오류 정보를 쓴다: %j', async (body, code) => {
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify(body), { status: 400 }))
+  await expect(apiFetch('/example')).rejects.toMatchObject({
+    ...body, status: 400, code, message: '연결하지 못했어요. 다시 시도해 주세요.',
+  })
 })

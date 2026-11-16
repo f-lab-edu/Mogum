@@ -1,5 +1,5 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { ApiError } from '../api/client'
+import { ApiError, CONNECTION_ERROR_MESSAGE } from '../api/client'
 import { useJob, useJobAction } from '../api/useJob'
 import type { JobResponse } from '../api/useJob'
 import Button from '../components/Button'
@@ -16,10 +16,9 @@ const kinds = new Map([
 ])
 const levels = new Map([['BEGINNER', '처음 배워요'], ['BASICS', '기초는 알아요'], ['FAMILIAR', '익숙해요']])
 const purposes = new Map([['WORK', '업무에 쓰려고요'], ['INTERVIEW', '면접 준비'], ['GENERAL', '교양 · 관심']])
-const connectionMessage = '연결하지 못했어요. 다시 시도해 주세요.'
 
 function errorMessage(error: unknown) {
-  return error instanceof ApiError && error.status >= 400 ? error.message : connectionMessage
+  return error instanceof ApiError && error.status >= 400 ? error.message : CONNECTION_ERROR_MESSAGE
 }
 
 function resultPath(result: JobResponse['result']) {

@@ -27,8 +27,8 @@ const tabs = [
   },
 ]
 
-function Brand() {
-  return <div className="flex items-center gap-2">
+function Brand({ className = '' }: { className?: string }) {
+  return <div className={`flex items-center gap-2 ${className}`}>
     <Mogumi size="logo" />
     <span className="text-title font-extrabold text-primary">머금</span>
   </div>
@@ -76,7 +76,7 @@ export default function AppLayout({ children, title }: { children: ReactNode; ti
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" focusable="false" className="size-6"><path d="m15 18-6-6 6-6" /></svg>
             </button>
             <h1 ref={heading} tabIndex={-1} className="min-w-0 truncate text-body font-bold">{title}</h1>
-          </> : <Brand />}
+          </> : <Brand className="lg:hidden" />}
         </header>
         <main className="px-4 pt-6 pb-24 lg:px-8 lg:pb-8">
           <div className="mx-auto max-w-content">{children}</div>

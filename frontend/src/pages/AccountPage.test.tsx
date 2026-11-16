@@ -117,6 +117,20 @@ test.each(['서버', '연결'])('%s 신청 실패 뒤 서버 문구 또는 연�
   expect(await screen.findByRole('heading', { name: '가입 승인을 기다리고 있어요' })).toBeVisible()
 })
 
+test('신청이 JSON이 아닌 오류 본문으로 실패하면 영어·기술 상세 대신 공통 연결 안내를 보인다', async () => {
+  open()
+  const button = await screen.findByRole('button', { name: '신청' })
+  vi.mocked(fetch).mockResolvedValue(new Response('<html>PRIVATE_PROXY_DETAILS</html>', {
+    status: 502, headers: { 'Content-Type': 'text/html' },
+  }))
+  fireEvent.click(button)
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveTextContent('신청하지 못했어요.')
+  expect(alert).toHaveTextContent('연결하지 못했어요. 다시 시도해 주세요.')
+  expect(screen.queryByText(/Request failed|Invalid API response|PRIVATE_PROXY_DETAILS|INTERNAL_ERROR/)).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '다시 시도' })).toBeEnabled()
+})
+
 test('다른 계정 로그인은 로그아웃 완료를 기다린 뒤 Google 로그인을 연다', async () => {
   open()
   const button = await screen.findByRole('button', { name: '다른 계정으로 로그인' })
