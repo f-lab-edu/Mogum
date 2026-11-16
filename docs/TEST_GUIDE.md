@@ -37,14 +37,14 @@
 @DisplayName("재로그인은 기존 회원 ID를 돌려주고 회원을 새로 만들지 않는다")
 void returnsExistingUserIdOnRelogin() {
     // given
-    var existing = users.save(UserFixtures.user("admin@example.com"));
+    var existing = userRepository.save(UserFixtures.user("admin@example.com"));
 
     // when
     var result = loginService.login(account(existing.getSubject(), "admin@example.com"));
 
     // then
     assertThat(result).isEqualTo(new LoginResult.Success(existing.getId()));
-    assertThat(users.count()).isEqualTo(1);
+    assertThat(userRepository.count()).isEqualTo(1);
 }
 ```
 
