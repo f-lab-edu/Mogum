@@ -1,35 +1,35 @@
 package com.mogum.worker;
 
 import com.mogum.config.WorkerProperties;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 /** 서버 수명에 실행기를 연결한다. 각 슬롯은 한 작업만 집으며 작업 분배 상태는 공유하지 않는다. */
+@RequiredArgsConstructor
+@Slf4j
 public final class WorkerLifecycle implements SmartLifecycle {
-    private static final Logger log = LoggerFactory.getLogger(WorkerLifecycle.class);
-    private final WorkerProperties properties;
+    private final WorkerProperties workerProperties;
     private final Function<ScheduledExecutorService, JobRunner> runnerFactory;
     private final List<Slot> slots = new ArrayList<>();
     private volatile boolean running;
     private CompletableFuture<Void> shutdown = CompletableFuture.completedFuture(null);
 
-    public WorkerLifecycle(WorkerProperties properties, Function<ScheduledExecutorService, JobRunner> runnerFactory) {
-        this.properties = properties;
-        this.runnerFactory = runnerFactory;
-    }
-
     @Override
     public synchronized void start() {
-        if (running || properties.count() == 0) return;
+        if (running || workerProperties.count() == 0) return;
         shutdown.join();
         slots.clear();
-        for (int index = 0; index < properties.count(); index++) slots.add(new Slot(index));
+        for (int index = 0; index < workerProperties.count(); index++) slots.add(new Slot(index));
         running = true;
         slots.forEach(slot -> slot.thread.start());
     }
@@ -45,7 +45,7 @@ public final class WorkerLifecycle implements SmartLifecycle {
     public synchronized void stop(Runnable callback) {
         if (running) {
             running = false;
-            long deadline = System.nanoTime() + properties.shutdownWait().toNanos();
+            long deadline = System.nanoTime() + workerProperties.shutdownWait().toNanos();
             slots.forEach(slot -> {
                 slot.stopping = true;
                 slot.runner.stopClaiming();
@@ -91,7 +91,7 @@ public final class WorkerLifecycle implements SmartLifecycle {
                 }
                 if (!found && !stopping) {
                     try {
-                        if (wakeup.await(properties.pollInterval().toNanos(), TimeUnit.NANOSECONDS)) {
+                        if (wakeup.await(workerProperties.pollInterval().toNanos(), TimeUnit.NANOSECONDS)) {
                             break;
                         }
                     } catch (InterruptedException exception) {

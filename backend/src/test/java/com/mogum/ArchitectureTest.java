@@ -1,64 +1,71 @@
 package com.mogum;
 
-import com.mogum.archfixture.testrules.AccessibleObjectUsage;
-import com.mogum.archfixture.testrules.JUnitAssertionsUsage;
-import com.mogum.archfixture.testrules.LegacyIT;
-import com.mogum.archfixture.testrules.ReflectionUtilsUsage;
+import com.mogum.account.controller.MeController;
+import com.mogum.account.domain.User;
 import com.mogum.account.domain.UserFixtures;
+import com.mogum.account.dto.MeResponse;
 import com.mogum.account.repository.FakeUserRepository;
-import com.tngtech.archunit.core.domain.JavaClass;
 import com.mogum.archfixture.account.AccountToGeneration;
 import com.mogum.archfixture.account.AccountToWorker;
 import com.mogum.archfixture.generation.TransactionalGeneration;
 import com.mogum.archfixture.job.JobToGeneration;
+import com.mogum.archfixture.testrules.AccessibleObjectUsage;
+import com.mogum.archfixture.testrules.JUnitAssertionsUsage;
+import com.mogum.archfixture.testrules.LegacyIT;
+import com.mogum.archfixture.testrules.ReflectionUtilsUsage;
 import com.mogum.archfixture.worker.JakartaTransactionalWorkerMethod;
 import com.mogum.archfixture.worker.TransactionalWorkerMethod;
-import com.mogum.account.controller.MeController;
-import com.mogum.account.domain.User;
-import com.mogum.account.dto.MeResponse;
-import com.mogum.common.persistence.AuditedEntity;
-import entityfixture.UnauditedEntity;
-import repositoryfixture.BroadUserRepository;
-import org.junit.jupiter.api.DisplayName;
-import org.springframework.data.repository.Repository;
-import org.springframework.data.repository.CrudRepository;
-import org.springframework.data.repository.ListCrudRepository;
-import org.springframework.data.repository.PagingAndSortingRepository;
-import org.springframework.data.jpa.repository.JpaRepository;
-import jakarta.persistence.Entity;
 import com.mogum.common.api.ApiErrorController;
 import com.mogum.common.api.ApiResponse;
+import com.mogum.common.persistence.AuditedEntity;
+import com.mogum.support.TestSessions;
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.domain.JavaParameterizedType;
 import com.tngtech.archunit.core.domain.JavaType;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
-import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ArchCondition;
+import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import entityfixture.UnauditedEntity;
+import jakarta.persistence.Entity;
+import jakarta.validation.Valid;
+import namingfixture.NamedDependencies;
+import namingfixture.ShortDependency;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.CrudRepository;
+import org.springframework.data.repository.ListCrudRepository;
+import org.springframework.data.repository.PagingAndSortingRepository;
+import org.springframework.data.repository.Repository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestBody;
-import jakarta.validation.Valid;
+import repositoryfixture.BroadUserRepository;
 
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
+import java.lang.reflect.AccessibleObject;
+
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -68,8 +75,62 @@ class ArchitectureTest {
             .importPackages("com.mogum");
     private static final JavaClasses TEST_CLASSES = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.ONLY_INCLUDE_TESTS)
-            .withImportOption(location -> !location.contains("/com/mogum/archfixture/"))
+            .withImportOption(location -> !location.contains("/com/mogum/archfixture/")
+                    && !location.contains("/namingfixture/"))
             .importClasspath();
+    private static final ArchRule COMPONENT_DEPENDENCIES_USE_TYPE_NAMES = classes().that(
+            new DescribedPredicate<JavaClass>("are Component classes including meta annotations") {
+                @Override
+                public boolean test(JavaClass type) {
+                    return type.isAnnotatedWith(Component.class) || type.isMetaAnnotatedWith(Component.class);
+                }
+            }).should(new ArchCondition<JavaClass>("name non-static final dependencies after their raw types") {
+                @Override
+                public void check(JavaClass type, ConditionEvents events) {
+                    for (JavaField field : type.getFields()) {
+                        var rawType = field.getRawType();
+                        if (field.getModifiers().contains(JavaModifier.STATIC)
+                                || !field.getModifiers().contains(JavaModifier.FINAL)
+                                || rawType.isPrimitive() || rawType.getPackageName().startsWith("java.")) continue;
+                        String typeName = rawType.getSimpleName();
+                        String camelCaseName = Character.toLowerCase(typeName.charAt(0)) + typeName.substring(1);
+                        boolean matches = field.getName().equals(camelCaseName) || field.getName().endsWith(typeName);
+                        events.add(new SimpleConditionEvent(field, matches,
+                                field.getFullName() + " must be named " + camelCaseName + " or end with " + typeName));
+                    }
+                }
+            });
+
+    @Test
+    @DisplayName("운영 빈의 final 의존 필드는 타입 이름이나 역할 접두와 타입 이름을 쓴다")
+    void requiresDependencyTypeNamesInComponents() {
+        // when
+        var result = COMPONENT_DEPENDENCIES_USE_TYPE_NAMES.evaluate(CLASSES);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
+    }
+
+    @Test
+    @DisplayName("타입 이름을 줄인 final 의존 필드가 있는 빈을 거부한다")
+    void rejectsShortDependencyNames() {
+        // when & then
+        assertViolation(COMPONENT_DEPENDENCIES_USE_TYPE_NAMES, ShortDependency.class);
+    }
+
+    @Test
+    @DisplayName("메타 애노테이션 빈의 타입 이름과 역할 접두를 허용하고 java 타입과 원시형은 제외한다")
+    void acceptsTypeNamesAndIgnoresExcludedFields() {
+        // given
+        var classes = new ClassFileImporter().importClasses(NamedDependencies.class);
+
+        // when
+        var result = COMPONENT_DEPENDENCIES_USE_TYPE_NAMES.evaluate(classes);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
+    }
+
     private static final ArchRule TESTS_USE_ASSERTJ = noClasses().should().dependOnClassesThat()
             .haveFullyQualifiedName("org.junit.jupiter.api.Assertions");
     private static final ArchRule TEST_NAMES_AVOID_IT = noClasses().should().haveSimpleNameEndingWith("IT");
@@ -89,7 +150,7 @@ class ArchitectureTest {
                     }
                     for (var call : type.getMethodCallsFromSelf()) {
                         if (call.getTarget().getName().equals("setAccessible")
-                                && call.getTargetOwner().isAssignableTo(java.lang.reflect.AccessibleObject.class)) {
+                                && call.getTargetOwner().isAssignableTo(AccessibleObject.class)) {
                             events.add(SimpleConditionEvent.violated(type, call.getDescription()));
                         }
                     }
@@ -158,8 +219,10 @@ class ArchitectureTest {
         assertThat(classes.contain(ArchitectureTest.class)).isTrue();
         assertThat(classes.contain(UserFixtures.class)).isTrue();
         assertThat(classes.contain(FakeUserRepository.class)).isTrue();
-        assertThat(classes.contain(com.mogum.support.TestSessions.class)).isTrue();
+        assertThat(classes.contain(TestSessions.class)).isTrue();
         assertThat(classes.contain(MogumApplication.class)).isFalse();
+        assertThat(classes.contain(ShortDependency.class)).isFalse();
+        assertThat(classes.contain(NamedDependencies.class)).isFalse();
         assertThat(classes.stream()).noneMatch(type -> type.getPackageName().startsWith("com.mogum.archfixture"));
     }
 

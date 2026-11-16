@@ -9,8 +9,7 @@ import jakarta.servlet.ServletRequestListener;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 
 import java.io.IOException;
@@ -18,13 +17,13 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /** 모든 필터 바깥에서 상관 ID를 붙이고, ERROR 처리까지 끝난 요청의 접근 줄을 만든다. */
+@Slf4j
 public final class RequestLogFilter implements Filter, ServletRequestListener {
     public static final String REQUEST_ID = "requestId";
     public static final String USER_ID = "userId";
     public static final String JOB_ID = "jobId";
     private static final String STATE = RequestLogFilter.class.getName() + ".state";
     private static final String HEADER = "X-Request-Id";
-    private static final Logger log = LoggerFactory.getLogger(RequestLogFilter.class);
 
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain chain)

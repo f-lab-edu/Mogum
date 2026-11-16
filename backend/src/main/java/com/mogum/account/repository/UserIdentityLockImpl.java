@@ -1,14 +1,12 @@
 package com.mogum.account.repository;
 
 import jakarta.persistence.EntityManager;
+import lombok.RequiredArgsConstructor;
 
 /** 행이 없는 신청 전 신원도 트랜잭션이 끝날 때까지 DB에서 직렬화한다. */
+@RequiredArgsConstructor
 public class UserIdentityLockImpl implements UserIdentityLock {
     private final EntityManager entityManager;
-
-    public UserIdentityLockImpl(EntityManager entityManager) {
-        this.entityManager = entityManager;
-    }
 
     @Override
     public void lockIdentity(String provider, String subject) {

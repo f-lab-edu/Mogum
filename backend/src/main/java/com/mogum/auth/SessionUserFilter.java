@@ -2,11 +2,12 @@ package com.mogum.auth;
 
 import com.mogum.account.repository.UserRepository;
 import com.mogum.common.logging.RequestLogFilter;
-import org.slf4j.MDC;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,14 +19,10 @@ import java.io.IOException;
 import java.util.List;
 
 /** 인증은 요청 안에만 두고, JDBC 세션에는 회원 ID 또는 신청 전 구글 신원만 남긴다. */
+@RequiredArgsConstructor
 public final class SessionUserFilter extends OncePerRequestFilter {
-    private final UserRepository users;
-    private final AuthenticationEntryPoint entryPoint;
-
-    public SessionUserFilter(UserRepository users, AuthenticationEntryPoint entryPoint) {
-        this.users = users;
-        this.entryPoint = entryPoint;
-    }
+    private final UserRepository userRepository;
+    private final AuthenticationEntryPoint authenticationEntryPoint;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -37,7 +34,7 @@ public final class SessionUserFilter extends OncePerRequestFilter {
             AccountPrincipal principal = null;
             if (owner != null && identity == null) {
                 Long userId = userId(owner);
-                var user = userId == null ? null : users.findById(userId).orElse(null);
+                var user = userId == null ? null : userRepository.findById(userId).orElse(null);
                 if (user != null) {
                     principal = new AccountPrincipal.Member(user.getId(), user.getEmail(), user.getName(), user.getStatus());
                 }
@@ -48,7 +45,7 @@ public final class SessionUserFilter extends OncePerRequestFilter {
             }
             if (principal == null) {
                 session.invalidate();
-                entryPoint.commence(request, response, new InsufficientAuthenticationException("Session user missing"));
+                authenticationEntryPoint.commence(request, response, new InsufficientAuthenticationException("Session user missing"));
                 return;
             }
             var context = SecurityContextHolder.createEmptyContext();

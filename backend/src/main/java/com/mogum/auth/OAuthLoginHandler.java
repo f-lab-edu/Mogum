@@ -7,8 +7,8 @@ import com.mogum.common.logging.RequestLogFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -19,21 +19,15 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 import org.springframework.session.FindByIndexNameSessionRepository;
 
 import java.io.IOException;
+import java.util.Collections;
 
+@RequiredArgsConstructor
+@Slf4j
 public final class OAuthLoginHandler implements AuthenticationSuccessHandler, AuthenticationFailureHandler {
-    private static final Logger log = LoggerFactory.getLogger(OAuthLoginHandler.class);
-    private final LoginService login;
-    private final GoogleAccountMapper accounts;
+    private final LoginService loginService;
+    private final GoogleAccountMapper googleAccountMapper;
     private final String origin;
-    private final CookieAuthorizationRequestRepository requests;
-
-    public OAuthLoginHandler(LoginService login, GoogleAccountMapper accounts, String origin,
-                              CookieAuthorizationRequestRepository requests) {
-        this.login = login;
-        this.accounts = accounts;
-        this.origin = origin;
-        this.requests = requests;
-    }
+    private final CookieAuthorizationRequestRepository cookieAuthorizationRequestRepository;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -41,12 +35,12 @@ public final class OAuthLoginHandler implements AuthenticationSuccessHandler, Au
         try {
             ExternalAccount account;
             try {
-                account = accounts.map(authentication);
+                account = googleAccountMapper.map(authentication);
             } catch (OAuth2AuthenticationException invalid) {
                 fail(request, response, "login_failed", failureReason(invalid));
                 return;
             }
-            switch (login.login(account)) {
+            switch (loginService.login(account)) {
                 case LoginResult.Success success -> {
                     var session = resetSession(request);
                     session.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME,
@@ -80,7 +74,7 @@ public final class OAuthLoginHandler implements AuthenticationSuccessHandler, Au
         var session = request.getSession(false);
         if (session == null) return request.getSession(true);
         request.changeSessionId();
-        java.util.Collections.list(session.getAttributeNames()).forEach(session::removeAttribute);
+        Collections.list(session.getAttributeNames()).forEach(session::removeAttribute);
         return session;
     }
 
@@ -107,7 +101,7 @@ public final class OAuthLoginHandler implements AuthenticationSuccessHandler, Au
     }
 
     private void fail(HttpServletRequest request, HttpServletResponse response, String error, String reason) throws IOException {
-        requests.saveAuthorizationRequest(null, request, response);
+        cookieAuthorizationRequestRepository.saveAuthorizationRequest(null, request, response);
         SecurityContextHolder.clearContext();
         response.sendRedirect(origin + "/login?error=" + error);
         if (reason.equals("invalid_grant") || reason.equals("invalid_token_response") || reason.equals("invalid_user_info_response")) {

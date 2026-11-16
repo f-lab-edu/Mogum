@@ -8,20 +8,17 @@ import com.mogum.account.repository.UserRepository;
 import com.mogum.common.api.ApiException;
 import com.mogum.common.api.ErrorCode;
 import com.mogum.common.time.SeoulClock;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 크레딧 잔액과 기록을 호출자의 트랜잭션에 참여해 함께 바꾼다. */
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class CreditLedger {
-    private final UserRepository users;
-    private final CreditEntryRepository entries;
-
-    public CreditLedger(UserRepository users, CreditEntryRepository entries) {
-        this.users = users;
-        this.entries = entries;
-    }
+    private final UserRepository userRepository;
+    private final CreditEntryRepository creditEntryRepository;
 
     /** users 행을 트랜잭션이 끝날 때까지 잠근다. 받기가 건 수를 세기 전에 부른다. */
     public void lock(long userId) {
@@ -38,7 +35,7 @@ public class CreditLedger {
                     "크레딧이 부족합니다. " + refillDate + "에 다시 채워집니다");
         }
         user.consumeCredits(amount);
-        entries.save(CreditEntry.consume(user, jobId, amount));
+        creditEntryRepository.save(CreditEntry.consume(user, jobId, amount));
     }
 
     /**
@@ -48,16 +45,16 @@ public class CreditLedger {
      */
     public void restoreIfOwed(long userId, long jobId) {
         var user = lockedUser(userId);
-        var last = entries.findFirstByUserIdAndJobIdOrderByIdDesc(userId, jobId);
+        var last = creditEntryRepository.findFirstByUserIdAndJobIdOrderByIdDesc(userId, jobId);
         if (last.isEmpty() || last.get().getType() != CreditEntryType.CONSUME) return;
-        var refill = entries.findFirstByUserIdAndTypeOrderByIdDesc(userId, CreditEntryType.REFILL);
+        var refill = creditEntryRepository.findFirstByUserIdAndTypeOrderByIdDesc(userId, CreditEntryType.REFILL);
         if (refill.isEmpty() || last.get().getId() <= refill.get().getId()) return;
         int amount = Math.negateExact(last.get().getAmount());
         user.restoreCredits(amount);
-        entries.save(CreditEntry.restore(user, jobId, amount));
+        creditEntryRepository.save(CreditEntry.restore(user, jobId, amount));
     }
 
     private User lockedUser(long userId) {
-        return users.findByIdForUpdate(userId).orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
+        return userRepository.findByIdForUpdate(userId).orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
     }
 }

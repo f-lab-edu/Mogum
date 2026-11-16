@@ -1,20 +1,21 @@
 package com.mogum.auth;
 
-import com.mogum.account.repository.UserRepository;
 import com.mogum.account.domain.UserStatus;
+import com.mogum.account.repository.UserRepository;
 import com.mogum.account.service.LoginService;
 import com.mogum.common.api.ApiErrorResponses;
 import com.mogum.common.api.ErrorCode;
 import com.mogum.config.WebProperties;
 import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.session.autoconfigure.DefaultCookieSerializerCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -31,9 +32,9 @@ import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.savedrequest.NullRequestCache;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.util.Assert;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.util.Assert;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
@@ -96,7 +97,7 @@ public class SecurityConfiguration {
                 .additionalParameters(parameters -> parameters.put("prompt", "select_account")));
         var getOnlyResolver = new OAuth2AuthorizationRequestResolver() {
             @Override
-            public OAuth2AuthorizationRequest resolve(jakarta.servlet.http.HttpServletRequest request) {
+            public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
                 if (!"GET".equals(request.getMethod())) return null;
                 var match = authorizationStart.matcher(request);
                 // 미등록 ID는 해석기의 예외/로그 대신 공통 404 ERROR 디스패치로 보낸다.
@@ -105,7 +106,7 @@ public class SecurityConfiguration {
             }
 
             @Override
-            public OAuth2AuthorizationRequest resolve(jakarta.servlet.http.HttpServletRequest request, String registrationId) {
+            public OAuth2AuthorizationRequest resolve(HttpServletRequest request, String registrationId) {
                 return "GET".equals(request.getMethod()) && registrations.findByRegistrationId(registrationId) != null
                         ? resolver.resolve(request, registrationId) : null;
             }
