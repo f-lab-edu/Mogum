@@ -42,9 +42,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         if (!(error instanceof FieldError fieldError) || !error.contains(ConstraintViolation.class)) {
             return null;
         }
+
         var violation = error.unwrap(ConstraintViolation.class);
         var descriptor = violation.getConstraintDescriptor();
         var annotationType = descriptor.getAnnotation().annotationType();
+
         if (annotationType == NotBlank.class || annotationType == NotNull.class) {
             return new FieldViolation(fieldError.getField(), FieldViolation.Reason.REQUIRED);
         }
@@ -52,6 +54,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 && sizeOf(violation.getInvalidValue()) > max) {
             return new FieldViolation(fieldError.getField(), FieldViolation.Reason.TOO_LONG);
         }
+
         // 사용자 입력이나 기본 검증 문구 대신, 서버 제약이 명시한 reason만 허용한다.
         var template = violation.getMessageTemplate();
         for (var reason : FieldViolation.Reason.values()) {
@@ -72,7 +75,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @Override
     protected ResponseEntity<Object> createResponseEntity(Object body, HttpHeaders headers,
-                                                         HttpStatusCode status, WebRequest request) {
+            HttpStatusCode status, WebRequest request) {
         var response = ApiErrorResponses.forStatus(status.value(), headers);
         return new ResponseEntity<>(response.getBody(), response.getHeaders(), response.getStatusCode());
     }
@@ -82,6 +85,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         if (exception instanceof ErrorResponse error) {
             return ApiErrorResponses.forStatus(error.getStatusCode().value(), error.getHeaders());
         }
+
         logger.error("Unhandled API exception", exception);
         return ApiErrorResponses.of(ErrorCode.INTERNAL_ERROR, null);
     }

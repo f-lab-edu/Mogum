@@ -24,24 +24,27 @@ public class JobController {
 
     @PostMapping("/api/jobs")
     public ApiResponse<JobResponse> receive(@AuthenticationPrincipal AccountPrincipal.Member member,
-                                            @Valid @RequestBody JobReceiveRequest request) {
+            @Valid @RequestBody JobReceiveRequest request) {
         var result = jobIntakeService.receive(member.userId(), request.toJobRequest());
         return ApiResponse.of(jobReadService.read(member.userId(), result.id()));
     }
 
     @GetMapping("/api/jobs/{id}")
-    public ApiResponse<JobResponse> read(@AuthenticationPrincipal AccountPrincipal.Member member, @PathVariable long id) {
+    public ApiResponse<JobResponse> read(@AuthenticationPrincipal AccountPrincipal.Member member,
+            @PathVariable long id) {
         return ApiResponse.of(jobReadService.read(member.userId(), id));
     }
 
     @PostMapping("/api/jobs/{id}/retry")
-    public ApiResponse<JobResponse> retry(@AuthenticationPrincipal AccountPrincipal.Member member, @PathVariable long id) {
+    public ApiResponse<JobResponse> retry(@AuthenticationPrincipal AccountPrincipal.Member member,
+            @PathVariable long id) {
         var result = jobIntakeService.retry(member.userId(), id);
         return ApiResponse.of(jobReadService.read(member.userId(), result.id()));
     }
 
     @PostMapping("/api/jobs/{id}/discard")
-    public ResponseEntity<Void> discard(@AuthenticationPrincipal AccountPrincipal.Member member, @PathVariable long id) {
+    public ResponseEntity<Void> discard(@AuthenticationPrincipal AccountPrincipal.Member member,
+            @PathVariable long id) {
         jobIntakeService.discard(member.userId(), id);
         return ResponseEntity.noContent().build();
     }

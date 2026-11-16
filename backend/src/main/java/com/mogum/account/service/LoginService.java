@@ -14,6 +14,7 @@ public class LoginService {
         if (!account.emailVerified()) {
             return new LoginResult.Rejected(LoginResult.RejectionReason.EMAIL_NOT_VERIFIED);
         }
+
         // 인증된 이메일만 저장소에서 조회한다.
         return userRepository.findByProviderAndSubject(account.provider(), account.subject())
                 .<LoginResult>map(user -> new LoginResult.Success(user.getId()))

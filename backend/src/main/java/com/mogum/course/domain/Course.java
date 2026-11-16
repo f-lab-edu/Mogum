@@ -32,40 +32,29 @@ public class Course extends AuditedEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     @Column(name = "user_id", nullable = false)
     private Long userId;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "roadmap_id")
     private Roadmap roadmap;
-
     @Column
     private Integer position;
-
     @Column(nullable = false, columnDefinition = "text")
     private String title;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, columnDefinition = "text")
     private CourseStatus status;
-
     @Embedded
     private LearningInput input;
-
     @Column(name = "plan_description", columnDefinition = "text")
     private String planDescription;
-
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "plan_concepts", columnDefinition = "jsonb")
     private List<PlannedConcept> planConcepts;
-
     @Column(name = "started_at")
     private Instant startedAt;
-
     @Column(name = "last_lesson_opened_at")
     private Instant lastLessonOpenedAt;
-
     @Column(name = "completed_at")
     private Instant completedAt;
 
@@ -79,7 +68,7 @@ public class Course extends AuditedEntity {
     }
 
     public static Course inRoadmap(Roadmap roadmap, int position, String title, String planDescription,
-                                   List<PlannedConcept> planConcepts) {
+            List<PlannedConcept> planConcepts) {
         var course = new Course();
         course.roadmap = roadmap;
         course.userId = roadmap.getUserId();

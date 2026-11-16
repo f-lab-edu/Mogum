@@ -37,13 +37,15 @@ public final class JobRunner {
     private final WorkerProperties workerProperties;
     private final Map<JobType, JobGenerator> generators;
     private final ScheduledExecutorService renewals;
+
     // 이 실행기 한 개의 시작/종료 경계다. 다른 워커의 작업 분배는 DB만 결정한다.
     private final Object admission = new Object();
     private volatile boolean stopping;
     private Lease current;
 
-    public JobRunner(EntityManager entityManager, PlatformTransactionManager transactions, CreditLedger creditLedger, Clock clock,
-                     WorkerProperties workerProperties, List<JobGenerator> generators, ScheduledExecutorService renewals) {
+    public JobRunner(EntityManager entityManager, PlatformTransactionManager transactions,
+            CreditLedger creditLedger, Clock clock, WorkerProperties workerProperties,
+            List<JobGenerator> generators, ScheduledExecutorService renewals) {
         this.entityManager = entityManager;
         this.transactionTemplate = new TransactionTemplate(transactions);
         this.releaseTransactionTemplate = new TransactionTemplate(transactions);
@@ -51,7 +53,8 @@ public final class JobRunner {
         this.creditLedger = creditLedger;
         this.clock = clock;
         this.workerProperties = workerProperties;
-        this.generators = generators.stream().collect(Collectors.toUnmodifiableMap(JobGenerator::type, Function.identity()));
+        this.generators = generators.stream()
+                .collect(Collectors.toUnmodifiableMap(JobGenerator::type, Function.identity()));
         this.renewals = renewals;
     }
 
@@ -60,28 +63,35 @@ public final class JobRunner {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("JobRunner requires no ambient transaction");
         }
+
         final Lease lease;
         synchronized (admission) {
             if (stopping) return false;
+
             var claimed = transactionTemplate.execute(status -> claim());
             if (claimed == null) return false;
+
             lease = new Lease(claimed);
             current = lease;
         }
+
         var job = lease.job;
         putMdc(job);
         try (lease) {
             var generator = generators.get(job.type());
             if (generator == null) throw new IllegalStateException("No generator for claimed job type");
+
             lease.start();
             GenerationOutcome outcome;
             int retries = 0;
             while (true) {
                 if (lease.lost()) return true;
+
                 outcome = generator.generate(job);
                 if (lease.lost()) return true;
                 if (!(outcome instanceof GenerationOutcome.Failure failure)
                         || !retryable(failure) || retries >= workerProperties.maxRetries()) break;
+
                 retries++;
                 try {
                     TimeUnit.NANOSECONDS.sleep(workerProperties.retryDelay().toNanos());
@@ -89,12 +99,15 @@ public final class JobRunner {
                     Thread.currentThread().interrupt();
                     return true; // 저장하지 않고 시한으로 되찾는다.
                 }
+
                 // 다음 유료 호출 전에 되찾기·삭제를 확인한다. claim_count는 그대로다.
                 lease.refresh();
             }
+
             // 이미 시작된 갱신이 끝날 때까지 기다려 완료 뒤 0 rows를 시한 상실로 오인하지 않는다.
             lease.close();
             if (lease.lost()) return true;
+
             if (outcome instanceof GenerationOutcome.Success success) {
                 save(job, generator, success.result(), lease);
             } else {
@@ -121,6 +134,7 @@ public final class JobRunner {
             lease = current;
         }
         if (lease == null) return;
+
         putMdc(lease.job);
         try {
             lease.release();
@@ -143,8 +157,11 @@ public final class JobRunner {
                     started_at = :now, finished_at = NULL, error_type = NULL, updated_at = :now
                 FROM candidate WHERE j.id = candidate.id RETURNING j.id
                 """)
-                .setParameter("now", now).setParameter("until", now.plus(workerProperties.leaseDuration())).getResultList();
+                .setParameter("now", now)
+                .setParameter("until", now.plus(workerProperties.leaseDuration()))
+                .getResultList();
         if (ids.isEmpty()) return null;
+
         var job = entityManager.find(GenerationJob.class, ((Number) ids.getFirst()).longValue());
         Long target = switch (job.getType()) {
             case NEW_COURSE, NEW_ROADMAP -> null;
@@ -153,9 +170,11 @@ public final class JobRunner {
             case MATERIAL -> job.getLessonId();
         };
         var input = job.getInput();
-        var values = input == null ? null : new JobSnapshot.Input(input.getTopic(), input.getLevel(), input.getLevelOther(),
-                input.getPurpose(), input.getPurposeOther(), input.getMemo());
-        return new JobSnapshot(job.getId(), job.getUserId(), job.getType(), target, values, job.getFeedback(), job.getClaimCount());
+        var values = input == null ? null
+                : new JobSnapshot.Input(input.getTopic(), input.getLevel(), input.getLevelOther(),
+                        input.getPurpose(), input.getPurposeOther(), input.getMemo());
+        return new JobSnapshot(job.getId(), job.getUserId(), job.getType(), target,
+                values, job.getFeedback(), job.getClaimCount());
     }
 
     /** 이 조건부 갱신이 트랜잭션의 첫 쓰기다. 끝날 때까지 행 잠금을 유지한다. */
@@ -163,8 +182,11 @@ public final class JobRunner {
         return entityManager.createNativeQuery("""
                 UPDATE generation_jobs SET updated_at = :now
                 WHERE id = :id AND claim_count = :claim AND status = 'RUNNING'
-                """).setParameter("now", clock.instant()).setParameter("id", job.id())
-                .setParameter("claim", job.claimCount()).executeUpdate() == 1;
+                """)
+                .setParameter("now", clock.instant())
+                .setParameter("id", job.id())
+                .setParameter("claim", job.claimCount())
+                .executeUpdate() == 1;
     }
 
     private void save(JobSnapshot job, JobGenerator generator, GeneratedResult result, Lease lease) {
@@ -172,21 +194,27 @@ public final class JobRunner {
         try {
             saved = Boolean.TRUE.equals(transactionTemplate.execute(status -> {
                 if (!guard(job)) return false;
+
                 var ref = generator.save(job, result);
                 if (job.targetId() != null && ref.id() != job.targetId()) {
                     throw new IllegalStateException("Result must refer to original target");
                 }
+
                 entityManager.flush(); // JPA 결과 생성·상태 변경 뒤 네이티브 쓰기 전에 반드시 반영한다.
                 String column = switch (job.type()) {
                     case NEW_COURSE, PLAN_ROADMAP_COURSE, REPLAN_COURSE -> "course_id";
                     case NEW_ROADMAP, REPLAN_ROADMAP -> "roadmap_id";
                     case MATERIAL -> "lesson_id";
                 };
-                entityManager.createNativeQuery("UPDATE generation_jobs SET status = 'SUCCEEDED', " + column + " = :result, "
-                        + "finished_at = :now, lease_until = NULL, error_type = NULL, updated_at = :now "
-                        + "WHERE id = :id AND claim_count = :claim AND status = 'RUNNING'")
-                        .setParameter("result", ref.id()).setParameter("now", clock.instant())
-                        .setParameter("id", job.id()).setParameter("claim", job.claimCount()).executeUpdate();
+                entityManager.createNativeQuery(
+                        "UPDATE generation_jobs SET status = 'SUCCEEDED', " + column + " = :result, "
+                                + "finished_at = :now, lease_until = NULL, error_type = NULL, updated_at = :now "
+                                + "WHERE id = :id AND claim_count = :claim AND status = 'RUNNING'")
+                        .setParameter("result", ref.id())
+                        .setParameter("now", clock.instant())
+                        .setParameter("id", job.id())
+                        .setParameter("claim", job.claimCount())
+                        .executeUpdate();
                 return true;
             }));
         } catch (RuntimeException exception) {
@@ -196,6 +224,7 @@ public final class JobRunner {
             log.error("job save failed", safe);
             return; // 롤백된 RUNNING은 시한 뒤 처음부터 되찾는다. 실패·복구로 바꾸지 않는다.
         }
+
         if (saved) log.info("job finished status=SUCCEEDED");
         else lease.lose();
     }
@@ -207,19 +236,25 @@ public final class JobRunner {
                     UPDATE generation_jobs SET status = 'FAILED', error_type = :error,
                         finished_at = :now, lease_until = NULL, updated_at = :now
                     WHERE id = :id AND claim_count = :claim AND status = 'RUNNING'
-                    """).setParameter("error", JobErrorType.valueOf(failure.name()).name())
-                    .setParameter("now", clock.instant()).setParameter("id", job.id())
-                    .setParameter("claim", job.claimCount()).executeUpdate();
+                    """)
+                    .setParameter("error", JobErrorType.valueOf(failure.name()).name())
+                    .setParameter("now", clock.instant())
+                    .setParameter("id", job.id())
+                    .setParameter("claim", job.claimCount())
+                    .executeUpdate();
             if (rows == 0) return false;
+
             creditLedger.restoreIfOwed(job.userId(), job.id());
             return true;
         }));
+
         if (failed) log.info("job finished status=FAILED");
         else lease.lose();
     }
 
     private static boolean retryable(GenerationOutcome.Failure failure) {
-        return failure == GenerationOutcome.Failure.PROVIDER_UNAVAILABLE || failure == GenerationOutcome.Failure.INVALID_OUTPUT;
+        return failure == GenerationOutcome.Failure.PROVIDER_UNAVAILABLE
+                || failure == GenerationOutcome.Failure.INVALID_OUTPUT;
     }
 
     private static void putMdc(JobSnapshot job) {
@@ -257,12 +292,17 @@ public final class JobRunner {
 
         private synchronized void refresh() {
             if (!active || lost) return;
+
             var now = clock.instant();
             int rows = transactionTemplate.execute(status -> entityManager.createNativeQuery("""
                     UPDATE generation_jobs SET lease_until = :until, updated_at = :now
                     WHERE id = :id AND claim_count = :claim AND status = 'RUNNING'
-                    """).setParameter("until", now.plus(workerProperties.leaseDuration())).setParameter("now", now)
-                    .setParameter("id", job.id()).setParameter("claim", job.claimCount()).executeUpdate());
+                    """)
+                    .setParameter("until", now.plus(workerProperties.leaseDuration()))
+                    .setParameter("now", now)
+                    .setParameter("id", job.id())
+                    .setParameter("claim", job.claimCount())
+                    .executeUpdate());
             if (rows == 0) lose();
         }
 
@@ -276,11 +316,15 @@ public final class JobRunner {
 
         private synchronized void release() {
             close(); // 진행 중인 갱신을 마친 뒤 취소한다. 반환 뒤에는 늘리지 않는다.
-            boolean released = Boolean.TRUE.equals(releaseTransactionTemplate.execute(status -> entityManager.createNativeQuery("""
-                    UPDATE generation_jobs SET status = 'QUEUED', lease_until = NULL, updated_at = :now
-                    WHERE id = :id AND claim_count = :claim AND status = 'RUNNING'
-                    """).setParameter("now", clock.instant()).setParameter("id", job.id())
-                    .setParameter("claim", job.claimCount()).executeUpdate() == 1));
+            boolean released = Boolean.TRUE.equals(releaseTransactionTemplate.execute(status ->
+                    entityManager.createNativeQuery("""
+                            UPDATE generation_jobs SET status = 'QUEUED', lease_until = NULL, updated_at = :now
+                            WHERE id = :id AND claim_count = :claim AND status = 'RUNNING'
+                            """)
+                            .setParameter("now", clock.instant())
+                            .setParameter("id", job.id())
+                            .setParameter("claim", job.claimCount())
+                            .executeUpdate() == 1));
             lost = true; // 의도한 반환이다. 늦은 시도는 DB/유료 호출을 더 하지 않는다.
             if (released) log.info("job released");
         }

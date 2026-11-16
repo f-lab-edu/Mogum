@@ -16,8 +16,8 @@ import java.util.List;
 public class WorkerConfiguration {
     @Bean
     public WorkerLifecycle workerLifecycle(EntityManager em, PlatformTransactionManager transactions,
-                                           CreditLedger ledger, Clock clock, WorkerProperties properties,
-                                           List<JobGenerator> generators) {
+            CreditLedger ledger, Clock clock, WorkerProperties properties,
+            List<JobGenerator> generators) {
         return new WorkerLifecycle(properties, scheduler ->
                 new JobRunner(em, transactions, ledger, clock, properties, generators, scheduler));
     }

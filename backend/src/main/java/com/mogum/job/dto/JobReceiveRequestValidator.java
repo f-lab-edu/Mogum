@@ -19,9 +19,13 @@ public final class JobReceiveRequestValidator implements ConstraintValidator<Val
     @Override
     public boolean isValid(JobReceiveRequest request, ConstraintValidatorContext context) {
         if (request == null) return true;
+
         var errors = new LinkedHashMap<String, Reason>();
         choice(errors, "type", request.type(), JobType.values());
-        var type = Arrays.stream(JobType.values()).filter(value -> value.name().equals(request.type())).findFirst();
+        var type = Arrays.stream(JobType.values())
+                .filter(value -> value.name().equals(request.type()))
+                .findFirst();
+
         if (type.isPresent()) {
             boolean fresh = type.get() == JobType.NEW_COURSE || type.get() == JobType.NEW_ROADMAP;
             if (fresh) {
@@ -39,17 +43,22 @@ public final class JobReceiveRequestValidator implements ConstraintValidator<Val
                 absent(errors, "purposeOther", request.purposeOther());
                 absent(errors, "memo", request.memo());
             }
-            target(errors, "courseId", request.courseId(), type.get() == JobType.PLAN_ROADMAP_COURSE || type.get() == JobType.REPLAN_COURSE);
+
+            target(errors, "courseId", request.courseId(),
+                    type.get() == JobType.PLAN_ROADMAP_COURSE || type.get() == JobType.REPLAN_COURSE);
             target(errors, "roadmapId", request.roadmapId(), type.get() == JobType.REPLAN_ROADMAP);
             target(errors, "lessonId", request.lessonId(), type.get() == JobType.MATERIAL);
             if (type.get() == JobType.REPLAN_COURSE || type.get() == JobType.REPLAN_ROADMAP)
                 text(errors, "feedback", request.feedback(), 500, false);
             else absent(errors, "feedback", request.feedback());
         }
+
         if (errors.isEmpty()) return true;
+
         context.disableDefaultConstraintViolation();
         errors.forEach((field, reason) -> context.buildConstraintViolationWithTemplate("field." + reason.name())
-                .addPropertyNode(field).addConstraintViolation());
+                .addPropertyNode(field)
+                .addConstraintViolation());
         return false;
     }
 
@@ -76,6 +85,7 @@ public final class JobReceiveRequestValidator implements ConstraintValidator<Val
 
     private static void choice(Map<String, Reason> errors, String field, String value, Enum<?>[] choices) {
         if (value == null || BLANK.matcher(value).matches()) errors.put(field, Reason.REQUIRED);
-        else if (Arrays.stream(choices).noneMatch(choice -> choice.name().equals(value))) errors.put(field, Reason.INVALID_VALUE);
+        else if (Arrays.stream(choices).noneMatch(choice -> choice.name().equals(value)))
+            errors.put(field, Reason.INVALID_VALUE);
     }
 }

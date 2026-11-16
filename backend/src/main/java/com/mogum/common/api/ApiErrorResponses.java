@@ -38,12 +38,12 @@ public final class ApiErrorResponses {
     }
 
     public static void write(HttpServletResponse response, ObjectMapper mapper,
-                             ErrorCode code, Integer retryAfterSeconds) throws IOException {
+            ErrorCode code, Integer retryAfterSeconds) throws IOException {
         write(response, mapper, code, retryAfterSeconds, null);
     }
 
     public static void write(HttpServletResponse response, ObjectMapper mapper,
-                             ErrorCode code, Integer retryAfterSeconds, List<FieldViolation> fields) throws IOException {
+            ErrorCode code, Integer retryAfterSeconds, List<FieldViolation> fields) throws IOException {
         var error = of(code, retryAfterSeconds, fields);
         response.setStatus(error.getStatusCode().value());
         error.getHeaders().forEach((name, values) -> {
@@ -54,17 +54,22 @@ public final class ApiErrorResponses {
     }
 
     private static ResponseEntity<ApiError> create(int status, HttpHeaders headers,
-                                                    ErrorCode code, String message, Integer retryAfterSeconds, List<FieldViolation> fields) {
+            ErrorCode code, String message, Integer retryAfterSeconds, List<FieldViolation> fields) {
         if (retryAfterSeconds != null && retryAfterSeconds <= 0) {
             throw new IllegalArgumentException("retryAfterSeconds must be positive");
         }
+
         var response = ResponseEntity.status(status).headers(headers).contentType(MediaType.APPLICATION_JSON);
         if (retryAfterSeconds != null) {
             response.header(HttpHeaders.RETRY_AFTER, retryAfterSeconds.toString());
         }
+
         var violations = code == ErrorCode.FIELD_INVALID && fields != null && !fields.isEmpty()
-                ? fields.stream().distinct().sorted(Comparator.comparing(FieldViolation::field)
-                        .thenComparing(violation -> violation.reason().name())).toList() : null;
+                ? fields.stream()
+                        .distinct()
+                        .sorted(Comparator.comparing(FieldViolation::field)
+                                .thenComparing(violation -> violation.reason().name()))
+                        .toList() : null;
         return response.body(new ApiError(code.name(), message, retryAfterSeconds, violations));
     }
 }

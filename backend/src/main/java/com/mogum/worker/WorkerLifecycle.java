@@ -27,9 +27,11 @@ public final class WorkerLifecycle implements SmartLifecycle {
     @Override
     public synchronized void start() {
         if (running || workerProperties.count() == 0) return;
+
         shutdown.join();
         slots.clear();
         for (int index = 0; index < workerProperties.count(); index++) slots.add(new Slot(index));
+
         running = true;
         slots.forEach(slot -> slot.thread.start());
     }
@@ -51,10 +53,13 @@ public final class WorkerLifecycle implements SmartLifecycle {
                 slot.runner.stopClaiming();
                 slot.wakeup.countDown();
             });
+
             // 모두 같은 종료 시각을 쓴다. 반환도 나란히 해 N배의 종료 대기가 생기지 않는다.
-            shutdown = CompletableFuture.allOf(slots.stream().map(slot -> slot.stopAt(deadline))
+            shutdown = CompletableFuture.allOf(slots.stream()
+                    .map(slot -> slot.stopAt(deadline))
                     .toArray(CompletableFuture[]::new));
         }
+
         shutdown.thenRun(callback);
     }
 
@@ -72,14 +77,22 @@ public final class WorkerLifecycle implements SmartLifecycle {
 
         private Slot(int index) {
             renewals = Executors.newSingleThreadScheduledExecutor(
-                    Thread.ofPlatform().daemon().name("mogum-renewal-" + index).factory());
+                    Thread.ofPlatform()
+                            .daemon()
+                            .name("mogum-renewal-" + index)
+                            .factory());
             runner = runnerFactory.apply(renewals);
+
             // 한도 뒤 외부 호출이 늦게 끝나도 JVM 종료를 붙잡지 않는다.
-            thread = Thread.ofPlatform().daemon().name("mogum-worker-" + index).unstarted(this::poll);
+            thread = Thread.ofPlatform()
+                    .daemon()
+                    .name("mogum-worker-" + index)
+                    .unstarted(this::poll);
         }
 
         private void poll() {
             Class<?> lastFailure = null;
+
             while (!stopping) {
                 boolean found = false;
                 try {
@@ -89,6 +102,7 @@ public final class WorkerLifecycle implements SmartLifecycle {
                     report(exception, exception.getClass() != lastFailure);
                     lastFailure = exception.getClass();
                 }
+
                 if (!found && !stopping) {
                     try {
                         if (wakeup.await(workerProperties.pollInterval().toNanos(), TimeUnit.NANOSECONDS)) {
@@ -104,21 +118,24 @@ public final class WorkerLifecycle implements SmartLifecycle {
 
         private CompletableFuture<Void> stopAt(long deadline) {
             var stopped = new CompletableFuture<Void>();
-            Thread.ofPlatform().daemon().name(thread.getName() + "-stop").start(() -> {
-                try {
-                    long remaining = deadline - System.nanoTime();
-                    if (remaining > 0) TimeUnit.NANOSECONDS.timedJoin(thread, remaining);
-                    runner.releaseCurrent();
-                } catch (InterruptedException exception) {
-                    Thread.currentThread().interrupt();
-                    runner.releaseCurrent();
-                } catch (RuntimeException exception) {
-                    report(exception, true);
-                } finally {
-                    renewals.shutdownNow();
-                    stopped.complete(null);
-                }
-            });
+            Thread.ofPlatform()
+                    .daemon()
+                    .name(thread.getName() + "-stop")
+                    .start(() -> {
+                        try {
+                            long remaining = deadline - System.nanoTime();
+                            if (remaining > 0) TimeUnit.NANOSECONDS.timedJoin(thread, remaining);
+                            runner.releaseCurrent();
+                        } catch (InterruptedException exception) {
+                            Thread.currentThread().interrupt();
+                            runner.releaseCurrent();
+                        } catch (RuntimeException exception) {
+                            report(exception, true);
+                        } finally {
+                            renewals.shutdownNow();
+                            stopped.complete(null);
+                        }
+                    });
             return stopped;
         }
     }

@@ -22,20 +22,15 @@ public class Roadmap extends AuditedEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     @Column(name = "user_id", nullable = false)
     private Long userId;
-
     @Column(nullable = false, columnDefinition = "text")
     private String title;
-
     @Column(nullable = false, columnDefinition = "text")
     private String description;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, columnDefinition = "text")
     private RoadmapStatus status;
-
     @Embedded
     private LearningInput input;
 

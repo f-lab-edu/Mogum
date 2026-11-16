@@ -24,11 +24,9 @@ public class Material extends AuditedEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lesson_id", nullable = false)
     private Lesson lesson;
-
     @Column(nullable = false, columnDefinition = "text")
     private String body;
 

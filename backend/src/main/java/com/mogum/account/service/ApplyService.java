@@ -27,14 +27,17 @@ public class ApplyService {
             case AccountPrincipal.NotApplied identity -> {
                 // 조회 전에 잠근다. 기다린 요청은 앞선 트랜잭션이 커밋한 행을 읽는다.
                 userRepository.lockIdentity(identity.provider(), identity.subject());
-                yield userRepository.findByProviderAndSubject(identity.provider(), identity.subject()).orElseGet(() -> {
-                    var applied = userRepository.save(User.apply(identity.provider(), identity.subject(), identity.email(),
-                            identity.name(), creditProperties.monthlyAmount()));
-                    creditEntryRepository.save(CreditEntry.refill(applied, creditProperties.monthlyAmount()));
-                    return applied;
-                });
+                yield userRepository.findByProviderAndSubject(identity.provider(), identity.subject())
+                        .orElseGet(() -> {
+                            var applied = userRepository.save(User.apply(
+                                    identity.provider(), identity.subject(), identity.email(),
+                                    identity.name(), creditProperties.monthlyAmount()));
+                            creditEntryRepository.save(CreditEntry.refill(applied, creditProperties.monthlyAmount()));
+                            return applied;
+                        });
             }
         };
+
         return new AccountPrincipal.Member(user.getId(), user.getEmail(), user.getName(), user.getStatus());
     }
 }

@@ -25,29 +25,21 @@ public class User extends AuditedEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     @Column(nullable = false, columnDefinition = "text")
     private String provider;
-
     @Column(nullable = false, columnDefinition = "text")
     private String subject;
-
     @Column(nullable = false, columnDefinition = "text")
     private String email;
-
     @Column(nullable = false, columnDefinition = "text")
     private String name;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, columnDefinition = "text")
     private UserStatus status;
-
     @Column(name = "approved_at")
     private Instant approvedAt;
-
     @Column(name = "credit_balance", nullable = false)
     private int creditBalance;
-
     @Column(name = "credit_refill_at")
     private Instant creditRefillAt;
 

@@ -20,8 +20,9 @@ public class ApplyController {
 
     @PostMapping("/api/account/apply")
     public ApiResponse<MeResponse> apply(@AuthenticationPrincipal AccountPrincipal principal,
-                                         HttpServletRequest request) {
+            HttpServletRequest request) {
         var member = applyService.apply(principal);
+
         // 서비스의 트랜잭션이 커밋된 뒤에만 신원 세션을 회원 세션으로 바꾼다.
         if (principal instanceof AccountPrincipal.NotApplied) {
             var session = request.getSession(false);
@@ -30,6 +31,7 @@ public class ApplyController {
             session.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME,
                     Long.toString(member.userId()));
         }
+
         return ApiResponse.of(new MeResponse(member.status().name(), member.email(), member.name()));
     }
 }

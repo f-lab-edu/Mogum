@@ -62,27 +62,35 @@ public class SecurityConfiguration {
 
     @Bean
     public SecurityFilterChain apiSecurity(HttpSecurity http, UserRepository users, ObjectMapper mapper,
-                                           WebProperties web, LoginService login, Clock clock,
-                                           ClientRegistrationRepository registrations,
-                                           DiscardingOAuth2AuthorizedClients clients) throws Exception {
-        var authorizationStart = PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET, "/auth/{registrationId}");
+            WebProperties web, LoginService login, Clock clock,
+            ClientRegistrationRepository registrations,
+            DiscardingOAuth2AuthorizedClients clients) throws Exception {
+        var authorizationStart = PathPatternRequestMatcher.withDefaults()
+                .matcher(HttpMethod.GET, "/auth/{registrationId}");
         AuthenticationEntryPoint unauthorized = (request, response, exception) -> {
             var match = authorizationStart.matcher(request);
-            if (match.isMatch() && registrations.findByRegistrationId(match.getVariables().get("registrationId")) == null) {
+            if (match.isMatch()
+                    && registrations.findByRegistrationId(match.getVariables().get("registrationId")) == null) {
                 response.sendError(HttpServletResponse.SC_NOT_FOUND);
             } else {
                 ApiErrorResponses.write(response, mapper, ErrorCode.UNAUTHORIZED, null);
             }
         };
+
         var tokens = CookieCsrfTokenRepository.withHttpOnlyFalse();
         tokens.setCookieCustomizer(cookie -> {
-            cookie.secure(true).sameSite("Lax").path("/");
+            cookie.secure(true)
+                    .sameSite("Lax")
+                    .path("/");
             if (!web.cookieDomain().isEmpty()) cookie.domain(web.cookieDomain());
         });
         var tokenHandler = new CsrfTokenRequestAttributeHandler();
+
         // SPA는 쿠키 원본을 헤더로 보내며, 첫 GET /api/me(401 포함)에서 쿠키를 발급한다.
         tokenHandler.setCsrfRequestAttributeName(null);
+
         var logoutRequest = PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/auth/logout");
+
         var cors = new CorsConfiguration();
         cors.setAllowedOrigins(List.of(web.origin()));
         cors.setAllowCredentials(true);
@@ -90,6 +98,7 @@ public class SecurityConfiguration {
         cors.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN"));
         var corsSource = new UrlBasedCorsConfigurationSource();
         corsSource.registerCorsConfiguration("/api/**", cors);
+
         var oauthRequests = new CookieAuthorizationRequestRepository(registrations, mapper, clock);
         var loginHandler = new OAuthLoginHandler(login, new GoogleAccountMapper(), web.origin(), oauthRequests);
         var resolver = new DefaultOAuth2AuthorizationRequestResolver(registrations, "/auth");
@@ -99,9 +108,14 @@ public class SecurityConfiguration {
             @Override
             public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
                 if (!"GET".equals(request.getMethod())) return null;
+
                 var match = authorizationStart.matcher(request);
+
                 // 미등록 ID는 해석기의 예외/로그 대신 공통 404 ERROR 디스패치로 보낸다.
-                if (match.isMatch() && registrations.findByRegistrationId(match.getVariables().get("registrationId")) == null) return null;
+                if (match.isMatch()
+                        && registrations.findByRegistrationId(match.getVariables().get("registrationId")) == null)
+                    return null;
+
                 return resolver.resolve(request);
             }
 
@@ -120,22 +134,29 @@ public class SecurityConfiguration {
                 // 기존 세션을 읽는 요청마다 새 로그인으로 판단해 ID/CSRF를 바꾸지 않는다.
                 .sessionManagement(session -> session.requireExplicitAuthenticationStrategy(true))
                 .oauth2Login(oauth -> oauth.loginPage("/auth/google")
-                        .authorizedClientRepository(clients).authorizedClientService(clients)
+                        .authorizedClientRepository(clients)
+                        .authorizedClientService(clients)
                         .authorizationEndpoint(endpoint -> endpoint.authorizationRequestResolver(getOnlyResolver)
                                 .authorizationRequestRepository(oauthRequests))
                         .redirectionEndpoint(endpoint -> endpoint.baseUri("/auth/google/callback"))
-                        .successHandler(loginHandler).failureHandler(loginHandler))
+                        .successHandler(loginHandler)
+                        .failureHandler(loginHandler))
                 .addFilterBefore(new SessionUserFilter(users, unauthorized), CsrfFilter.class)
-                .csrf(csrf -> csrf.csrfTokenRepository(tokens).csrfTokenRequestHandler(tokenHandler))
+                .csrf(csrf -> csrf.csrfTokenRepository(tokens)
+                        .csrfTokenRequestHandler(tokenHandler))
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(unauthorized)
                         .accessDeniedHandler((request, response, exception) -> {
                             var match = authorizationStart.matcher(request);
-                            if (match.isMatch() && registrations.findByRegistrationId(match.getVariables().get("registrationId")) == null) {
+                            if (match.isMatch()
+                                    && registrations.findByRegistrationId(
+                                            match.getVariables().get("registrationId")) == null) {
                                 response.sendError(HttpServletResponse.SC_NOT_FOUND);
                                 return;
                             }
+
                             var authentication = SecurityContextHolder.getContext().getAuthentication();
-                            boolean anonymous = authentication == null || authentication instanceof AnonymousAuthenticationToken;
+                            boolean anonymous = authentication == null
+                                    || authentication instanceof AnonymousAuthenticationToken;
                             if (anonymous && !logoutRequest.matches(request)) {
                                 unauthorized.commence(request, response,
                                         new InsufficientAuthenticationException("Login required"));
@@ -147,19 +168,26 @@ public class SecurityConfiguration {
                                 ApiErrorResponses.write(response, mapper, ErrorCode.NOT_FOUND, null);
                             }
                         }))
-                .authorizeHttpRequests(requests -> requests.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/auth/google", "/auth/google/callback").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/me").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/account/apply", "/api/auth/logout").authenticated()
-                        .requestMatchers("/api/**").access((authentication, context) ->
+                .authorizeHttpRequests(requests -> requests.dispatcherTypeMatchers(DispatcherType.ERROR)
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/auth/google", "/auth/google/callback")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/actuator/health")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/me")
+                        .authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/account/apply", "/api/auth/logout")
+                        .authenticated()
+                        .requestMatchers("/api/**")
+                        .access((authentication, context) ->
                                 new AuthorizationDecision(
                                         authentication.get().getPrincipal() instanceof AccountPrincipal.Member member
                                                 && member.status() == UserStatus.APPROVED))
-                        .anyRequest().denyAll())
+                        .anyRequest()
+                        .denyAll())
                 .logout(logout -> logout.logoutRequestMatcher(logoutRequest)
                         .logoutSuccessHandler((request, response, authentication) -> response.setStatus(204)));
+
         return http.build();
     }
-
 }

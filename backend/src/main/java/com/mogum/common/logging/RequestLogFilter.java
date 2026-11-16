@@ -35,10 +35,12 @@ public final class RequestLogFilter implements Filter, ServletRequestListener {
             state = new RequestState(request, response);
             request.setAttribute(STATE, state);
         }
+
         MDC.put(REQUEST_ID, state.id);
         MDC.remove(USER_ID);
         if (state.userId != null) MDC.put(USER_ID, state.userId);
         response.setHeader(HEADER, state.id);
+
         boolean dispatchFailed = false;
         try {
             chain.doFilter(request, response);
@@ -48,6 +50,7 @@ public final class RequestLogFilter implements Filter, ServletRequestListener {
             throw exception;
         } finally {
             state.userId = MDC.get(USER_ID);
+
             // 체인 밖에서 컨테이너가 찍는 ERROR까지 ID를 유지하고 종료 리스너에서 지운다.
             if (!dispatchFailed) clearRequestMdc();
         }
@@ -58,6 +61,7 @@ public final class RequestLogFilter implements Filter, ServletRequestListener {
         var request = event.getServletRequest();
         var state = (RequestState) request.getAttribute(STATE);
         if (state == null) return;
+
         try {
             MDC.put(REQUEST_ID, state.id);
             MDC.remove(USER_ID);

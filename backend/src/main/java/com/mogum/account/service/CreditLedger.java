@@ -28,12 +28,14 @@ public class CreditLedger {
     /** amount는 양수다. users 행을 잠그고 잔액과 음수 CONSUME 기록을 함께 바꾼다. */
     public void consume(long userId, long jobId, int amount) {
         if (amount <= 0) throw new IllegalArgumentException("amount must be positive");
+
         var user = lockedUser(userId);
         if (user.getCreditBalance() < amount) {
             var refillDate = user.getCreditRefillAt().atZone(SeoulClock.ZONE).toLocalDate();
             throw ApiException.withMessage(ErrorCode.CREDIT_INSUFFICIENT,
                     "크레딧이 부족합니다. " + refillDate + "에 다시 채워집니다");
         }
+
         user.consumeCredits(amount);
         creditEntryRepository.save(CreditEntry.consume(user, jobId, amount));
     }
@@ -49,6 +51,7 @@ public class CreditLedger {
         if (last.isEmpty() || last.get().getType() != CreditEntryType.CONSUME) return;
         var refill = creditEntryRepository.findFirstByUserIdAndTypeOrderByIdDesc(userId, CreditEntryType.REFILL);
         if (refill.isEmpty() || last.get().getId() <= refill.get().getId()) return;
+
         int amount = Math.negateExact(last.get().getAmount());
         user.restoreCredits(amount);
         creditEntryRepository.save(CreditEntry.restore(user, jobId, amount));

@@ -24,18 +24,14 @@ public class CreditEntry extends AuditedEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, columnDefinition = "text")
     private CreditEntryType type;
-
     @Column(nullable = false)
     private int amount;
-
     @Column(name = "job_id")
     private Long jobId;
 
@@ -51,6 +47,7 @@ public class CreditEntry extends AuditedEntity {
 
     private static CreditEntry movement(User user, long jobId, CreditEntryType type, int amount, int sign) {
         if (amount <= 0) throw new IllegalArgumentException("amount must be positive");
+
         var entry = new CreditEntry();
         entry.user = user;
         entry.jobId = jobId;

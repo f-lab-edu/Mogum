@@ -24,11 +24,9 @@ public class Review extends AuditedEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "card_id", nullable = false)
     private Card card;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, columnDefinition = "text")
     private Rating rating;

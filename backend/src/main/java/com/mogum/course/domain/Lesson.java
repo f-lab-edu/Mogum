@@ -29,29 +29,23 @@ public class Lesson extends AuditedEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
-
     @Column(nullable = false)
     private int position;
-
     @Column(nullable = false, columnDefinition = "text")
     private String title;
-
     @Column(nullable = false, columnDefinition = "text")
     private String description;
-
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
     private List<PlannedConcept> concepts;
-
     @Column(name = "completed_at")
     private Instant completedAt;
 
     public static Lesson listed(Course course, int position, String title, String description,
-                                List<PlannedConcept> concepts) {
+            List<PlannedConcept> concepts) {
         var lesson = new Lesson();
         lesson.course = course;
         lesson.position = position;

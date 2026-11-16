@@ -41,9 +41,10 @@ public class JobIntakeService {
     private final JobProperties jobProperties;
     private final Map<JobType, JobIntakeHandler> handlers;
 
-    public JobIntakeService(GenerationJobRepository generationJobRepository, CourseRepository courseRepository, RoadmapRepository roadmapRepository,
-                            LessonRepository lessonRepository, CreditLedger creditLedger, CreditProperties creditProperties,
-                            JobProperties jobProperties, List<JobIntakeHandler> handlers) {
+    public JobIntakeService(GenerationJobRepository generationJobRepository,
+            CourseRepository courseRepository, RoadmapRepository roadmapRepository, LessonRepository lessonRepository,
+            CreditLedger creditLedger, CreditProperties creditProperties, JobProperties jobProperties,
+            List<JobIntakeHandler> handlers) {
         this.generationJobRepository = generationJobRepository;
         this.courseRepository = courseRepository;
         this.roadmapRepository = roadmapRepository;
@@ -51,20 +52,26 @@ public class JobIntakeService {
         this.creditLedger = creditLedger;
         this.creditProperties = creditProperties;
         this.jobProperties = jobProperties;
-        this.handlers = handlers.stream().collect(Collectors.toUnmodifiableMap(JobIntakeHandler::type, Function.identity()));
+        this.handlers = handlers.stream()
+                .collect(Collectors.toUnmodifiableMap(JobIntakeHandler::type, Function.identity()));
     }
 
     public JobResult receive(long userId, JobRequest request) {
         creditLedger.lock(userId);
         checkOwner(userId, request);
+
         var handler = handlers.get(request.type());
         if (handler == null) throw new ApiException(ErrorCode.INVALID_REQUEST);
         handler.check(userId, request);
+
         if (request.type() != JobType.NEW_COURSE && request.type() != JobType.NEW_ROADMAP) {
-            boolean includeSucceeded = request.type() == JobType.MATERIAL || request.type() == JobType.PLAN_ROADMAP_COURSE;
-            var existing = generationJobRepository.findSameTarget(userId, request.type(), request.targetId(), includeSucceeded);
+            boolean includeSucceeded = request.type() == JobType.MATERIAL
+                    || request.type() == JobType.PLAN_ROADMAP_COURSE;
+            var existing = generationJobRepository.findSameTarget(
+                    userId, request.type(), request.targetId(), includeSucceeded);
             if (existing.isPresent()) return result(existing.get());
         }
+
         checkLimit(userId);
         var job = generationJobRepository.save(create(userId, request));
         creditLedger.consume(userId, job.getId(), cost(job.getType()));
@@ -77,6 +84,7 @@ public class JobIntakeService {
         var job = ownedJob(userId, jobId);
         if (job.getStatus() != JobStatus.FAILED) return result(job);
         if (job.getErrorType() == JobErrorType.INPUT_TOO_LARGE) throw new ApiException(ErrorCode.JOB_RETRY_NOT_ALLOWED);
+
         checkLimit(userId);
         job.retry();
         creditLedger.consume(userId, jobId, cost(job.getType()));
@@ -88,6 +96,7 @@ public class JobIntakeService {
         creditLedger.lock(userId);
         var job = ownedJob(userId, jobId);
         if (job.getStatus() != JobStatus.FAILED) throw new ApiException(ErrorCode.JOB_DISCARD_NOT_ALLOWED);
+
         creditLedger.restoreIfOwed(userId, jobId);
         generationJobRepository.delete(job);
     }
@@ -96,22 +105,28 @@ public class JobIntakeService {
         long owner = switch (request.type()) {
             case NEW_COURSE, NEW_ROADMAP -> userId;
             case PLAN_ROADMAP_COURSE, REPLAN_COURSE -> courseRepository.findById(request.targetId())
-                    .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND)).getUserId();
+                    .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND))
+                    .getUserId();
             case REPLAN_ROADMAP -> roadmapRepository.findById(request.targetId())
-                    .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND)).getUserId();
+                    .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND))
+                    .getUserId();
             case MATERIAL -> lessonRepository.findById(request.targetId())
-                    .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND)).getCourse().getUserId();
+                    .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND))
+                    .getCourse()
+                    .getUserId();
         };
         if (owner != userId) throw new ApiException(ErrorCode.NOT_FOUND);
     }
 
     private GenerationJob ownedJob(long userId, long jobId) {
-        return generationJobRepository.findById(jobId).filter(job -> job.getUserId() == userId)
+        return generationJobRepository.findById(jobId)
+                .filter(job -> job.getUserId() == userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
     }
 
     private void checkLimit(long userId) {
-        long count = generationJobRepository.countByUserIdAndStatusIn(userId, List.of(JobStatus.QUEUED, JobStatus.RUNNING));
+        long count = generationJobRepository.countByUserIdAndStatusIn(
+                userId, List.of(JobStatus.QUEUED, JobStatus.RUNNING));
         if (count >= jobProperties.maxInProgressPerUser()) throw new ApiException(ErrorCode.TOO_MANY_IN_PROGRESS);
     }
 
@@ -150,6 +165,7 @@ public class JobIntakeService {
                 MDC.remove(RequestLogFilter.JOB_ID);
             }
         };
+
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
