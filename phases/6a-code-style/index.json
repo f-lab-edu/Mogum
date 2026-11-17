@@ -70,7 +70,15 @@
     {
       "step": 5,
       "name": "layout-test-b",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-17T10:19:08+0900",
+      "summary": "대상 Java 81개 중 42개 파일의 문맥 단위 빈 줄·줄 나누기·들여쓰기 정리를 유지하고 리뷰 지적 CourseSchemaRepositoryTest.otherInputRow의 문자열 연결 이어쓰기를 24칸(앞줄 +8칸)으로 수정. 공백 외 문자는 대상 81개 모두 HEAD와 동일하고 word diff 변경 표시 없음. ./backend/gradlew -p backend build 통과(compileTestJava 실행, test UP-TO-DATE). 120자 초과 12줄(backend/src/test/java/com/mogum/ 기준): card/repository/CardSchemaRepositoryTest.java:107 — SQL 문자열 리터럴(150자); card/repository/CardSchemaRepositoryTest.java:126 — SQL 문자열 리터럴(150자); card/repository/CardSchemaRepositoryTest.java:338 — SQL 텍스트 블록 리터럴(123자); card/repository/CardSchemaRepositoryTest.java:346 — SQL 텍스트 블록 리터럴(137자); common/api/RequestValidationIntegrationTest.java:87 — JSON 문자열 리터럴(126자); common/api/RequestValidationIntegrationTest.java:137 — JSON 문자열 리터럴(126자); common/api/RequestValidationIntegrationTest.java:152 — JSON 문자열 리터럴(124자); common/logging/RequestLogFilterIntegrationTest.java:101 — 로그 검색 문자열 리터럴(133자); course/repository/CourseSchemaRepositoryTest.java:364 — SQL 텍스트 블록 리터럴(121자); course/repository/CourseSchemaRepositoryTest.java:378 — SQL 텍스트 블록 리터럴(139자); course/repository/CourseSchemaRepositoryTest.java:406 — SQL 문자열 리터럴(143자); support/IntegrationTestConfiguration.java:416 — JSON 문자열 리터럴(150자).",
+      "completed_at": "2026-11-17T10:34:01+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/card/repository/CardSchemaRepositoryTest.java:setFsrs — 인자를 `state,` / `step, card` 로 나눠 짝인 state·step 이 갈라졌다 → 다음 정리 때 문자열 뒤에서 끊고 `state, step, card` 를 한 줄에 두는 편이 §2의 '의미가 묶이는 것끼리'에 맞는다(공백만 바뀌므로 step 7 이나 이후 정리에서 가능).",
+        "backend/src/test/java/com/mogum/common/api/RequestValidationIntegrationTest.java:645 — while 조건의 `&& System.nanoTime() < deadline` 이 줄 중간에 남아 있다(연산자는 줄 앞에서 끊는다는 규칙과 어긋나지만 120자 이내라 허용 범위다) → step 7 에서 이 while 에 중괄호를 달 때 조건 줄 나누기도 함께 정리하면 좋다.",
+        "backend/src/test/java/com/mogum/common/logging/RequestLogFilterIntegrationTest.java:followsLoggedInRequests 쪽 for 루프 — `var earlier = send(...)` 뒤의 빈 줄은 같은 반복 하나의 요청→검사를 갈라 놓아 다소 기계적이다. 취향 차이라 반려 사유는 아니다."
+      ]
     },
     {
       "step": 6,
