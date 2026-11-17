@@ -123,7 +123,10 @@
     {
       "step": 9,
       "name": "role-prefixed-names",
-      "status": "pending"
+      "status": "completed",
+      "summary": "requestLogCompletion의 filterRegistrationBean → requestLogFilterRegistrationBean, FilterFailure.filterFailure의 abstractFilterRegistrationBean → securityFilterRegistrationBean으로 매개변수와 사용처 총 4곳만 변경. 줄 배치 유지·변경 줄 120자 이내, git diff HEAD로 지정 이름 외 코드 변경 없음 확인. ./backend/gradlew -p backend build 통과(테스트 실제 실행: 97개 클래스·1,494개 테스트, 실패·오류·건너뛰기 0개).",
+      "started_at": "2026-11-17T15:43:29+0900",
+      "completed_at": "2026-11-17T15:45:14+0900"
     }
   ],
   "created_at": "2026-11-17T04:54:38+0900",
