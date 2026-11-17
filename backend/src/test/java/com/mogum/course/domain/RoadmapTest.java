@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RoadmapTest {
     @Test
@@ -33,6 +34,20 @@ class RoadmapTest {
         assertThat(roadmap.getTitle()).isEqualTo("서버 개발 로드맵");
         assertThat(roadmap.getDescription()).isEqualTo("서버를 만들 수 있어요");
         assertThat(roadmap.getStatus()).isEqualTo(RoadmapStatus.REVIEWING);
+    }
+
+    @Test
+    @DisplayName("첫 코스를 받으면 검토 중 로드맵이 진행 중으로 바뀐다")
+    void startsRoadmapOnce() {
+        // given
+        var roadmap = RoadmapFixtures.roadmap(1L);
+
+        // when
+        roadmap.start();
+
+        // then
+        assertThat(roadmap.getStatus()).isEqualTo(RoadmapStatus.IN_PROGRESS);
+        assertThatThrownBy(roadmap::start).isInstanceOf(IllegalStateException.class);
     }
 }
 

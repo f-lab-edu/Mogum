@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CourseTest {
     @Test
@@ -65,6 +66,24 @@ class CourseTest {
         assertThat(course.getStartedAt()).isNull();
         assertThat(course.getLastLessonOpenedAt()).isNull();
         assertThat(course.getCompletedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("강의 목록이 생기면 짜기 전 코스만 검토 중으로 바뀌고 계획은 그대로다")
+    void reviewsPlannedCourse() {
+        // given
+        var course = CourseFixtures.inRoadmap(RoadmapFixtures.roadmap(1L), 1, "계획 제목", "계획 설명",
+                List.of(new PlannedConcept("개념", "정의")));
+
+        // when
+        course.planLessons();
+
+        // then
+        assertThat(course.getStatus()).isEqualTo(CourseStatus.REVIEWING);
+        assertThat(course.getTitle()).isEqualTo("계획 제목");
+        assertThat(course.getPlanDescription()).isEqualTo("계획 설명");
+        assertThat(course.getPlanConcepts()).containsExactly(new PlannedConcept("개념", "정의"));
+        assertThatThrownBy(course::planLessons).isInstanceOf(IllegalStateException.class);
     }
 }
 

@@ -6,6 +6,8 @@ import com.mogum.course.repository.RoadmapRepository;
 import com.mogum.generation.ChatCall;
 import com.mogum.generation.NewCourseGenerator;
 import com.mogum.generation.NewRoadmapGenerator;
+import com.mogum.generation.PlanRoadmapCourseGenerator;
+import com.mogum.generation.RoadmapCoursePlanReader;
 import com.mogum.generation.call.LlmCallWriter;
 import com.mogum.generation.call.repository.LlmCallRepository;
 import com.mogum.generation.plan.CoursePlanFormat;
@@ -29,6 +31,20 @@ public class GenerationConfiguration {
             CourseRepository courseRepository, RoadmapRepository roadmapRepository) {
         return new NewRoadmapGenerator(chatCall, llmProperties.chats().get("planning"), new RoadmapPlanFormat(),
                 courseRepository, roadmapRepository);
+    }
+
+    @Bean
+    public RoadmapCoursePlanReader roadmapCoursePlanReader(CourseRepository courseRepository,
+            LessonRepository lessonRepository, PlatformTransactionManager platformTransactionManager) {
+        return new RoadmapCoursePlanReader(courseRepository, lessonRepository, platformTransactionManager);
+    }
+
+    @Bean
+    public PlanRoadmapCourseGenerator planRoadmapCourseGenerator(ChatCall chatCall, LlmProperties llmProperties,
+            RoadmapCoursePlanReader roadmapCoursePlanReader, CourseRepository courseRepository,
+            LessonRepository lessonRepository) {
+        return new PlanRoadmapCourseGenerator(chatCall, llmProperties.chats().get("planning"), new CoursePlanFormat(),
+                roadmapCoursePlanReader, courseRepository, lessonRepository);
     }
 
     @Bean

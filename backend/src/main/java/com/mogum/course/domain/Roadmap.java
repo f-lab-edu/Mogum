@@ -48,5 +48,10 @@ public class Roadmap extends AuditedEntity {
         roadmap.status = RoadmapStatus.REVIEWING;
         return roadmap;
     }
+
+    public void start() {
+        if (status != RoadmapStatus.REVIEWING) throw new IllegalStateException("Roadmap must be reviewing");
+        status = RoadmapStatus.IN_PROGRESS;
+    }
 }
 

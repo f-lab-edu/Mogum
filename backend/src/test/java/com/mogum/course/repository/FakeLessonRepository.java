@@ -3,7 +3,9 @@ package com.mogum.course.repository;
 import com.mogum.course.domain.Lesson;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -17,4 +19,10 @@ public final class FakeLessonRepository implements LessonRepository {
     }
 
     public Optional<Lesson> findById(Long id) { return Optional.ofNullable(entities.get(id)); }
+
+    public List<Lesson> findByCourseIdOrderByPositionAsc(Long courseId) {
+        return entities.values().stream()
+                .filter(entity -> entity.getCourse() != null && entity.getCourse().getId().equals(courseId))
+                .sorted(Comparator.comparingInt(Lesson::getPosition)).toList();
+    }
 }

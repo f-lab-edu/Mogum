@@ -90,5 +90,10 @@ public class Course extends AuditedEntity {
         course.status = CourseStatus.NOT_PLANNED;
         return course;
     }
+
+    public void planLessons() {
+        if (status != CourseStatus.NOT_PLANNED) throw new IllegalStateException("Course must be unplanned");
+        status = CourseStatus.REVIEWING;
+    }
 }
 

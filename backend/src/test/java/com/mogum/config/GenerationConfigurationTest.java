@@ -7,6 +7,8 @@ import com.mogum.generation.ChatCall;
 import com.mogum.generation.ChatSettings;
 import com.mogum.generation.NewCourseGenerator;
 import com.mogum.generation.NewRoadmapGenerator;
+import com.mogum.generation.PlanRoadmapCourseGenerator;
+import com.mogum.generation.RoadmapCoursePlanReader;
 import com.mogum.generation.TokenPrices;
 import com.mogum.generation.call.LlmCallWriter;
 import com.mogum.generation.call.repository.LlmCallRepository;
@@ -46,7 +48,8 @@ class GenerationConfigurationTest {
         runner.run(context -> {
             // then
             assertThat(context).hasNotFailed().hasSingleBean(LlmCallWriter.class)
-                    .hasSingleBean(NewCourseGenerator.class).hasSingleBean(NewRoadmapGenerator.class);
+                    .hasSingleBean(NewCourseGenerator.class).hasSingleBean(NewRoadmapGenerator.class)
+                    .hasSingleBean(PlanRoadmapCourseGenerator.class).hasSingleBean(RoadmapCoursePlanReader.class);
         });
     }
 }

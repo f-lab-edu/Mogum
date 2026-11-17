@@ -38,7 +38,7 @@ class JobControllerNoHandlersIntegrationTest {
     @Autowired ApplicationContext applicationContext;
 
     @ParameterizedTest(name = "종류={0}")
-    @EnumSource(value = JobType.class, names = {"NEW_COURSE", "NEW_ROADMAP"}, mode = EnumSource.Mode.EXCLUDE)
+    @EnumSource(value = JobType.class, names = {"NEW_COURSE", "NEW_ROADMAP", "PLAN_ROADMAP_COURSE"}, mode = EnumSource.Mode.EXCLUDE)
     @DisplayName("처리기가 없는 종류는 HTTP 받기를 거절하고 작업과 크레딧을 보존한다")
     void rejectsTypesWithoutHandlers(JobType type) {
         // given

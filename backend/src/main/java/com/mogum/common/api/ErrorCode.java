@@ -31,6 +31,15 @@ public enum ErrorCode {
     /** 한 사람의 기다림과 만드는 중 작업이 상한에 닿으면 409로 반환한다. */
     TOO_MANY_IN_PROGRESS(HttpStatus.CONFLICT, "지금 만드는 것이 끝나면 다시 시도해 주세요"),
 
+    /** 코스가 짜기 전이 아니거나 로드맵 상태가 맞지 않으면 강의 목록 받기를 409로 거절한다. */
+    COURSE_PLAN_NOT_ALLOWED(HttpStatus.CONFLICT, "지금은 이 코스의 강의 목록을 만들 수 없어요"),
+
+    /** 앞선 짜기 전 코스가 있거나 바로 앞 코스가 다 마침이 아니면 409로 반환한다. */
+    PREVIOUS_COURSE_NOT_COMPLETED(HttpStatus.CONFLICT, "앞 코스를 다 마치면 만들 수 있어요"),
+
+    /** 성공하지 않은 로드맵 다시 짜기가 있으면 첫 코스의 받기를 409로 거절한다. */
+    ROADMAP_REPLAN_IN_PROGRESS(HttpStatus.CONFLICT, "다시 짜는 중에는 시작할 수 없어요"),
+
     /** 입력이 너무 커 실패한 작업의 다시 시도를 거절할 때 409로 반환한다. */
     JOB_RETRY_NOT_ALLOWED(HttpStatus.CONFLICT, "주제를 좁혀 새로 만들어 주세요"),
 

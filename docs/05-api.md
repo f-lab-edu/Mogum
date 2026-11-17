@@ -42,6 +42,7 @@
 - 만드는 작업 TASK(`6-job-worker` step 1) 구현: 「크레딧 부족」은 `CREDIT_INSUFFICIENT`(409)이며 문구는 「크레딧이 부족합니다. {yyyy-MM-dd}에 다시 채워집니다」다. `{yyyy-MM-dd}`에는 `credit_refill_at`을 `Asia/Seoul`로 바꾼 한국 날짜를 넣는다. 서버 문구는 `ApiException.withMessage(ErrorCode, String)`로 넘기고 `ApiExceptionHandler` → `ApiErrorResponses.of(ApiException)`의 공통 경로로 응답한다. 기존 생성자는 고정 문구와 `retryAfterSeconds` 동작을 유지하며 예외 자체의 메시지는 code만 담는다.
 - 만드는 작업 TASK(`6-job-worker` step 2) 구현: 「만드는 중인 것이 많음」은 `TOO_MANY_IN_PROGRESS`(409), 문구는 「지금 만드는 것이 끝나면 다시 시도해 주세요」다. 입력이 너무 큰 실패의 다시 시도 거절은 `JOB_RETRY_NOT_ALLOWED`(409), 「주제를 좁혀 새로 만들어 주세요」다. 실패가 아닌 작업의 버리기 거절은 `JOB_DISCARD_NOT_ALLOWED`(409), 「실패한 만들기만 버릴 수 있습니다」다. 실패가 아닌 작업의 다시 시도는 현재 작업을 그대로 돌려준다.
 - 만드는 작업 TASK 구현: `6-job-worker` step 3의 작업 읽기는 실패한 작업도 HTTP 200의 `data.error`에 공통 `ApiError` 객체(`code` · `message`)를 싣는다. `INPUT_TOO_LARGE`는 `JOB_INPUT_FAILURE`, 「주제를 좁혀 새로 만들어 주세요」이며 버리기만 가능하다. 나머지 세 실패 까닭은 `JOB_TEMPORARY_FAILURE`, 「만들지 못했습니다. 다시 시도하거나 버려 주세요」이며 다시 시도 · 버리기가 가능하다. 원래 실패 까닭은 반환하지 않는다.
+- 강의 목록 TASK(`7-course-planning` step 4) 구현: 로드맵 코스 받기의 상태 거절은 `COURSE_PLAN_NOT_ALLOWED`(409), 「지금은 이 코스의 강의 목록을 만들 수 없어요」다. 앞선 짜기 전 코스가 있거나 바로 앞 코스가 다 마침이 아니면 `PREVIOUS_COURSE_NOT_COMPLETED`(409), 「앞 코스를 다 마치면 만들 수 있어요」다. 첫 코스의 받기에서 성공하지 않은 로드맵 다시 짜기가 있으면 `ROADMAP_REPLAN_IN_PROGRESS`(409), 「다시 짜는 중에는 시작할 수 없어요」다. 각각 현재 코스 상태 확인 · 앞 코스 학습 완료 · 다시 짜기 종료(실패면 다시 시도 또는 버리기)를 안내한다. 단일 코스를 로드맵 코스 받기의 대상으로 보내면 `NOT_FOUND`(404)다.
 - 기술적인 원인(응답이 잘림 · 서버 응답 없음 등)은 싣지 않는다(ADR-088).
 - 만들기 실패도 작업을 읽을 때 같은 모양으로 싣는다.
 
@@ -71,7 +72,7 @@
 
 - 만드는 작업 TASK 구현: `6-job-worker` step 7의 기다리는 화면은 작업을 **2초 간격**으로 다시 읽는다. `QUEUED` · `RUNNING`일 때만 이어 읽고, 성공 · 실패 또는 읽기 오류가 되면 멈춘다. 읽기 오류는 화면의 「다시 시도」로 다시 읽고, 실패한 작업의 다시 시도가 성공하면 응답으로 읽기 캐시를 교체해 간격 읽기를 재개한다. 버리기 성공은 해당 작업 캐시를 지운다.
 
-- 만드는 작업 TASK 구현: `6-job-worker` step 3의 네 주소는 아래와 같다. 받기와 다시 시도는 step 2의 트랜잭션이 커밋된 뒤 작업을 다시 읽어 같은 응답을 반환한다. `7-course-planning` step 3부터 `NEW_COURSE` · `NEW_ROADMAP`는 운영 받기 · 생성 처리기로 받는다. `PLAN_ROADMAP_COURSE` · `REPLAN_COURSE` · `REPLAN_ROADMAP` · `MATERIAL`은 아직 운영 처리기가 없어 `INVALID_REQUEST`(400)다. 새로 배우기의 HTTP 받기 · 크레딧 사용은 운영 처리기로 검증한다.
+- 만드는 작업 TASK 구현: `6-job-worker` step 3의 네 주소는 아래와 같다. 받기와 다시 시도는 step 2의 트랜잭션이 커밋된 뒤 작업을 다시 읽어 같은 응답을 반환한다. `7-course-planning` step 3부터 `NEW_COURSE` · `NEW_ROADMAP`, step 4부터 `PLAN_ROADMAP_COURSE`는 운영 받기 · 생성 처리기로 받는다. `REPLAN_COURSE` · `REPLAN_ROADMAP` · `MATERIAL`은 아직 운영 처리기가 없어 `INVALID_REQUEST`(400)다. 새로 배우기의 HTTP 받기 · 크레딧 사용은 운영 처리기로 검증한다.
 
 | 동작 | 메서드 · 경로 | 성공 |
 |---|---|---|
