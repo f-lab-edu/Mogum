@@ -1,0 +1,16 @@
+{
+  "project": "Mogum",
+  "phase": "7-course-planning",
+  "steps": [
+    { "step": 0, "name": "llm-calls", "status": "pending" },
+    { "step": 1, "name": "openai-client", "status": "pending" },
+    { "step": 2, "name": "plan-format", "status": "pending" },
+    { "step": 3, "name": "new-learning-jobs", "status": "pending" },
+    { "step": 4, "name": "roadmap-course-job", "status": "pending" },
+    { "step": 5, "name": "replan-jobs", "status": "pending" },
+    { "step": 6, "name": "course-api", "status": "pending" },
+    { "step": 7, "name": "new-learning-screen", "status": "pending" },
+    { "step": 8, "name": "course-screen", "status": "pending" },
+    { "step": 9, "name": "roadmap-screen-and-tabs", "status": "pending" }
+  ]
+}
