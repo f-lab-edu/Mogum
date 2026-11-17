@@ -36,7 +36,8 @@ class WebPropertiesTest {
     @DisplayName("설정 키로 단일 출처와 쿠키 도메인을 바인딩한다")
     void bindsOriginAndCookieDomain() {
         // given
-        var configured = applicationContextRunner.withPropertyValues("app.web.origin=https://mogum.example", "app.web.cookie-domain=mogum.example");
+        var configured = applicationContextRunner.withPropertyValues("app.web.origin=https://mogum.example",
+                "app.web.cookie-domain=mogum.example");
 
         // when
         configured.run(context -> {
@@ -52,8 +53,9 @@ class WebPropertiesTest {
     @DisplayName("환경 변수로 출처와 쿠키 도메인을 덮어쓴다")
     void overridesOriginAndDomainFromEnvironment() {
         // given
-        var configured = applicationContextRunner.withInitializer(context -> context.getEnvironment().getPropertySources().addFirst(
-                new SystemEnvironmentPropertySource("test-env", Map.of(
+        var configured = applicationContextRunner.withInitializer(context -> context.getEnvironment()
+                .getPropertySources()
+                .addFirst(new SystemEnvironmentPropertySource("test-env", Map.of(
                         "APP_WEB_ORIGIN", "https://mogum.example",
                         "APP_WEB_COOKIE_DOMAIN", "mogum.example"))));
 

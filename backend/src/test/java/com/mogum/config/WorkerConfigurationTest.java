@@ -27,6 +27,7 @@ class WorkerConfigurationTest {
                 .withBean(CreditLedger.class, () -> mock(CreditLedger.class))
                 .withBean(Clock.class, Clock::systemUTC)
                 .withPropertyValues("app.worker.count=0");
+
         // when
         runner.run(context -> {
             // then

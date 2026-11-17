@@ -20,8 +20,10 @@ class CardConceptTest {
         assertThat(link.getId()).isEqualTo(new CardConceptId(17L, 23L));
         assertThat(link.getId().cardId()).isEqualTo(17L);
         assertThat(link.getId().conceptId()).isEqualTo(23L);
+
         assertThat(link.getCard()).isSameAs(card);
         assertThat(link.getConcept()).isSameAs(concept);
+
         assertThat(link.getCreatedAt()).isNull();
         assertThat(link.getUpdatedAt()).isNull();
         assertThat(link.isNew()).isTrue();

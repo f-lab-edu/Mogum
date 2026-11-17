@@ -23,8 +23,10 @@ public final class TestRequests {
         var response = authenticated.get().uri("/api/me").exchange().returnResult();
         var token = response.getResponseCookies().getFirst("XSRF-TOKEN");
         if (token == null) throw new IllegalStateException("GET /api/me did not issue XSRF-TOKEN");
+
         return authenticated.mutate()
                 .defaultCookie("XSRF-TOKEN", token.getValue())
-                .defaultHeader("X-XSRF-TOKEN", token.getValue()).build();
+                .defaultHeader("X-XSRF-TOKEN", token.getValue())
+                .build();
     }
 }

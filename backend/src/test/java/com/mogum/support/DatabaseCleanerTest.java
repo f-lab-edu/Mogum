@@ -63,6 +63,7 @@ class DatabaseCleanerTest {
         var user = userRepository.save(UserFixtures.user("catalog@example.com"));
         var history = jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history", Long.class);
         jdbc.execute("CREATE TABLE cleaner_probe (user_id bigint REFERENCES users(id))");
+
         try {
             jdbc.update("INSERT INTO cleaner_probe VALUES (?)", user.getId());
 

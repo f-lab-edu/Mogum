@@ -24,7 +24,8 @@ class IntegrationTestContextIntegrationTest {
     void sharesContextWithAnotherTestClass() {
         // when
         var other = new TestContextManager(IntegrationTestSharedContextIntegrationTest.class)
-                .getTestContext().getApplicationContext();
+                .getTestContext()
+                .getApplicationContext();
 
         // then
         assertThat(other).isSameAs(applicationContext);

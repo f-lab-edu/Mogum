@@ -16,11 +16,13 @@ class CardTest {
         assertThat(card.getId()).isNull();
         assertThat(card.getCreatedAt()).isNull();
         assertThat(card.getUpdatedAt()).isNull();
+
         assertThat(card.getUserId()).isEqualTo(8L);
         assertThat(card.getLessonId()).isEqualTo(13L);
         assertThat(card.getPosition()).isEqualTo(2);
         assertThat(card.getQuestion()).isEqualTo("변수란 무엇인가요?");
         assertThat(card.getAnswer()).isEqualTo("값을 담는 이름이에요.");
+
         assertThat(card.getStatus()).isEqualTo(CardStatus.ACTIVE);
         assertThat(card.getFsrsState()).isEqualTo(FsrsState.LEARNING);
         assertThat(card.getFsrsStep()).isZero();

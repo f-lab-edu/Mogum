@@ -30,6 +30,7 @@ class TestRequestsIntegrationTest {
         // then
         assertThat(response.getStatus().value()).isEqualTo(200);
         assertThat(response.getResponseBody()).contains("http@example.com");
+
         var stored = jdbcIndexedSessionRepository.findByPrincipalName(Long.toString(user.getId()));
         assertThat(stored).hasSize(1);
         Session session = stored.values().iterator().next();

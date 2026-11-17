@@ -42,6 +42,7 @@ class ReviewRepositoryTest {
     void reloadsRatingAndReviewTimeWithoutChangingCard(Rating rating) {
         // given
         var card = savedCard();
+
         var reviewedAt = Instant.parse("2026-11-10T03:04:05Z");
         testClock.set(reviewedAt);
         var saved = reviewRepository.save(ReviewFixtures.review(card, rating));
@@ -56,6 +57,7 @@ class ReviewRepositoryTest {
         assertThat(actual.getRating()).isEqualTo(rating);
         assertThat(actual.getCreatedAt()).isEqualTo(reviewedAt);
         assertThat(actual.getUpdatedAt()).isEqualTo(reviewedAt);
+
         var unchanged = cardRepository.findById(card.getId()).orElseThrow();
         assertThat(unchanged.getFsrsState()).isEqualTo(FsrsState.LEARNING);
         assertThat(unchanged.getFsrsStep()).isZero();

@@ -64,6 +64,7 @@ class AuditedEntityTest {
         var reloaded = userRepository.findById(id).orElseThrow();
         assertThat(reloaded.getCreatedAt()).isEqualTo(created);
         assertThat(reloaded.getUpdatedAt()).isEqualTo(updated);
+
         jdbcTemplate.queryForObject("SELECT created_at, updated_at FROM users WHERE id = ?", (row, index) -> {
             assertThat(row.getTimestamp("created_at").toInstant()).isEqualTo(created);
             assertThat(row.getTimestamp("updated_at").toInstant()).isEqualTo(updated);

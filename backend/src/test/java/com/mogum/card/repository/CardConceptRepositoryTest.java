@@ -39,7 +39,8 @@ class CardConceptRepositoryTest {
     void reloadsLinkWithCompositeIdAndLazyParents() {
         // given
         var card = savedCard();
-        var concept = conceptRepository.save(ConceptFixtures.concept(card.getUserId(), "변수", "값을 담는 이름", new float[]{1, 2, 3}));
+        var concept = conceptRepository.save(ConceptFixtures.concept(
+                card.getUserId(), "변수", "값을 담는 이름", new float[]{1, 2, 3}));
         var saved = cardConceptRepository.save(CardConceptFixtures.link(card, concept));
 
         // when
@@ -48,10 +49,13 @@ class CardConceptRepositoryTest {
         // then
         assertThat(actual).isNotSameAs(saved);
         assertThat(actual.getId()).isEqualTo(new CardConceptId(card.getId(), concept.getId()));
+
         assertThat(actual.getCard().getId()).isEqualTo(card.getId());
         assertThat(actual.getConcept().getId()).isEqualTo(concept.getId());
+
         assertThat(Hibernate.isInitialized(actual.getCard())).isFalse();
         assertThat(Hibernate.isInitialized(actual.getConcept())).isFalse();
+
         assertThat(actual.getCreatedAt()).isEqualTo(testClock.instant());
         assertThat(actual.getUpdatedAt()).isEqualTo(testClock.instant());
         assertThat(actual.isNew()).isFalse();
@@ -62,14 +66,16 @@ class CardConceptRepositoryTest {
     void rejectsDuplicateLinkOnSave() {
         // given
         var card = savedCard();
-        var concept = conceptRepository.save(ConceptFixtures.concept(card.getUserId(), "변수", "값을 담는 이름", new float[]{1, 2, 3}));
+        var concept = conceptRepository.save(ConceptFixtures.concept(
+                card.getUserId(), "변수", "값을 담는 이름", new float[]{1, 2, 3}));
         var saved = cardConceptRepository.save(CardConceptFixtures.link(card, concept));
         var duplicate = CardConceptFixtures.link(card, concept);
 
         // when & then
         assertThatThrownBy(() -> cardConceptRepository.save(duplicate))
                 .isInstanceOf(DataIntegrityViolationException.class)
-                .rootCause().isInstanceOfSatisfying(SQLException.class, sql -> {
+                .rootCause()
+                .isInstanceOfSatisfying(SQLException.class, sql -> {
                     assertThat(sql.getSQLState()).isEqualTo("23505");
                     assertThat(sql.getMessage()).contains("card_concepts_pkey");
                 });

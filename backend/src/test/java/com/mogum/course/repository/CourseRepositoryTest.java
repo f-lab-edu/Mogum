@@ -34,7 +34,7 @@ class CourseRepositoryTest {
             "OTHER,실습 경험,OTHER,개인 프로젝트,"})
     @DisplayName("단일 코스는 입력과 검토 중 상태를 저장하고 계획과 학습 시각은 비운다")
     void reloadsSingleCourseWithInput(Level level, String levelOther, Purpose purpose,
-                                     String purposeOther, String memo) {
+            String purposeOther, String memo) {
         // given
         var user = userRepository.save(UserFixtures.user("me@example.com"));
         var input = new LearningInput("자바", level, levelOther, purpose, purposeOther, memo);
@@ -46,14 +46,17 @@ class CourseRepositoryTest {
         // then
         assertThat(actual).isNotSameAs(saved);
         assertThat(actual.getId()).isPositive();
+
         assertThat(actual.getUserId()).isEqualTo(user.getId());
         assertThat(actual.getTitle()).isEqualTo("자바 기초");
         assertThat(actual.getInput()).usingRecursiveComparison().isEqualTo(input);
+
         assertThat(actual.getStatus()).isEqualTo(CourseStatus.REVIEWING);
         assertThat(actual.getRoadmap()).isNull();
         assertThat(actual.getPosition()).isNull();
         assertThat(actual.getPlanDescription()).isNull();
         assertThat(actual.getPlanConcepts()).isNull();
+
         assertThat(actual.getStartedAt()).isNull();
         assertThat(actual.getLastLessonOpenedAt()).isNull();
         assertThat(actual.getCompletedAt()).isNull();
@@ -74,6 +77,7 @@ class CourseRepositoryTest {
         // then
         assertThat(actual).isNotSameAs(saved);
         assertThat(actual.getId()).isPositive();
+
         assertThat(actual.getUserId()).isEqualTo(roadmap.getUserId());
         assertThat(actual.getRoadmap().getId()).isEqualTo(roadmap.getId());
         assertThat(Hibernate.isInitialized(actual.getRoadmap())).isFalse();
@@ -82,10 +86,13 @@ class CourseRepositoryTest {
         assertThat(actual.getPlanDescription()).isEqualTo("기본 문법을 익혀요");
         assertThat(actual.getPlanConcepts()).containsExactlyElementsOf(concepts);
         assertThat(actual.getInput()).isNull();
+
         assertThat(actual.getStatus()).isEqualTo(CourseStatus.NOT_PLANNED);
+
         assertThat(actual.getStartedAt()).isNull();
         assertThat(actual.getLastLessonOpenedAt()).isNull();
         assertThat(actual.getCompletedAt()).isNull();
+
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT plan_concepts = '[{"name":"변수","definition":"값을 담는 이름"},
                   {"name":"타입","definition":"값의 종류"}]'::jsonb FROM courses WHERE id = ?

@@ -30,7 +30,8 @@ class WorkerPropertiesTest {
                     Duration.ofMinutes(5), Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
                     2, Duration.ofSeconds(1), Duration.ofSeconds(100)));
             assertThat(Binder.get(context.getEnvironment())
-                    .bind("spring.lifecycle.timeout-per-shutdown-phase", Duration.class).get())
+                    .bind("spring.lifecycle.timeout-per-shutdown-phase", Duration.class)
+                    .get())
                     .isGreaterThan(Duration.ofSeconds(120));
         });
     }
@@ -47,6 +48,7 @@ class WorkerPropertiesTest {
     void rejectsInvalidSettings(String property) {
         // given
         var invalid = applicationContextRunner.withPropertyValues(property);
+
         // when
         invalid.run(context -> {
             // then
@@ -60,6 +62,7 @@ class WorkerPropertiesTest {
     void acceptsDisabledWorkersAndImmediateRetry() {
         // given
         var disabled = applicationContextRunner.withPropertyValues("app.worker.count=0", "app.worker.retry-delay=0s");
+
         // when
         disabled.run(context -> {
             // then

@@ -243,7 +243,8 @@ class ApiExceptionHandlerTest {
     @DisplayName("잘못된 JSON은 상세 원문 없이 공통 400으로 변환한다")
     void convertsMalformedJsonWithoutPrivateDetails() throws Exception {
         // given
-        var exception = new HttpMessageNotReadableException("private JSON input", new MockHttpInputMessage(new byte[0]));
+        var exception = new HttpMessageNotReadableException("private JSON input",
+                new MockHttpInputMessage(new byte[0]));
         var request = webRequest();
 
         // when
@@ -290,7 +291,8 @@ class ApiExceptionHandlerTest {
 
     private MockMvcTester mvc(RuntimeException failure) {
         return MockMvcTester.of(List.of(new Controllers.FailingController(failure)), builder -> builder
-                .setControllerAdvice(new ApiExceptionHandler()).build());
+                .setControllerAdvice(new ApiExceptionHandler())
+                .build());
     }
 
     // standalone 전용 컨트롤러가 다른 슬라이스나 통합 컨텍스트의 스캔에 섞이지 않게 한다.
@@ -321,14 +323,17 @@ class ApiExceptionHandlerTest {
             validator.afterPropertiesSet();
             validator.validate(target, binding);
         }
+
         return binding.getAllErrors();
     }
 
     private static MethodArgumentNotValidException validationException(List<ObjectError> errors) throws Exception {
         var binding = new BeanPropertyBindingResult(new Object(), "request");
         errors.forEach(binding::addError);
+
         var parameter = new MethodParameter(ApiExceptionHandlerTest.class
                 .getDeclaredMethod("validationTarget", Object.class), 0);
+
         return new MethodArgumentNotValidException(parameter, binding);
     }
 

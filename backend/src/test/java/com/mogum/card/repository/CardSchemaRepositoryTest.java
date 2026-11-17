@@ -50,7 +50,8 @@ class CardSchemaRepositoryTest {
         update("reviews", graph.review(), "rating", rating);
 
         // then
-        assertThat(jdbcTemplate.queryForObject("SELECT rating FROM reviews WHERE id = ?", String.class, graph.review())).isEqualTo(rating);
+        assertThat(jdbcTemplate.queryForObject("SELECT rating FROM reviews WHERE id = ?", String.class, graph.review()))
+                .isEqualTo(rating);
     }
 
     @ParameterizedTest(name = "FSRS {0}, 단계 {1}")
@@ -65,7 +66,8 @@ class CardSchemaRepositoryTest {
 
         // then
         assertThat(jdbcTemplate.queryForMap("SELECT fsrs_state, fsrs_step FROM cards WHERE id = ?", graph.card()))
-                .containsEntry("fsrs_state", state).containsEntry("fsrs_step", step);
+                .containsEntry("fsrs_state", state)
+                .containsEntry("fsrs_step", step);
     }
 
     @ParameterizedTest(name = "FSRS {0}, 단계 {1}")
@@ -87,9 +89,13 @@ class CardSchemaRepositoryTest {
         jdbcTemplate.update("DELETE FROM materials WHERE id = ?", graph.material());
 
         // when & then
-        assertConstraint("23514", "cards_lesson_id_check", () -> jdbcTemplate.update("DELETE FROM lessons WHERE id = ?", graph.lesson()));
-        assertThat(jdbcTemplate.queryForObject("SELECT lesson_id FROM cards WHERE id = ?", Long.class, graph.card())).isEqualTo(graph.lesson());
-        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM lessons WHERE id = ?", Integer.class, graph.lesson())).isEqualTo(1);
+        assertConstraint("23514", "cards_lesson_id_check",
+                () -> jdbcTemplate.update("DELETE FROM lessons WHERE id = ?", graph.lesson()));
+        assertThat(jdbcTemplate.queryForObject("SELECT lesson_id FROM cards WHERE id = ?", Long.class, graph.card()))
+                .isEqualTo(graph.lesson());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM lessons WHERE id = ?", Integer.class, graph.lesson()))
+                .isEqualTo(1);
     }
 
     @Test
@@ -97,13 +103,16 @@ class CardSchemaRepositoryTest {
     void deletesCourseInDocumentedOrderAndPreservesCards() {
         // given
         var graph = graph();
-        var cardBefore = jdbcTemplate.queryForMap("SELECT question, answer, fsrs_state, fsrs_step, due_at, stability, difficulty, last_reviewed_at, created_at FROM cards WHERE id = ?", graph.card());
+        var cardBefore = jdbcTemplate.queryForMap(
+                "SELECT question, answer, fsrs_state, fsrs_step, due_at, stability, difficulty, last_reviewed_at, created_at FROM cards WHERE id = ?",
+                graph.card());
         var linksBefore = jdbcTemplate.queryForList("SELECT * FROM card_concepts");
         var reviewsBefore = jdbcTemplate.queryForList("SELECT * FROM reviews");
 
         // when
         new TransactionTemplate(platformTransactionManager).executeWithoutResult(status -> {
-            jdbcTemplate.update("UPDATE cards SET status = 'COURSE_DELETED', updated_at = now() WHERE lesson_id = ?", graph.lesson());
+            jdbcTemplate.update("UPDATE cards SET status = 'COURSE_DELETED', updated_at = now() WHERE lesson_id = ?",
+                    graph.lesson());
             jdbcTemplate.update("DELETE FROM materials WHERE lesson_id = ?", graph.lesson());
             jdbcTemplate.update("DELETE FROM lessons WHERE course_id = ?", graph.course());
             jdbcTemplate.update("DELETE FROM courses WHERE id = ?", graph.course());
@@ -111,19 +120,25 @@ class CardSchemaRepositoryTest {
 
         // then
         assertThat(jdbcTemplate.queryForMap("SELECT status, lesson_id FROM cards WHERE id = ?", graph.card()))
-                .containsEntry("status", "COURSE_DELETED").containsEntry("lesson_id", null);
-        assertThat(jdbcTemplate.queryForMap("SELECT question, answer, fsrs_state, fsrs_step, due_at, stability, difficulty, last_reviewed_at, created_at FROM cards WHERE id = ?", graph.card()))
+                .containsEntry("status", "COURSE_DELETED")
+                .containsEntry("lesson_id", null);
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT question, answer, fsrs_state, fsrs_step, due_at, stability, difficulty, last_reviewed_at, created_at FROM cards WHERE id = ?",
+                graph.card()))
                 .isEqualTo(cardBefore);
         assertThat(jdbcTemplate.queryForList("SELECT * FROM card_concepts")).isEqualTo(linksBefore);
         assertThat(jdbcTemplate.queryForList("SELECT * FROM reviews")).isEqualTo(reviewsBefore);
+
         for (String table : new String[]{"materials", "lessons", "courses"}) {
             assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM " + table, Integer.class)).isZero();
         }
+
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM concepts", Integer.class)).isEqualTo(1);
     }
 
     @ParameterizedTest(name = "부모 {0}")
-    @CsvSource({"courses,lessons_course_id_fkey", "cards,reviews_card_id_fkey", "concepts,card_concepts_concept_id_fkey"})
+    @CsvSource({"courses,lessons_course_id_fkey", "cards,reviews_card_id_fkey",
+            "concepts,card_concepts_concept_id_fkey"})
     @DisplayName("자식이 남은 부모는 먼저 지울 수 없다")
     void rejectsDeletingParentsBeforeChildren(String table, String constraint) {
         // given
@@ -157,6 +172,7 @@ class CardSchemaRepositoryTest {
         for (String table : new String[]{"cards", "card_concepts", "reviews"}) {
             assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM " + table, Integer.class)).isZero();
         }
+
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM concepts", Integer.class)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM courses", Integer.class)).isEqualTo(1);
     }
@@ -193,7 +209,8 @@ class CardSchemaRepositoryTest {
         update("cards", graph.card(), "position", 0);
 
         // then
-        assertThat(jdbcTemplate.queryForObject("SELECT position FROM cards WHERE id = ?", Integer.class, graph.card())).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT position FROM cards WHERE id = ?", Integer.class, graph.card()))
+                .isZero();
     }
 
     @Test
@@ -206,7 +223,8 @@ class CardSchemaRepositoryTest {
         long second = concept(graph.user(), "[1,2,3,4,5]");
 
         // then
-        assertThat(jdbcTemplate.queryForList("SELECT vector_dims(embedding) FROM concepts ORDER BY id", Integer.class)).containsExactly(3, 5);
+        assertThat(jdbcTemplate.queryForList("SELECT vector_dims(embedding) FROM concepts ORDER BY id", Integer.class))
+                .containsExactly(3, 5);
         assertThat(second).isNotEqualTo(graph.concept());
     }
 
@@ -245,7 +263,9 @@ class CardSchemaRepositoryTest {
         update(table, id, column, text);
 
         // then
-        assertThat(jdbcTemplate.queryForObject("SELECT " + column + " FROM " + table + " WHERE id = ?", String.class, id)).isEqualTo(text);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT " + column + " FROM " + table + " WHERE id = ?", String.class, id))
+                .isEqualTo(text);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -261,14 +281,17 @@ class CardSchemaRepositoryTest {
 
         // then
         assertThat(timestamps).containsExactly("created_at", "updated_at");
+
         String[] indexes = switch (table) {
-            case "cards" -> new String[]{"cards_pkey", "cards_lesson_id_position_key", "cards_user_id_due_at_idx", "cards_lesson_id_idx"};
+            case "cards" -> new String[]{"cards_pkey", "cards_lesson_id_position_key", "cards_user_id_due_at_idx",
+                    "cards_lesson_id_idx"};
             case "card_concepts" -> new String[]{"card_concepts_pkey", "card_concepts_concept_id_idx"};
             case "reviews" -> new String[]{"reviews_pkey", "reviews_card_id_idx"};
             case "concepts" -> new String[]{"concepts_pkey", "concepts_user_id_idx"};
             default -> throw new IllegalArgumentException(table);
         };
-        assertThat(jdbcTemplate.queryForList("SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = ?", String.class, table))
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = ?", String.class, table))
                 .containsExactlyInAnyOrder(indexes);
     }
 
@@ -284,8 +307,10 @@ class CardSchemaRepositoryTest {
                 """);
 
         // then
-        assertThat(actions).hasSize(11).allSatisfy(row -> assertThat(row.get("action"))
-                .isEqualTo(row.get("conname").equals("cards_lesson_id_fkey") ? "n" : "a"));
+        assertThat(actions)
+                .hasSize(11)
+                .allSatisfy(row -> assertThat(row.get("action"))
+                        .isEqualTo(row.get("conname").equals("cards_lesson_id_fkey") ? "n" : "a"));
     }
 
     private Graph graph() {
@@ -302,12 +327,17 @@ class CardSchemaRepositoryTest {
                 INSERT INTO materials (lesson_id, body, created_at, updated_at)
                 VALUES (?, '본문', now(), now()) RETURNING id
                 """, Long.class, lesson);
+
         long card = card(user, lesson, 1);
         long concept = concept(user, "[1,2,3]");
-        jdbcTemplate.update("INSERT INTO card_concepts (card_id, concept_id, created_at, updated_at) VALUES (?, ?, now(), now())", card, concept);
+        jdbcTemplate.update(
+                "INSERT INTO card_concepts (card_id, concept_id, created_at, updated_at) VALUES (?, ?, now(), now())",
+                card, concept);
+
         long review = jdbcTemplate.queryForObject("""
                 INSERT INTO reviews (card_id, rating, created_at, updated_at) VALUES (?, 'GOOD', now(), now()) RETURNING id
                 """, Long.class, card);
+
         return new Graph(user, course, lesson, material, card, concept, review);
     }
 
@@ -326,7 +356,8 @@ class CardSchemaRepositoryTest {
     }
 
     private void setFsrs(long card, String state, Integer step) {
-        jdbcTemplate.update("UPDATE cards SET fsrs_state = ?, fsrs_step = ?, updated_at = now() WHERE id = ?", state, step, card);
+        jdbcTemplate.update("UPDATE cards SET fsrs_state = ?, fsrs_step = ?, updated_at = now() WHERE id = ?", state,
+                step, card);
     }
 
     private void update(String table, long id, String column, Object value) {
@@ -334,10 +365,12 @@ class CardSchemaRepositoryTest {
     }
 
     private static void assertConstraint(String state, String constraint, Runnable operation) {
-        assertThatThrownBy(operation::run).rootCause().isInstanceOfSatisfying(SQLException.class, sql -> {
-            assertThat(sql.getSQLState()).isEqualTo(state);
-            assertThat(sql.getMessage()).contains(constraint);
-        });
+        assertThatThrownBy(operation::run)
+                .rootCause()
+                .isInstanceOfSatisfying(SQLException.class, sql -> {
+                    assertThat(sql.getSQLState()).isEqualTo(state);
+                    assertThat(sql.getMessage()).contains(constraint);
+                });
     }
 
     static Stream<Arguments> blankColumns() {

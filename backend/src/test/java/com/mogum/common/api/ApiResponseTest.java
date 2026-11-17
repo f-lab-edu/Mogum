@@ -34,6 +34,7 @@ class ApiResponseTest {
         assertThat(new JsonContent(json)).isStrictlyEqualTo("""
                 {"data":{"email":"me@example.com","optional":null}}
                 """);
+
         assertThat(applicationContext.getBeansOfType(DataSource.class)).isEmpty();
         assertThat(applicationContext.getBeansOfType(EntityManagerFactory.class)).isEmpty();
     }
@@ -98,6 +99,8 @@ class ApiResponseTest {
     }
 
     private record OptionalResponse(String email, String optional) { }
+
     private record TimestampResponse(Instant createdAt) { }
+
     private record StatusResponse(UserStatus status) { }
 }

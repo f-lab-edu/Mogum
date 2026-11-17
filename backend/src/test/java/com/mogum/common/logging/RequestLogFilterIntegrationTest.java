@@ -57,6 +57,7 @@ class RequestLogFilterIntegrationTest {
         // 컨테이너 로그를 보는 이 테스트에 필요한 연결을 준비하고 끝나면 원래 상태로 돌린다.
         installedJulBridge = !SLF4JBridgeHandler.isInstalled();
         if (installedJulBridge) SLF4JBridgeHandler.install();
+
         user = userRepository.save(UserFixtures.approved("request-log@example.com"));
         cookie = new TestSessions(jdbcIndexedSessionRepository).create(user.getId());
     }
@@ -68,13 +69,19 @@ class RequestLogFilterIntegrationTest {
 
     @ParameterizedTest(name = "{0} {1} 인증 {2} 상태 {3}")
     @CsvSource({"GET,/api/me,false,401,false", "GET,/api/me,true,200,false",
-            "POST,/api/auth/logout,true,403,false", "GET,/api/log-test-missing,true,404,false", "POST,/api/me,true,405,true"})
+            "POST,/api/auth/logout,true,403,false", "GET,/api/log-test-missing,true,404,false",
+            "POST,/api/me,true,405,true"})
     @DisplayName("인증 CSRF MVC 오류는 최종 상태로 접근 줄 하나를 남긴다")
-    void logsFinalStatusOnce(String method, String path, boolean authenticated, int status, boolean csrf, CapturedOutput output) throws Exception {
+    void logsFinalStatusOnce(String method, String path, boolean authenticated, int status, boolean csrf,
+            CapturedOutput output) throws Exception {
         // given
-        String token = csrf ? send("GET", "/api/me", true, null).getResponseCookies().getFirst("XSRF-TOKEN").getValue() : null;
+        String token = csrf
+                ? send("GET", "/api/me", true, null).getResponseCookies().getFirst("XSRF-TOKEN").getValue()
+                : null;
+
         // when
         var response = send(method, path, authenticated, token);
+
         // then
         assertAccess(response, status, method, path, authenticated, output);
     }
@@ -84,15 +91,19 @@ class RequestLogFilterIntegrationTest {
     void cleansUserMdcAfterFilterFailure(CapturedOutput output) throws Exception {
         // when
         var response = send("GET", "/api/test-request-log-filter-failure", true, null);
+
         // then
         assertAccess(response, 500, "GET", "/api/test-request-log-filter-failure", true, output);
-        var errors = output.getOut().lines().filter(line -> line.contains(" ERROR ")
-                && line.contains("Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception")
-                && line.contains("requestId=" + requestId(response))).toList();
+
+        var errors = output.getOut()
+                .lines()
+                .filter(line -> line.contains(" ERROR ")
+                        && line.contains("Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception")
+                        && line.contains("requestId=" + requestId(response)))
+                .toList();
         assertThat(errors).hasSize(1);
         assertThat(errors.getFirst().contains("userId=" + user.getId())).isTrue();
         assertThat(output.getOut().contains("java.lang.RuntimeException: request log filter failure marker")).isTrue();
-
     }
 
     @Test
@@ -101,8 +112,10 @@ class RequestLogFilterIntegrationTest {
         // given
         var failedResponse = send("GET", "/api/test-request-log-filter-failure", true, null);
         var failed = assertAccess(failedResponse, 500, "GET", "/api/test-request-log-filter-failure", true, output);
+
         // when
         var response = send("GET", "/api/me", false, null);
+
         // then
         var anonymous = assertAccess(response, 401, "GET", "/api/me", false, output);
         assertThat(thread(anonymous)).isEqualTo(thread(failed));
@@ -114,10 +127,15 @@ class RequestLogFilterIntegrationTest {
     void correlatesUnhandledExceptionAndAccessLog(CapturedOutput output) throws Exception {
         // when
         var response = send("GET", "/api/test-request-log-failure", true, null);
+
         // then
         assertAccess(response, 500, "GET", "/api/test-request-log-failure", true, output);
-        var error = output.getOut().lines().filter(line -> line.contains("Unhandled API exception")
-                && line.contains("requestId=" + requestId(response))).toList();
+
+        var error = output.getOut()
+                .lines()
+                .filter(line -> line.contains("Unhandled API exception")
+                        && line.contains("requestId=" + requestId(response)))
+                .toList();
         assertThat(error).hasSize(1);
         assertThat(error.getFirst().contains("ERROR")).isTrue();
         assertThat(output.getOut().contains("java.lang.IllegalStateException: request log test failure")).isTrue();
@@ -128,6 +146,7 @@ class RequestLogFilterIntegrationTest {
     void correlatesErrorDispatchAndAccessLog(CapturedOutput output) throws Exception {
         // when
         var response = send("GET", "/auth/unknown", false, null);
+
         // then
         assertAccess(response, 404, "GET", "/auth/unknown", false, output);
         assertThat(response.getResponseHeaders().getOrEmpty("X-Test-Dispatch")).containsExactly("ERROR");
@@ -142,16 +161,21 @@ class RequestLogFilterIntegrationTest {
         // given
         var loggedInResponse = send("GET", "/api/me", true, null);
         var loggedIn = assertAccess(loggedInResponse, 200, "GET", "/api/me", true, output);
+
         var ids = new HashSet<String>();
         ids.add(requestId(loggedInResponse));
+
         for (int i = 1; i < sequence; i++) {
             var earlier = send("GET", "/api/me", false, null);
+
             var line = assertAccess(earlier, 401, "GET", "/api/me", false, output);
             assertThat(thread(line)).isEqualTo(thread(loggedIn));
             assertThat(ids.add(requestId(earlier))).isTrue();
         }
+
         // when
         var response = send("GET", "/api/me", false, null);
+
         // then
         var anonymous = assertAccess(response, 401, "GET", "/api/me", false, output);
         assertThat(thread(anonymous)).isEqualTo(thread(loggedIn));
@@ -163,10 +187,17 @@ class RequestLogFilterIntegrationTest {
     void omitsUntrustedHeadersCookiesAndOAuthQuery(CapturedOutput output) throws Exception {
         // given
         var marker = "private-marker-fixed";
+
         // when
-        var response = testRequests.anonymous().get().uri("/auth/google/callback?code=" + marker + "&state=" + marker)
-                .header("X-Request-Id", marker).header("X-Private-Test", marker)
-                .header("Cookie", "PRIVATE_TEST=" + marker).exchange().returnResult(String.class);
+        var response = testRequests.anonymous()
+                .get()
+                .uri("/auth/google/callback?code=" + marker + "&state=" + marker)
+                .header("X-Request-Id", marker)
+                .header("X-Private-Test", marker)
+                .header("Cookie", "PRIVATE_TEST=" + marker)
+                .exchange()
+                .returnResult(String.class);
+
         // then
         assertAccess(response, 302, "GET", "/auth/google/callback", false, output);
         assertThat(requestId(response)).isNotEqualTo(marker);
@@ -178,9 +209,11 @@ class RequestLogFilterIntegrationTest {
     void omitsHealthAccessLogButReturnsId(CapturedOutput output) throws Exception {
         // when
         var response = send("GET", "/actuator/health", false, null);
+
         // then
         assertThat(response.getStatus().value()).isEqualTo(200);
         UUID.fromString(requestId(response));
+
         // 같은 단일 서버 스레드의 다음 접근 줄을 기다리면 헬스 종료 처리도 끝났다.
         assertAccess(send("GET", "/api/me", false, null), 401, "GET", "/api/me", false, output);
         assertThat(accessLines(output, requestId(response)).isEmpty()).isTrue();
@@ -190,19 +223,26 @@ class RequestLogFilterIntegrationTest {
     @DisplayName("등록된 순서는 세션과 보안보다 바깥이며 ERROR도 포함한다")
     void registersLoggingOutsideSecurityAndSession() {
         // given
-        var sessionFilter = applicationContext.getBean("sessionRepositoryFilterRegistration", AbstractFilterRegistrationBean.class);
-        var security = applicationContext.getBean("securityFilterChainRegistration", AbstractFilterRegistrationBean.class);
+        var sessionFilter = applicationContext.getBean("sessionRepositoryFilterRegistration",
+                AbstractFilterRegistrationBean.class);
+        var security = applicationContext.getBean("securityFilterChainRegistration",
+                AbstractFilterRegistrationBean.class);
+
         // when
         var logging = applicationContext.getBean("requestLogFilter", FilterRegistrationBean.class);
+
         // then
         assertThat(logging.getOrder()).isEqualTo(Ordered.HIGHEST_PRECEDENCE);
         assertThat(logging.getOrder() < sessionFilter.getOrder()).isTrue();
         assertThat(logging.getOrder() < security.getOrder()).isTrue();
         assertThat(logging.determineDispatcherTypes().contains(DispatcherType.ERROR)).isTrue();
-        applicationContext.getBeansOfType(AbstractFilterRegistrationBean.class).values()
+        applicationContext.getBeansOfType(AbstractFilterRegistrationBean.class)
+                .values()
                 .forEach(filter -> assertThat(logging.getOrder() <= filter.getOrder()).isTrue());
+
         var server = (TomcatWebServer) ((WebServerApplicationContext) applicationContext).getWebServer();
         var servletContext = (Context) server.getTomcat().getHost().findChildren()[0];
+
         // 같은 최솟값을 쓰는 Boot 필터도 있으므로 실제 컨테이너 매핑의 첫 자리까지 확인한다.
         assertThat(servletContext.findFilterMaps()[0].getFilterName()).isEqualTo(logging.getFilterName());
     }
@@ -211,33 +251,46 @@ class RequestLogFilterIntegrationTest {
         var builder = testRequests.anonymous().method(HttpMethod.valueOf(method)).uri(path);
         if (authenticated) builder.cookie("SESSION", cookie.getValue());
         if (token != null) builder.cookie("XSRF-TOKEN", token).header("X-XSRF-TOKEN", token);
+
         return builder.exchange().returnResult(String.class);
     }
 
     private String assertAccess(EntityExchangeResult<String> response, int status, String method, String path,
-                                boolean authenticated, CapturedOutput output) throws InterruptedException {
+            boolean authenticated, CapturedOutput output) throws InterruptedException {
         assertThat(response.getStatus().value()).isEqualTo(status);
         var id = requestId(response);
         assertThat(UUID.fromString(id).toString()).isEqualTo(id);
+
         var deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
         while (accessLines(output, id).isEmpty() && System.nanoTime() < deadline) Thread.sleep(10);
+
         var lines = accessLines(output, id);
         assertThat(lines).hasSize(1);
+
         var line = lines.getFirst();
         assertThat(line).contains(" INFO ");
         assertThat(line).contains("access method=" + method + " path=" + path + " status=" + status + " durationMs=");
         assertThat(line.matches(".*durationMs=\\d+$")).isTrue();
         assertThat(TimeZone.getDefault().getID()).isEqualTo("UTC");
         assertThat(line.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\+09:00 .*")).isTrue();
+
         if (authenticated) assertThat(line).contains("userId=" + user.getId());
         else assertThat(line).doesNotContain("userId=");
+
         assertThat(Optional.ofNullable(response.getResponseBody()).orElse("")).doesNotContain("requestId");
-        assertThat(Optional.ofNullable(response.getResponseHeaders().getFirst("Access-Control-Expose-Headers")).orElse("").contains("X-Request-Id")).isFalse();
+        assertThat(Optional.ofNullable(response.getResponseHeaders().getFirst("Access-Control-Expose-Headers"))
+                .orElse("")
+                .contains("X-Request-Id"))
+                .isFalse();
+
         return line;
     }
 
     private static List<String> accessLines(CapturedOutput output, String id) {
-        return output.getOut().lines().filter(line -> line.contains("requestId=" + id) && line.contains("access method=")).toList();
+        return output.getOut()
+                .lines()
+                .filter(line -> line.contains("requestId=" + id) && line.contains("access method="))
+                .toList();
     }
 
     private static String requestId(EntityExchangeResult<?> response) {
@@ -249,5 +302,4 @@ class RequestLogFilterIntegrationTest {
     private static String thread(String line) {
         return line.substring(line.lastIndexOf('['), line.lastIndexOf(']') + 1);
     }
-
 }

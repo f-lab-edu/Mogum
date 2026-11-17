@@ -34,6 +34,7 @@ class CardRepositoryTest {
         var user = userRepository.save(UserFixtures.user("me@example.com"));
         var course = courseRepository.save(CourseFixtures.single(user.getId()));
         var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
+
         var writtenAt = Instant.parse("2026-11-10T03:04:05Z");
         testClock.set(writtenAt);
         var saved = cardRepository.save(CardFixtures.card(user.getId(), lesson.getId(), 2, "변수란?", "값을 담는 이름"));
@@ -44,11 +45,13 @@ class CardRepositoryTest {
         // then
         assertThat(actual).isNotSameAs(saved);
         assertThat(actual.getId()).isPositive();
+
         assertThat(actual.getUserId()).isEqualTo(user.getId());
         assertThat(actual.getLessonId()).isEqualTo(lesson.getId());
         assertThat(actual.getPosition()).isEqualTo(2);
         assertThat(actual.getQuestion()).isEqualTo("변수란?");
         assertThat(actual.getAnswer()).isEqualTo("값을 담는 이름");
+
         assertThat(actual.getStatus()).isEqualTo(CardStatus.ACTIVE);
         assertThat(actual.getFsrsState()).isEqualTo(FsrsState.LEARNING);
         assertThat(actual.getFsrsStep()).isZero();
@@ -56,6 +59,7 @@ class CardRepositoryTest {
         assertThat(actual.getStability()).isNull();
         assertThat(actual.getDifficulty()).isNull();
         assertThat(actual.getLastReviewedAt()).isNull();
+
         assertThat(actual.getCreatedAt()).isEqualTo(writtenAt);
         assertThat(actual.getUpdatedAt()).isEqualTo(writtenAt);
     }

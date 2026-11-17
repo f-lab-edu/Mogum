@@ -29,11 +29,12 @@ class RoadmapRepositoryTest {
             "OTHER,실습 경험,OTHER,개인 프로젝트,"})
     @DisplayName("로드맵의 입력과 생성 내용 및 공용 시계의 시각을 다시 읽는다")
     void reloadsRoadmapWithInputAndAuditing(Level level, String levelOther, Purpose purpose,
-                                          String purposeOther, String memo) {
+            String purposeOther, String memo) {
         // given
         var user = userRepository.save(UserFixtures.user("me@example.com"));
         var instant = Instant.parse("2026-11-10T01:23:45.123456Z");
         testClock.set(instant);
+
         var input = new LearningInput("서버 개발", level, levelOther, purpose, purposeOther, memo);
         var saved = roadmapRepository.save(RoadmapFixtures.roadmap(user.getId(), input, "서버 로드맵", "서버를 만들 수 있어요"));
 
@@ -48,6 +49,7 @@ class RoadmapRepositoryTest {
         assertThat(actual.getDescription()).isEqualTo("서버를 만들 수 있어요");
         assertThat(actual.getStatus()).isEqualTo(RoadmapStatus.REVIEWING);
         assertThat(actual.getInput()).usingRecursiveComparison().isEqualTo(input);
+
         assertThat(actual.getCreatedAt()).isEqualTo(instant);
         assertThat(actual.getUpdatedAt()).isEqualTo(instant);
     }

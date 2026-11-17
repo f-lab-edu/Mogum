@@ -10,6 +10,7 @@ import java.util.Map;
 @Service
 public class NamedDependencies {
     private static final UserRepository shortStatic = null;
+
     private final UserRepository userRepository;
     private final TransactionTemplate releaseTransactionTemplate;
     private final Clock time;

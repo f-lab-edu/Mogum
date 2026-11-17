@@ -15,7 +15,7 @@ public final class CourseFixtures {
     }
 
     public static Course inRoadmap(Roadmap roadmap, int position, String title, String planDescription,
-                                   List<PlannedConcept> planConcepts) {
+            List<PlannedConcept> planConcepts) {
         return Course.inRoadmap(roadmap, position, title, planDescription, planConcepts);
     }
 }

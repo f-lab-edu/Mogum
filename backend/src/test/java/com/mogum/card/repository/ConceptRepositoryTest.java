@@ -26,6 +26,7 @@ class ConceptRepositoryTest {
         var user = userRepository.save(UserFixtures.user("me@example.com"));
         var shortVector = new float[]{0.25f, -0.5f, 1.125f};
         var longVector = new float[]{-1, 0, 0.125f, 2.5f, 3};
+
         var first = conceptRepository.save(ConceptFixtures.concept(user.getId(), "변수", "값을 담는 이름", shortVector));
         var second = conceptRepository.save(ConceptFixtures.concept(user.getId(), "타입", "값의 종류", longVector));
 
@@ -39,14 +40,17 @@ class ConceptRepositoryTest {
         assertThat(actual.getName()).isEqualTo("변수");
         assertThat(actual.getDefinition()).isEqualTo("값을 담는 이름");
         assertThat(actual.getEmbedding()).containsExactly(shortVector);
+
         assertThat(actual.getCreatedAt()).isEqualTo(testClock.instant());
         assertThat(actual.getUpdatedAt()).isEqualTo(testClock.instant());
+
         var other = conceptRepository.findById(second.getId()).orElseThrow();
         assertThat(other).isNotSameAs(second);
         assertThat(other.getUserId()).isEqualTo(user.getId());
         assertThat(other.getName()).isEqualTo("타입");
         assertThat(other.getDefinition()).isEqualTo("값의 종류");
         assertThat(other.getEmbedding()).containsExactly(longVector);
+
         assertThat(jdbcTemplate.queryForList("SELECT vector_dims(embedding) FROM concepts ORDER BY id", Integer.class))
                 .containsExactly(3, 5);
         assertThat(jdbcTemplate.queryForObject("""

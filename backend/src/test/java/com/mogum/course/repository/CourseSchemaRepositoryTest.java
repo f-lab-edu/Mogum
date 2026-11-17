@@ -36,11 +36,14 @@ class CourseSchemaRepositoryTest {
         long planned = planned(user, roadmap, 1);
 
         // then
-        assertThat(jdbcTemplate.queryForMap("SELECT roadmap_id, position, plan_description, plan_concepts FROM courses WHERE id = ?", single))
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT roadmap_id, position, plan_description, plan_concepts FROM courses WHERE id = ?", single))
                 .allSatisfy((column, value) -> assertThat(value).isNull());
-        assertThat(jdbcTemplate.queryForMap("SELECT topic, level, level_other, purpose, purpose_other, memo FROM courses WHERE id = ?", planned))
+        assertThat(jdbcTemplate.queryForMap(
+                "SELECT topic, level, level_other, purpose, purpose_other, memo FROM courses WHERE id = ?", planned))
                 .allSatisfy((column, value) -> assertThat(value).isNull());
-        assertThat(jdbcTemplate.queryForObject("SELECT status FROM courses WHERE id = ?", String.class, planned)).isEqualTo("NOT_PLANNED");
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM courses WHERE id = ?", String.class, planned))
+                .isEqualTo("NOT_PLANNED");
     }
 
     @ParameterizedTest(name = "단일 코스의 잘못된 칸: {0}")
@@ -52,7 +55,8 @@ class CourseSchemaRepositoryTest {
         long id = single(owner());
 
         // when & then
-        assertConstraint("23514", "courses_roadmap_id_check", () -> updateExpression("courses", id, column, expression));
+        assertConstraint("23514", "courses_roadmap_id_check",
+                () -> updateExpression("courses", id, column, expression));
     }
 
     @ParameterizedTest(name = "로드맵 코스의 잘못된 칸: {0}")
@@ -65,7 +69,8 @@ class CourseSchemaRepositoryTest {
         long id = planned(user, roadmap(user), 1);
 
         // when & then
-        assertConstraint("23514", "courses_roadmap_id_check", () -> updateExpression("courses", id, column, expression));
+        assertConstraint("23514", "courses_roadmap_id_check",
+                () -> updateExpression("courses", id, column, expression));
     }
 
     @ParameterizedTest(name = "상태 {0}, 시작 {1}, 완료 {2}")
@@ -79,7 +84,8 @@ class CourseSchemaRepositoryTest {
         setCourseStatus(id, status, started, completed);
 
         // then
-        assertThat(jdbcTemplate.queryForObject("SELECT status FROM courses WHERE id = ?", String.class, id)).isEqualTo(status);
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM courses WHERE id = ?", String.class, id))
+                .isEqualTo(status);
     }
 
     @ParameterizedTest(name = "상태 {0}, 시작 {1}, 완료 {2}")
@@ -94,7 +100,8 @@ class CourseSchemaRepositoryTest {
         long id = planned(user, roadmap(user), 1);
 
         // when & then
-        assertConstraint("23514", "courses_" + column + "_check", () -> setCourseStatus(id, status, started, completed));
+        assertConstraint("23514", "courses_" + column + "_check",
+                () -> setCourseStatus(id, status, started, completed));
     }
 
     @Test
@@ -132,7 +139,8 @@ class CourseSchemaRepositoryTest {
         long id = planned(user, otherRoadmap, 1);
 
         // then
-        assertThat(jdbcTemplate.queryForObject("SELECT roadmap_id FROM courses WHERE id = ?", Long.class, id)).isEqualTo(otherRoadmap);
+        assertThat(jdbcTemplate.queryForObject("SELECT roadmap_id FROM courses WHERE id = ?", Long.class, id))
+                .isEqualTo(otherRoadmap);
     }
 
     @ParameterizedTest(name = "{0}.{1}: {2}")
@@ -144,7 +152,8 @@ class CourseSchemaRepositoryTest {
 
         // when & then
         assertConstraint("23514", table + "_" + column + "_other_check", () -> jdbcTemplate.update(
-                "UPDATE " + table + " SET " + column + " = ?, " + column + "_other = ?, updated_at = now() WHERE id = ?",
+                "UPDATE " + table + " SET " + column + " = ?, " + column
+                        + "_other = ?, updated_at = now() WHERE id = ?",
                 other ? "OTHER" : column.equals("level") ? "BEGINNER" : "WORK", text ? "기타" : null, id));
     }
 
@@ -156,15 +165,19 @@ class CourseSchemaRepositoryTest {
         long id = inputRow(table);
 
         // when
-        jdbcTemplate.update("UPDATE " + table + " SET " + column + " = ?, " + column + "_other = ?, updated_at = now() WHERE id = ?",
+        jdbcTemplate.update("UPDATE " + table + " SET " + column + " = ?, " + column
+                + "_other = ?, updated_at = now() WHERE id = ?",
                 value, value.equals("OTHER") ? "직접 입력" : null, id);
 
         // then
-        assertThat(jdbcTemplate.queryForObject("SELECT " + column + " FROM " + table + " WHERE id = ?", String.class, id)).isEqualTo(value);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT " + column + " FROM " + table + " WHERE id = ?", String.class, id))
+                .isEqualTo(value);
     }
 
     @ParameterizedTest(name = "{0}.{1}")
-    @CsvSource({"roadmaps,status", "roadmaps,level", "roadmaps,purpose", "courses,status", "courses,level", "courses,purpose"})
+    @CsvSource({"roadmaps,status", "roadmaps,level", "roadmaps,purpose", "courses,status", "courses,level",
+            "courses,purpose"})
     @DisplayName("목록 밖의 상태 수준 목적은 거절한다")
     void rejectsUnsupportedValues(String table, String column) {
         // given
@@ -185,7 +198,8 @@ class CourseSchemaRepositoryTest {
         update("roadmaps", id, "status", status);
 
         // then
-        assertThat(jdbcTemplate.queryForObject("SELECT status FROM roadmaps WHERE id = ?", String.class, id)).isEqualTo(status);
+        assertThat(jdbcTemplate.queryForObject("SELECT status FROM roadmaps WHERE id = ?", String.class, id))
+                .isEqualTo(status);
     }
 
     @ParameterizedTest(name = "{0}.{1} 상한 {2}")
@@ -200,7 +214,9 @@ class CourseSchemaRepositoryTest {
         update(table, id, column, text);
 
         // then
-        assertThat(jdbcTemplate.queryForObject("SELECT " + column + " FROM " + table + " WHERE id = ?", String.class, id)).isEqualTo(text);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT " + column + " FROM " + table + " WHERE id = ?", String.class, id))
+                .isEqualTo(text);
     }
 
     @ParameterizedTest(name = "{0}.{1} 상한 {2}")
@@ -211,7 +227,8 @@ class CourseSchemaRepositoryTest {
         long id = otherInputRow(table);
 
         // when & then
-        assertConstraint("23514", table + "_" + column + "_check", () -> update(table, id, column, "가".repeat(limit + 1)));
+        assertConstraint("23514", table + "_" + column + "_check",
+                () -> update(table, id, column, "가".repeat(limit + 1)));
     }
 
     @ParameterizedTest(name = "{0}.{1}: [{2}]")
@@ -226,7 +243,8 @@ class CourseSchemaRepositoryTest {
     }
 
     @ParameterizedTest(name = "{0}.{1}")
-    @CsvSource({"roadmaps,description", "courses,plan_description", "lessons,title", "lessons,description", "materials,body"})
+    @CsvSource({"roadmaps,description", "courses,plan_description", "lessons,title", "lessons,description",
+            "materials,body"})
     @DisplayName("생성된 글에는 길이 상한을 두지 않는다")
     void storesLongGeneratedText(String table, String column) {
         // given
@@ -237,7 +255,9 @@ class CourseSchemaRepositoryTest {
         update(table, id, column, text);
 
         // then
-        assertThat(jdbcTemplate.queryForObject("SELECT " + column + " FROM " + table + " WHERE id = ?", String.class, id)).isEqualTo(text);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT " + column + " FROM " + table + " WHERE id = ?", String.class, id))
+                .isEqualTo(text);
     }
 
     @ParameterizedTest(name = "강의 순서 {0}")
@@ -262,7 +282,8 @@ class CourseSchemaRepositoryTest {
         long id = lesson(course, position);
 
         // then
-        assertThat(jdbcTemplate.queryForObject("SELECT position FROM lessons WHERE id = ?", Integer.class, id)).isEqualTo(position);
+        assertThat(jdbcTemplate.queryForObject("SELECT position FROM lessons WHERE id = ?", Integer.class, id))
+                .isEqualTo(position);
     }
 
     @Test
@@ -301,8 +322,11 @@ class CourseSchemaRepositoryTest {
         updateExpression("lessons", lesson, "concepts", "'null'::jsonb");
 
         // then
-        assertThat(jdbcTemplate.queryForObject("SELECT concepts::text FROM lessons WHERE id = ?", String.class, lesson)).isEqualTo("null");
-        assertThat(jdbcTemplate.queryForObject("SELECT mastery_report::text FROM courses WHERE id = ?", String.class, course)).isEqualTo("42");
+        assertThat(jdbcTemplate.queryForObject("SELECT concepts::text FROM lessons WHERE id = ?", String.class, lesson))
+                .isEqualTo("null");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT mastery_report::text FROM courses WHERE id = ?", String.class, course))
+                .isEqualTo("42");
     }
 
     @ParameterizedTest(name = "{0}")
@@ -318,6 +342,7 @@ class CourseSchemaRepositoryTest {
 
         // then
         assertThat(timestamps).containsExactly("created_at", "updated_at");
+
         String[] indexes = switch (table) {
             case "roadmaps" -> new String[]{"roadmaps_pkey", "roadmaps_user_id_idx"};
             case "courses" -> new String[]{"courses_pkey", "courses_roadmap_id_position_key", "courses_user_id_idx"};
@@ -325,7 +350,8 @@ class CourseSchemaRepositoryTest {
             case "materials" -> new String[]{"materials_pkey", "materials_lesson_id_key"};
             default -> throw new IllegalArgumentException(table);
         };
-        assertThat(jdbcTemplate.queryForList("SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = ?", String.class, table))
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = ?", String.class, table))
                 .containsExactlyInAnyOrder(indexes);
     }
 
@@ -375,21 +401,28 @@ class CourseSchemaRepositoryTest {
 
     private long otherInputRow(String table) {
         long id = inputRow(table);
-        jdbcTemplate.update("UPDATE " + table + " SET level = 'OTHER', level_other = '수준', purpose = 'OTHER', purpose_other = '목적', updated_at = now() WHERE id = ?", id);
+        jdbcTemplate.update(
+                "UPDATE " + table
+                        + " SET level = 'OTHER', level_other = '수준', purpose = 'OTHER', purpose_other = '목적', updated_at = now() WHERE id = ?",
+                id);
         return id;
     }
 
     private long textRow(String table, String column) {
-        if (table.equals("roadmaps") || table.equals("courses") && !column.equals("plan_description")) return otherInputRow(table);
+        if (table.equals("roadmaps") || table.equals("courses") && !column.equals("plan_description"))
+                return otherInputRow(table);
+
         long user = owner();
         if (table.equals("courses")) return planned(user, roadmap(user), 1);
+
         long lesson = lesson(single(user), 1);
         return table.equals("lessons") ? lesson : material(lesson);
     }
 
     private void setCourseStatus(long id, String status, boolean started, boolean completed) {
         jdbcTemplate.update("UPDATE courses SET status = ?, started_at = " + (started ? "now()" : "NULL")
-                + ", completed_at = " + (completed ? "now()" : "NULL") + ", updated_at = now() WHERE id = ?", status, id);
+                + ", completed_at = " + (completed ? "now()" : "NULL") + ", updated_at = now() WHERE id = ?",
+                status, id);
     }
 
     private void update(String table, long id, String column, Object value) {
@@ -397,37 +430,49 @@ class CourseSchemaRepositoryTest {
     }
 
     private void updateExpression(String table, long id, String column, String expression) {
-        jdbcTemplate.update("UPDATE " + table + " SET " + column + " = " + expression + ", updated_at = now() WHERE id = ?", id);
+        jdbcTemplate.update(
+                "UPDATE " + table + " SET " + column + " = " + expression + ", updated_at = now() WHERE id = ?", id);
     }
 
     private static void assertConstraint(String state, String constraint, Runnable operation) {
-        assertThatThrownBy(operation::run).rootCause().isInstanceOfSatisfying(SQLException.class, sql -> {
-            assertThat(sql.getSQLState()).isEqualTo(state);
-            assertThat(sql.getMessage()).contains(constraint);
-        });
+        assertThatThrownBy(operation::run)
+                .rootCause()
+                .isInstanceOfSatisfying(SQLException.class, sql -> {
+                    assertThat(sql.getSQLState()).isEqualTo(state);
+                    assertThat(sql.getMessage()).contains(constraint);
+                });
     }
 
     static Stream<Arguments> otherInputCombinations() {
-        return Stream.of("roadmaps", "courses").flatMap(table -> Stream.of("level", "purpose")
-                .flatMap(column -> Stream.of(Arguments.of(table, column, true, false), Arguments.of(table, column, false, true))));
+        return Stream.of("roadmaps", "courses")
+                .flatMap(table -> Stream.of("level", "purpose")
+                        .flatMap(column -> Stream.of(Arguments.of(table, column, true, false),
+                                Arguments.of(table, column, false, true))));
     }
 
     static Stream<Arguments> supportedInputValues() {
-        return Stream.of("roadmaps", "courses").flatMap(table -> Stream.concat(
-                Stream.of("BEGINNER", "BASICS", "FAMILIAR", "OTHER").map(value -> Arguments.of(table, "level", value)),
-                Stream.of("WORK", "INTERVIEW", "GENERAL", "OTHER").map(value -> Arguments.of(table, "purpose", value))));
+        return Stream.of("roadmaps", "courses")
+                .flatMap(table -> Stream.concat(
+                        Stream.of("BEGINNER", "BASICS", "FAMILIAR", "OTHER")
+                                .map(value -> Arguments.of(table, "level", value)),
+                        Stream.of("WORK", "INTERVIEW", "GENERAL", "OTHER")
+                                .map(value -> Arguments.of(table, "purpose", value))));
     }
 
     static Stream<Arguments> limitedColumns() {
-        return Stream.of("roadmaps", "courses").flatMap(table -> Stream.of(
-                Arguments.of(table, "topic", 100), Arguments.of(table, "title", 100),
-                Arguments.of(table, "level_other", 50), Arguments.of(table, "purpose_other", 50), Arguments.of(table, "memo", 500)));
+        return Stream.of("roadmaps", "courses")
+                .flatMap(table -> Stream.of(
+                        Arguments.of(table, "topic", 100), Arguments.of(table, "title", 100),
+                        Arguments.of(table, "level_other", 50), Arguments.of(table, "purpose_other", 50),
+                        Arguments.of(table, "memo", 500)));
     }
 
     static Stream<Arguments> blankColumns() {
-        return Stream.of("roadmaps,title", "roadmaps,description", "roadmaps,topic", "roadmaps,level_other", "roadmaps,purpose_other", "roadmaps,memo",
-                        "courses,title", "courses,topic", "courses,level_other", "courses,purpose_other", "courses,memo", "courses,plan_description",
-                        "lessons,title", "lessons,description", "materials,body")
+        return Stream.of("roadmaps,title", "roadmaps,description", "roadmaps,topic",
+                "roadmaps,level_other", "roadmaps,purpose_other", "roadmaps,memo",
+                "courses,title", "courses,topic", "courses,level_other", "courses,purpose_other",
+                "courses,memo", "courses,plan_description",
+                "lessons,title", "lessons,description", "materials,body")
                 .map(pair -> pair.split(","))
                 .flatMap(pair -> Stream.of("", "   ", "\t\n").map(blank -> Arguments.of(pair[0], pair[1], blank)));
     }

@@ -97,14 +97,21 @@ public class IntegrationTestConfiguration {
     public static class JobIntakeHandlers {
         @Bean
         public JobIntakeHandler newCourseIntake() { return new TestJobIntakeHandler(JobType.NEW_COURSE); }
+
         @Bean
         public JobIntakeHandler newRoadmapIntake() { return new TestJobIntakeHandler(JobType.NEW_ROADMAP); }
+
         @Bean
-        public JobIntakeHandler planRoadmapCourseIntake() { return new TestJobIntakeHandler(JobType.PLAN_ROADMAP_COURSE); }
+        public JobIntakeHandler planRoadmapCourseIntake() {
+            return new TestJobIntakeHandler(JobType.PLAN_ROADMAP_COURSE);
+        }
+
         @Bean
         public JobIntakeHandler replanCourseIntake() { return new TestJobIntakeHandler(JobType.REPLAN_COURSE); }
+
         @Bean
         public JobIntakeHandler replanRoadmapIntake() { return new TestJobIntakeHandler(JobType.REPLAN_ROADMAP); }
+
         @Bean
         public JobIntakeHandler materialIntake() { return new TestJobIntakeHandler(JobType.MATERIAL); }
     }
@@ -112,10 +119,14 @@ public class IntegrationTestConfiguration {
     /** 만드는 작업 시험만 쓰는 확인 처리기. 원문을 로그나 예외에 넣지 않는다. */
     public static final class TestJobIntakeHandler implements JobIntakeHandler {
         public static final String REJECT_TOPIC = "test-intake-rejected";
+
         private final JobType jobType;
+
         public TestJobIntakeHandler(JobType jobType) { this.jobType = jobType; }
+
         @Override
         public JobType type() { return jobType; }
+
         @Override
         public void check(long userId, JobRequest request) {
             if (request.input() != null && REJECT_TOPIC.equals(request.input().getTopic())) {
@@ -129,18 +140,23 @@ public class IntegrationTestConfiguration {
         @Bean public TestJobGenerator newCourseGenerator(EntityManager em, TestClock clock) {
             return new TestJobGenerator(JobType.NEW_COURSE, em, clock);
         }
+
         @Bean public TestJobGenerator newRoadmapGenerator(EntityManager em, TestClock clock) {
             return new TestJobGenerator(JobType.NEW_ROADMAP, em, clock);
         }
+
         @Bean public TestJobGenerator planRoadmapCourseGenerator(EntityManager em, TestClock clock) {
             return new TestJobGenerator(JobType.PLAN_ROADMAP_COURSE, em, clock);
         }
+
         @Bean public TestJobGenerator replanCourseGenerator(EntityManager em, TestClock clock) {
             return new TestJobGenerator(JobType.REPLAN_COURSE, em, clock);
         }
+
         @Bean public TestJobGenerator replanRoadmapGenerator(EntityManager em, TestClock clock) {
             return new TestJobGenerator(JobType.REPLAN_ROADMAP, em, clock);
         }
+
         @Bean public TestJobGenerator materialGenerator(EntityManager em, TestClock clock) {
             return new TestJobGenerator(JobType.MATERIAL, em, clock);
         }
@@ -158,8 +174,11 @@ public class IntegrationTestConfiguration {
             this.entityManager = entityManager;
             this.testClock = testClock;
         }
+
         @Override public JobType type() { return jobType; }
+
         public Plan plan(long id) { return plans.computeIfAbsent(id, ignored -> new Plan()); }
+
         public void reset() { plans.clear(); }
 
         @Override
@@ -170,15 +189,18 @@ public class IntegrationTestConfiguration {
             plan.outsideTransaction &= !TransactionSynchronizationManager.isActualTransactionActive()
                     && !TransactionSynchronizationManager.hasResource(entityManager.getEntityManagerFactory());
             plan.mdc = "jobId=" + MDC.get(RequestLogFilter.JOB_ID) + ",userId=" + MDC.get(RequestLogFilter.USER_ID);
+
             if (call == 1 && plan.holding) {
                 plan.entered.countDown();
                 try {
-                    if (!plan.released.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("Stub not released");
+                    if (!plan.released.await(15, TimeUnit.SECONDS))
+                            throw new IllegalStateException("Stub not released");
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
                     throw new IllegalStateException("Stub interrupted");
                 }
             }
+
             return call <= plan.failures ? plan.failure
                     : new GenerationOutcome.Success(new TestResult("LEAKCHECK-result"));
         }
@@ -188,6 +210,7 @@ public class IntegrationTestConfiguration {
             if (!TransactionSynchronizationManager.isActualTransactionActive()) {
                 throw new IllegalStateException("Stub save requires transaction");
             }
+
             var plan = plan(job.id());
             plan.saves.incrementAndGet();
             String text = ((TestResult) result).text();
@@ -211,22 +234,31 @@ public class IntegrationTestConfiguration {
                     var course = entityManager.find(Course.class, job.targetId());
                     entityManager.persist(Lesson.listed(course, 1, text, text, List.of()));
                     entityManager.flush();
-                    entityManager.createNativeQuery("UPDATE courses SET status = 'REVIEWING', updated_at = :now WHERE id = :id")
-                            .setParameter("now", testClock.instant()).setParameter("id", course.getId()).executeUpdate();
+                    entityManager.createNativeQuery(
+                            "UPDATE courses SET status = 'REVIEWING', updated_at = :now WHERE id = :id")
+                            .setParameter("now", testClock.instant())
+                            .setParameter("id", course.getId())
+                            .executeUpdate();
                     yield course.getId();
                 }
                 case REPLAN_COURSE, REPLAN_ROADMAP -> {
                     String table = jobType == JobType.REPLAN_COURSE ? "courses" : "roadmaps";
-                    entityManager.createNativeQuery("UPDATE " + table + " SET title = :title, updated_at = :now WHERE id = :id")
-                            .setParameter("title", text).setParameter("now", testClock.instant()).setParameter("id", job.targetId()).executeUpdate();
+                    entityManager.createNativeQuery(
+                            "UPDATE " + table + " SET title = :title, updated_at = :now WHERE id = :id")
+                            .setParameter("title", text)
+                            .setParameter("now", testClock.instant())
+                            .setParameter("id", job.targetId())
+                            .executeUpdate();
                     yield job.targetId();
                 }
             };
+
             if (plan.saveFailure != null) {
                 var exception = new IllegalStateException(plan.saveFailure, new RuntimeException(plan.saveFailure));
                 exception.addSuppressed(new IllegalArgumentException(plan.saveFailure));
                 throw exception;
             }
+
             return new ResultRef(id);
         }
 
@@ -234,6 +266,7 @@ public class IntegrationTestConfiguration {
             return new LearningInput(input.topic(), input.level(), input.levelOther(),
                     input.purpose(), input.purposeOther(), input.memo());
         }
+
         public record TestResult(String text) implements GeneratedResult { }
 
         public static final class Plan {
@@ -248,21 +281,31 @@ public class IntegrationTestConfiguration {
             private volatile String saveFailure;
             private volatile boolean outsideTransaction = true;
             private volatile String mdc;
+
             public Plan fail(GenerationOutcome.Failure failure, int count) {
                 this.failure = failure;
                 this.failures = count;
                 return this;
             }
+
             public Plan holdFirst() { holding = true; return this; }
+
             public Plan failSave(String message) { saveFailure = message; return this; }
+
             public void awaitEntered() throws InterruptedException {
                 if (!entered.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("Stub not entered");
             }
+
             public void release() { released.countDown(); }
+
             public int calls() { return calls.get(); }
+
             public int saves() { return saves.get(); }
+
             public List<JobSnapshot> snapshots() { return List.copyOf(snapshots); }
+
             public boolean outsideTransaction() { return outsideTransaction; }
+
             public String mdc() { return mdc; }
         }
     }
@@ -303,7 +346,9 @@ public class IntegrationTestConfiguration {
         private final AtomicLong attempts = new AtomicLong();
 
         public DatabaseProbe(DataSource source) { super(source); }
+
         public void failConnections(boolean value) { failing = value; }
+
         public long connectionAttempts() { return attempts.get(); }
 
         @Override
@@ -325,12 +370,14 @@ public class IntegrationTestConfiguration {
     }
 
     /** Google 루프백 서버도 컨텍스트 키를 바꾸지 않도록 공용 initializer에서 연결한다. */
-    public static final class OAuthInitializer implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+    public static final class OAuthInitializer
+            implements ApplicationContextInitializer<ConfigurableApplicationContext> {
         @Override
         public void initialize(ConfigurableApplicationContext context) {
             TestPropertyValues.of(
                     "app.worker.count=0",
-                    "spring.security.oauth2.client.provider.google.authorization-uri=" + FakeGoogle.ORIGIN + "/authorize",
+                    "spring.security.oauth2.client.provider.google.authorization-uri="
+                            + FakeGoogle.ORIGIN + "/authorize",
                     "spring.security.oauth2.client.provider.google.token-uri=" + FakeGoogle.ORIGIN + "/token",
                     "spring.security.oauth2.client.provider.google.user-info-uri=" + FakeGoogle.ORIGIN + "/userinfo")
                     .applyTo(context);
@@ -349,38 +396,49 @@ public class IntegrationTestConfiguration {
         public static volatile boolean verified;
         public static volatile boolean tokenFailure;
         public static volatile boolean userInfoFailure;
+
         private static HttpServer fakeGoogle() {
             try {
                 var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+
                 server.createContext("/token", exchange -> {
                     TOKEN_CALLS.incrementAndGet();
                     String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                     var form = UriComponentsBuilder.fromUriString("http://localhost/?" + body).build().getQueryParams();
+
                     String verifier = form.getFirst("code_verifier");
                     if (verifier != null) verifier = URLDecoder.decode(verifier, StandardCharsets.UTF_8);
+
                     boolean bad = tokenFailure || "bad-token".equals(form.getFirst("code")) || verifier == null
                             || CODE_CHALLENGE.get() == null || !CODE_CHALLENGE.get().equals(challenge(verifier));
-                    String response = bad ? "{\"error\":\"invalid_grant\",\"error_description\":\"" + form.getFirst("code") + "\"}" : "{\"access_token\":\"fake-access-token\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"id_token\":\"fake-id-token\"}";
+                    String response = bad
+                            ? "{\"error\":\"invalid_grant\",\"error_description\":\"" + form.getFirst("code") + "\"}"
+                            : "{\"access_token\":\"fake-access-token\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"id_token\":\"fake-id-token\"}";
+
                     byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
                     exchange.getResponseHeaders().set("Content-Type", "application/json");
                     exchange.sendResponseHeaders(bad ? 400 : 200, bytes.length);
                     exchange.getResponseBody().write(bytes);
                     exchange.close();
                 });
+
                 server.createContext("/userinfo", exchange -> {
                     var identity = new LinkedHashMap<String, Object>();
                     identity.put("sub", sub);
                     identity.put("email", email);
                     identity.put("email_verified", verified);
                     if (name != null) identity.put("name", name);
-                    String response = userInfoFailure ? "{\"error\":\"invalid_token\",\"error_description\":\"" + sub + "\"}"
+                    String response = userInfoFailure
+                            ? "{\"error\":\"invalid_token\",\"error_description\":\"" + sub + "\"}"
                             : new ObjectMapper().writeValueAsString(identity);
+
                     byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
                     exchange.getResponseHeaders().set("Content-Type", "application/json");
                     exchange.sendResponseHeaders(userInfoFailure ? 400 : 200, bytes.length);
                     exchange.getResponseBody().write(bytes);
                     exchange.close();
                 });
+
                 Runtime.getRuntime().addShutdownHook(new Thread(() -> server.stop(0), "test-google-shutdown"));
                 server.start();
                 return server;
@@ -391,8 +449,11 @@ public class IntegrationTestConfiguration {
 
         private static String challenge(String verifier) {
             try {
-                return Base64.getUrlEncoder().withoutPadding().encodeToString(
-                        MessageDigest.getInstance("SHA-256").digest(verifier.getBytes(StandardCharsets.US_ASCII)));
+                return Base64.getUrlEncoder()
+                        .withoutPadding()
+                        .encodeToString(
+                                MessageDigest.getInstance("SHA-256")
+                                        .digest(verifier.getBytes(StandardCharsets.US_ASCII)));
             } catch (NoSuchAlgorithmException exception) {
                 throw new AssertionError(exception);
             }
@@ -413,11 +474,11 @@ public class IntegrationTestConfiguration {
     }
 
     record ValidationRequest(@NotBlank @Size(max = 5) String topic,
-                             @NotBlank @Size(max = 10) String purpose) { }
+            @NotBlank @Size(max = 10) String purpose) { }
 
     record OtherValidationRequest(@Size(min = 2, max = 5) String topic,
-                                  @Pattern(regexp = "학습") String purpose,
-                                  @NotNull String requestId) { }
+            @Pattern(regexp = "학습") String purpose,
+            @NotNull String requestId) { }
 
     @TestConfiguration(proxyBeanMethods = false)
     public static class ServletErrors {
@@ -431,6 +492,7 @@ public class IntegrationTestConfiguration {
                     throw new ServletException("private servlet failure");
                 }
             };
+
             var registration = new FilterRegistrationBean<>(filter);
             registration.addUrlPatterns("/api/test-servlet-errors/*");
             registration.setDispatcherTypes(DispatcherType.REQUEST);
@@ -457,8 +519,10 @@ public class IntegrationTestConfiguration {
                 if ("/api/test-request-log-filter-failure".equals(((HttpServletRequest) request).getRequestURI())) {
                     throw new RuntimeException("request log filter failure marker");
                 }
+
                 chain.doFilter(request, response);
             };
+
             var registration = new FilterRegistrationBean<>(failure);
             registration.setOrder(security.getOrder() + 1);
             registration.setDispatcherTypes(DispatcherType.REQUEST);
@@ -474,14 +538,17 @@ public class IntegrationTestConfiguration {
                 ((HttpServletResponse) response).addHeader("X-Test-Dispatch", request.getDispatcherType().name());
                 ((HttpServletResponse) response).addHeader("X-Test-Dispatch-Request-Id",
                         MDC.get(RequestLogFilter.REQUEST_ID));
+
                 chain.doFilter(request, response);
             };
+
             var registration = new FilterRegistrationBean<>(probe);
             registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 1);
             registration.setDispatcherTypes(DispatcherType.ERROR);
             return registration;
         }
     }
+
     @RestController
     public static class DomainFailureController {
         @GetMapping("/api/test-domain-error")

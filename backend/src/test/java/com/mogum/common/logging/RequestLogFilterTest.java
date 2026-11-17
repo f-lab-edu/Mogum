@@ -34,6 +34,7 @@ class RequestLogFilterTest {
     void exposesJobMdcKey() {
         // when
         var key = RequestLogFilter.JOB_ID;
+
         // then
         assertThat(key).isEqualTo("jobId");
     }
@@ -156,7 +157,8 @@ class RequestLogFilterTest {
         assertThat(MDC.get(RequestLogFilter.USER_ID)).isNull();
     }
 
-    private void prepareErrorDispatch(MockHttpServletRequest request, MockHttpServletResponse response) throws Exception {
+    private void prepareErrorDispatch(MockHttpServletRequest request,
+            MockHttpServletResponse response) throws Exception {
         requestLogFilter.doFilter(request, response, (req, res) -> {
             MDC.put(RequestLogFilter.USER_ID, "42");
             response.sendError(404);

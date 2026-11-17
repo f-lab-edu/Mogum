@@ -34,6 +34,7 @@ public final class TestClock extends Clock {
     public Clock withZone(ZoneId zone) {
         Objects.requireNonNull(zone);
         if (getZone().equals(zone)) return this;
+
         return new Clock() {
             @Override
             public ZoneId getZone() {

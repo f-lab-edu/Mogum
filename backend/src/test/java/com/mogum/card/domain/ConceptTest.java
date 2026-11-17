@@ -19,6 +19,7 @@ class ConceptTest {
         assertThat(concept.getId()).isNull();
         assertThat(concept.getCreatedAt()).isNull();
         assertThat(concept.getUpdatedAt()).isNull();
+
         assertThat(concept.getUserId()).isEqualTo(8L);
         assertThat(concept.getName()).isEqualTo("변수");
         assertThat(concept.getDefinition()).isEqualTo("값을 담는 이름");

@@ -40,6 +40,7 @@ class RequestValidationIntegrationTest {
     void prepareUserRequest() {
         var user = userRepository.save(UserFixtures.approved("validation@example.com"));
         authenticatedRestTestClient = testRequests.asUser(user.getId());
+
         var cookie = new TestSessions(jdbcIndexedSessionRepository).create(user.getId());
         sessionRestTestClient = testRequests.anonymous().mutate().defaultCookie("SESSION", cookie.getValue()).build();
     }
@@ -51,6 +52,7 @@ class RequestValidationIntegrationTest {
         var response = post("""
                 {"topic":"학습","purpose":"개념 이해"}
                 """);
+
         // then
         assertThat(response.getStatus().value()).isEqualTo(200);
         JsonAssert.comparator(JsonCompareMode.STRICT).assertIsMatch("""
@@ -65,8 +67,10 @@ class RequestValidationIntegrationTest {
         var response = post("""
                 {"topic":"private-topic","purpose":"학습"}
                 """);
+
         // then
-        assertError(response, "FIELD_INVALID", ",\"fields\":[{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]", "private-topic");
+        assertError(response, "FIELD_INVALID", ",\"fields\":[{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]",
+                "private-topic");
     }
 
     @ParameterizedTest(name = "정렬 반복 {0}")
@@ -77,9 +81,11 @@ class RequestValidationIntegrationTest {
         var response = post("""
                     {"topic":"private-topic","purpose":"private-purpose"}
                     """);
+
         // then
-        assertError(response, "FIELD_INVALID", ",\"fields\":[{\"field\":\"purpose\",\"reason\":\"TOO_LONG\"},{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]",
-                    "private-topic", "private-purpose");
+        assertError(response, "FIELD_INVALID",
+                ",\"fields\":[{\"field\":\"purpose\",\"reason\":\"TOO_LONG\"},{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]",
+                "private-topic", "private-purpose");
     }
 
     @ParameterizedTest(name = "허용 경계 {0}")
@@ -88,6 +94,7 @@ class RequestValidationIntegrationTest {
     void acceptsUtf16Boundary(String topic) {
         // when
         var response = post("{\"topic\":\"" + topic + "\",\"purpose\":\"학습\"}");
+
         // then
         assertThat(response.getStatus().value()).isEqualTo(200);
     }
@@ -98,8 +105,10 @@ class RequestValidationIntegrationTest {
     void rejectsUtf16Overflow(String topic) {
         // when
         var response = post("{\"topic\":\"" + topic + "\",\"purpose\":\"학습\"}");
+
         // then
-        assertError(response, "FIELD_INVALID", ",\"fields\":[{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]", topic, "학습");
+        assertError(response, "FIELD_INVALID",
+                ",\"fields\":[{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]", topic, "학습");
     }
 
     @ParameterizedTest(name = "필수값 요청 {0}")
@@ -109,8 +118,10 @@ class RequestValidationIntegrationTest {
     void rejectsMissingRequiredValue(String body) {
         // when
         var response = post(body);
+
         // then
-        assertError(response, "FIELD_INVALID", ",\"fields\":[{\"field\":\"topic\",\"reason\":\"REQUIRED\"}]", "private");
+        assertError(response, "FIELD_INVALID", ",\"fields\":[{\"field\":\"topic\",\"reason\":\"REQUIRED\"}]",
+                "private");
     }
 
     @Test
@@ -120,6 +131,7 @@ class RequestValidationIntegrationTest {
         var response = post("""
                 {"topic":"private-topic"}
                 """);
+
         // then
         assertError(response, "FIELD_INVALID",
                 ",\"fields\":[{\"field\":\"purpose\",\"reason\":\"REQUIRED\"},{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]",
@@ -134,10 +146,11 @@ class RequestValidationIntegrationTest {
         var response = post("""
                     {"topic":"      ","purpose":"private"}
                     """);
+
         // then
         assertError(response, "FIELD_INVALID",
-                    ",\"fields\":[{\"field\":\"topic\",\"reason\":\"REQUIRED\"},{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]",
-                    "      ", "private");
+                ",\"fields\":[{\"field\":\"topic\",\"reason\":\"REQUIRED\"},{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]",
+                "      ", "private");
     }
 
     @Test
@@ -147,6 +160,7 @@ class RequestValidationIntegrationTest {
         var response = post("/api/test-request-validation-other", """
                 {"topic":"학습","purpose":"학습"}
                 """);
+
         // then
         assertError(response, "FIELD_INVALID", ",\"fields\":[{\"field\":\"requestId\",\"reason\":\"REQUIRED\"}]", "학습");
     }
@@ -158,6 +172,7 @@ class RequestValidationIntegrationTest {
         var response = post("/api/test-request-validation-other", """
                 {"topic":"가","purpose":"학습","requestId":"id"}
                 """);
+
         // then
         assertError(response, "INVALID_REQUEST", "", "가", "학습", "id");
     }
@@ -169,6 +184,7 @@ class RequestValidationIntegrationTest {
         var response = post("/api/test-request-validation-other", """
                 {"topic":"private-topic","purpose":"private-purpose","requestId":"id"}
                 """);
+
         // then
         assertError(response, "INVALID_REQUEST", "", "private-topic", "private-purpose", "id");
     }
@@ -178,6 +194,7 @@ class RequestValidationIntegrationTest {
     void rejectsMalformedJsonWithoutInput() throws Exception {
         // when
         var response = post("{\"topic\":\"private-topic\",");
+
         // then
         assertError(response, "INVALID_REQUEST", "", "private-topic");
     }
@@ -189,6 +206,7 @@ class RequestValidationIntegrationTest {
         var response = post("""
                 {"topic":["private-topic"],"purpose":"private"}
                 """);
+
         // then
         assertError(response, "INVALID_REQUEST", "", "private-topic", "private");
     }
@@ -200,12 +218,19 @@ class RequestValidationIntegrationTest {
         // given
         String marker = "LEAKCHECK-validation-marker";
         int offset = output.getAll().length();
+
         var request = switch (condition) {
-            case "json" -> authenticatedRestTestClient.post().uri("/api/test-request-validation").contentType(MediaType.APPLICATION_JSON)
+            case "json" -> authenticatedRestTestClient.post()
+                    .uri("/api/test-request-validation")
+                    .contentType(MediaType.APPLICATION_JSON)
                     .body("{\"topic\":\"" + marker + "\",");
-            case "validation" -> authenticatedRestTestClient.post().uri("/api/test-request-validation").contentType(MediaType.APPLICATION_JSON)
+            case "validation" -> authenticatedRestTestClient.post()
+                    .uri("/api/test-request-validation")
+                    .contentType(MediaType.APPLICATION_JSON)
                     .body("{\"topic\":\"" + marker + "\",\"purpose\":\"학습\"}");
-            case "type" -> authenticatedRestTestClient.post().uri("/api/test-request-validation").contentType(MediaType.APPLICATION_JSON)
+            case "type" -> authenticatedRestTestClient.post()
+                    .uri("/api/test-request-validation")
+                    .contentType(MediaType.APPLICATION_JSON)
                     .body("{\"topic\":[\"" + marker + "\"],\"purpose\":\"학습\"}");
             default -> {
                 var selected = condition.equals("401") ? testRequests.anonymous()
@@ -217,22 +242,36 @@ class RequestValidationIntegrationTest {
                         .uri(path + "?private=" + marker);
             }
         };
-        int expectedStatus = switch (condition) { case "json", "validation", "type" -> 400; default -> Integer.parseInt(condition); };
+        int expectedStatus = switch (condition) {
+            case "json", "validation", "type" -> 400;
+            default -> Integer.parseInt(condition);
+        };
+
         // when
         var response = request.exchange().returnResult(String.class);
+
         // then
         assertThat(response.getStatus().value()).isEqualTo(expectedStatus);
+
         String id = Optional.ofNullable(response.getResponseHeaders().getFirst("X-Request-Id")).orElseThrow();
         long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
         while (output.getOut().lines().noneMatch(line -> line.contains("requestId=" + id)
-                && line.contains("access method=")) && System.nanoTime() < deadline) Thread.sleep(10);
+                && line.contains("access method=")) && System.nanoTime() < deadline)
+                Thread.sleep(10);
+
         var requestLines = output.getOut().lines().filter(line -> line.contains("requestId=" + id)).toList();
         assertThat(requestLines).hasSize(1);
-        assertThat(requestLines.getFirst().contains(" INFO ") && requestLines.getFirst().contains("access method=")).isTrue();
+        assertThat(requestLines.getFirst().contains(" INFO ") && requestLines.getFirst().contains("access method="))
+                .isTrue();
         assertThat(requestLines.getFirst().contains("status=" + expectedStatus)).isTrue();
+
         assertThat(output.getAll().contains(marker)).isFalse();
         assertThat(response.getResponseBody().contains(marker)).isFalse();
-        assertThat(output.getAll().substring(offset).lines().noneMatch(line -> line.contains(" WARN ") || line.contains(" ERROR "))).isTrue();
+        assertThat(output.getAll()
+                .substring(offset)
+                .lines()
+                .noneMatch(line -> line.contains(" WARN ") || line.contains(" ERROR ")))
+                .isTrue();
     }
 
     private EntityExchangeResult<String> post(String body) {
@@ -240,18 +279,28 @@ class RequestValidationIntegrationTest {
     }
 
     private EntityExchangeResult<String> post(String path, String body) {
-        return authenticatedRestTestClient.post().uri(path).contentType(MediaType.APPLICATION_JSON)
-                .body(body).exchange().returnResult(String.class);
+        return authenticatedRestTestClient.post()
+                .uri(path)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .exchange()
+                .returnResult(String.class);
     }
 
-    private static void assertError(EntityExchangeResult<String> response, String code, String fields, String... inputs) {
+    private static void assertError(EntityExchangeResult<String> response, String code, String fields,
+            String... inputs) {
         assertThat(response.getStatus().value()).isEqualTo(400);
-        assertThat(Optional.ofNullable(response.getResponseHeaders().getFirst("Content-Type")).orElseThrow().startsWith("application/json")).isTrue();
+        assertThat(Optional.ofNullable(response.getResponseHeaders().getFirst("Content-Type"))
+                .orElseThrow()
+                .startsWith("application/json"))
+                .isTrue();
         assertThat(Optional.ofNullable(response.getResponseHeaders().getFirst("Retry-After")).isEmpty()).isTrue();
+
         var message = code.equals("FIELD_INVALID") ? "입력을 확인해 주십시오" : "요청을 확인할 수 없습니다";
         JsonAssert.comparator(JsonCompareMode.STRICT).assertIsMatch(
-                "{\"code\":\"" + code + "\",\"message\":\"" + message + "\"" + fields + "}", response.getResponseBody());
+                "{\"code\":\"" + code + "\",\"message\":\"" + message + "\"" + fields + "}",
+                response.getResponseBody());
+
         for (var input : inputs) assertThat(response.getResponseBody().contains(input)).isFalse();
     }
-
 }

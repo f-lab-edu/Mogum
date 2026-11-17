@@ -185,5 +185,4 @@ class SeoulClockTest {
             TimeZone.setDefault(original);
         }
     }
-
 }

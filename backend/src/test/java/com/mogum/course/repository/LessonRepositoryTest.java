@@ -50,8 +50,11 @@ class LessonRepositoryTest {
         assertThat(actual.getDescription()).isEqualTo("값을 다루는 법을 배워요");
         assertThat(actual.getConcepts()).containsExactlyElementsOf(concepts);
         assertThat(actual.getCompletedAt()).isNull();
-        assertThat(entityManagerFactory.unwrap(SessionFactoryImplementor.class).getSessionFactoryOptions()
+
+        assertThat(entityManagerFactory.unwrap(SessionFactoryImplementor.class)
+                .getSessionFactoryOptions()
                 .getJsonFormatMapper()).isInstanceOf(Jackson3JsonFormatMapper.class);
+
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT concepts = '[{"name":"변수","definition":"값을 담는 이름"},
                   {"name":"타입","definition":"값의 종류"}]'::jsonb FROM lessons WHERE id = ?
