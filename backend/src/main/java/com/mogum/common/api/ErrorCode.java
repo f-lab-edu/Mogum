@@ -40,6 +40,9 @@ public enum ErrorCode {
     /** 성공하지 않은 로드맵 다시 짜기가 있으면 첫 코스의 받기를 409로 거절한다. */
     ROADMAP_REPLAN_IN_PROGRESS(HttpStatus.CONFLICT, "다시 짜는 중에는 시작할 수 없어요"),
 
+    /** 코스나 로드맵이 검토 중이 아니면 다시 짜기 받기를 409로 거절한다. */
+    REPLAN_NOT_ALLOWED(HttpStatus.CONFLICT, "검토 중일 때만 다시 짤 수 있어요"),
+
     /** 입력이 너무 커 실패한 작업의 다시 시도를 거절할 때 409로 반환한다. */
     JOB_RETRY_NOT_ALLOWED(HttpStatus.CONFLICT, "주제를 좁혀 새로 만들어 주세요"),
 

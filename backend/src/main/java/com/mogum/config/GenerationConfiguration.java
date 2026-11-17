@@ -7,6 +7,8 @@ import com.mogum.generation.ChatCall;
 import com.mogum.generation.NewCourseGenerator;
 import com.mogum.generation.NewRoadmapGenerator;
 import com.mogum.generation.PlanRoadmapCourseGenerator;
+import com.mogum.generation.ReplanCourseGenerator;
+import com.mogum.generation.ReplanRoadmapGenerator;
 import com.mogum.generation.RoadmapCoursePlanReader;
 import com.mogum.generation.call.LlmCallWriter;
 import com.mogum.generation.call.repository.LlmCallRepository;
@@ -45,6 +47,23 @@ public class GenerationConfiguration {
             LessonRepository lessonRepository) {
         return new PlanRoadmapCourseGenerator(chatCall, llmProperties.chats().get("planning"), new CoursePlanFormat(),
                 roadmapCoursePlanReader, courseRepository, lessonRepository);
+    }
+
+    @Bean
+    public ReplanCourseGenerator replanCourseGenerator(ChatCall chatCall, LlmProperties llmProperties,
+            RoadmapCoursePlanReader roadmapCoursePlanReader, CourseRepository courseRepository,
+            LessonRepository lessonRepository, EntityManager entityManager,
+            PlatformTransactionManager platformTransactionManager) {
+        return new ReplanCourseGenerator(chatCall, llmProperties.chats().get("planning"), new CoursePlanFormat(),
+                roadmapCoursePlanReader, courseRepository, lessonRepository, entityManager, platformTransactionManager);
+    }
+
+    @Bean
+    public ReplanRoadmapGenerator replanRoadmapGenerator(ChatCall chatCall, LlmProperties llmProperties,
+            CourseRepository courseRepository, RoadmapRepository roadmapRepository, EntityManager entityManager,
+            PlatformTransactionManager platformTransactionManager) {
+        return new ReplanRoadmapGenerator(chatCall, llmProperties.chats().get("planning"), new RoadmapPlanFormat(),
+                courseRepository, roadmapRepository, entityManager, platformTransactionManager);
     }
 
     @Bean

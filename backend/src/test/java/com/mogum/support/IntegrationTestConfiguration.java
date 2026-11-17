@@ -195,8 +195,10 @@ public class IntegrationTestConfiguration {
                      {"title":"응용", "description":"응용 설명",
                       "concepts":[{"name":"함수", "definition":"동작의 묶음"}]}]
                     """;
-            if (type == JobType.PLAN_ROADMAP_COURSE) return "{\"lessons\":" + outlines + "}";
-            return type == JobType.NEW_ROADMAP
+            if (type == JobType.PLAN_ROADMAP_COURSE || type == JobType.REPLAN_COURSE) {
+                return "{\"lessons\":" + outlines + "}";
+            }
+            return type == JobType.NEW_ROADMAP || type == JobType.REPLAN_ROADMAP
                     ? "{\"title\":\"자바 로드맵\",\"description\":\"자바를 익힌다\",\"courses\":" + outlines + "}"
                     : "{\"title\":\"자바 코스\",\"lessons\":" + outlines + "}";
         }
