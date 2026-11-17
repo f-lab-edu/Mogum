@@ -2,15 +2,63 @@
   "project": "Mogum",
   "phase": "7-course-planning",
   "steps": [
-    { "step": 0, "name": "llm-calls", "status": "pending" },
-    { "step": 1, "name": "openai-client", "status": "pending" },
-    { "step": 2, "name": "plan-format", "status": "pending" },
-    { "step": 3, "name": "new-learning-jobs", "status": "pending" },
-    { "step": 4, "name": "roadmap-course-job", "status": "pending" },
-    { "step": 5, "name": "replan-jobs", "status": "pending" },
-    { "step": 6, "name": "course-api", "status": "pending" },
-    { "step": 7, "name": "new-learning-screen", "status": "pending" },
-    { "step": 8, "name": "course-screen", "status": "pending" },
-    { "step": 9, "name": "roadmap-screen-and-tabs", "status": "pending" }
-  ]
+    {
+      "step": 0,
+      "name": "llm-calls",
+      "status": "completed",
+      "started_at": "2026-11-17T18:36:01+0900",
+      "summary": "V12__create_llm_calls.sql; generation.call.domain.LlmCall(AuditedEntity) · LlmCallType · LlmCallOutcome, generation.call.repository.LlmCallRepository(save/findById); generation.call.LlmCallWriter.long start(Long jobId, Long userId, JobType jobType, LlmCallType callType, String model) · void finish(long callId, LlmCallOutcome outcome, Integer inputTokens, Integer outputTokens, BigDecimal cost, int durationMs); config.GenerationConfiguration.llmCallWriter @Bean 조립, TransactionTemplate REQUIRES_NEW 독립 커밋 · JPA Auditing 공용 Clock · 없는 연결만 비움 · FK 삭제 경합 롤백 후 한 번 재시도; 두 AC 통과, 서버 테스트 1494 → 1540개(46개 추가, 실패 0).",
+      "completed_at": "2026-11-17T18:44:29+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/generation/call/LlmCallWriter.java:31 — start 는 FK 위반이 아닌 DB 오류를 그대로 던진다. 두 번째 시도의 FK 위반도 그대로 던진다. → step 1 의 LLM 클라이언트가 start 실패를 어떻게 다룰지(호출을 보내지 않고 실패로 둘지) 정할 때 이 동작을 전제로 둔다.",
+        "backend/src/main/java/com/mogum/generation/call/LlmCallWriter.java:47 — finish 는 행이 없으면 IllegalStateException 을 던진다. 호출 기록은 지우지 않으므로 지금은 생길 수 없는 경우다. → step 1 에서 finish 를 부르는 쪽이 이 예외로 결과 저장을 막지 않게 한다."
+      ]
+    },
+    {
+      "step": 1,
+      "name": "openai-client",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "plan-format",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "new-learning-jobs",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "roadmap-course-job",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "replan-jobs",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "course-api",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "new-learning-screen",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "course-screen",
+      "status": "pending"
+    },
+    {
+      "step": 9,
+      "name": "roadmap-screen-and-tabs",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-11-17T18:36:01+0900"
 }
