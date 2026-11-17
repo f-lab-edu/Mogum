@@ -49,6 +49,8 @@
 - LLM 호출 중에는 DB 연결을 쥐지 않는다(ADR-149).
 - 프로세스 메모리에 함께 지킬 상태(카운터 · 캐시 · 잠금)를 두지 않는다 — DB 에 둔다(ADR-133).
 
+`7-course-planning` step 6 구현: `course.controller` · `course.service` · `course.dto`가 코스 · 로드맵 읽기와 코스 시작 · 제목 고치기를 담당한다. `job`이 이미 `course`를 참조하므로 역방향 Java 의존은 ArchUnit으로 막았다. `course.repository.JpaCourseJobRepository`는 `EntityManager` 네이티브 SQL로 `generation_jobs`에서 성공하지 않은 강의 목록 작업의 ID · 실패 여부와 코스 다시 짜기의 존재 여부만 읽는다. 진행과 다음 코스는 읽기 서비스에서 계산하고 저장하지 않는다. 코스 시작은 받기와 같은 `CreditLedger.lock`의 사용자 행 잠금 뒤에 상태와 다시 짜기를 확인한다. API 계약은 [05 §3 · §4](./05-api.md#3-읽기--화면마다-한-번)에 있다.
+
 ### 2.3 기존 구현 — 그대로 · 바꾼다 · 버린다
 
 이미 구현한 TASK(`0-skeleton` ~ `3a-test-conventions`)를 새 설계와 맞댄 결과다. 바꾸는 방법은 각 TASK 에서 정한다.

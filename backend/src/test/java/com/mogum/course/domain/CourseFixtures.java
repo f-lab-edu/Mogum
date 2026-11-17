@@ -23,14 +23,14 @@ public final class CourseFixtures {
     }
 
     public static Course withStatus(Course course, CourseStatus status) {
-        if (status == CourseStatus.REVIEWING && course.getStatus() == CourseStatus.NOT_PLANNED) {
+        if (status != CourseStatus.NOT_PLANNED && course.getStatus() == CourseStatus.NOT_PLANNED) {
             course.planLessons();
-        } else {
-            ReflectionTestUtils.setField(course, "status", status);
         }
-        if (status == CourseStatus.LEARNING || status == CourseStatus.COMPLETED) {
-            ReflectionTestUtils.setField(course, "startedAt", Instant.parse("2026-11-01T00:00:00Z"));
+        if ((status == CourseStatus.LEARNING || status == CourseStatus.COMPLETED)
+                && course.getStatus() == CourseStatus.REVIEWING) {
+            course.start(Instant.parse("2026-11-01T00:00:00Z"));
         }
+        if (course.getStatus() != status) ReflectionTestUtils.setField(course, "status", status);
         if (status == CourseStatus.COMPLETED) {
             ReflectionTestUtils.setField(course, "completedAt", Instant.parse("2026-11-02T00:00:00Z"));
         }

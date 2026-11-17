@@ -7,6 +7,7 @@ import com.mogum.account.dto.MeResponse;
 import com.mogum.account.repository.FakeUserRepository;
 import com.mogum.archfixture.account.AccountToGeneration;
 import com.mogum.archfixture.account.AccountToWorker;
+import com.mogum.archfixture.course.CourseToJob;
 import com.mogum.archfixture.generation.TransactionalGeneration;
 import com.mogum.archfixture.job.JobToGeneration;
 import com.mogum.archfixture.testrules.AccessibleObjectUsage;
@@ -377,6 +378,10 @@ class ArchitectureTest {
         assertViolation(ENTITIES_EXTEND_AUDITED_ENTITY, UnauditedEntity.class);
     }
 
+    private static final ArchRule COURSE_DOES_NOT_DEPEND_ON_JOB = noClasses()
+            .that().resideInAPackage("..course..")
+            .should().dependOnClassesThat().resideInAPackage("..job..");
+
     // config 는 API와 워커를 한 서버에 조립한다. 워커 수 0이면 API만 실행한다.
     private static final ArchRule GENERATION_ONLY_FROM_WORKER = noClasses()
             .that().resideOutsideOfPackages("..generation..", "..worker..", "..config..")
@@ -453,6 +458,23 @@ class ArchitectureTest {
 
     private static boolean isApiResponse(JavaType type) {
         return type instanceof JavaParameterizedType && type.toErasure().isEquivalentTo(ApiResponse.class);
+    }
+
+    @Test
+    @DisplayName("코스는 작업의 Java 타입에 의존하지 않는다")
+    void prohibitsCourseDependencyOnJob() {
+        // when
+        var result = COURSE_DOES_NOT_DEPEND_ON_JOB.evaluate(CLASSES);
+
+        // then
+        assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
+    }
+
+    @Test
+    @DisplayName("작업 타입을 참조한 코스 위반 픽스처를 거부한다")
+    void rejectsCourseToJobDependency() {
+        // when & then
+        assertViolation(COURSE_DOES_NOT_DEPEND_ON_JOB, CourseToJob.class);
     }
 
     @Test

@@ -22,6 +22,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Getter
@@ -89,6 +90,16 @@ public class Course extends AuditedEntity {
         course.planConcepts = List.copyOf(planConcepts);
         course.status = CourseStatus.NOT_PLANNED;
         return course;
+    }
+
+    public void start(Instant startedAt) {
+        if (status != CourseStatus.REVIEWING) throw new IllegalStateException("Course must be reviewing");
+        this.startedAt = Objects.requireNonNull(startedAt);
+        status = CourseStatus.LEARNING;
+    }
+
+    public void rename(String title) {
+        this.title = title;
     }
 
     public void planLessons() {

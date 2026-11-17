@@ -1,6 +1,7 @@
 package com.mogum.course.repository;
 
 import com.mogum.course.domain.Course;
+import com.mogum.course.domain.CourseStatus;
 import org.springframework.data.repository.Repository;
 
 import java.util.List;
@@ -12,5 +13,6 @@ public interface CourseRepository extends Repository<Course, Long> {
     Optional<Course> findById(Long id);
 
     List<Course> findByRoadmapIdOrderByPositionAsc(Long roadmapId);
-}
 
+    List<Course> findByUserIdAndStatusNotOrderByCreatedAtDescIdDesc(Long userId, CourseStatus status);
+}
