@@ -186,7 +186,7 @@ erDiagram
 
 ## 8. 테이블
 
-PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md) — 이 절을 고치면 ERD 도 같은 변경에서 고친다. `users` 를 고치고 `credit_entries` 를 만드는 것은 계정 TASK 의 마이그레이션이다(ADR-147 · ADR-173) — 신청할 때 채움 기록이 생기기 때문이다. 그때는 가리킬 `generation_jobs` 가 없어 `credit_entries.job_id` 를 빼고 만들고, `generation_jobs` 를 만드는 마이그레이션이 그 칸과 연결을 더한다(사용자 확인 2026-11-08). 배우는 것 · 기억 · 개념의 테이블(§8.3 · §8.4 — 여덟 개)은 배우는 단위 모델 TASK(`5-learning-model`)가 새 마이그레이션 하나로 옛 커리큘럼 테이블(`curriculum_groups` · `curriculum_steps` · `curriculums` · `lessons`)을 지우고 만든다(ADR-148). `generation_jobs` 와 `credit_entries.job_id` 는 만드는 작업 TASK 가, `llm_calls` 는 강의 목록 TASK 가 그 테이블을 쓰는 코드와 함께 만든다(사용자 확인 2026-11-10). 로그인 세션 테이블(`SPRING_SESSION` · `SPRING_SESSION_ATTRIBUTES`)은 그대로다.
+PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md) — 이 절을 고치면 ERD 도 같은 변경에서 고친다. `users` 를 고치고 `credit_entries` 를 만드는 것은 계정 TASK 의 마이그레이션이다(ADR-147 · ADR-173) — 신청할 때 채움 기록이 생기기 때문이다. 그때는 가리킬 `generation_jobs` 가 없어 `credit_entries.job_id` 를 빼고 만들고, `generation_jobs` 를 만드는 마이그레이션이 그 칸과 연결을 더한다(사용자 확인 2026-11-08). 배우는 것 · 기억 · 개념의 테이블(§8.3 · §8.4 — 여덟 개)은 배우는 단위 모델 TASK(`5-learning-model`)가 새 마이그레이션 하나로 옛 커리큘럼 테이블(`curriculum_groups` · `curriculum_steps` · `curriculums` · `lessons`)을 지우고 만든다(ADR-148). `generation_jobs` 와 `credit_entries.job_id` 는 만드는 작업 TASK 가, `llm_calls` 는 강의 목록 TASK 가 `V12__create_llm_calls.sql`로 그 테이블을 쓰는 코드와 함께 만든다(사용자 확인 2026-11-10). 로그인 세션 테이블(`SPRING_SESSION` · `SPRING_SESSION_ATTRIBUTES`)은 그대로다.
 
 ### 8.1 공통 규칙
 
