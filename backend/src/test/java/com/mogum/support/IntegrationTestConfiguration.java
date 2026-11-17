@@ -1,26 +1,37 @@
 package com.mogum.support;
 
+import com.mogum.account.service.CreditLedger;
 import com.mogum.auth.SecurityConfiguration;
 import com.mogum.common.api.ApiException;
 import com.mogum.common.api.ApiResponse;
 import com.mogum.common.api.ErrorCode;
 import com.mogum.common.logging.RequestLogFilter;
+import com.mogum.config.CreditProperties;
+import com.mogum.config.JobProperties;
 import com.mogum.config.WebProperties;
 import com.mogum.course.domain.Course;
 import com.mogum.course.domain.LearningInput;
 import com.mogum.course.domain.Lesson;
 import com.mogum.course.domain.Material;
 import com.mogum.course.domain.Roadmap;
+import com.mogum.course.repository.CourseRepository;
+import com.mogum.course.repository.LessonRepository;
+import com.mogum.course.repository.RoadmapRepository;
+import com.mogum.generation.ChatProvider;
 import com.mogum.generation.GeneratedResult;
 import com.mogum.generation.GenerationOutcome;
 import com.mogum.generation.JobGenerator;
 import com.mogum.generation.JobSnapshot;
 import com.mogum.generation.ResultRef;
+import com.mogum.generation.call.domain.LlmCallOutcome;
 import com.mogum.job.JobIntakeHandler;
 import com.mogum.job.JobRequest;
 import com.mogum.job.domain.JobType;
+import com.mogum.job.repository.GenerationJobRepository;
+import com.mogum.job.service.JobIntakeService;
 import com.sun.net.httpserver.HttpServer;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.Filter;
 import jakarta.servlet.ServletException;
@@ -33,24 +44,29 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import javax.sql.DataSource;
 import org.slf4j.MDC;
+import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.config.BeanPostProcessor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.boot.web.servlet.AbstractFilterRegistrationBean;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.Ordered;
 import org.springframework.jdbc.datasource.DelegatingDataSource;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.session.web.http.CookieSerializer;
 import org.springframework.session.web.http.DefaultCookieSerializer;
 import org.springframework.test.web.servlet.client.RestTestClient;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
+import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -68,7 +84,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -87,33 +106,99 @@ import java.util.concurrent.atomic.AtomicReference;
         IntegrationTestConfiguration.ServletErrors.class,
         IntegrationTestConfiguration.FilterFailure.class,
         IntegrationTestConfiguration.ErrorDispatchProbe.class,
-        IntegrationTestConfiguration.DomainFailureController.class,
-        IntegrationTestConfiguration.JobIntakeHandlers.class,
-        IntegrationTestConfiguration.JobGenerators.class})
+        IntegrationTestConfiguration.DomainFailureController.class})
 public class IntegrationTestConfiguration {
-    /** 기본 통합 시험은 여섯 종류를 허용하며, 처리기 없는 운영 구성 시험만 이 묶음을 뺀다. */
-    @TestConfiguration(proxyBeanMethods = false)
-    @ConditionalOnProperty(name = "test.job-intake-handlers", havingValue = "true", matchIfMissing = true)
-    public static class JobIntakeHandlers {
-        @Bean
-        public JobIntakeHandler newCourseIntake() { return new TestJobIntakeHandler(JobType.NEW_COURSE); }
+    /** 틀 시험이 직접 만드는 처리기와 트랜잭션 프록시. 공용 컨텍스트에는 등록하지 않는다. */
+    public static final class FrameworkJobs {
+        public final JobIntakeService jobIntakeService;
+        public final List<JobGenerator> generators;
 
-        @Bean
-        public JobIntakeHandler newRoadmapIntake() { return new TestJobIntakeHandler(JobType.NEW_ROADMAP); }
+        public FrameworkJobs(ApplicationContext applicationContext) {
+            var service = new JobIntakeService(applicationContext.getBean(GenerationJobRepository.class),
+                    applicationContext.getBean(CourseRepository.class),
+                    applicationContext.getBean(RoadmapRepository.class),
+                    applicationContext.getBean(LessonRepository.class), applicationContext.getBean(CreditLedger.class),
+                    applicationContext.getBean(CreditProperties.class), applicationContext.getBean(JobProperties.class),
+                    Arrays.stream(JobType.values()).<JobIntakeHandler>map(TestJobIntakeHandler::new).toList());
 
-        @Bean
-        public JobIntakeHandler planRoadmapCourseIntake() {
-            return new TestJobIntakeHandler(JobType.PLAN_ROADMAP_COURSE);
+            var proxy = new ProxyFactory(service);
+            var transactions = new TransactionInterceptor();
+            transactions.setTransactionManager(applicationContext.getBean(PlatformTransactionManager.class));
+            transactions.setTransactionAttributeSource(new AnnotationTransactionAttributeSource());
+            proxy.addAdvice(transactions);
+            jobIntakeService = (JobIntakeService) proxy.getProxy();
+
+            generators = Arrays.stream(JobType.values()).<JobGenerator>map(type -> new TestJobGenerator(type,
+                    applicationContext.getBean(EntityManager.class), applicationContext.getBean(TestClock.class)))
+                    .toList();
+        }
+    }
+
+    @Bean
+    @Primary
+    public TestChatProvider testChatProvider(EntityManager entityManager) {
+        return new TestChatProvider(entityManager);
+    }
+
+    /** 운영 생성 흐름에서 교체하는 유일한 경계. 응답은 작업별 순서대로 소비한다. */
+    public static final class TestChatProvider implements ChatProvider {
+        private final ConcurrentMap<Long, Deque<Reply>> replies = new ConcurrentHashMap<>();
+        private final List<Request> requests = new CopyOnWriteArrayList<>();
+        private final ConcurrentMap<Long, Boolean> outsideTransactions = new ConcurrentHashMap<>();
+        private final EntityManagerFactory entityManagerFactory;
+
+        public TestChatProvider(EntityManager entityManager) {
+            this.entityManagerFactory = entityManager.getEntityManagerFactory();
         }
 
-        @Bean
-        public JobIntakeHandler replanCourseIntake() { return new TestJobIntakeHandler(JobType.REPLAN_COURSE); }
+        public void reset() { replies.clear(); requests.clear(); outsideTransactions.clear(); }
 
-        @Bean
-        public JobIntakeHandler replanRoadmapIntake() { return new TestJobIntakeHandler(JobType.REPLAN_ROADMAP); }
+        public boolean outsideTransaction(long jobId) { return Boolean.TRUE.equals(outsideTransactions.get(jobId)); }
 
-        @Bean
-        public JobIntakeHandler materialIntake() { return new TestJobIntakeHandler(JobType.MATERIAL); }
+        public void reply(long jobId, Reply... sequence) {
+            replies.put(jobId, new ArrayDeque<>(List.of(sequence)));
+        }
+
+        public List<Request> requests(long jobId) {
+            return requests.stream().filter(request -> request.jobId() == jobId).toList();
+        }
+
+        @Override
+        public Reply send(Request request) {
+            requests.add(request);
+            boolean outside = !TransactionSynchronizationManager.isActualTransactionActive()
+                    && !TransactionSynchronizationManager.hasResource(entityManagerFactory);
+            outsideTransactions.merge(request.jobId(), outside, (previous, current) -> previous && current);
+            var sequence = replies.get(request.jobId());
+            if (sequence != null) {
+                synchronized (sequence) {
+                    if (!sequence.isEmpty()) return sequence.removeFirst();
+                }
+            }
+            return success(defaultText(request.jobType()));
+        }
+
+        public static Reply success(String text) {
+            return new Reply(text, LlmCallOutcome.SUCCEEDED, null, new Usage(100, 0, 50));
+        }
+
+        public static Reply failure(GenerationOutcome.Failure failure) {
+            if (failure == GenerationOutcome.Failure.INVALID_OUTPUT) return success("invalid output");
+            return new Reply(null, failure == GenerationOutcome.Failure.PROVIDER_UNAVAILABLE
+                    ? LlmCallOutcome.PROVIDER_ERROR : LlmCallOutcome.REJECTED, failure, null);
+        }
+
+        public static String defaultText(JobType type) {
+            String outlines = """
+                    [{"title":"기초", "description":"기초 설명",
+                      "concepts":[{"name":"변수", "definition":"값을 담는 이름"}]},
+                     {"title":"응용", "description":"응용 설명",
+                      "concepts":[{"name":"함수", "definition":"동작의 묶음"}]}]
+                    """;
+            return type == JobType.NEW_ROADMAP
+                    ? "{\"title\":\"자바 로드맵\",\"description\":\"자바를 익힌다\",\"courses\":" + outlines + "}"
+                    : "{\"title\":\"자바 코스\",\"lessons\":" + outlines + "}";
+        }
     }
 
     /** 만드는 작업 시험만 쓰는 확인 처리기. 원문을 로그나 예외에 넣지 않는다. */
@@ -132,33 +217,6 @@ public class IntegrationTestConfiguration {
             if (request.input() != null && REJECT_TOPIC.equals(request.input().getTopic())) {
                 throw new ApiException(ErrorCode.INVALID_REQUEST);
             }
-        }
-    }
-
-    @TestConfiguration(proxyBeanMethods = false)
-    public static class JobGenerators {
-        @Bean public TestJobGenerator newCourseGenerator(EntityManager entityManager, TestClock testClock) {
-            return new TestJobGenerator(JobType.NEW_COURSE, entityManager, testClock);
-        }
-
-        @Bean public TestJobGenerator newRoadmapGenerator(EntityManager entityManager, TestClock testClock) {
-            return new TestJobGenerator(JobType.NEW_ROADMAP, entityManager, testClock);
-        }
-
-        @Bean public TestJobGenerator planRoadmapCourseGenerator(EntityManager entityManager, TestClock testClock) {
-            return new TestJobGenerator(JobType.PLAN_ROADMAP_COURSE, entityManager, testClock);
-        }
-
-        @Bean public TestJobGenerator replanCourseGenerator(EntityManager entityManager, TestClock testClock) {
-            return new TestJobGenerator(JobType.REPLAN_COURSE, entityManager, testClock);
-        }
-
-        @Bean public TestJobGenerator replanRoadmapGenerator(EntityManager entityManager, TestClock testClock) {
-            return new TestJobGenerator(JobType.REPLAN_ROADMAP, entityManager, testClock);
-        }
-
-        @Bean public TestJobGenerator materialGenerator(EntityManager entityManager, TestClock testClock) {
-            return new TestJobGenerator(JobType.MATERIAL, entityManager, testClock);
         }
     }
 

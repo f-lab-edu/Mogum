@@ -49,7 +49,7 @@ public final class ChatCall {
             long started = System.nanoTime();
             ChatProvider.Reply reply;
             try {
-                reply = chatProvider.send(new ChatProvider.Request(settings, messages));
+                reply = chatProvider.send(new ChatProvider.Request(job.id(), job.type(), settings, messages));
             } catch (RuntimeException ignored) {
                 reply = new ChatProvider.Reply(null, LlmCallOutcome.PROVIDER_ERROR,
                         GenerationOutcome.Failure.PROVIDER_UNAVAILABLE, null);

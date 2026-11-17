@@ -1,6 +1,7 @@
 package com.mogum.generation;
 
 import com.mogum.generation.call.domain.LlmCallOutcome;
+import com.mogum.job.domain.JobType;
 
 import java.util.List;
 
@@ -9,7 +10,7 @@ import java.util.List;
 public interface ChatProvider {
     Reply send(Request request);
 
-    record Request(ChatSettings settings, List<Message> messages) {
+    record Request(long jobId, JobType jobType, ChatSettings settings, List<Message> messages) {
         public Request { messages = List.copyOf(messages); }
     }
 

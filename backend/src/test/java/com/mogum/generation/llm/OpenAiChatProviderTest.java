@@ -4,6 +4,7 @@ import com.mogum.generation.ChatProvider;
 import com.mogum.generation.ChatSettings;
 import com.mogum.generation.GenerationOutcome;
 import com.mogum.generation.call.domain.LlmCallOutcome;
+import com.mogum.job.domain.JobType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,7 +31,7 @@ class OpenAiChatProviderTest {
             if (headersFirst) server.respondWithDelayedBody(200, response, Duration.ofSeconds(2));
             else server.respond(200, response, Duration.ofSeconds(2));
             var settings = new ChatSettings("gpt-5.6-terra", 4000, Duration.ofMillis(300), 1);
-            var request = new ChatProvider.Request(settings,
+            var request = new ChatProvider.Request(1L, JobType.NEW_COURSE, settings,
                     List.of(new ChatProvider.Message(ChatProvider.Role.USER, "PROMPT_PRIVATE_MARKER")));
 
             // when
@@ -51,7 +52,7 @@ class OpenAiChatProviderTest {
         // given
         try (var server = new FakeOpenAiServer();
                 var provider = new OpenAiChatProvider("fake-key", server.baseUrl(), Duration.ofSeconds(2))) {
-            var request = new ChatProvider.Request(new ChatSettings("gpt-5.6-terra", 4000,
+            var request = new ChatProvider.Request(1L, JobType.NEW_COURSE, new ChatSettings("gpt-5.6-terra", 4000,
                     Duration.ofSeconds(2), 1),
                     List.of(new ChatProvider.Message(ChatProvider.Role.USER, "PROMPT_PRIVATE_MARKER")));
 
@@ -75,7 +76,7 @@ class OpenAiChatProviderTest {
             server.respond(401, """
                     {"error":{"message":"RESPONSE_PRIVATE_MARKER","type":"invalid_request_error","code":123}}
                     """);
-            var request = new ChatProvider.Request(new ChatSettings("gpt-5.6-terra", 4000,
+            var request = new ChatProvider.Request(1L, JobType.NEW_COURSE, new ChatSettings("gpt-5.6-terra", 4000,
                     Duration.ofSeconds(2), 1),
                     List.of(new ChatProvider.Message(ChatProvider.Role.USER, "PROMPT_PRIVATE_MARKER")));
 
@@ -97,7 +98,7 @@ class OpenAiChatProviderTest {
         try (var server = new FakeOpenAiServer();
                 var provider = new OpenAiChatProvider("fake-key", server.baseUrl(), Duration.ofSeconds(2))) {
             server.respond(200, "RESPONSE_PRIVATE_MARKER");
-            var request = new ChatProvider.Request(new ChatSettings("gpt-5.6-terra", 4000,
+            var request = new ChatProvider.Request(1L, JobType.NEW_COURSE, new ChatSettings("gpt-5.6-terra", 4000,
                     Duration.ofSeconds(2), 1),
                     List.of(new ChatProvider.Message(ChatProvider.Role.USER, "PROMPT_PRIVATE_MARKER")));
 

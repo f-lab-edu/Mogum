@@ -22,6 +22,7 @@ import com.mogum.job.repository.GenerationJobRepository;
 import com.mogum.job.service.JobIntakeService;
 import com.mogum.support.IntegrationTest;
 import com.mogum.support.IntegrationTestConfiguration.DatabaseProbe;
+import com.mogum.support.IntegrationTestConfiguration.FrameworkJobs;
 import com.mogum.support.IntegrationTestConfiguration.TestJobGenerator;
 import com.mogum.support.TestClock;
 import jakarta.persistence.EntityManager;
@@ -36,6 +37,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -56,10 +58,11 @@ class WorkerLifecycleIntegrationTest {
     @Autowired CreditLedger creditLedger;
     @Autowired TestClock testClock;
     @Autowired GenerationJobRepository generationJobRepository;
-    @Autowired JobIntakeService jobIntakeService;
+    @Autowired ApplicationContext applicationContext;
+    JobIntakeService jobIntakeService;
     @Autowired UserRepository userRepository;
     @Autowired CreditEntryRepository creditEntryRepository;
-    @Autowired List<JobGenerator> generators;
+    List<JobGenerator> generators;
     @Autowired WorkerLifecycle configuredWorkerLifecycle;
     @Autowired WorkerProperties configuredWorkerProperties;
     @Autowired JdbcTemplate jdbcTemplate;
@@ -69,7 +72,9 @@ class WorkerLifecycleIntegrationTest {
 
     @BeforeEach
     void resetGenerators() {
-        generators.forEach(generator -> ((TestJobGenerator) generator).reset());
+        var framework = new FrameworkJobs(applicationContext);
+        jobIntakeService = framework.jobIntakeService;
+        generators = framework.generators;
     }
 
     @AfterEach

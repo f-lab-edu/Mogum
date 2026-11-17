@@ -52,7 +52,8 @@ class ChatCallTest {
         assertThat(result).isEqualTo(new ChatResult.Success<>("완성"));
         var order = inOrder(llmCallWriter, chatProvider);
         order.verify(llmCallWriter).start(1L, 2L, JobType.NEW_COURSE, LlmCallType.CHAT, "gpt-5.6-terra");
-        order.verify(chatProvider).send(any());
+        order.verify(chatProvider).send(argThat(request -> request.jobId() == jobSnapshot.id()
+                && request.jobType() == jobSnapshot.type()));
         order.verify(llmCallWriter).finish(eq(10L), eq(LlmCallOutcome.SUCCEEDED), eq(100), eq(20),
                 argThat(cost -> cost.compareTo(new BigDecimal("0.000368")) == 0), anyInt());
     }

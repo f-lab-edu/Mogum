@@ -8,6 +8,7 @@ import com.mogum.account.repository.CreditEntryRepository;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.account.service.CreditLedger;
 import com.mogum.auth.AccountPrincipal;
+import com.mogum.config.CreditProperties;
 import com.mogum.config.JobProperties;
 import com.mogum.course.domain.CourseFixtures;
 import com.mogum.course.domain.LearningInput;
@@ -57,8 +58,36 @@ class JobControllerIntegrationTest {
     @Autowired LessonRepository lessonRepository;
     @Autowired CreditLedger creditLedger;
     @Autowired JobProperties jobProperties;
+    @Autowired CreditProperties creditProperties;
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired JdbcIndexedSessionRepository jdbcIndexedSessionRepository;
+
+    @ParameterizedTest(name = "종류={0}")
+    @EnumSource(value = JobType.class, names = {"NEW_COURSE", "NEW_ROADMAP"})
+    @DisplayName("운영 받기는 새 코스와 로드맵을 각각 받고 같은 입력을 두 번 보내도 각각 크레딧을 쓴다")
+    void acceptsNewLearningWithoutDeduplication(JobType type) {
+        // given
+        var user = approved(100);
+        var client = testRequests.asUser(user.getId());
+        var body = Map.of("type", type, "topic", "자바", "level", "BEGINNER", "purpose", "WORK");
+        int cost = type == JobType.NEW_COURSE ? creditProperties.newCourse() : creditProperties.newRoadmap();
+
+        var first = client.post().uri("/api/jobs").body(body).exchange();
+
+        // when
+        var second = client.post().uri("/api/jobs").body(body).exchange();
+
+        // then
+        first.expectStatus().isOk();
+        second.expectStatus().isOk();
+        assertThat(jdbcTemplate.queryForList("SELECT type FROM generation_jobs", String.class))
+                .containsExactly(type.name(), type.name());
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getCreditBalance()).isEqualTo(100 - 2 * cost);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM credit_entries WHERE type = 'CONSUME'", Integer.class)).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM courses", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM roadmaps", Integer.class)).isZero();
+    }
 
     @Test
     @DisplayName("받기와 읽기와 실패 다시 시도와 버리기를 실제 HTTP로 한 바퀴 수행한다")
