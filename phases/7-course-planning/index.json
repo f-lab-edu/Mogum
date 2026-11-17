@@ -30,7 +30,14 @@
     {
       "step": 2,
       "name": "plan-format",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-17T20:18:36+0900",
+      "summary": "generation.plan: PlanningInput(topic, level, levelOther, purpose, purposeOther, memo); CoursePlanInput.NewCourse(input) / RoadmapCourse(input, context) / ReplanCourse(input, context, previousLessons, feedback), RoadmapContext(position, coursePlan, previousCourseLessons, followingCoursePlans); RoadmapPlanInput.NewRoadmap(input) / ReplanRoadmap(input, previousPlan, feedback); CoursePlanFormat.prompt(CoursePlanInput): PlanPrompt(system, user), parseNewCourse(String) · parseLessons(String): Optional<CoursePlan(title, lessons)>(기존 코스 title=null); RoadmapPlanFormat.prompt(RoadmapPlanInput): PlanPrompt, parse(String): Optional<RoadmapPlan(title, description, courses)>; LessonOutline · CourseOutline(title, description, List<PlannedConcept>), PlanPromptSupport · PlanJson; 리소스 backend/src/main/resources/prompts/planning/{common,course,roadmap,new-course-output,lessons-output,user,level-beginner,level-basics,level-familiar,purpose-work,purpose-interview,purpose-general}.txt; 수준/목적 문구 · 자료 경계 · 입력별 재료 분기 · JSON 추출/형식/코드 포인트 100자 검사 · ChatCall 메서드 참조 연결; 두 AC 통과, 서버 테스트 1596 → 1806개(210개 추가, 실패 0).",
+      "completed_at": "2026-11-17T20:29:05+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/generation/plan/PlanJson.java:27 — `endOfValue` 가 -1 이면 이미 계획 JSON 을 찾았어도 `Optional.empty()` 를 반환한다. 앞뒤 설명에 닫히지 않은 괄호가 하나만 있어도(예: 뒤 설명 \"(참고: {\" · 앞 설명 \"[참고 아래 JSON\") 정상 답이 INVALID_OUTPUT 이 되어 다시 시도 비용이 든다. → 닫히지 않은 괄호는 그 위치만 건너뛰고(`continue`) 다음 글자부터 계속 찾게 한 뒤, 이 두 경우를 테스트로 더하는 것을 권한다. 다시 시도가 흡수하는 드문 경우라 반려 사유로 보지 않았다.",
+        "backend/src/main/resources/prompts/planning/common.txt:3 — level 값이 「기초부터」 같은 짧은 문구로만 들어가고, 시스템 문구에는 「level은 시작 수준」이라고만 적혀 있다. 03 §1.2 의 「강의 목록에 기초를 얼마나 넣나」라는 뜻을 시스템 문구에 한 줄 적어 두면 LLM 이 해석을 덜 헷갈린다. 품질 점검 TASK 에서 다듬을 문구 수준이다."
+      ]
     },
     {
       "step": 3,
