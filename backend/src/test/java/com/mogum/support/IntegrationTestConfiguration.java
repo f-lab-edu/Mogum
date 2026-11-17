@@ -517,7 +517,7 @@ public class IntegrationTestConfiguration {
         @Bean
         FilterRegistrationBean<Filter> filterFailure(
                 @Qualifier("securityFilterChainRegistration")
-                AbstractFilterRegistrationBean<?> abstractFilterRegistrationBean) {
+                AbstractFilterRegistrationBean<?> securityFilterRegistrationBean) {
             Filter failure = (request, response, chain) -> {
                 if ("/api/test-request-log-filter-failure".equals(((HttpServletRequest) request).getRequestURI())) {
                     throw new RuntimeException("request log filter failure marker");
@@ -527,7 +527,7 @@ public class IntegrationTestConfiguration {
             };
 
             var registration = new FilterRegistrationBean<>(failure);
-            registration.setOrder(abstractFilterRegistrationBean.getOrder() + 1);
+            registration.setOrder(securityFilterRegistrationBean.getOrder() + 1);
             registration.setDispatcherTypes(DispatcherType.REQUEST);
             return registration;
         }
