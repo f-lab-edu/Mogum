@@ -17,7 +17,15 @@
     {
       "step": 1,
       "name": "openai-client",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-17T18:44:30+0900",
+      "summary": "generation.ChatProvider.send(Request): Reply(HTTP 1회 · SDK 없는 스텁 인터페이스), generation.llm.OpenAiChatProvider; generation.ChatCall.<T>call(JobSnapshot, ChatSettings, String system, String user, Function<String, Optional<T>>): ChatResult<T>(Success<T>(value) / Failed<T>(GenerationOutcome.Failure)) — 이어 쓰기 · 해석 · 호출별 start/finish · 실패 4갈래 · 캐시 단가 비용; config.LlmProperties(app.llm.openai.api-key=${OPENAI_API_KEY:}, base-url=빈 값은 SDK 기본 주소, chats.planning.model=gpt-5.6-terra/max-completion-tokens=4000/timeout=50s/max-continuations=1, prices[gpt-5.6-terra].input=2.00/cached-input=0.20/output=12.00 USD/1M, database-allowance=10s); config.LlmConfiguration 기동 검사(키 · 단가 · 모든 채팅 묶음 시한 식 · 종료 대기), app.worker.lease-duration=6m > 312s(T_DB=10s, D이어쓰기=0), 갱신 30s · 종료 대기 100s 유지; SDK 4.75.1 소스 JAR 확인: RequestOptions, CompletionUsage.PromptTokensDetails, ChatCompletionCreateParams.Builder, ChatCompletion.Choice.FinishReason, OpenAIServiceException, BadRequestException, RateLimitException, InternalServerException, OpenAIIoException, OpenAIInvalidDataException, JsonHandler, OkHttpClient(연결 재시도 false); 가짜 HTTP 서버 · 로그/커넥션 검증, 실제 유료 시험 llmTest(기본 test 제외 · 키 없으면 건너뜀 · 미실행), 로컬/배포 env · 문서 반영; 두 AC 통과, 서버 테스트 1540 → 1596개(56개 추가, 실패 0).",
+      "completed_at": "2026-11-17T20:18:36+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/generation/ChatCall.java:89 — `prices.get(model).cost(usage)`는 finish 호출의 인자라 먼저 계산된다. 단가가 없는 모델이면 여기서 NPE가 나고 catch가 삼켜서 `llmCallWriter.finish` 자체가 불리지 않는다. 그러면 호출 기록이 outcome · duration 없이 남는다. 지금은 기동 검사가 설정된 묶음을 막지만, ChatCall은 호출자가 넘긴 아무 ChatSettings나 받는다. → 단가가 없으면 비용만 null로 두고 finish는 부르게 하거나, call 시작에서 단가 존재를 확인하는 방향을 권한다. step 3에서 ChatSettings를 설정 밖에서 만들지 않으면 영향은 없다.",
+        "backend/src/main/java/com/mogum/generation/ChatCall.java:32 — 호출자가 트랜잭션을 쥔 채 들어오면 PROVIDER_UNAVAILABLE을 돌려준다. 이 값은 워커가 다시 시도하는 실패라, 프로그래밍 오류가 프로바이더 장애처럼 보이고 호출 기록도 남지 않는다. → 동작에는 문제가 없다. step 3에서 처리기가 트랜잭션 밖에서 부르는지 시험으로 확인하면 충분하다.",
+        "backend/src/main/java/com/mogum/generation/llm/OpenAiChatProvider.java:79 — 정상 종료 때 워커 스레드가 인터럽트되면 OkHttp의 InterruptedIOException도 TIMEOUT으로 분류된다. 호출 기록의 TIMEOUT 비율을 볼 때 종료 중 끊긴 호출이 섞일 수 있다는 점만 알아 두면 된다."
+      ]
     },
     {
       "step": 2,
