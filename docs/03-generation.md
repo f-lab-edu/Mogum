@@ -175,4 +175,4 @@ LLM : 강의 자료 + 카드 — 호출 한 번
 | 출력 제한 — 강의 목록 · 로드맵 계획은 4,000 토큰(ADR-181, 임시 값). 강의 자료 + 카드는 해당 TASK에서 정한다 | ADR-119 |
 | 관련 개념 검색 범위 · 넘기는 개수 · 다시 짚는 강의의 몫 | ADR-032 |
 | 카드 하나에 붙는 개념 수(예: 2~3) · 강의당 카드 수 | ADR-033 |
-| 섹션 이름 · 프롬프트 문구 | ADR-021 |
+| 섹션 이름 · 프롬프트 문구 — 강의 목록: `backend/src/main/resources/prompts/planning/course.txt` + `new-course-output.txt`(새 코스) / `lessons-output.txt`(기존 코스). 로드맵 계획: `backend/src/main/resources/prompts/planning/roadmap.txt`. 공통 규칙 · 사용자 자료 틀 · 수준/목적 문구도 같은 디렉터리에 둔다 | ADR-021 |
