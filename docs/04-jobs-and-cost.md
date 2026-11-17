@@ -268,7 +268,7 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 | 시한 · 늘리는 간격은 아래 임시 설정. 각 워커의 `ScheduledExecutorService.scheduleWithFixedDelay`로 만드는 동안과 정상 종료 대기 중에 갱신한다. 시한 식은 아래와 같고, 호출 시간 제한과 이어 쓰기 값은 강의 목록 TASK에서 정한 뒤 다시 대입한다 | ADR-126 |
 | 자동 다시 시도는 아래 임시 설정. 이어 쓰기 횟수 · 간격 · 프로바이더 오류 분류는 강의 목록 TASK에서 정한다(갈래 자체는 ADR-163) | ADR-127 |
 | 꺼내기는 PostgreSQL CTE 하나에서 `SELECT … ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1` → `UPDATE … RETURNING id`. `QUEUED` 또는 같은 `Clock`의 현재 시각보다 `lease_until`이 작은 `RUNNING` 하나를 집고 `claim_count + 1` · 시한 · 시작/수정 시각을 바꾼다 | ADR-129 |
-| 종류별 크레딧 값 · 한 달 몫 — 한 달 몫은 계정 TASK 가 설정 한 곳에 임시 값 100 으로 두고, 강의 목록 TASK 에서 토큰을 잰 뒤 정한다(사용자 확인 2026-11-08). 종류별 값은 `6-job-worker` step 1에서 아래 설정에 모두 임시 값 1로 두었다 | ADR-107 · ADR-115 |
+| 종류별 크레딧 값 · 한 달 몫 — 한 달 몫은 계정 TASK 가 설정 한 곳에 임시 값 100 으로 두고, 홈 · 크레딧 TASK 에서 M1 · M2 동안 쌓인 호출 기록(`llm_calls`)으로 정한다(README 2026-11-17 — 처음에는 강의 목록 TASK 였다). 종류별 값은 `6-job-worker` step 1에서 아래 설정에 모두 임시 값 1로 두었다 | ADR-107 · ADR-115 |
 | 크레딧 채우기를 여러 서버에서 한 번만 일어나게 하는 방법 · 새벽 4시에 서버가 꺼져 있었을 때 따라잡는 방법 | ADR-133 · ADR-173 |
 | 패키지를 코스 · 로드맵 등으로 나누는 방식 — 테이블은 02 §8 에서 정했다 | ADR-148 |
 
@@ -308,4 +308,4 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 | `REPLAN_ROADMAP` | `app.credit.replan-roadmap` | `replanRoadmap()` | 1 |
 | `MATERIAL` | `app.credit.material` | `material()` | 1 |
 
-실제 토큰 측정에 따른 확정 값은 강의 목록 TASK에서 정한다.
+확정 값은 홈 · 크레딧 TASK 에서 호출 기록으로 정한다(README 2026-11-17). 그때까지 쓰는 사람은 운영자뿐이라 임시 값으로 둔다.
