@@ -42,7 +42,15 @@
     {
       "step": 3,
       "name": "new-learning-jobs",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-17T20:29:06+0900",
+      "summary": "job.NewCourseIntakeHandler · NewRoadmapIntakeHandler + generation.NewCourseGenerator · NewRoadmapGenerator를 config.GenerationConfiguration에서 짝으로 조립; planning 채팅 · 형식 해석 · 호출 기록을 거쳐 성공 트랜잭션에서 입력과 검토 중 결과 저장(새 코스는 순서 있는 강의, 새 로드맵은 강의 없는 NOT_PLANNED 코스들); 공용 IntegrationTestConfiguration.TestChatProvider(@Primary ChatProvider)만 교체 — reset(), reply(jobId, Reply...), success(text), failure(Failure), defaultText(type), requests(jobId), outsideTransaction(jobId), ChatProvider.Request(jobId, jobType, settings, messages); 공용 테스트 처리기 빈 12개와 NoJobHandlersIntegrationTest 어노테이션 · test.job-intake-handlers 속성 제거, 틀 시험은 new FrameworkJobs(applicationContext)의 jobIntakeService(여섯 테스트 받기 처리기 + 실제 애노테이션 트랜잭션 프록시) · generators(여섯 테스트 생성 처리기)를 직접 만든 JobRunner/WorkerLifecycle에 전달; 옛 시험 사실 → 새 시험 대응: 받기 경합 · 건 수 · 중복 · 종류별 크레딧 · 롤백 · 소유권 · 재시도/버리기 · 로그/MDC → JobIntakeServiceIntegrationTest의 기존 모든 시험(직접 구성으로 이전), 여섯 종류 저장 · SKIP LOCKED/받은 순서 · 시한/갱신 · 늦은 워커/삭제 차단 · 재시도/복구 · 저장 롤백/되찾기 · 연결 반환/종료 → JobRunnerIntegrationTest의 기존 모든 시험(직접 구성으로 이전), 정상 종료/시간 초과 반환 · 늦은 시도 차단 · N개 플랫폼 워커 · DB 장애 회복 → WorkerLifecycleIntegrationTest의 기존 모든 시험(직접 구성으로 이전), 여섯 종류/모든 상태 읽기 · 실패 묶음 · 응답 비공개 정보 제외/소유권 → JobReadServiceIntegrationTest · JobControllerIntegrationTest의 기존 시험(작업 픽스처 유지, HTTP 새 코스 받기는 운영 처리기), 처리기 없는 여섯 종류 HTTP 거절/DB 보존 → JobControllerNoHandlersIntegrationTest.rejectsTypesWithoutHandlers의 미지원 네 종류 + 지원 시작한 두 종류는 JobControllerIntegrationTest.acceptsNewLearningWithoutDeduplication의 성공/각각 크레딧 사용으로 이전(검증 사실 누락 없음); 정상 두 종류 · 이어 쓰기 · 형식 실패/결과 없음/버리기/복구 · 일시적 실패 뒤 성공 · 거절/입력 초과 1회 · 예외의 실패 반환 · 테스트 처리기 빈 부재 검증; 두 AC 통과(대상 881개, 전체 build 1823개), 서버 테스트 1806 → 1823개(19개 추가 · 기존 거절 2개를 성공 시험으로 이전하여 순증 17개, 실패/오류/건너뜀 0); 실제 OpenAI 미호출 · 커밋 없음.",
+      "completed_at": "2026-11-18T01:12:06+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/generation/NewCourseGenerator.java:42 (NewRoadmapGenerator.java:42 도 같다) — `catch (RuntimeException ignored)`이 재료 준비 · 프롬프트 리소스 누락 같은 프로그래밍 오류까지 다시 시도 가능한 `PROVIDER_UNAVAILABLE`로 바꾸고 아무 흔적도 남기지 않는다. 그러면 운영자는 버그를 프로바이더 장애로 착각한다 → 원문 없이 예외 클래스 이름만 남기거나(금지 26 범위 안), ChatCall 앞 단계의 예외만 따로 다루는 방법을 phase `/review`에서 검토한다.",
+        "backend/src/main/java/com/mogum/config/GenerationConfiguration.java:23 — `llmProperties.chats().get(\"planning\")`가 null이어도(설정 키 누락) 기동이 실패하지 않는다. 그러면 모든 작업이 조용히 `PROVIDER_UNAVAILABLE`로 끝난다 → 조립할 때 `Objects.requireNonNull`이나 Assert로 기동 시점에 막는 편이 낫다. 동작 영향은 설정 실수일 때뿐이다.",
+        "backend/src/test/java/com/mogum/generation/NewRoadmapGeneratorIntegrationTest.java:110 — 「공용 컨텍스트에 테스트 처리기 빈이 없음」 시험이 로드맵 생성기 테스트 안에 있다. 뒤 step 작업자가 찾기 쉽도록 `support` 패키지 쪽 시험으로 옮기는 것을 고려한다."
+      ]
     },
     {
       "step": 4,
