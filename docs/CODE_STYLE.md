@@ -70,6 +70,7 @@ return generationJobRepository.findById(jobId)
 
 - **주입받는 의존 필드는 타입 단순 이름을 camelCase 로 쓴다** — `RoadmapRepository roadmapRepository` · `LoginService loginService` · `TransactionTemplate transactionTemplate` · `ObjectMapper objectMapper` · `EntityManager entityManager`. 줄임말(`tx` · `em` · `repo`) · 역할 이름(`roadmaps` · `login` · `reads`)을 쓰지 않는다.
 - **같은 타입이 둘 이상이면 역할을 앞에 붙이고 타입 이름으로 끝낸다** — `transactionTemplate` · `releaseTransactionTemplate`.
+- 타입 이름만으로 무엇을 담았는지 모르는 범용 타입(`FilterRegistrationBean<RequestLogFilter>`)도 역할을 앞에 붙인다 — `requestLogFilterRegistrationBean`. 추상 타입은 `Abstract` 를 떼고 본다 — `AbstractFilterRegistrationBean` → `securityFilterRegistrationBean`.
 - 주입받는 매개변수도 같다 — 직접 쓴 생성자와 `@Bean` 메서드의 매개변수(`EntityManager entityManager` · `TestClock testClock`). `java.*` 타입 예외도 같다(`Clock clock`). 빌드는 필드만 검사한다.
 - **테스트도 같다** — `@Autowired UserRepository userRepository`. Fake 는 대신하는 타입의 이름을 쓴다 — `FakeUserRepository userRepository`.
 - **`java.*` 타입은 예외다** — `Clock clock` · `Map<JobType, JobIntakeHandler> handlers` · `ScheduledExecutorService renewals` 처럼 담은 것을 말하는 이름을 쓴다. 범용 타입은 타입 이름이 내용을 말하지 않는다.

@@ -119,6 +119,11 @@
         "phases/6a-code-style/step8.md 4 — 메서드 이름 `followsLoggedInRequests` 는 실제 파일에 없다. 고친 곳은 `cleansUserMdcForNextAnonymousRequests` 의 for 본문이고, 그 파일의 for 는 이것 하나뿐이라 결과는 맞다. step 을 쓸 때 메서드 이름을 확인하면 구현 담당이 덜 헤맨다.",
         "AC build 는 UP-TO-DATE 캐시로 통과했다. 입력이 같아 문제는 없지만, 리뷰에서 다시 실행하려면 `--rerun-tasks` 가 필요하다."
       ]
+    },
+    {
+      "step": 9,
+      "name": "role-prefixed-names",
+      "status": "pending"
     }
   ],
   "created_at": "2026-11-17T04:54:38+0900",
