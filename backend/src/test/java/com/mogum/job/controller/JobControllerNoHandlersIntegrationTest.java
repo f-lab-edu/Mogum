@@ -44,15 +44,18 @@ class JobControllerNoHandlersIntegrationTest {
         // given
         var user = userRepository.save(UserFixtures.approved("me@example.com"));
         creditEntryRepository.save(CreditEntry.refill(user, 100));
+
         var course = courseRepository.save(CourseFixtures.single(user.getId()));
         var roadmap = roadmapRepository.save(RoadmapFixtures.roadmap(user.getId()));
         var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
+
         Map<String, Object> body = switch (type) {
             case NEW_COURSE, NEW_ROADMAP -> Map.of("type", type, "topic", "자바", "level", "BEGINNER", "purpose", "WORK");
             case PLAN_ROADMAP_COURSE, REPLAN_COURSE -> Map.of("type", type, "courseId", course.getId());
             case REPLAN_ROADMAP -> Map.of("type", type, "roadmapId", roadmap.getId());
             case MATERIAL -> Map.of("type", type, "lessonId", lesson.getId());
         };
+
         var beforeUser = jdbcTemplate.queryForMap("SELECT * FROM users");
         var beforeEntries = jdbcTemplate.queryForList("SELECT * FROM credit_entries");
         var client = testRequests.asUser(user.getId());

@@ -76,6 +76,7 @@ class JobRunnerIntegrationTest {
     @Autowired List<JobGenerator> generators;
     @Autowired WorkerProperties configuredWorkerProperties;
     ScheduledExecutorService renewals;
+
     static final Duration LEASE = Duration.ofMinutes(5);
 
     @BeforeEach
@@ -122,6 +123,7 @@ class JobRunnerIntegrationTest {
         long userId = user();
         var request = request(userId, type);
         long id = jobIntakeService.receive(userId, request).id();
+
         testClock.advance(Duration.ofSeconds(1));
         var stub = stub(type);
 
@@ -140,6 +142,7 @@ class JobRunnerIntegrationTest {
         assertThat(job.getErrorType()).isNull();
         assertThat(stub.plan(id).calls()).isEqualTo(1);
         assertThat(stub.plan(id).saves()).isEqualTo(1);
+
         var snapshot = stub.plan(id).snapshots().getFirst();
         assertThat(snapshot.id()).isEqualTo(id);
         assertThat(snapshot.userId()).isEqualTo(userId);
@@ -147,26 +150,36 @@ class JobRunnerIntegrationTest {
         assertThat(snapshot.targetId()).isEqualTo(request.targetId());
         assertThat(snapshot.feedback()).isEqualTo(request.feedback());
         assertThat(snapshot.claimCount()).isEqualTo(1);
+
         if (request.input() != null) {
             assertThat(snapshot.input()).isEqualTo(new JobSnapshot.Input("LEAKCHECK-topic", Level.OTHER,
                     "LEAKCHECK-level", Purpose.OTHER, "LEAKCHECK-purpose", "LEAKCHECK-memo"));
         } else assertThat(snapshot.input()).isNull();
+
         if (type == JobType.NEW_COURSE) {
             assertThat(job.getCourseId()).isNotNull();
-            assertThat(courseRepository.findById(job.getCourseId()).orElseThrow().getInput().getMemo()).isEqualTo("LEAKCHECK-memo");
+            assertThat(courseRepository.findById(job.getCourseId()).orElseThrow().getInput().getMemo())
+                    .isEqualTo("LEAKCHECK-memo");
             assertThat(count("courses")).isEqualTo(1);
         }
+
         if (type == JobType.NEW_ROADMAP) {
             assertThat(job.getRoadmapId()).isNotNull();
-            assertThat(roadmapRepository.findById(job.getRoadmapId()).orElseThrow().getInput().getLevelOther()).isEqualTo("LEAKCHECK-level");
+            assertThat(roadmapRepository.findById(job.getRoadmapId()).orElseThrow().getInput().getLevelOther())
+                    .isEqualTo("LEAKCHECK-level");
             assertThat(count("roadmaps")).isEqualTo(1);
         }
+
         if (type == JobType.MATERIAL) assertThat(count("materials")).isEqualTo(1);
+
         assertCredit(userId, 99, 1, 0);
         assertThat(stub.plan(id).outsideTransaction()).isTrue();
         assertThat(stub.plan(id).mdc()).contains("jobId=" + id, "userId=" + userId);
-        assertThat(output.getAll().lines().filter(line -> line.contains("job finished"))).singleElement()
-                .asString().contains(" INFO ", "jobId=" + id, "userId=" + userId, "job finished status=SUCCEEDED");
+
+        assertThat(output.getAll().lines().filter(line -> line.contains("job finished")))
+                .singleElement()
+                .asString()
+                .contains(" INFO ", "jobId=" + id, "userId=" + userId, "job finished status=SUCCEEDED");
         assertThat(output.getAll()).doesNotContain("LEAKCHECK");
         assertThat(MDC.getCopyOfContextMap()).isNullOrEmpty();
     }
@@ -177,11 +190,12 @@ class JobRunnerIntegrationTest {
             "PROVIDER_REJECTED,3,FAILED,1", "INPUT_TOO_LARGE,3,FAILED,1"})
     @DisplayName("일시적과 형식 실패만 같은 꺼내기 안에서 정한 횟수까지 다시 만든다")
     void retriesOnlyRecoverableFailures(GenerationOutcome.Failure failure, int failures, JobStatus status, int calls,
-                                       CapturedOutput output) {
+            CapturedOutput output) {
         // given
         long userId = user();
         long id = jobIntakeService.receive(userId, request(userId, JobType.NEW_COURSE)).id();
         var plan = stub(JobType.NEW_COURSE).plan(id).fail(failure, failures);
+
         testClock.advance(Duration.ofSeconds(1));
 
         // when
@@ -193,13 +207,17 @@ class JobRunnerIntegrationTest {
         assertThat(job.getClaimCount()).isEqualTo(1);
         assertThat(plan.calls()).isEqualTo(calls);
         assertThat(plan.snapshots()).extracting(JobSnapshot::claimCount).containsOnly(1);
-        assertThat(job.getErrorType()).isEqualTo(status == JobStatus.FAILED ? JobErrorType.valueOf(failure.name()) : null);
+        assertThat(job.getErrorType())
+                .isEqualTo(status == JobStatus.FAILED ? JobErrorType.valueOf(failure.name()) : null);
         assertThat(job.getFinishedAt()).isEqualTo(testClock.instant());
         assertThat(job.getUpdatedAt()).isEqualTo(testClock.instant());
         assertThat(job.getLeaseUntil()).isNull();
         assertThat(count("courses")).isEqualTo(status == JobStatus.SUCCEEDED ? 1 : 0);
+
         assertCredit(userId, status == JobStatus.SUCCEEDED ? 99 : 100, 1, status == JobStatus.FAILED ? 1 : 0);
-        assertThat(output.getAll()).contains("job finished status=" + status).doesNotContain("job lease lost", "job save failed", "LEAKCHECK");
+        assertThat(output.getAll())
+                .contains("job finished status=" + status)
+                .doesNotContain("job lease lost", "job save failed", "LEAKCHECK");
         assertThat(MDC.getCopyOfContextMap()).isNullOrEmpty();
     }
 
@@ -218,6 +236,7 @@ class JobRunnerIntegrationTest {
         // then
         assertThat(runner.runOnce()).isFalse();
         assertThat(count("materials")).isZero();
+
         assertCredit(userId, 100, 1, 1);
     }
 
@@ -230,6 +249,7 @@ class JobRunnerIntegrationTest {
             return jobIntakeService.receive(userId, request(userId, JobType.NEW_COURSE)).id();
         }).toList();
         var start = new CountDownLatch(1);
+
         try (var workers = Executors.newFixedThreadPool(8)) {
             var futures = IntStream.range(0, 8).mapToObj(i -> workers.submit(() -> {
                 start.await();
@@ -242,10 +262,12 @@ class JobRunnerIntegrationTest {
             // then
             for (var future : futures) assertThat(future.get(10, TimeUnit.SECONDS)).isTrue();
         }
+
         for (long id : ids) {
             assertThat(generationJobRepository.findById(id).orElseThrow().getClaimCount()).isEqualTo(1);
             assertThat(stub(JobType.NEW_COURSE).plan(id).calls()).isEqualTo(1);
         }
+
         assertThat(count("courses")).isEqualTo(8);
     }
 
@@ -256,7 +278,9 @@ class JobRunnerIntegrationTest {
         long userId = user();
         long first = jobIntakeService.receive(userId, request(userId, JobType.NEW_COURSE)).id();
         long second = jobIntakeService.receive(userId, request(userId, JobType.NEW_COURSE)).id();
-        try (var connection = jdbcTemplate.getDataSource().getConnection(); var worker = Executors.newSingleThreadExecutor()) {
+
+        try (var connection = jdbcTemplate.getDataSource().getConnection();
+                var worker = Executors.newSingleThreadExecutor()) {
             connection.setAutoCommit(false);
             try (var lock = connection.prepareStatement("SELECT id FROM generation_jobs WHERE id = ? FOR UPDATE")) {
                 lock.setLong(1, first);
@@ -269,7 +293,8 @@ class JobRunnerIntegrationTest {
                 // then
                 assertThat(found).isTrue();
                 assertThat(generationJobRepository.findById(first).orElseThrow().getClaimCount()).isZero();
-                assertThat(generationJobRepository.findById(second).orElseThrow().getStatus()).isEqualTo(JobStatus.SUCCEEDED);
+                assertThat(generationJobRepository.findById(second).orElseThrow().getStatus())
+                        .isEqualTo(JobStatus.SUCCEEDED);
             } finally { connection.rollback(); }
         }
     }
@@ -280,6 +305,7 @@ class JobRunnerIntegrationTest {
         // given
         long userId = user();
         long first = jobIntakeService.receive(userId, request(userId, JobType.NEW_COURSE)).id();
+
         testClock.advance(Duration.ofSeconds(1));
         long second = jobIntakeService.receive(userId, request(userId, JobType.NEW_COURSE)).id();
         long third = jobIntakeService.receive(userId, request(userId, JobType.NEW_COURSE)).id();
@@ -295,6 +321,7 @@ class JobRunnerIntegrationTest {
         assertThat(runner.runOnce()).isTrue();
         assertThat(generationJobRepository.findById(second).orElseThrow().getStatus()).isEqualTo(JobStatus.SUCCEEDED);
         assertThat(generationJobRepository.findById(third).orElseThrow().getStatus()).isEqualTo(JobStatus.QUEUED);
+
         assertCredit(userId, 97, 3, 0);
     }
 
@@ -333,7 +360,9 @@ class JobRunnerIntegrationTest {
 
         // then
         assertThat(plan.calls()).isEqualTo(1);
-        assertThat(generationJobRepository.findById(id).orElseThrow().getErrorType()).isEqualTo(JobErrorType.PROVIDER_UNAVAILABLE);
+        assertThat(generationJobRepository.findById(id).orElseThrow().getErrorType())
+                .isEqualTo(JobErrorType.PROVIDER_UNAVAILABLE);
+
         assertCredit(userId, 100, 1, 1);
     }
 
@@ -354,6 +383,7 @@ class JobRunnerIntegrationTest {
         // then
         assertThat(generationJobRepository.findById(id).orElseThrow().getClaimCount()).isEqualTo(2);
         assertThat(stub(JobType.NEW_COURSE).plan(id).snapshots().getFirst().claimCount()).isEqualTo(2);
+
         assertCredit(userId, 99, 1, 0);
     }
 
@@ -364,13 +394,15 @@ class JobRunnerIntegrationTest {
         long userId = user();
         long id = jobIntakeService.receive(userId, request(userId, JobType.NEW_COURSE)).id();
         var plan = stub(JobType.NEW_COURSE).plan(id).holdFirst();
+
         try (var worker = Executors.newSingleThreadExecutor()) {
             var result = worker.submit(() -> runner(Duration.ofMillis(5)).runOnce());
             try {
                 plan.awaitEntered();
                 testClock.advance(Duration.ofMinutes(4));
                 await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
-                        assertThat(generationJobRepository.findById(id).orElseThrow().getLeaseUntil()).isEqualTo(testClock.instant().plus(LEASE)));
+                        assertThat(generationJobRepository.findById(id).orElseThrow().getLeaseUntil())
+                                .isEqualTo(testClock.instant().plus(LEASE)));
                 testClock.advance(Duration.ofMinutes(2));
 
                 // when
@@ -378,9 +410,11 @@ class JobRunnerIntegrationTest {
 
                 // then
                 assertThat(claimed).isFalse();
-                assertThat(generationJobRepository.findById(id).orElseThrow().getUpdatedAt()).isAfter(TestClock.INITIAL_INSTANT);
+                assertThat(generationJobRepository.findById(id).orElseThrow().getUpdatedAt())
+                        .isAfter(TestClock.INITIAL_INSTANT);
                 assertThat(plan.calls()).isEqualTo(1);
             } finally { plan.release(); }
+
             assertThat(result.get(5, TimeUnit.SECONDS)).isTrue();
         }
         assertThat(output.getAll()).doesNotContain("job lease lost");
@@ -395,6 +429,7 @@ class JobRunnerIntegrationTest {
         long userId = user();
         long id = jobIntakeService.receive(userId, request(userId, JobType.NEW_COURSE)).id();
         var plan = stub(JobType.NEW_COURSE).plan(id).holdFirst().fail(failure, 1);
+
         try (var worker = Executors.newSingleThreadExecutor()) {
             var old = worker.submit(() -> runner().runOnce());
             try {
@@ -408,14 +443,17 @@ class JobRunnerIntegrationTest {
                 old.get(5, TimeUnit.SECONDS);
 
                 // then
-                assertThat(jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", id)).isEqualTo(finished);
+                assertThat(jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", id))
+                        .isEqualTo(finished);
                 assertThat(plan.calls()).isEqualTo(2);
                 assertThat(plan.saves()).isEqualTo(1);
                 assertThat(count("courses")).isEqualTo(1);
                 assertThat(generationJobRepository.findById(id).orElseThrow().getClaimCount()).isEqualTo(2);
+
                 assertCredit(userId, 99, 1, 0);
             } finally { plan.release(); }
         }
+
         assertLeaseLostOnce(output, id, userId);
     }
 
@@ -426,21 +464,26 @@ class JobRunnerIntegrationTest {
         long userId = user();
         long id = jobIntakeService.receive(userId, request(userId, JobType.NEW_COURSE)).id();
         var plan = stub(JobType.NEW_COURSE).plan(id).holdFirst();
+
         try (var worker = Executors.newSingleThreadExecutor()) {
             var old = worker.submit(() -> runner().runOnce());
             try {
                 plan.awaitEntered();
                 testClock.advance(LEASE.plusSeconds(1));
                 runner().runOnce();
+
                 // when
                 plan.release();
                 old.get(5, TimeUnit.SECONDS);
+
                 // then
                 assertThat(plan.saves()).isEqualTo(1);
                 assertThat(count("courses")).isEqualTo(1);
+
                 assertCredit(userId, 99, 1, 0);
             } finally { plan.release(); }
         }
+
         assertLeaseLostOnce(output, id, userId);
     }
 
@@ -453,12 +496,14 @@ class JobRunnerIntegrationTest {
         long id = jobIntakeService.receive(userId, request(userId, JobType.NEW_COURSE)).id();
         var plan = stub(JobType.NEW_COURSE).plan(id).holdFirst();
         if (fail) plan.fail(GenerationOutcome.Failure.PROVIDER_REJECTED, 1);
+
         try (var worker = Executors.newSingleThreadExecutor()) {
             var result = worker.submit(() -> runner(renew ? Duration.ofMillis(5) : Duration.ofMinutes(4)).runOnce());
             try {
                 plan.awaitEntered();
                 jdbcTemplate.update("DELETE FROM generation_jobs WHERE id = ?", id);
-                if (renew) await().atMost(Duration.ofSeconds(5)).until(() -> output.getAll().contains("job lease lost"));
+                if (renew)
+                        await().atMost(Duration.ofSeconds(5)).until(() -> output.getAll().contains("job lease lost"));
 
                 // when
                 plan.release();
@@ -468,9 +513,11 @@ class JobRunnerIntegrationTest {
                 assertThat(plan.saves()).isZero();
                 assertThat(count("courses")).isZero();
                 assertThat(generationJobRepository.findById(id)).isEmpty();
+
                 assertCredit(userId, 99, 1, 0);
             } finally { plan.release(); }
         }
+
         assertLeaseLostOnce(output, id, userId);
         assertThat(output.getAll()).doesNotContain("job save failed", "job finished");
     }
@@ -483,6 +530,7 @@ class JobRunnerIntegrationTest {
         long id = jobIntakeService.receive(userId, request(userId, JobType.NEW_COURSE)).id();
         var plan = stub(JobType.NEW_COURSE).plan(id).failSave("LEAKCHECK-exception");
         var runner = runner();
+
         testClock.advance(Duration.ofSeconds(1));
 
         // when
@@ -494,12 +542,18 @@ class JobRunnerIntegrationTest {
         assertThat(job.getFinishedAt()).isNull();
         assertThat(job.getCourseId()).isNull();
         assertThat(count("courses")).isZero();
+
         assertCredit(userId, 99, 1, 0);
-        assertThat(output.getAll().lines().filter(line -> line.contains("job save failed"))).singleElement()
-                .asString().contains(" ERROR ", "jobId=" + id, "userId=" + userId);
-        assertThat(output.getAll()).contains("at com.mogum.support.IntegrationTestConfiguration$TestJobGenerator.save")
+
+        assertThat(output.getAll().lines().filter(line -> line.contains("job save failed")))
+                .singleElement()
+                .asString()
+                .contains(" ERROR ", "jobId=" + id, "userId=" + userId);
+        assertThat(output.getAll())
+                .contains("at com.mogum.support.IntegrationTestConfiguration$TestJobGenerator.save")
                 .doesNotContain("LEAKCHECK", "job finished");
         assertThat(MDC.getCopyOfContextMap()).isNullOrEmpty();
+
         plan.failSave(null);
         testClock.advance(LEASE.plusSeconds(1));
         assertThat(runner.runOnce()).isTrue();
@@ -507,6 +561,7 @@ class JobRunnerIntegrationTest {
         assertThat(generationJobRepository.findById(id).orElseThrow().getClaimCount()).isEqualTo(2);
         assertThat(plan.calls()).isEqualTo(2);
         assertThat(count("courses")).isEqualTo(1);
+
         assertCredit(userId, 99, 1, 0);
     }
 
@@ -515,8 +570,10 @@ class JobRunnerIntegrationTest {
     void rejectsAmbientTransaction() {
         // given
         var runner = runner();
+
         // when & then
-        assertThatThrownBy(() -> new TransactionTemplate(platformTransactionManager).execute(status -> runner.runOnce()))
+        assertThatThrownBy(() -> new TransactionTemplate(platformTransactionManager)
+                .execute(status -> runner.runOnce()))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -528,14 +585,17 @@ class JobRunnerIntegrationTest {
         long id = jobIntakeService.receive(userId, request(userId, JobType.NEW_COURSE)).id();
         var runner = runner();
         runner.stopClaiming();
+
         // when
         boolean found = runner.runOnce();
+
         // then
         assertThat(found).isFalse();
         assertThat(generationJobRepository.findById(id).orElseThrow().getClaimCount()).isZero();
     }
 
     private JobRunner runner() { return runner(Duration.ofMinutes(4)); }
+
     private JobRunner runner(Duration interval) {
         return new JobRunner(entityManager, platformTransactionManager, creditLedger, testClock,
                 new WorkerProperties(LEASE, interval, 2, Duration.ofMillis(1),
@@ -543,16 +603,24 @@ class JobRunnerIntegrationTest {
     }
 
     private TestJobGenerator stub(JobType type) {
-        return (TestJobGenerator) generators.stream().filter(generator -> generator.type() == type).findFirst().orElseThrow();
+        return (TestJobGenerator) generators.stream()
+                .filter(generator -> generator.type() == type)
+                .findFirst()
+                .orElseThrow();
     }
+
     private long user() { return user("worker@example.com"); }
+
     private long user(String email) {
-        var user = userRepository.save(UserFixtures.approved(email, 100, testClock.instant().plus(Duration.ofDays(30))));
+        var user = userRepository.save(UserFixtures.approved(
+                email, 100, testClock.instant().plus(Duration.ofDays(30))));
         creditEntryRepository.save(CreditEntry.refill(user, 100));
         return user.getId();
     }
+
     private JobRequest request(long userId, JobType type) {
-        var input = new LearningInput("LEAKCHECK-topic", Level.OTHER, "LEAKCHECK-level", Purpose.OTHER, "LEAKCHECK-purpose", "LEAKCHECK-memo");
+        var input = new LearningInput("LEAKCHECK-topic", Level.OTHER, "LEAKCHECK-level",
+                Purpose.OTHER, "LEAKCHECK-purpose", "LEAKCHECK-memo");
         Long target = switch (type) {
             case NEW_COURSE, NEW_ROADMAP -> null;
             case REPLAN_COURSE -> courseRepository.save(Course.single(userId, input, "코스")).getId();
@@ -569,16 +637,29 @@ class JobRunnerIntegrationTest {
         return new JobRequest(type, target, type == JobType.NEW_COURSE || type == JobType.NEW_ROADMAP ? input : null,
                 type == JobType.REPLAN_COURSE || type == JobType.REPLAN_ROADMAP ? "LEAKCHECK-feedback" : null);
     }
-    private int count(String table) { return jdbcTemplate.queryForObject("SELECT count(*) FROM " + table, Integer.class); }
+
+    private int count(String table) {
+        return jdbcTemplate.queryForObject("SELECT count(*) FROM " + table, Integer.class);
+    }
+
     private void assertCredit(long userId, int balance, int consumes, int restores) {
         assertThat(userRepository.findById(userId).orElseThrow().getCreditBalance()).isEqualTo(balance);
-        assertThat(jdbcTemplate.queryForObject("SELECT sum(amount) FROM credit_entries WHERE user_id = ?", Integer.class, userId)).isEqualTo(balance);
-        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries WHERE user_id = ? AND type = 'CONSUME'", Integer.class, userId)).isEqualTo(consumes);
-        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries WHERE user_id = ? AND type = 'RESTORE'", Integer.class, userId)).isEqualTo(restores);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT sum(amount) FROM credit_entries WHERE user_id = ?", Integer.class, userId))
+                .isEqualTo(balance);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM credit_entries WHERE user_id = ? AND type = 'CONSUME'", Integer.class, userId))
+                .isEqualTo(consumes);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM credit_entries WHERE user_id = ? AND type = 'RESTORE'", Integer.class, userId))
+                .isEqualTo(restores);
     }
+
     private void assertLeaseLostOnce(CapturedOutput output, long id, long userId) {
-        assertThat(output.getAll().lines().filter(line -> line.contains("job lease lost"))).singleElement()
-                .asString().contains(" WARN ", "jobId=" + id, "userId=" + userId);
+        assertThat(output.getAll().lines().filter(line -> line.contains("job lease lost")))
+                .singleElement()
+                .asString()
+                .contains(" WARN ", "jobId=" + id, "userId=" + userId);
         assertThat(output.getAll()).doesNotContain("LEAKCHECK");
     }
 }

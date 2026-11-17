@@ -73,13 +73,19 @@ class JobControllerIntegrationTest {
         // then
         long id = jdbcTemplate.queryForObject("SELECT id FROM generation_jobs", Long.class);
         received.expectStatus().isOk().expectBody().json(queued(id), JsonCompareMode.STRICT);
-        client.get().uri("/api/jobs/" + id).exchange().expectStatus().isOk()
-                .expectBody().json(queued(id), JsonCompareMode.STRICT);
+        client.get()
+                .uri("/api/jobs/" + id)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .json(queued(id), JsonCompareMode.STRICT);
         assertThat(userRepository.findById(user.getId()).orElseThrow().getCreditBalance()).isEqualTo(99);
 
         // given — 워커의 실패 · 복구를 SQL 픽스처와 원장으로 준비한다.
         fail(id, JobErrorType.PROVIDER_UNAVAILABLE);
         creditLedger.restoreIfOwed(user.getId(), id);
+
         client.get().uri("/api/jobs/" + id).exchange().expectStatus().isOk().expectBody().json("""
                 {"data":{"id":%d,"type":"NEW_COURSE","status":"FAILED",
                  "subject":{"topic":"자바","level":"BEGINNER","purpose":"WORK"},
@@ -101,8 +107,13 @@ class JobControllerIntegrationTest {
 
         // then
         discarded.expectStatus().isNoContent().expectBody().isEmpty();
-        client.get().uri("/api/jobs/" + id).exchange().expectStatus().isNotFound()
-                .expectBody().json(notFound(), JsonCompareMode.STRICT);
+        client.get()
+                .uri("/api/jobs/" + id)
+                .exchange()
+                .expectStatus()
+                .isNotFound()
+                .expectBody()
+                .json(notFound(), JsonCompareMode.STRICT);
         assertThat(userRepository.findById(user.getId()).orElseThrow().getCreditBalance()).isEqualTo(100);
         assertThat(jdbcTemplate.queryForObject("SELECT sum(amount) FROM credit_entries", Integer.class)).isEqualTo(100);
     }
@@ -115,7 +126,8 @@ class JobControllerIntegrationTest {
         var owner = approved(100);
         var other = userRepository.save(UserFixtures.approved("other@example.com"));
         var job = generationJobRepository.save(GenerationJobFixtures.newCourse(owner.getId(),
-                new LearningInput("LEAKCHECK-private-topic", Level.BEGINNER, null, Purpose.WORK, null, "LEAKCHECK-private-memo")));
+                new LearningInput("LEAKCHECK-private-topic", Level.BEGINNER, null,
+                        Purpose.WORK, null, "LEAKCHECK-private-memo")));
         fail(job.getId(), JobErrorType.INVALID_OUTPUT);
         var before = jdbcTemplate.queryForMap("SELECT * FROM generation_jobs");
         var client = testRequests.asUser(other.getId());
@@ -140,6 +152,7 @@ class JobControllerIntegrationTest {
         var job = generationJobRepository.save(GenerationJobFixtures.newRoadmap(user.getId(), new LearningInput(
                 "물리", Level.OTHER, "수학은 알아요", Purpose.OTHER, "연구", "LEAKCHECK-private-memo")));
         fail(job.getId(), cause);
+
         var client = testRequests.asUser(user.getId());
         boolean input = cause == JobErrorType.INPUT_TOO_LARGE;
 
@@ -164,6 +177,7 @@ class JobControllerIntegrationTest {
         var course = courseRepository.save(CourseFixtures.single(user.getId()));
         var roadmap = roadmapRepository.save(RoadmapFixtures.roadmap(user.getId()));
         var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
+
         var input = new LearningInput("자바", Level.BEGINNER, null, Purpose.WORK, null, "비공개 메모");
         var job = generationJobRepository.save(switch (type) {
             case NEW_COURSE -> GenerationJobFixtures.newCourse(user.getId(), input);
@@ -173,20 +187,25 @@ class JobControllerIntegrationTest {
             case REPLAN_ROADMAP -> GenerationJobFixtures.replanRoadmap(user.getId(), roadmap.getId(), "비공개 피드백");
             case MATERIAL -> GenerationJobFixtures.material(user.getId(), lesson.getId());
         });
-        boolean courseResult = type == JobType.NEW_COURSE || type == JobType.PLAN_ROADMAP_COURSE || type == JobType.REPLAN_COURSE;
+
+        boolean courseResult = type == JobType.NEW_COURSE
+                || type == JobType.PLAN_ROADMAP_COURSE || type == JobType.REPLAN_COURSE;
         boolean roadmapResult = type == JobType.NEW_ROADMAP || type == JobType.REPLAN_ROADMAP;
         GenerationJobFixtures.succeeded(jdbcTemplate, job.getId(), courseResult ? course.getId() : null,
                 roadmapResult ? roadmap.getId() : null, type == JobType.MATERIAL ? lesson.getId() : null,
                 Instant.parse("2026-11-15T00:00:00Z"));
+
         String subject = switch (type) {
             case NEW_COURSE, NEW_ROADMAP -> "\"topic\":\"자바\",\"level\":\"BEGINNER\",\"purpose\":\"WORK\"";
             case MATERIAL -> "\"title\":\"" + lesson.getTitle() + "\"";
             case REPLAN_ROADMAP -> "\"title\":\"" + roadmap.getTitle() + "\"";
             default -> "\"title\":\"" + course.getTitle() + "\"";
         };
+
         String result = courseResult ? "\"type\":\"COURSE\",\"id\":" + course.getId()
                 : roadmapResult ? "\"type\":\"ROADMAP\",\"id\":" + roadmap.getId()
                 : "\"type\":\"LESSON\",\"id\":" + lesson.getId() + ",\"courseId\":" + course.getId();
+
         var client = testRequests.asUser(user.getId());
 
         // when
@@ -206,6 +225,7 @@ class JobControllerIntegrationTest {
         var user = approved(0);
         var job = generationJobRepository.save(GenerationJobFixtures.newCourse(user.getId(), input()));
         fail(job.getId(), JobErrorType.INVALID_OUTPUT);
+
         var client = testRequests.asUser(user.getId());
 
         // when
@@ -227,7 +247,10 @@ class JobControllerIntegrationTest {
         var user = approved(100);
         var failed = generationJobRepository.save(GenerationJobFixtures.newCourse(user.getId(), input()));
         fail(failed.getId(), JobErrorType.INVALID_OUTPUT);
-        for (int i = 0; i < jobProperties.maxInProgressPerUser(); i++) generationJobRepository.save(GenerationJobFixtures.newCourse(user.getId(), input()));
+
+        for (int i = 0; i < jobProperties.maxInProgressPerUser(); i++)
+                generationJobRepository.save(GenerationJobFixtures.newCourse(user.getId(), input()));
+
         var client = testRequests.asUser(user.getId());
 
         // when
@@ -237,7 +260,8 @@ class JobControllerIntegrationTest {
         result.expectStatus().isEqualTo(409).expectBody().json("""
                 {"code":"TOO_MANY_IN_PROGRESS","message":"지금 만드는 것이 끝나면 다시 시도해 주세요"}
                 """, JsonCompareMode.STRICT);
-        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM generation_jobs", Integer.class)).isEqualTo(jobProperties.maxInProgressPerUser() + 1);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM generation_jobs", Integer.class))
+                .isEqualTo(jobProperties.maxInProgressPerUser() + 1);
         assertThat(userRepository.findById(user.getId()).orElseThrow().getCreditBalance()).isEqualTo(100);
     }
 
@@ -267,12 +291,25 @@ class JobControllerIntegrationTest {
         // given
         RestTestClient client;
         if (status.equals("NOT_APPLIED")) {
-            var cookie = new TestSessions(jdbcIndexedSessionRepository).createNotApplied(new AccountPrincipal.NotApplied("google", "sub", "me@example.com", "나"));
-            var sessionClient = testRequests.anonymous().mutate().defaultCookie(cookie.getName(), cookie.getValue()).build();
-            var token = sessionClient.get().uri("/api/me").exchange().returnResult().getResponseCookies().getFirst("XSRF-TOKEN");
-            client = sessionClient.mutate().defaultCookie("XSRF-TOKEN", token.getValue()).defaultHeader("X-XSRF-TOKEN", token.getValue()).build();
+            var cookie = new TestSessions(jdbcIndexedSessionRepository)
+                    .createNotApplied(new AccountPrincipal.NotApplied("google", "sub", "me@example.com", "나"));
+            var sessionClient = testRequests.anonymous()
+                    .mutate()
+                    .defaultCookie(cookie.getName(), cookie.getValue())
+                    .build();
+            var token = sessionClient.get()
+                    .uri("/api/me")
+                    .exchange()
+                    .returnResult()
+                    .getResponseCookies()
+                    .getFirst("XSRF-TOKEN");
+            client = sessionClient.mutate()
+                    .defaultCookie("XSRF-TOKEN", token.getValue())
+                    .defaultHeader("X-XSRF-TOKEN", token.getValue())
+                    .build();
         } else {
-            var user = userRepository.save(UserFixtures.withStatus(UserFixtures.user("me@example.com"), UserStatus.valueOf(status)));
+            var user = userRepository.save(UserFixtures.withStatus(
+                    UserFixtures.user("me@example.com"), UserStatus.valueOf(status)));
             client = testRequests.asUser(user.getId());
         }
 
@@ -306,11 +343,14 @@ class JobControllerIntegrationTest {
                 {"code":"FIELD_INVALID","message":"입력을 확인해 주십시오",
                  "fields":[{"field":"type","reason":"INVALID_VALUE"}]}
                 """, JsonCompareMode.STRICT);
-        assertThat(output.getAll()).contains("method=POST", "path=/api/jobs", "status=400").doesNotContain(marker, "Unhandled API exception");
+        assertThat(output.getAll())
+                .contains("method=POST", "path=/api/jobs", "status=400")
+                .doesNotContain(marker, "Unhandled API exception");
     }
 
     private User approved(int balance) {
-        var user = userRepository.save(UserFixtures.approved("me@example.com", balance, Instant.parse("2026-12-08T15:00:00Z")));
+        var user = userRepository.save(UserFixtures.approved(
+                "me@example.com", balance, Instant.parse("2026-12-08T15:00:00Z")));
         creditEntryRepository.save(CreditEntry.refill(user, balance));
         return user;
     }
@@ -336,7 +376,8 @@ class JobControllerIntegrationTest {
     private String queued(long id) {
         return """
                 {"data":{"id":%d,"type":"NEW_COURSE","status":"QUEUED", "subject":{"topic":"자바","level":"BEGINNER","purpose":"WORK"}}}
-                """.formatted(id);
+                """
+                .formatted(id);
     }
 
     private String notFound() { return "{\"code\":\"NOT_FOUND\",\"message\":\"찾을 수 없습니다\"}"; }

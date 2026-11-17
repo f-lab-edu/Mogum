@@ -75,12 +75,14 @@ class WorkerLifecycleIntegrationTest {
     @AfterEach
     void finishWorkers() {
         if (workerLifecycle != null) workerLifecycle.stop();
+
         generators.forEach(generator -> {
             if (generator.type() == JobType.NEW_COURSE) {
                 jdbcTemplate.queryForList("SELECT id FROM generation_jobs", Long.class)
                         .forEach(id -> ((TestJobGenerator) generator).plan(id).release());
             }
         });
+
         await().atMost(Duration.ofSeconds(5)).until(() -> processingThreads.stream().noneMatch(Thread::isAlive));
     }
 
@@ -89,8 +91,10 @@ class WorkerLifecycleIntegrationTest {
     void disablesAutomaticWorkersInSharedContext() {
         // given
         long id = job(user());
+
         // when
         var persisted = generationJobRepository.findById(id).orElseThrow();
+
         // then
         assertThat(configuredWorkerProperties.count()).isZero();
         assertThat(configuredWorkerLifecycle.isRunning()).isFalse();
@@ -106,6 +110,7 @@ class WorkerLifecycleIntegrationTest {
         long first = job(userId);
         long second = job(userId);
         var plan = stub().plan(first).holdFirst();
+
         workerLifecycle = lifecycle(1, Duration.ofSeconds(3), Duration.ofMillis(10));
         workerLifecycle.start();
         plan.awaitEntered();
@@ -117,10 +122,12 @@ class WorkerLifecycleIntegrationTest {
         // then
         assertThat(workerLifecycle.isRunning()).isFalse();
         assertThat(stopped.getCount()).isEqualTo(1);
+
         testClock.advance(Duration.ofSeconds(20));
         await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
                 assertThat(generationJobRepository.findById(first).orElseThrow().getLeaseUntil())
                         .isEqualTo(testClock.instant().plus(Duration.ofMinutes(5))));
+
         plan.release();
         assertThat(stopped.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(generationJobRepository.findById(first).orElseThrow().getStatus()).isEqualTo(JobStatus.SUCCEEDED);
@@ -138,6 +145,7 @@ class WorkerLifecycleIntegrationTest {
         long id = job(userId);
         var plan = stub().plan(id).holdFirst();
         if (failure) plan.fail(GenerationOutcome.Failure.PROVIDER_UNAVAILABLE, 10);
+
         workerLifecycle = lifecycle(1, Duration.ofMillis(80), Duration.ofMillis(10));
         workerLifecycle.start();
         plan.awaitEntered();
@@ -153,16 +161,24 @@ class WorkerLifecycleIntegrationTest {
         assertThat(released.getClaimCount()).isEqualTo(1);
         assertThat(released.getUpdatedAt()).isEqualTo(testClock.instant());
         assertThat(released.getFinishedAt()).isNull();
-        assertThat(output.getAll().lines().filter(line -> line.contains("job released"))).singleElement()
-                .asString().contains(" INFO ", "jobId=" + id, "userId=" + userId);
+        assertThat(output.getAll().lines().filter(line -> line.contains("job released")))
+                .singleElement()
+                .asString()
+                .contains(" INFO ", "jobId=" + id, "userId=" + userId);
+
         plan.release();
         await().atMost(Duration.ofSeconds(5)).until(() -> processingThreads.stream().noneMatch(Thread::isAlive));
+
         assertThat(plan.calls()).isEqualTo(1);
         assertThat(plan.saves()).isZero();
         assertThat(generationJobRepository.findById(id).orElseThrow().getStatus()).isEqualTo(JobStatus.QUEUED);
+
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM courses", Integer.class)).isZero();
         assertThat(userRepository.findById(userId).orElseThrow().getCreditBalance()).isEqualTo(99);
-        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries WHERE type = 'RESTORE'", Integer.class)).isZero();
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM credit_entries WHERE type = 'RESTORE'", Integer.class))
+                .isZero();
         assertThat(output.getAll()).doesNotContain("LEAKCHECK");
     }
 
@@ -172,6 +188,7 @@ class WorkerLifecycleIntegrationTest {
         // given
         long id = job(user());
         var plan = stub().plan(id).holdFirst();
+
         workerLifecycle = lifecycle(1, Duration.ofMillis(60), Duration.ofMinutes(4));
         workerLifecycle.start();
         plan.awaitEntered();
@@ -184,6 +201,7 @@ class WorkerLifecycleIntegrationTest {
         assertThat(generationJobRepository.findById(id).orElseThrow().getStatus()).isEqualTo(JobStatus.RUNNING);
         assertThat(generationJobRepository.findById(id).orElseThrow().getClaimCount()).isEqualTo(2);
         assertThat(output.getAll()).doesNotContain("job released");
+
         plan.release();
     }
 
@@ -193,6 +211,7 @@ class WorkerLifecycleIntegrationTest {
         // given
         long id = job(user());
         var plan = stub().plan(id).holdFirst();
+
         workerLifecycle = lifecycle(1, Duration.ofMillis(60), Duration.ofMinutes(4));
         workerLifecycle.start();
         plan.awaitEntered();
@@ -204,6 +223,7 @@ class WorkerLifecycleIntegrationTest {
         // then
         assertThat(generationJobRepository.findById(id)).isEmpty();
         assertThat(output.getAll()).doesNotContain("job released");
+
         plan.release();
     }
 
@@ -217,6 +237,7 @@ class WorkerLifecycleIntegrationTest {
         long third = job(userId);
         var firstPlan = stub().plan(first).holdFirst();
         var secondPlan = stub().plan(second).holdFirst();
+
         workerLifecycle = lifecycle(2, Duration.ofMillis(60), Duration.ofMinutes(4));
 
         // when
@@ -225,11 +246,14 @@ class WorkerLifecycleIntegrationTest {
         // then
         firstPlan.awaitEntered();
         secondPlan.awaitEntered();
-        assertThat(processingThreads).hasSize(2).doesNotHaveDuplicates()
+        assertThat(processingThreads)
+                .hasSize(2)
+                .doesNotHaveDuplicates()
                 .allSatisfy(thread -> assertThat(thread.isVirtual()).isFalse());
         assertThat(generationJobRepository.findById(first).orElseThrow().getStatus()).isEqualTo(JobStatus.RUNNING);
         assertThat(generationJobRepository.findById(second).orElseThrow().getStatus()).isEqualTo(JobStatus.RUNNING);
         assertThat(generationJobRepository.findById(third).orElseThrow().getStatus()).isEqualTo(JobStatus.QUEUED);
+
         workerLifecycle.stop();
         firstPlan.release();
         secondPlan.release();
@@ -241,21 +265,26 @@ class WorkerLifecycleIntegrationTest {
         // given
         long id = job(user());
         var probe = (DatabaseProbe) dataSource;
+
         workerLifecycle = lifecycle(1, Duration.ofSeconds(1), Duration.ofMinutes(4));
         probe.failConnections(true);
 
         // when
         try {
             workerLifecycle.start();
-            await().atMost(Duration.ofSeconds(5)).until(() -> output.getAll().lines()
-                    .filter(line -> line.contains("worker poll failed")).count() >= 2);
+            await().atMost(Duration.ofSeconds(5)).until(() -> output.getAll()
+                    .lines()
+                    .filter(line -> line.contains("worker poll failed"))
+                    .count() >= 2);
         } finally {
             probe.failConnections(false);
         }
 
         // then
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
-                assertThat(generationJobRepository.findById(id).orElseThrow().getStatus()).isEqualTo(JobStatus.SUCCEEDED));
+                assertThat(generationJobRepository.findById(id).orElseThrow().getStatus())
+                        .isEqualTo(JobStatus.SUCCEEDED));
+
         workerLifecycle.stop();
         assertThat(stub().plan(id).saves()).isEqualTo(1);
         assertThat(output.getAll()).doesNotContain("LEAKCHECK");
@@ -264,25 +293,35 @@ class WorkerLifecycleIntegrationTest {
     private WorkerLifecycle lifecycle(int count, Duration wait, Duration renewal) {
         var settings = new WorkerProperties(Duration.ofMinutes(5), renewal, 2, Duration.ofMillis(1),
                 count, Duration.ofMillis(10), wait);
+
         var recording = new JobGenerator() {
             @Override public JobType type() { return JobType.NEW_COURSE; }
+
             @Override public GenerationOutcome generate(JobSnapshot job) {
                 processingThreads.add(Thread.currentThread());
                 return stub().generate(job);
             }
-            @Override public ResultRef save(JobSnapshot job, GeneratedResult result) { return stub().save(job, result); }
+
+            @Override public ResultRef save(JobSnapshot job, GeneratedResult result) {
+                return stub().save(job, result);
+            }
         };
+
         return new WorkerLifecycle(settings, scheduler ->
-                new JobRunner(entityManager, platformTransactionManager, creditLedger, testClock, settings, List.of(recording), scheduler));
+                new JobRunner(entityManager, platformTransactionManager, creditLedger, testClock, settings,
+                        List.of(recording), scheduler));
     }
 
     private TestJobGenerator stub() {
-        return (TestJobGenerator) generators.stream().filter(generator -> generator.type() == JobType.NEW_COURSE)
-                .findFirst().orElseThrow();
+        return (TestJobGenerator) generators.stream()
+                .filter(generator -> generator.type() == JobType.NEW_COURSE)
+                .findFirst()
+                .orElseThrow();
     }
 
     private long user() {
-        var user = userRepository.save(UserFixtures.approved("lifecycle@example.com", 100, testClock.instant().plus(Duration.ofDays(30))));
+        var user = userRepository.save(UserFixtures.approved(
+                "lifecycle@example.com", 100, testClock.instant().plus(Duration.ofDays(30))));
         creditEntryRepository.save(CreditEntry.refill(user, 100));
         return user.getId();
     }

@@ -75,17 +75,22 @@ class JobIntakeServiceIntegrationTest {
     void serializesIntakeAtLimit() throws Exception {
         // given
         long userId = user(100);
-        for (int i = 0; i < jobProperties.maxInProgressPerUser() - 1; i++) jobIntakeService.receive(userId, request(JobType.NEW_COURSE, userId));
+        for (int i = 0; i < jobProperties.maxInProgressPerUser() - 1; i++)
+                jobIntakeService.receive(userId, request(JobType.NEW_COURSE, userId));
+
         var first = request(JobType.NEW_ROADMAP, userId);
         var second = request(JobType.MATERIAL, userId);
 
         // when
-        var results = concurrently(userId, () -> jobIntakeService.receive(userId, first), () -> jobIntakeService.receive(userId, second));
+        var results = concurrently(userId, () -> jobIntakeService.receive(userId, first),
+                () -> jobIntakeService.receive(userId, second));
 
         // then
         assertThat(results.stream().filter(JobResult.class::isInstance)).hasSize(1);
-        assertThat(results.stream().filter(ApiException.class::isInstance)).singleElement()
-                .satisfies(result -> assertThat(((ApiException) result).errorCode()).isEqualTo(ErrorCode.TOO_MANY_IN_PROGRESS));
+        assertThat(results.stream().filter(ApiException.class::isInstance))
+                .singleElement()
+                .satisfies(result -> assertThat(((ApiException) result).errorCode())
+                        .isEqualTo(ErrorCode.TOO_MANY_IN_PROGRESS));
         assertThat(jobCount()).isEqualTo(jobProperties.maxInProgressPerUser());
         assertBalanceMatchesLedger(userId);
     }
@@ -99,7 +104,8 @@ class JobIntakeServiceIntegrationTest {
         var request = request(type, userId);
 
         // when
-        var results = concurrently(userId, () -> jobIntakeService.receive(userId, request), () -> jobIntakeService.receive(userId, request));
+        var results = concurrently(userId, () -> jobIntakeService.receive(userId, request),
+                () -> jobIntakeService.receive(userId, request));
 
         // then
         assertThat(results).hasSize(2).allMatch(JobResult.class::isInstance);
@@ -124,7 +130,8 @@ class JobIntakeServiceIntegrationTest {
         // then
         assertThat(result.status()).isEqualTo(JobStatus.QUEUED);
         assertThat(userRepository.findById(userId).orElseThrow().getCreditBalance()).isEqualTo(100 - expected);
-        assertThat(jdbcTemplate.queryForObject("SELECT amount FROM credit_entries WHERE job_id = ?", Integer.class, result.id()))
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT amount FROM credit_entries WHERE job_id = ?", Integer.class, result.id()))
                 .isEqualTo(-expected);
         assertThat(entryCount("CONSUME")).isEqualTo(1);
         assertBalanceMatchesLedger(userId);
@@ -151,7 +158,8 @@ class JobIntakeServiceIntegrationTest {
         // given
         long userId = user(100);
         var request = new JobRequest(JobType.NEW_COURSE, null,
-                new LearningInput(TestJobIntakeHandler.REJECT_TOPIC, Level.BEGINNER, null, Purpose.WORK, null, null), null);
+                new LearningInput(TestJobIntakeHandler.REJECT_TOPIC, Level.BEGINNER, null,
+                        Purpose.WORK, null, null), null);
 
         // when & then
         assertError(() -> jobIntakeService.receive(userId, request), ErrorCode.INVALID_REQUEST);
@@ -172,17 +180,21 @@ class JobIntakeServiceIntegrationTest {
         testClock.advance(Duration.ofMinutes(1));
 
         // when
-        var results = concurrently(userId, () -> jobIntakeService.retry(userId, result.id()), () -> jobIntakeService.retry(userId, result.id()));
+        var results = concurrently(userId, () -> jobIntakeService.retry(userId, result.id()),
+                () -> jobIntakeService.retry(userId, result.id()));
 
         // then
         assertThat(results).containsOnly(new JobResult(result.id(), JobStatus.QUEUED));
+
         var after = generationJobRepository.findById(result.id()).orElseThrow();
         assertThat(after.getCreatedAt()).isEqualTo(before.getCreatedAt());
         assertThat(after.getUpdatedAt()).isEqualTo(testClock.instant());
         assertThat(after.getErrorType()).isNull();
         assertThat(after.getFinishedAt()).isNull();
+
         assertThat(entryCount("CONSUME")).isEqualTo(2);
-        assertThat(userRepository.findById(userId).orElseThrow().getCreditBalance()).isEqualTo(100 - creditProperties.newCourse());
+        assertThat(userRepository.findById(userId).orElseThrow().getCreditBalance())
+                .isEqualTo(100 - creditProperties.newCourse());
         assertBalanceMatchesLedger(userId);
     }
 
@@ -198,6 +210,7 @@ class JobIntakeServiceIntegrationTest {
 
         // when & then
         assertError(() -> jobIntakeService.retry(userId, result.id()), ErrorCode.CREDIT_INSUFFICIENT);
+
         var after = generationJobRepository.findById(result.id()).orElseThrow();
         assertThat(after.getStatus()).isEqualTo(JobStatus.FAILED);
         assertThat(after.getErrorType()).isEqualTo(before.getErrorType());
@@ -223,7 +236,9 @@ class JobIntakeServiceIntegrationTest {
         // then
         assertThat(generationJobRepository.findById(result.id())).isEmpty();
         assertThat(entryCount("RESTORE")).isEqualTo(1);
-        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries WHERE job_id IS NOT NULL", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM credit_entries WHERE job_id IS NOT NULL", Integer.class))
+                .isZero();
         assertThat(userRepository.findById(userId).orElseThrow().getCreditBalance()).isEqualTo(100);
         assertBalanceMatchesLedger(userId);
     }
@@ -244,8 +259,11 @@ class JobIntakeServiceIntegrationTest {
         });
 
         // then
-        assertThat(outcomes.stream().filter(ApiException.class::isInstance)).singleElement().satisfies(outcome ->
-                assertThat(((ApiException) outcome).errorCode()).isIn(ErrorCode.NOT_FOUND, ErrorCode.JOB_DISCARD_NOT_ALLOWED));
+        assertThat(outcomes.stream().filter(ApiException.class::isInstance))
+                .singleElement()
+                .satisfies(outcome ->
+                        assertThat(((ApiException) outcome).errorCode())
+                                .isIn(ErrorCode.NOT_FOUND, ErrorCode.JOB_DISCARD_NOT_ALLOWED));
         assertThat(entryCount("RESTORE")).isEqualTo(1);
         assertBalanceMatchesLedger(userId);
     }
@@ -306,6 +324,7 @@ class JobIntakeServiceIntegrationTest {
             assertThat(entryCount("CONSUME")).isEqualTo(1);
         } else {
             assertThat(second.id()).isNotEqualTo(first.id());
+
             assertThat(entryCount("CONSUME")).isEqualTo(2);
         }
         assertBalanceMatchesLedger(userId);
@@ -322,6 +341,7 @@ class JobIntakeServiceIntegrationTest {
         var result = jobIntakeService.receive(userId, request);
         fail(result.id(), JobErrorType.INVALID_OUTPUT);
         creditLedger.restoreIfOwed(userId, result.id());
+
         MDC.put(RequestLogFilter.REQUEST_ID, "test-job-request");
         MDC.put(RequestLogFilter.USER_ID, Long.toString(userId));
 
@@ -330,12 +350,17 @@ class JobIntakeServiceIntegrationTest {
             jobIntakeService.retry(userId, result.id());
 
             // then
-            var received = output.getAll().lines().filter(line -> line.contains("job received type=NEW_COURSE")).toList();
+            var received = output.getAll()
+                    .lines()
+                    .filter(line -> line.contains("job received type=NEW_COURSE"))
+                    .toList();
             var retried = output.getAll().lines().filter(line -> line.contains("job retried")).toList();
             assertThat(received).singleElement().asString().contains(" INFO ", "jobId=" + result.id());
             assertThat(retried).singleElement().asString().contains(" INFO ", "jobId=" + result.id(),
                     "requestId=test-job-request", "userId=" + userId);
+
             assertThat(output.getAll()).doesNotContain(marker);
+
             assertThat(MDC.get(RequestLogFilter.JOB_ID)).isNull();
             assertThat(MDC.get(RequestLogFilter.REQUEST_ID)).isEqualTo("test-job-request");
             assertThat(MDC.get(RequestLogFilter.USER_ID)).isEqualTo(Long.toString(userId));
@@ -350,7 +375,8 @@ class JobIntakeServiceIntegrationTest {
         // given
         long userId = user(100);
         var request = request(JobType.REPLAN_COURSE, userId);
-        var result = jobIntakeService.receive(userId, new JobRequest(request.type(), request.targetId(), null, "LEAKCHECK-feedback"));
+        var result = jobIntakeService.receive(userId,
+                new JobRequest(request.type(), request.targetId(), null, "LEAKCHECK-feedback"));
         long before = jobLogCount(output);
 
         // when
@@ -364,12 +390,14 @@ class JobIntakeServiceIntegrationTest {
         // then
         assertThat(jobLogCount(output)).isEqualTo(before);
         assertThat(output.getAll()).doesNotContain("LEAKCHECK-feedback");
+
         assertThat(MDC.get(RequestLogFilter.JOB_ID)).isNull();
     }
 
     private long user(int amount) {
         return new TransactionTemplate(platformTransactionManager).execute(status -> {
-            var user = userRepository.save(UserFixtures.approved("user" + userCount() + "@example.com", amount, testClock.instant().plusSeconds(30L * 86400)));
+            var user = userRepository.save(UserFixtures.approved(
+                    "user" + userCount() + "@example.com", amount, testClock.instant().plusSeconds(30L * 86400)));
             creditEntryRepository.save(CreditEntry.refill(user, amount));
             return user.getId();
         });
@@ -377,7 +405,9 @@ class JobIntakeServiceIntegrationTest {
 
     private JobRequest request(JobType type, long owner) {
         Long target = switch (type) {
-            case MATERIAL -> lessonRepository.save(LessonFixtures.lesson(courseRepository.save(CourseFixtures.single(owner)), 1)).getId();
+            case MATERIAL -> lessonRepository.save(
+                    LessonFixtures.lesson(courseRepository.save(CourseFixtures.single(owner)), 1))
+                    .getId();
             case PLAN_ROADMAP_COURSE, REPLAN_COURSE -> courseRepository.save(CourseFixtures.single(owner)).getId();
             case REPLAN_ROADMAP -> roadmapRepository.save(RoadmapFixtures.roadmap(owner)).getId();
             default -> null;
@@ -397,21 +427,34 @@ class JobIntakeServiceIntegrationTest {
         };
     }
 
-    private void fail(long id, JobErrorType error) { GenerationJobFixtures.failed(jdbcTemplate, id, error, testClock.instant()); }
-    private int jobCount() { return jdbcTemplate.queryForObject("SELECT count(*) FROM generation_jobs", Integer.class); }
+    private void fail(long id, JobErrorType error) {
+        GenerationJobFixtures.failed(jdbcTemplate, id, error, testClock.instant());
+    }
+
+    private int jobCount() {
+        return jdbcTemplate.queryForObject("SELECT count(*) FROM generation_jobs", Integer.class);
+    }
+
     private int userCount() { return jdbcTemplate.queryForObject("SELECT count(*) FROM users", Integer.class); }
+
     private int entryCount(String type) {
         return jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries WHERE type = ?", Integer.class, type);
     }
+
     private static long jobLogCount(CapturedOutput output) {
-        return output.getAll().lines().filter(line -> line.contains("job received") || line.contains("job retried")).count();
+        return output.getAll()
+                .lines()
+                .filter(line -> line.contains("job received") || line.contains("job retried"))
+                .count();
     }
+
     private void assertBalanceMatchesLedger(long userId) {
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT u.credit_balance = sum(e.amount) FROM users u JOIN credit_entries e ON e.user_id = u.id
                 WHERE u.id = ? GROUP BY u.id
                 """, Boolean.class, userId)).isTrue();
     }
+
     private List<Object> concurrently(long userId, Callable<?> first, Callable<?> second) throws Exception {
         try (var executor = Executors.newFixedThreadPool(2); var connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
@@ -419,6 +462,7 @@ class JobIntakeServiceIntegrationTest {
                 statement.setLong(1, userId);
                 statement.execute();
             }
+
             var futures = List.of(executor.submit(outcome(first)), executor.submit(outcome(second)));
             int waiting;
             try {
@@ -426,16 +470,19 @@ class JobIntakeServiceIntegrationTest {
             } finally {
                 connection.commit();
             }
+
             assertThat(waiting).isEqualTo(2);
             return List.of(futures.get(0).get(10, TimeUnit.SECONDS), futures.get(1).get(10, TimeUnit.SECONDS));
         }
     }
+
     private static Callable<Object> outcome(Callable<?> action) {
         return () -> {
             try { return action.call(); }
             catch (ApiException exception) { return exception; }
         };
     }
+
     private int awaitLockWaiters() throws InterruptedException {
         long deadline = System.nanoTime() + Duration.ofSeconds(8).toNanos();
         int waiting;
@@ -445,11 +492,14 @@ class JobIntakeServiceIntegrationTest {
                     SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()
                     AND wait_event_type = 'Lock' AND query LIKE '%users%'
                     """, Integer.class);
+
             if (waiting >= 2) return waiting;
             Thread.sleep(10);
         } while (System.nanoTime() < deadline);
+
         return waiting;
     }
+
     private static void assertError(Runnable call, ErrorCode code) {
         assertThatThrownBy(call::run).isInstanceOfSatisfying(ApiException.class,
                 error -> assertThat(error.errorCode()).isEqualTo(code));

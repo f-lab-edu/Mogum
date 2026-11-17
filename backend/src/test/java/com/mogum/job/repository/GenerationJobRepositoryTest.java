@@ -47,8 +47,10 @@ class GenerationJobRepositoryTest {
         var course = courseRepository.save(CourseFixtures.single(user.getId()));
         var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
         var input = new LearningInput("자바", Level.OTHER, "실습 경험", Purpose.OTHER, "개인 프로젝트", "예제 중심");
+
         var instant = Instant.parse("2026-11-15T01:23:45.123456Z");
         testClock.set(instant);
+
         var job = switch (type) {
             case NEW_COURSE -> GenerationJobFixtures.newCourse(user.getId(), input);
             case NEW_ROADMAP -> GenerationJobFixtures.newRoadmap(user.getId(), input);
@@ -68,6 +70,7 @@ class GenerationJobRepositoryTest {
         assertThat(actual.getUserId()).isEqualTo(user.getId());
         assertThat(actual.getType()).isEqualTo(type);
         assertThat(actual.getStatus()).isEqualTo(JobStatus.QUEUED);
+
         assertThat(actual.getInput()).usingRecursiveComparison().isEqualTo(
                 type == JobType.NEW_COURSE || type == JobType.NEW_ROADMAP ? input : null);
         assertThat(actual.getFeedback()).isEqualTo(switch (type) {
@@ -79,11 +82,13 @@ class GenerationJobRepositoryTest {
                 type == JobType.PLAN_ROADMAP_COURSE || type == JobType.REPLAN_COURSE ? course.getId() : null);
         assertThat(actual.getRoadmapId()).isEqualTo(type == JobType.REPLAN_ROADMAP ? roadmap.getId() : null);
         assertThat(actual.getLessonId()).isEqualTo(type == JobType.MATERIAL ? lesson.getId() : null);
+
         assertThat(actual.getClaimCount()).isZero();
         assertThat(actual.getLeaseUntil()).isNull();
         assertThat(actual.getErrorType()).isNull();
         assertThat(actual.getStartedAt()).isNull();
         assertThat(actual.getFinishedAt()).isNull();
+
         assertThat(actual.getCreatedAt()).isEqualTo(instant);
         assertThat(actual.getUpdatedAt()).isEqualTo(instant);
     }
@@ -99,6 +104,7 @@ class GenerationJobRepositoryTest {
         var startedAt = testClock.instant().plusSeconds(10);
         var leaseUntil = startedAt.plusSeconds(300);
         var finishedAt = startedAt.plusSeconds(60);
+
         if (status != JobStatus.QUEUED) {
             GenerationJobFixtures.running(jdbcTemplate, saved.getId(), 2, startedAt, leaseUntil);
         }
@@ -113,12 +119,14 @@ class GenerationJobRepositoryTest {
 
         // then
         assertThat(actual.getStatus()).isEqualTo(status);
+
         assertThat(actual.getClaimCount()).isEqualTo(status == JobStatus.QUEUED ? 0 : 2);
         assertThat(actual.getStartedAt()).isEqualTo(status == JobStatus.QUEUED ? null : startedAt);
         assertThat(actual.getLeaseUntil()).isEqualTo(status == JobStatus.RUNNING ? leaseUntil : null);
         assertThat(actual.getErrorType()).isEqualTo(status == JobStatus.FAILED ? JobErrorType.INVALID_OUTPUT : null);
         assertThat(actual.getFinishedAt()).isEqualTo(
                 status == JobStatus.SUCCEEDED || status == JobStatus.FAILED ? finishedAt : null);
+
         assertThat(actual.getCreatedAt()).isEqualTo(testClock.instant());
         assertThat(actual.getUpdatedAt()).isEqualTo(switch (status) {
             case QUEUED -> testClock.instant();

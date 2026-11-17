@@ -35,15 +35,18 @@ class WorkerLifecycleTest {
         var attempts = new AtomicInteger();
         var failure = new IllegalStateException("LEAKCHECK-message", new RuntimeException("LEAKCHECK-cause"));
         failure.addSuppressed(new RuntimeException("LEAKCHECK-suppressed"));
+
         given(jobRunner.runOnce()).willAnswer(invocation -> {
             int attempt = attempts.incrementAndGet();
             if (attempt <= 3 || attempt == 5) throw failure;
             return attempt == 4;
         });
+
         var lifecycle = new WorkerLifecycle(settings(1, Duration.ofMillis(10)), scheduler -> jobRunner);
 
         // when
         lifecycle.start();
+
         try {
             await().atMost(Duration.ofSeconds(5)).until(() -> attempts.get() >= 6);
         } finally {
@@ -52,9 +55,12 @@ class WorkerLifecycleTest {
 
         // then
         assertThat(output.getAll().lines().filter(line -> line.contains("worker poll failed"))).hasSize(4);
-        assertThat(output.getAll().lines().filter(line -> line.contains("RuntimeException: java.lang.IllegalStateException")))
+        assertThat(output.getAll()
+                .lines()
+                .filter(line -> line.contains("RuntimeException: java.lang.IllegalStateException")))
                 .hasSize(2);
         assertThat(output.getAll()).doesNotContain("LEAKCHECK");
+
         then(jobRunner).should().stopClaiming();
         assertThat(lifecycle.isRunning()).isFalse();
     }
@@ -64,7 +70,9 @@ class WorkerLifecycleTest {
     void wakesIdleWorkerOnStop() {
         // given
         var attempts = new AtomicInteger();
+
         given(jobRunner.runOnce()).willAnswer(invocation -> { attempts.incrementAndGet(); return false; });
+
         var lifecycle = new WorkerLifecycle(settings(1, Duration.ofSeconds(30)), scheduler -> jobRunner);
         lifecycle.start();
         await().atMost(Duration.ofSeconds(5)).until(() -> attempts.get() == 1);
@@ -83,13 +91,16 @@ class WorkerLifecycleTest {
     void createsNothingWhenDisabled() {
         // given
         var factories = new AtomicInteger();
+
         var lifecycle = new WorkerLifecycle(settings(0, Duration.ofMillis(10)), scheduler -> {
             factories.incrementAndGet();
             return jobRunner;
         });
+
         // when
         lifecycle.start();
         lifecycle.stop();
+
         // then
         assertThat(factories).hasValue(0);
         then(jobRunner).shouldHaveNoInteractions();
@@ -104,15 +115,20 @@ class WorkerLifecycleTest {
         var finish = new CountDownLatch(1);
         var releasedWithOpenPool = new AtomicBoolean();
         var pool = new HikariDataSource();
+
         given(jobRunner.runOnce()).willAnswer(invocation -> {
             entered.countDown();
             finish.await(5, TimeUnit.SECONDS);
             return true;
         });
+
         willAnswer(invocation -> { releasedWithOpenPool.set(!pool.isClosed()); return null; })
-                .given(jobRunner).releaseCurrent();
+                .given(jobRunner)
+                .releaseCurrent();
+
         var context = new AnnotationConfigApplicationContext();
-        context.registerBean("dataSource", HikariDataSource.class, () -> pool, definition -> definition.setDestroyMethodName("close"));
+        context.registerBean("dataSource", HikariDataSource.class, () -> pool,
+                definition -> definition.setDestroyMethodName("close"));
         context.registerBean(WorkerLifecycle.class, () -> new WorkerLifecycle(
                 new WorkerProperties(Duration.ofMinutes(5), Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
                         1, Duration.ofMillis(10), Duration.ofMillis(50)), scheduler -> jobRunner));
@@ -129,6 +145,7 @@ class WorkerLifecycleTest {
         // then
         assertThat(releasedWithOpenPool).isTrue();
         assertThat(pool.isClosed()).isTrue();
+
         then(jobRunner).should().stopClaiming();
         then(jobRunner).should().releaseCurrent();
     }

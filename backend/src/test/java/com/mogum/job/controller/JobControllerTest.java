@@ -64,8 +64,11 @@ class JobControllerTest {
     @DisplayName("잘못된 요청은 서비스 전에 칸과 reason으로 반환한다")
     void rejectsInvalidFields(String description, Map<String, Object> body, String field, String reason) {
         // when
-        var result = mockMvcTester.post().uri("/api/jobs").contentType(MediaType.APPLICATION_JSON)
-                .content(jsonMapper.writeValueAsString(body)).exchange();
+        var result = mockMvcTester.post()
+                .uri("/api/jobs")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonMapper.writeValueAsString(body))
+                .exchange();
 
         // then
         assertThat(result).hasStatus(400).bodyJson().isStrictlyEqualTo("""
@@ -78,12 +81,15 @@ class JobControllerTest {
 
     static Stream<Object[]> invalidRequests() {
         var cases = new ArrayList<Object[]>();
+
         for (var field : List.of("topic", "level", "purpose", "type")) {
             cases.add(new Object[]{field + " 누락", changed(field, null), field, "REQUIRED"});
             cases.add(new Object[]{field + " 빈 글", changed(field, " \t\n"), field, "REQUIRED"});
         }
+
         for (var field : List.of("type", "level", "purpose"))
-            cases.add(new Object[]{field + " 모르는 값", changed(field, "FUTURE"), field, "INVALID_VALUE"});
+                cases.add(new Object[]{field + " 모르는 값", changed(field, "FUTURE"), field, "INVALID_VALUE"});
+
         for (var field : List.of("topic", "memo", "levelOther", "purposeOther", "feedback")) {
             var body = changed(field, "가".repeat(field.equals("topic") ? 101 : field.endsWith("Other") ? 51 : 501));
             if (field.equals("levelOther")) body.put("level", "OTHER");
@@ -91,6 +97,7 @@ class JobControllerTest {
             if (field.equals("feedback")) body = target("REPLAN_COURSE", "courseId", 1L, field, body.get(field));
             cases.add(new Object[]{field + " 상한 초과", body, field, "TOO_LONG"});
         }
+
         for (var field : List.of("memo", "levelOther", "purposeOther", "feedback")) {
             var body = changed(field, "\t\n ");
             if (field.equals("levelOther")) body.put("level", "OTHER");
@@ -98,21 +105,33 @@ class JobControllerTest {
             if (field.equals("feedback")) body = target("REPLAN_COURSE", "courseId", 1L, field, "\t\n ");
             cases.add(new Object[]{field + " 빈 글", body, field, "REQUIRED"});
         }
+
         cases.add(new Object[]{"기타 수준 글 누락", changed("level", "OTHER"), "levelOther", "REQUIRED"});
         cases.add(new Object[]{"기타 목적 글 누락", changed("purpose", "OTHER"), "purposeOther", "REQUIRED"});
+
         for (var field : List.of("levelOther", "purposeOther", "feedback", "courseId", "roadmapId", "lessonId"))
-            cases.add(new Object[]{field + " 허용 안 됨", changed(field, field.endsWith("Id") ? 1L : "글"), field, "NOT_ALLOWED"});
+                cases.add(new Object[]{field + " 허용 안 됨", changed(field, field.endsWith("Id") ? 1L : "글"),
+                        field, "NOT_ALLOWED"});
+
         for (var entry : Map.of("MATERIAL", "lessonId", "PLAN_ROADMAP_COURSE", "courseId",
                 "REPLAN_COURSE", "courseId", "REPLAN_ROADMAP", "roadmapId").entrySet()) {
-            cases.add(new Object[]{entry.getKey() + " 대상 누락", Map.of("type", entry.getKey()), entry.getValue(), "REQUIRED"});
-            for (var field : List.of("topic", "level", "purpose", "levelOther", "purposeOther", "memo", "courseId", "roadmapId", "lessonId")) {
+            cases.add(new Object[]{entry.getKey() + " 대상 누락", Map.of("type", entry.getKey()),
+                    entry.getValue(), "REQUIRED"});
+
+            for (var field : List.of("topic", "level", "purpose", "levelOther", "purposeOther", "memo",
+                    "courseId", "roadmapId", "lessonId")) {
                 if (field.equals(entry.getValue())) continue;
                 cases.add(new Object[]{entry.getKey() + " " + field + " 허용 안 됨",
-                        target(entry.getKey(), entry.getValue(), 1L, field, field.endsWith("Id") ? 2L : "글"), field, "NOT_ALLOWED"});
+                        target(entry.getKey(), entry.getValue(), 1L, field, field.endsWith("Id") ? 2L : "글"),
+                        field, "NOT_ALLOWED"});
             }
         }
-        cases.add(new Object[]{"자료에 피드백 불가", target("MATERIAL", "lessonId", 1L, "feedback", "글"), "feedback", "NOT_ALLOWED"});
-        cases.add(new Object[]{"첫 코스에 피드백 불가", target("PLAN_ROADMAP_COURSE", "courseId", 1L, "feedback", "글"), "feedback", "NOT_ALLOWED"});
+
+        cases.add(new Object[]{"자료에 피드백 불가", target("MATERIAL", "lessonId", 1L, "feedback", "글"),
+                "feedback", "NOT_ALLOWED"});
+        cases.add(new Object[]{"첫 코스에 피드백 불가", target("PLAN_ROADMAP_COURSE", "courseId", 1L, "feedback", "글"),
+                "feedback", "NOT_ALLOWED"});
+
         return cases.stream();
     }
 
@@ -122,17 +141,23 @@ class JobControllerTest {
         // given
         given(jobIntakeService.receive(eq(7L), any())).willReturn(new JobResult(11L, JobStatus.QUEUED));
         given(jobReadService.read(7L, 11L)).willReturn(response());
+
         var body = changed("memo", "비공개 메모");
         body.put("future", Map.of("value", 1));
 
         // when
-        var result = mockMvcTester.post().uri("/api/jobs").contentType(MediaType.APPLICATION_JSON)
-                .content(jsonMapper.writeValueAsString(body)).exchange();
+        var result = mockMvcTester.post()
+                .uri("/api/jobs")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonMapper.writeValueAsString(body))
+                .exchange();
 
         // then
         assertReadShape(result);
+
         var captor = ArgumentCaptor.forClass(JobRequest.class);
         then(jobIntakeService).should().receive(eq(7L), captor.capture());
+
         var request = captor.getValue();
         assertThat(request.type()).isEqualTo(JobType.NEW_COURSE);
         assertThat(request.targetId()).isNull();
@@ -147,6 +172,7 @@ class JobControllerTest {
         // given
         given(jobIntakeService.receive(eq(7L), any())).willReturn(new JobResult(11L, JobStatus.QUEUED));
         given(jobReadService.read(7L, 11L)).willReturn(response());
+
         Map<String, Object> body = switch (type) {
             case NEW_COURSE, NEW_ROADMAP -> changed("type", type.name());
             case PLAN_ROADMAP_COURSE, REPLAN_COURSE -> target(type.name(), "courseId", 23L, "feedback", null);
@@ -156,10 +182,15 @@ class JobControllerTest {
         if (type.name().startsWith("REPLAN")) body.put("feedback", "바꿔 주세요");
 
         // when
-        var result = mockMvcTester.post().uri("/api/jobs").contentType(MediaType.APPLICATION_JSON).content(jsonMapper.writeValueAsString(body)).exchange();
+        var result = mockMvcTester.post()
+                .uri("/api/jobs")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonMapper.writeValueAsString(body))
+                .exchange();
 
         // then
         assertThat(result).hasStatusOk();
+
         var captor = ArgumentCaptor.forClass(JobRequest.class);
         then(jobIntakeService).should().receive(eq(7L), captor.capture());
         assertThat(captor.getValue().type()).isEqualTo(type);
@@ -220,7 +251,8 @@ class JobControllerTest {
     }
 
     private static Map<String, Object> changed(String field, Object value) {
-        var body = new LinkedHashMap<String, Object>(Map.of("type", "NEW_COURSE", "topic", "자바", "level", "BEGINNER", "purpose", "WORK"));
+        var body = new LinkedHashMap<String, Object>(Map.of(
+                "type", "NEW_COURSE", "topic", "자바", "level", "BEGINNER", "purpose", "WORK"));
         body.put(field, value);
         return body;
     }

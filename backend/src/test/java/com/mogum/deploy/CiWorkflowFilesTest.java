@@ -39,9 +39,11 @@ class CiWorkflowFilesTest {
 
         // then
         assertThat(definition.get("permissions")).isEqualTo(Map.of("contents", "read"));
+
         for (var value : map(definition.get("jobs")).values()) {
             assertThat(map(value)).doesNotContainKeys("permissions", "environment");
         }
+
         assertThat(text).doesNotContain("secrets.", "vars.");
     }
 
@@ -53,9 +55,11 @@ class CiWorkflowFilesTest {
 
         // then
         assertThat(definition.get("name")).isEqualTo("CI");
+
         var concurrency = map(definition.get("concurrency"));
         assertThat(concurrency.get("group").toString()).contains("${{ github.event.pull_request.number }}");
         assertThat(concurrency.get("cancel-in-progress")).isEqualTo(true);
+
         var jobs = map(definition.get("jobs"));
         assertThat(jobs).containsOnlyKeys("backend", "frontend", "ci-ok");
         var timeouts = Map.of("backend", 30, "frontend", 15, "ci-ok", 5);
@@ -64,6 +68,7 @@ class CiWorkflowFilesTest {
             assertThat(job.get("runs-on")).isEqualTo("ubuntu-24.04");
             assertThat(job.get("timeout-minutes")).isEqualTo(timeouts.get(id));
         }
+
         assertThat(map(jobs.get("backend"))).doesNotContainKeys("if", "needs");
         assertThat(map(jobs.get("frontend"))).doesNotContainKeys("if", "needs");
     }
@@ -78,6 +83,7 @@ class CiWorkflowFilesTest {
         assertThat(aggregate).doesNotContainKey("name");
         assertThat(aggregate.get("needs")).isEqualTo(List.of("backend", "frontend"));
         assertThat(aggregate.get("if")).isEqualTo("always()");
+
         var steps = steps(aggregate);
         assertThat(steps).hasSize(1);
         assertThat(steps.getFirst().get("env")).isEqualTo(Map.of(
@@ -95,6 +101,7 @@ class CiWorkflowFilesTest {
         var script = steps(job("ci-ok")).getFirst().get("run").toString();
         var results = List.of("success", "failure", "cancelled", "skipped");
         var expected = new ArrayList<Integer>();
+
         for (var backend : results) {
             for (var frontend : results) {
                 expected.add(backend.equals("success") && frontend.equals("success") ? 0 : 1);
@@ -125,23 +132,27 @@ class CiWorkflowFilesTest {
 
         // then
         var actions = new ArrayList<String>();
+
         for (var value : map(definition.get("jobs")).values()) {
             for (var step : steps(map(value))) {
                 if (step.containsKey("uses")) actions.add(step.get("uses").toString());
                 if (step.containsKey("run")) assertThat(step.get("run").toString()).doesNotContain("${{");
             }
         }
+
         assertThat(Set.copyOf(actions)).isEqualTo(releases.keySet());
         for (var action : actions) {
             assertThat(action).matches("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*@[0-9a-f]{40}");
         }
+
         var lines = text.lines().filter(line -> line.matches("\\s*(?:-\\s+)?uses\\s*:.*")).toList();
         assertThat(lines).hasSize(actions.size());
         for (var line : lines) {
             assertThat(releases.entrySet().stream().anyMatch(release -> line.matches(
                     "\\s*(?:-\\s+)?uses: " + Pattern.quote(release.getKey())
                             + " # " + Pattern.quote(release.getValue()) + "\\s*")))
-                    .as("액션 SHA와 릴리스 주석: " + line).isTrue();
+                    .as("액션 SHA와 릴리스 주석: " + line)
+                    .isTrue();
         }
     }
 
@@ -164,6 +175,7 @@ class CiWorkflowFilesTest {
         assertThat(map(steps.get(4).get("with")))
                 .containsEntry("path", "backend/build/reports/tests/test")
                 .containsEntry("retention-days", 7);
+
         assertThat(steps.toString()).doesNotContain("imageTest", "docker");
         for (var step : steps.subList(0, 4)) assertThat(step).doesNotContainKey("if");
     }
@@ -177,6 +189,7 @@ class CiWorkflowFilesTest {
         // then
         assertThat(map(map(frontend.get("defaults")).get("run")))
                 .containsEntry("working-directory", "frontend");
+
         var steps = steps(frontend);
         assertThat(steps).hasSize(6);
         assertThat(steps.get(0).get("uses").toString()).startsWith("actions/checkout@");
@@ -187,6 +200,7 @@ class CiWorkflowFilesTest {
                 "cache-dependency-path", "frontend/package-lock.json"));
         assertThat(steps.subList(2, 6).stream().map(step -> step.get("run")).toList())
                 .containsExactly("npm ci --ignore-scripts", "npm run lint", "npm run test", "npm run build");
+
         for (var step : steps) assertThat(step).doesNotContainKey("if");
     }
 
@@ -202,6 +216,7 @@ class CiWorkflowFilesTest {
 
     private static List<Integer> aggregateExitCodes(String script, List<String> results) throws Exception {
         var exits = new ArrayList<Integer>();
+
         for (var backend : results) {
             for (var frontend : results) {
                 var process = new ProcessBuilder("bash", "-e", "-c", script);
@@ -210,6 +225,7 @@ class CiWorkflowFilesTest {
                 exits.add(process.start().waitFor());
             }
         }
+
         return exits;
     }
 

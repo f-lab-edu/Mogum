@@ -30,23 +30,30 @@ class BackupFilesScriptTest {
         // then
         boolean success = List.of("success", "delayed").contains(scenario);
         assertThat(result.status()).as(result.output()).isEqualTo(success ? 0 : 1);
-        assertThat(result.commands().contains("pg_dump")).isEqualTo(!List.of("not-ready", "ambiguous").contains(scenario));
+        assertThat(result.commands().contains("pg_dump"))
+                .isEqualTo(!List.of("not-ready", "ambiguous").contains(scenario));
+
         boolean upload = success || scenario.equals("upload-failure");
         assertThat(result.commands().contains("s3 cp")).as(result.commands()).isEqualTo(upload);
+
         if (upload) {
             assertThat(result.commands()).contains("-Fc");
             assertThat(result.commands()).contains("s3://test-bucket/" + KEY);
             assertThat(result.commands()).contains("mode=600");
         }
+
         if (scenario.equals("not-ready")) {
             assertThat(result.commands().lines().filter(line -> line.equals("sleep 5")).count()).isEqualTo(24);
         }
+
         if (scenario.equals("delayed")) assertThat(result.commands()).contains("sleep 5");
+
         if (success) {
             assertThat(result.output()).contains(KEY);
             assertThat(result.output()).contains("bytes");
             assertThat(result.output().lines().count() <= 2).isTrue();
         }
+
         assertClean(root, result);
     }
 
@@ -62,31 +69,40 @@ class BackupFilesScriptTest {
         // then
         boolean success = List.of("success", "latest").contains(scenario);
         assertThat(result.status()).as(result.output()).isEqualTo(success ? 0 : 1);
+
         boolean downloaded = !List.of("no-backup", "invalid-key").contains(scenario);
         assertThat(result.commands().contains("s3 cp")).isEqualTo(downloaded);
+
         boolean cleanupDb = downloaded && !scenario.equals("download-failure");
         assertThat(result.commands().lines().filter(line -> line.contains("dropdb")).count())
-                .as(result.commands()).isEqualTo(cleanupDb ? 2 : 0);
+                .as(result.commands())
+                .isEqualTo(cleanupDb ? 2 : 0);
+
         if (cleanupDb) {
             assertThat(result.commands()).contains("mogum_restore_check");
             assertThat(result.commands()).doesNotContain("POSTGRES_DB");
-            assertThat(Pattern.compile("(?:-d|--dbname[= ])\\s*mogum(?:\\s|$)").matcher(result.commands()).find()).isFalse();
+            assertThat(Pattern.compile("(?:-d|--dbname[= ])\\s*mogum(?:\\s|$)").matcher(result.commands()).find())
+                    .isFalse();
         }
+
         if (success) {
             assertThat(result.output()).contains("users | 2");
             assertThat(result.commands()).contains("pg_tables");
             assertThat(result.commands()).contains("mode=600");
         }
+
         if (scenario.equals("latest")) {
             assertThat(result.commands()).contains("list-objects-v2");
             assertThat(result.commands()).contains("--prefix backups/");
             assertThat(result.commands()).contains("s3://test-bucket/" + KEY);
         }
+
         assertClean(root, result);
     }
 
     private void assertClean(Path root, Result result) throws Exception {
         try (var files = Files.list(root.resolve("tmp"))) { assertThat(files.count()).isEqualTo(0); }
+
         assertThat(result.output()).doesNotContain("private-dump-content");
         assertThat(result.output()).doesNotContain("private-error-content");
     }
@@ -145,20 +161,24 @@ class BackupFilesScriptTest {
                     else exit 1; fi ;;
                 esac
                 """;
+
         for (var nameOfCommand : List.of("id", "date", "sleep", "aws", "docker")) {
             var path = Files.writeString(bin.resolve(nameOfCommand), fake);
             Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwx------"));
         }
+
         var builder = new ProcessBuilder("bash", DEPLOY.resolve(name).toAbsolutePath().toString());
         if (name.equals("restore.sh")) {
             builder.command().add(List.of("latest", "no-backup").contains(scenario) ? "latest"
                     : scenario.equals("invalid-key") ? "releases/not-a-backup" : KEY);
         }
+
         builder.redirectErrorStream(true);
         builder.environment().remove("APP_IMAGE");
         builder.environment().putAll(Map.of("TEST_ROOT", root.toString(), "SCENARIO", scenario,
                 "MOGUM_BUCKET", "test-bucket", "TMPDIR", tmp.toString(),
                 "PATH", bin + ":" + System.getenv("PATH")));
+
         var process = builder.start();
         var output = new String(process.getInputStream().readAllBytes());
         int status = process.waitFor();

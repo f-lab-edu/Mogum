@@ -24,7 +24,8 @@ class WorkflowFilesScriptTest {
     private static final Set<String> SECRETS = Set.of("AWS_DEPLOY_ROLE_ARN", "DEPLOY_BUCKET", "DEPLOY_INSTANCE_ID");
 
     @ParameterizedTest(name = "시나리오 {0}")
-    @ValueSource(strings = {"push", "manual", "rollback", "invalid-sha", "uppercase-sha", "other-branch", "missing-vars",
+    @ValueSource(strings = {"push", "manual", "rollback", "invalid-sha", "uppercase-sha", "other-branch",
+            "missing-vars",
             "invalid-region", "invalid-role", "invalid-bucket", "invalid-instance"})
     @Timeout(15)
     @DisplayName("AWS와 빌드 전에 입력과 변수를 검사한다")
@@ -38,17 +39,21 @@ class WorkflowFilesScriptTest {
             case "uppercase-sha" -> "A".repeat(40);
             default -> "";
         });
+
         if (scenario.equals("other-branch")) environment.put("SOURCE_REF", "refs/heads/other");
+
         switch (scenario) {
             case "invalid-region" -> environment.put("AWS_REGION", "invalid-region");
             case "invalid-role" -> environment.put("AWS_DEPLOY_ROLE_ARN", "arn:aws:iam::000000000000:user/invalid");
             case "invalid-bucket" -> environment.put("DEPLOY_BUCKET", "INVALID_BUCKET");
             case "invalid-instance" -> environment.put("DEPLOY_INSTANCE_ID", "invalid-instance");
         }
+
         if (scenario.equals("missing-vars")) {
             environment.put("DEPLOY_BUCKET", "");
             environment.put("API_ORIGIN", "");
         }
+
         // when
         var result = run("validate", root, environment, "");
 
@@ -59,12 +64,15 @@ class WorkflowFilesScriptTest {
         assertThat(result.commands()).as("검사 중에는 AWS를 호출하지 않는다").isEqualTo("");
         assertThat(result.output()).as("오류 출력보다 먼저 계정 ID를 가린다").startsWith("::add-mask::000000000000\n");
         assertThat(result.output().substring(result.output().indexOf('\n') + 1)).doesNotContain("000000000000");
+
         if (success) {
             assertThat(result.output()).isEqualTo("::add-mask::000000000000\n");
-            assertThat(result.environment()).contains("RELEASE_SHA=" + (scenario.equals("rollback") ? "c".repeat(40) : SHA));
+            assertThat(result.environment())
+                    .contains("RELEASE_SHA=" + (scenario.equals("rollback") ? "c".repeat(40) : SHA));
             assertThat(result.outputs()).contains("redeploy=" + scenario.equals("rollback"));
         } else {
             assertThat(result.environment()).isEmpty();
+
             if (scenario.equals("missing-vars")) {
                 assertThat(result.output()).contains("Missing repository secret: DEPLOY_BUCKET");
                 assertThat(result.output()).contains("Missing repository variable: API_ORIGIN");
@@ -82,6 +90,7 @@ class WorkflowFilesScriptTest {
         // given
         var environment = baseEnvironment();
         environment.put(name, "");
+
         // when
         var result = run("validate", root, environment, "");
 
@@ -108,12 +117,14 @@ class WorkflowFilesScriptTest {
                 printf '{"imageDetails":[{"imageDigest":"%s"}]}' "$TEST_DIGEST"
                 """;
         environment.put("SCENARIO", scenario);
+
         // when
         var result = run("image", root, environment, fake);
 
         // then
         assertThat(result.status())
-                .as(result.output()).isEqualTo(Set.of("denied", "rollback-missing").contains(scenario) ? 1 : 0);
+                .as(result.output())
+                .isEqualTo(Set.of("denied", "rollback-missing").contains(scenario) ? 1 : 0);
         if (scenario.equals("existing")) {
             assertThat(result.outputs()).contains("exists=true");
             assertThat(result.environment()).contains("APP_IMAGE_REF=" + REGISTRY + "/mogum-app@" + DIGEST);
@@ -131,11 +142,15 @@ class WorkflowFilesScriptTest {
         var environment = baseEnvironment();
         environment.put("SCENARIO", scenario);
         environment.put("APP_IMAGE_REF", REGISTRY + "/mogum-app@" + DIGEST);
+
         var archive = Files.createDirectory(root.resolve("archive"));
         Files.writeString(archive.resolve("app-image.ref"), REGISTRY + "/mogum-app@"
                 + (scenario.equals("mismatched") ? "sha256:" + "c".repeat(64) : DIGEST) + "\n");
-        var tar = new ProcessBuilder("tar", "-czf", root.resolve("fixture.tar.gz").toString(), "-C", archive.toString(), "app-image.ref").start();
+        var tar = new ProcessBuilder("tar", "-czf", root.resolve("fixture.tar.gz").toString(),
+                "-C", archive.toString(), "app-image.ref")
+                .start();
         assertThat(tar.waitFor()).isEqualTo(0);
+
         // when
         var result = run("inspect-release", root, environment, """
                 [[ $SCENARIO != missing ]] || exit 1
@@ -155,6 +170,7 @@ class WorkflowFilesScriptTest {
         // given
         var environment = baseEnvironment();
         environment.put("SCENARIO", scenario);
+
         // when
         var result = run("ssm", root, environment, """
                 if [[ $2 == send-command ]]; then
@@ -174,6 +190,7 @@ class WorkflowFilesScriptTest {
             assertThat(result.output()).contains("deploy-output");
             assertThat(result.output()).contains("deploy-error");
         }
+
         var parameters = Files.readString(root.resolve("ssm-parameters.json"));
         assertThat(parameters).contains("AWS_REGION");
         assertThat(parameters).contains("/opt/mogum/releases");
@@ -191,6 +208,7 @@ class WorkflowFilesScriptTest {
         // given
         var environment = baseEnvironment();
         environment.put("SCENARIO", status);
+
         // when
         var result = run("health", root, environment, "");
 
@@ -208,16 +226,24 @@ class WorkflowFilesScriptTest {
         Files.writeString(bin.resolve("sleep"), "#!/usr/bin/env bash\nexit 0\n");
         Files.writeString(bin.resolve("curl"), "#!/usr/bin/env bash\n"
                 + "printf '%s\\n' \"$*\" >> \"$TEST_ROOT/commands\"\nprintf '%s' \"$SCENARIO\"\n");
-        for (var name : List.of("aws", "sleep", "curl")) assertThat(bin.resolve(name).toFile().setExecutable(true)).isTrue();
+        for (var name : List.of("aws", "sleep", "curl"))
+                assertThat(bin.resolve(name).toFile().setExecutable(true))
+                        .isTrue();
+
         var source = script(id);
-        if (environment.getOrDefault("SCENARIO", "").equals("poll-timeout")) source = source.replace("SECONDS + 1200", "SECONDS + 0");
+        if (environment.getOrDefault("SCENARIO", "").equals("poll-timeout"))
+                source = source.replace("SECONDS + 1200", "SECONDS + 0");
         if (id.equals("health")) source = source.replace("SECONDS + 60", "SECONDS + 1");
+
         var script = Files.writeString(root.resolve("run.sh"), source);
-        var builder = new ProcessBuilder("bash", "-e", "-o", "pipefail", script.toString()).directory(root.toFile()).redirectErrorStream(true);
+        var builder = new ProcessBuilder("bash", "-e", "-o", "pipefail", script.toString())
+                .directory(root.toFile())
+                .redirectErrorStream(true);
         builder.environment().putAll(environment);
         builder.environment().putAll(Map.of("TEST_ROOT", root.toString(), "RUNNER_TEMP", root.toString(),
                 "TEST_DIGEST", DIGEST, "GITHUB_OUTPUT", output.toString(), "GITHUB_ENV", env.toString(),
                 "PATH", bin + ":" + System.getenv("PATH")));
+
         var process = builder.start();
         var text = new String(process.getInputStream().readAllBytes());
         int status = process.waitFor();
@@ -227,7 +253,8 @@ class WorkflowFilesScriptTest {
 
     private static Map<String, String> baseEnvironment() {
         return new HashMap<>(Map.ofEntries(
-                Map.entry("AWS_REGION", "ap-northeast-2"), Map.entry("AWS_DEPLOY_ROLE_ARN", "arn:aws:iam::000000000000:role/mogum-deploy"),
+                Map.entry("AWS_REGION", "ap-northeast-2"),
+                Map.entry("AWS_DEPLOY_ROLE_ARN", "arn:aws:iam::000000000000:role/mogum-deploy"),
                 Map.entry("DEPLOY_BUCKET", "test-bucket"), Map.entry("DEPLOY_INSTANCE_ID", "i-00000000000000000"),
                 Map.entry("API_ORIGIN", "https://api.example.invalid"), Map.entry("COMMIT_SHA", SHA),
                 Map.entry("SOURCE_REF", "refs/heads/main"), Map.entry("REGISTRY", REGISTRY),
@@ -236,16 +263,23 @@ class WorkflowFilesScriptTest {
     }
 
     private Map<String, Object> workflow() throws Exception { return new Yaml().load(Files.readString(WORKFLOW)); }
+
     private Map<String, Object> job() throws Exception { return map(map(workflow().get("jobs")).get("deploy")); }
+
     private List<Map<String, Object>> steps() throws Exception {
         return list(job().get("steps")).stream().map(WorkflowFilesScriptTest::map).toList();
     }
+
     private Map<String, Object> step(String id) throws Exception {
         return steps().stream().filter(step -> id.equals(step.get("id"))).findFirst().orElseThrow();
     }
+
     private String script(String id) throws Exception { return step(id).get("run").toString(); }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> map(Object value) { return (Map<String, Object>) value; }
+
     private static List<?> list(Object value) { return (List<?>) value; }
+
     private record Result(int status, String output, String outputs, String environment, String commands) {}
 }

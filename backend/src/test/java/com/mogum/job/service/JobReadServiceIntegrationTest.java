@@ -44,7 +44,9 @@ class JobReadServiceIntegrationTest {
     @Autowired JdbcTemplate jdbcTemplate;
 
     static Stream<Object[]> typesAndStates() {
-        return Arrays.stream(JobType.values()).flatMap(type -> Arrays.stream(JobStatus.values()).map(status -> new Object[]{type, status}));
+        return Arrays.stream(JobType.values())
+                .flatMap(type -> Arrays.stream(JobStatus.values())
+                        .map(status -> new Object[]{type, status}));
     }
 
     @ParameterizedTest(name = "종류={0}, 상태={1}")
@@ -57,6 +59,7 @@ class JobReadServiceIntegrationTest {
         var course = courseRepository.save(CourseFixtures.single(owner));
         var roadmap = roadmapRepository.save(RoadmapFixtures.roadmap(owner));
         var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
+
         var job = generationJobRepository.save(switch (type) {
             case NEW_COURSE -> GenerationJobFixtures.newCourse(owner, input);
             case NEW_ROADMAP -> GenerationJobFixtures.newRoadmap(owner, input);
@@ -65,6 +68,7 @@ class JobReadServiceIntegrationTest {
             case REPLAN_ROADMAP -> GenerationJobFixtures.replanRoadmap(owner, roadmap.getId(), "비공개 피드백");
             case MATERIAL -> GenerationJobFixtures.material(owner, lesson.getId());
         });
+
         var now = Instant.parse("2026-11-15T00:00:00Z");
         switch (status) {
             case QUEUED -> { }
@@ -73,9 +77,13 @@ class JobReadServiceIntegrationTest {
             case SUCCEEDED -> GenerationJobFixtures.succeeded(jdbcTemplate, job.getId(), switch (type) {
                 case NEW_COURSE, PLAN_ROADMAP_COURSE, REPLAN_COURSE -> course.getId();
                 default -> null;
-            }, switch (type) { case NEW_ROADMAP, REPLAN_ROADMAP -> roadmap.getId(); default -> null; },
+            }, switch (type) {
+                case NEW_ROADMAP, REPLAN_ROADMAP -> roadmap.getId();
+                default -> null;
+            },
                     type == JobType.MATERIAL ? lesson.getId() : null, now);
         }
+
         var before = jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", job.getId());
 
         // when
@@ -85,6 +93,7 @@ class JobReadServiceIntegrationTest {
         assertThat(result.id()).isEqualTo(job.getId());
         assertThat(result.type()).isEqualTo(type);
         assertThat(result.status()).isEqualTo(status);
+
         if (type == JobType.NEW_COURSE || type == JobType.NEW_ROADMAP) {
             assertThat(result.subject().topic()).isEqualTo("물리");
             assertThat(result.subject().level()).isEqualTo("OTHER");
@@ -100,6 +109,7 @@ class JobReadServiceIntegrationTest {
                 default -> course.getTitle();
             });
         }
+
         if (status == JobStatus.SUCCEEDED) {
             assertThat(result.result().type()).isEqualTo(switch (type) {
                 case NEW_ROADMAP, REPLAN_ROADMAP -> "ROADMAP";
@@ -113,11 +123,14 @@ class JobReadServiceIntegrationTest {
             });
             assertThat(result.result().courseId()).isEqualTo(type == JobType.MATERIAL ? course.getId() : null);
         } else assertThat(result.result()).isNull();
+
         if (status == JobStatus.FAILED) {
             assertThat(result.error().code()).isEqualTo("JOB_TEMPORARY_FAILURE");
             assertThat(result.error().message()).isEqualTo("만들지 못했습니다. 다시 시도하거나 버려 주세요");
         } else assertThat(result.error()).isNull();
-        assertThat(jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", job.getId())).isEqualTo(before);
+
+        assertThat(jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", job.getId()))
+                .isEqualTo(before);
     }
 
     static Stream<Object[]> typesAndErrors() {
@@ -135,6 +148,7 @@ class JobReadServiceIntegrationTest {
         var course = courseRepository.save(CourseFixtures.single(owner));
         var roadmap = roadmapRepository.save(RoadmapFixtures.roadmap(owner));
         var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
+
         var job = generationJobRepository.save(switch (type) {
             case NEW_COURSE -> GenerationJobFixtures.newCourse(owner, input);
             case NEW_ROADMAP -> GenerationJobFixtures.newRoadmap(owner, input);
@@ -151,7 +165,8 @@ class JobReadServiceIntegrationTest {
         // then
         boolean inputProblem = error == JobErrorType.INPUT_TOO_LARGE;
         assertThat(result.error().code()).isEqualTo(inputProblem ? "JOB_INPUT_FAILURE" : "JOB_TEMPORARY_FAILURE");
-        assertThat(result.error().message()).isEqualTo(inputProblem ? "주제를 좁혀 새로 만들어 주세요" : "만들지 못했습니다. 다시 시도하거나 버려 주세요");
+        assertThat(result.error().message())
+                .isEqualTo(inputProblem ? "주제를 좁혀 새로 만들어 주세요" : "만들지 못했습니다. 다시 시도하거나 버려 주세요");
         assertThat(result.error().fields()).isNull();
         assertThat(result.error().retryAfterSeconds()).isNull();
     }

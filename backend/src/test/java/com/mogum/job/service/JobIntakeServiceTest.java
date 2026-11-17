@@ -54,6 +54,7 @@ class JobIntakeServiceTest {
     private final JobIntakeService jobIntakeService = service(List.of(JobType.values()).stream().map(type ->
             (JobIntakeHandler) new JobIntakeHandler() {
                 public JobType type() { return type; }
+
                 public void check(long userId, JobRequest request) {
                     if ("reject".equals(request.feedback())) throw new ApiException(ErrorCode.INVALID_REQUEST);
                 }
@@ -66,7 +67,9 @@ class JobIntakeServiceTest {
         // given
         long userId = user(100);
         var request = request(type, userId);
-        var runner = new ApplicationContextRunner().withUserConfiguration(JobIntakeService.class)
+
+        var runner = new ApplicationContextRunner()
+                .withUserConfiguration(JobIntakeService.class)
                 .withBean(GenerationJobRepository.class, () -> generationJobRepository)
                 .withBean(CourseRepository.class, () -> courseRepository)
                 .withBean(RoadmapRepository.class, () -> roadmapRepository)
@@ -80,7 +83,8 @@ class JobIntakeServiceTest {
             // then
             assertThat(context).hasNotFailed();
             assertThat(context.getBeansOfType(JobIntakeHandler.class)).isEmpty();
-            assertError(() -> context.getBean(JobIntakeService.class).receive(userId, request), ErrorCode.INVALID_REQUEST);
+            assertError(() -> context.getBean(JobIntakeService.class).receive(userId, request),
+                    ErrorCode.INVALID_REQUEST);
             assertThat(generationJobRepository.size()).isZero();
             assertThat(creditEntryRepository.entries()).hasSize(1);
         });
@@ -95,6 +99,7 @@ class JobIntakeServiceTest {
         var foreign = request(type, user(100));
         var rejectAll = service(List.of(new JobIntakeHandler() {
             public JobType type() { return type; }
+
             public void check(long id, JobRequest request) { throw new AssertionError("ownership must run first"); }
         }));
 
@@ -127,9 +132,16 @@ class JobIntakeServiceTest {
         long userId = user(100);
         var request = request(type, userId);
         var first = jobIntakeService.receive(userId, request);
-        GenerationJobFixtures.failed(generationJobRepository.findById(first.id()).orElseThrow(), JobErrorType.INVALID_OUTPUT);
+        GenerationJobFixtures.failed(
+                generationJobRepository.findById(first.id()).orElseThrow(), JobErrorType.INVALID_OUTPUT);
+
         for (int i = 0; i < 3; i++) generationJobRepository.save(GenerationJobFixtures.newCourse(userId, input()));
-        userRepository.findById(userId).orElseThrow().consumeCredits(userRepository.findById(userId).orElseThrow().getCreditBalance());
+        userRepository.findById(userId)
+                .orElseThrow()
+                .consumeCredits(userRepository.findById(userId)
+                        .orElseThrow()
+                        .getCreditBalance());
+
         int entryCount = creditEntryRepository.entries().size();
 
         // when
@@ -152,7 +164,8 @@ class JobIntakeServiceTest {
         GenerationJobFixtures.running(running);
 
         // when & then
-        assertError(() -> jobIntakeService.receive(userId, request(JobType.NEW_COURSE, userId)), ErrorCode.TOO_MANY_IN_PROGRESS);
+        assertError(() -> jobIntakeService.receive(userId, request(JobType.NEW_COURSE, userId)),
+                ErrorCode.TOO_MANY_IN_PROGRESS);
         assertThat(generationJobRepository.size()).isEqualTo(3);
         assertThat(creditEntryRepository.entries()).hasSize(1);
     }
@@ -164,8 +177,10 @@ class JobIntakeServiceTest {
         long userId = user(0);
 
         // when & then
-        assertError(() -> jobIntakeService.receive(userId, request(JobType.NEW_COURSE, userId)), ErrorCode.CREDIT_INSUFFICIENT);
+        assertError(() -> jobIntakeService.receive(userId, request(JobType.NEW_COURSE, userId)),
+                ErrorCode.CREDIT_INSUFFICIENT);
         assertThat(creditEntryRepository.entries()).hasSize(1);
+
         // Fake는 트랜잭션 롤백을 흉내 내지 않는다. 작업 롤백은 통합 시험에서 본다.
     }
 
@@ -183,6 +198,7 @@ class JobIntakeServiceTest {
         // then
         assertThat(result.status()).isEqualTo(JobStatus.QUEUED);
         assertThat(generationJobRepository.findById(result.id())).isPresent();
+
         assertThat(creditEntryRepository.entries()).last().satisfies(entry -> {
             assertThat(entry.getJobId()).isEqualTo(result.id());
             assertThat(entry.getAmount()).isEqualTo(-switch (type) {
@@ -232,6 +248,7 @@ class JobIntakeServiceTest {
         // given
         long userId = user(100);
         var job = failed(userId, JobErrorType.INVALID_OUTPUT);
+
         for (int i = 0; i < 3; i++) generationJobRepository.save(GenerationJobFixtures.newCourse(userId, input()));
 
         // when & then
@@ -253,7 +270,10 @@ class JobIntakeServiceTest {
         assertThat(result).isEqualTo(new JobResult(job.getId(), JobStatus.QUEUED));
         assertThat(job.getErrorType()).isNull();
         assertThat(job.getFinishedAt()).isNull();
-        assertThat(creditEntryRepository.entries()).last().satisfies(entry -> assertThat(entry.getAmount()).isEqualTo(-2));
+        assertThat(creditEntryRepository.entries())
+                .last()
+                .satisfies(entry -> assertThat(entry.getAmount())
+                        .isEqualTo(-2));
     }
 
     @ParameterizedTest
@@ -298,6 +318,7 @@ class JobIntakeServiceTest {
         // when & then
         assertError(() -> jobIntakeService.retry(userId, job.getId()), ErrorCode.NOT_FOUND);
         assertError(() -> jobIntakeService.discard(userId, job.getId()), ErrorCode.NOT_FOUND);
+
         assertError(() -> jobIntakeService.retry(userId, 999), ErrorCode.NOT_FOUND);
         assertError(() -> jobIntakeService.discard(userId, 999), ErrorCode.NOT_FOUND);
         assertThat(generationJobRepository.size()).isEqualTo(1);
@@ -305,11 +326,13 @@ class JobIntakeServiceTest {
     }
 
     private JobIntakeService service(List<JobIntakeHandler> handlers) {
-        return new JobIntakeService(generationJobRepository, courseRepository, roadmapRepository, lessonRepository, creditLedger, creditProperties, new JobProperties(3), handlers);
+        return new JobIntakeService(generationJobRepository, courseRepository, roadmapRepository, lessonRepository,
+                creditLedger, creditProperties, new JobProperties(3), handlers);
     }
 
     private long user(int amount) {
-        var user = userRepository.save(UserFixtures.approved("me@example.com", amount, Instant.parse("2026-12-01T19:00:00Z")));
+        var user = userRepository.save(UserFixtures.approved(
+                "me@example.com", amount, Instant.parse("2026-12-01T19:00:00Z")));
         creditEntryRepository.save(CreditEntry.refill(user, amount));
         return user.getId();
     }
@@ -322,7 +345,9 @@ class JobIntakeServiceTest {
 
     private JobRequest request(JobType type, long owner) {
         Long target = switch (type) {
-            case MATERIAL -> lessonRepository.save(LessonFixtures.lesson(courseRepository.save(CourseFixtures.single(owner)), 1)).getId();
+            case MATERIAL -> lessonRepository.save(
+                    LessonFixtures.lesson(courseRepository.save(CourseFixtures.single(owner)), 1))
+                    .getId();
             case PLAN_ROADMAP_COURSE, REPLAN_COURSE -> courseRepository.save(CourseFixtures.single(owner)).getId();
             case REPLAN_ROADMAP -> roadmapRepository.save(RoadmapFixtures.roadmap(owner)).getId();
             default -> null;
