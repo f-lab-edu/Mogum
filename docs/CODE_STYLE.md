@@ -47,6 +47,7 @@ public JobResult receive(long userId, JobRequest request) {
 - 의미 단위에서 끊는다.
     - 연산자(`&&` · `||` · `+` · `?` · `:`)는 **앞에서** 끊고 다음 줄 맨 앞에 둔다.
     - 메서드 체인은 `.` 앞에서 끊고, 끊으면 한 줄에 호출 하나씩 둔다.
+    - 예외 — 호출 둘이 뜻 하나를 이루는 설정 체인은 그 둘을 한 줄에 둔다. Spring Security 의 `.requestMatchers(…).permitAll()` 처럼 대상과 규칙이 짝이면 짝마다 한 줄이다 — 나누면 어느 규칙이 어느 경로에 걸리는지 읽기 어렵다.
     - 인자 · 매개변수는 쉼표 뒤에서 끊는다. 한 줄에 다 들어가지 않으면 의미가 묶이는 것끼리 둔다.
 - 검색할 문구(오류 문구 · 로그 문구 · SQL 조각)를 나눠야만 120자를 지킬 수 있으면 나누지 않고 넘겨도 된다.
 
@@ -57,6 +58,11 @@ boolean includeSucceeded = request.type() == JobType.MATERIAL
 return generationJobRepository.findById(jobId)
         .filter(job -> job.getUserId() == userId)
         .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
+
+.authorizeHttpRequests(requests -> requests
+        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+        .requestMatchers(HttpMethod.GET, "/api/me").authenticated()
+        .anyRequest().denyAll())
 ```
 
 ## 3. 이름 — 의존 필드는 타입 이름 그대로
@@ -92,5 +98,14 @@ return generationJobRepository.findById(jobId)
 
 ## 6. 정했지만 제한하지 않는 것
 
-- **중괄호 없는 한 줄 `if` 를 쓴다** — 가드가 아니어도 된다. 한 줄에 들어가지 않으면 중괄호를 쓴다.
+- **중괄호 없는 `if` 는 조건과 본문이 한 줄에 들어가는 간단한 경우에만 쓴다** — 가드가 아니어도 된다. 조건이나 본문이 두 줄 이상이면 중괄호를 쓴다(`else` 도 같다).
+
+```java
+if (handler == null) throw new ApiException(ErrorCode.INVALID_REQUEST);
+
+if (match.isMatch()
+        && registrations.findByRegistrationId(match.getVariables().get("registrationId")) == null) {
+    return null;
+}
+```
 - **`var`** — 객체는 `var`, 원시값 · `boolean` 은 타입을 쓴다(`long count = …` · `boolean includeSucceeded = …`).
