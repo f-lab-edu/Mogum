@@ -74,8 +74,9 @@ class DeployFilesScriptTest {
 
         var current = root.resolve("current");
         if (!scenario.equals("first-failure")) Files.createSymbolicLink(current, previous);
-        if (scenario.equals("invalid-reference"))
-                Files.writeString(release.resolve("app-image.ref"), image + "\nextra\n");
+        if (scenario.equals("invalid-reference")) {
+            Files.writeString(release.resolve("app-image.ref"), image + "\nextra\n");
+        }
 
         var envFile = root.resolve("server-env");
         Files.writeString(envFile, "GOOGLE_CLIENT_SECRET=must-never-be-printed\n");

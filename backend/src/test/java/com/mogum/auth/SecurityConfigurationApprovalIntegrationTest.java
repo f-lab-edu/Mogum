@@ -65,8 +65,9 @@ class SecurityConfigurationApprovalIntegrationTest extends SecurityScenario {
         // given
         var client = csrfClient(accountSession(status));
         var request = client.method(HttpMethod.valueOf(method)).uri(path);
-        if (path.equals("/api/test-request-validation"))
-                request.contentType(MediaType.APPLICATION_JSON).body("{\"topic\":\"학습\",\"purpose\":\"공부\"}");
+        if (path.equals("/api/test-request-validation")) {
+            request.contentType(MediaType.APPLICATION_JSON).body("{\"topic\":\"학습\",\"purpose\":\"공부\"}");
+        }
 
         // when
         var response = request.exchange().returnResult(String.class);
@@ -134,8 +135,10 @@ class SecurityConfigurationApprovalIntegrationTest extends SecurityScenario {
 
     private Cookie accountSession(String status) {
         var helper = new TestSessions(jdbcIndexedSessionRepository);
-        if (status.equals("NOT_APPLIED")) return helper.createNotApplied(
-                new AccountPrincipal.NotApplied("google", "new", "new@example.com", "새 이름"));
+        if (status.equals("NOT_APPLIED")) {
+            return helper.createNotApplied(
+                    new AccountPrincipal.NotApplied("google", "new", "new@example.com", "새 이름"));
+        }
 
         var user = userRepository.save(
                 UserFixtures.withStatus(UserFixtures.user("approval@example.com"), UserStatus.valueOf(status)));

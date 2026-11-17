@@ -502,8 +502,9 @@ class JobRunnerIntegrationTest {
             try {
                 plan.awaitEntered();
                 jdbcTemplate.update("DELETE FROM generation_jobs WHERE id = ?", id);
-                if (renew)
-                        await().atMost(Duration.ofSeconds(5)).until(() -> output.getAll().contains("job lease lost"));
+                if (renew) {
+                    await().atMost(Duration.ofSeconds(5)).until(() -> output.getAll().contains("job lease lost"));
+                }
 
                 // when
                 plan.release();

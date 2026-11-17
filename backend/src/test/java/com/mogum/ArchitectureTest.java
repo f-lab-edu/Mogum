@@ -97,7 +97,9 @@ class ArchitectureTest {
                         var rawType = field.getRawType();
                         if (field.getModifiers().contains(JavaModifier.STATIC)
                                 || !field.getModifiers().contains(JavaModifier.FINAL)
-                                || rawType.isPrimitive() || rawType.getPackageName().startsWith("java.")) continue;
+                                || rawType.isPrimitive() || rawType.getPackageName().startsWith("java.")) {
+                            continue;
+                        }
 
                         String typeName = rawType.getSimpleName();
                         String camelCaseName = Character.toLowerCase(typeName.charAt(0)) + typeName.substring(1);

@@ -231,8 +231,9 @@ class WorkflowFilesScriptTest {
                         .isTrue();
 
         var source = script(id);
-        if (environment.getOrDefault("SCENARIO", "").equals("poll-timeout"))
-                source = source.replace("SECONDS + 1200", "SECONDS + 0");
+        if (environment.getOrDefault("SCENARIO", "").equals("poll-timeout")) {
+            source = source.replace("SECONDS + 1200", "SECONDS + 0");
+        }
         if (id.equals("health")) source = source.replace("SECONDS + 60", "SECONDS + 1");
 
         var script = Files.writeString(root.resolve("run.sh"), source);

@@ -47,7 +47,9 @@ public final class CookieAuthorizationRequestRepository
             long age = clock.instant().getEpochSecond() - saved.issuedAt();
             if (saved.state() == null || saved.state().isBlank() || saved.state().length() > 128
                     || !saved.state().equals(request.getParameter("state"))
-                    || age < 0 || age >= MAX_AGE_SECONDS) return null;
+                    || age < 0 || age >= MAX_AGE_SECONDS) {
+                return null;
+            }
             if (saved.codeVerifier() == null || !saved.codeVerifier().matches("[A-Za-z0-9._~-]{43,128}")) return null;
 
             var registration = clientRegistrationRepository.findByRegistrationId("google");

@@ -90,7 +90,9 @@ public final class JobRunner {
                 outcome = generator.generate(job);
                 if (lease.lost()) return true;
                 if (!(outcome instanceof GenerationOutcome.Failure failure)
-                        || !retryable(failure) || retries >= workerProperties.maxRetries()) break;
+                        || !retryable(failure) || retries >= workerProperties.maxRetries()) {
+                    break;
+                }
 
                 retries++;
                 try {

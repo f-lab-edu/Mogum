@@ -409,8 +409,9 @@ class CourseSchemaRepositoryTest {
     }
 
     private long textRow(String table, String column) {
-        if (table.equals("roadmaps") || table.equals("courses") && !column.equals("plan_description"))
-                return otherInputRow(table);
+        if (table.equals("roadmaps") || table.equals("courses") && !column.equals("plan_description")) {
+            return otherInputRow(table);
+        }
 
         long user = owner();
         if (table.equals("courses")) return planned(user, roadmap(user), 1);

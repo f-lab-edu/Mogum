@@ -113,8 +113,9 @@ public class SecurityConfiguration {
 
                 // 미등록 ID는 해석기의 예외/로그 대신 공통 404 ERROR 디스패치로 보낸다.
                 if (match.isMatch()
-                        && registrations.findByRegistrationId(match.getVariables().get("registrationId")) == null)
+                        && registrations.findByRegistrationId(match.getVariables().get("registrationId")) == null) {
                     return null;
+                }
 
                 return resolver.resolve(request);
             }
@@ -168,23 +169,17 @@ public class SecurityConfiguration {
                                 ApiErrorResponses.write(response, mapper, ErrorCode.NOT_FOUND, null);
                             }
                         }))
-                .authorizeHttpRequests(requests -> requests.dispatcherTypeMatchers(DispatcherType.ERROR)
-                        .permitAll()
-                        .requestMatchers(HttpMethod.GET, "/auth/google", "/auth/google/callback")
-                        .permitAll()
-                        .requestMatchers(HttpMethod.GET, "/actuator/health")
-                        .permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/me")
-                        .authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/account/apply", "/api/auth/logout")
-                        .authenticated()
-                        .requestMatchers("/api/**")
-                        .access((authentication, context) ->
+                .authorizeHttpRequests(requests -> requests
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/auth/google", "/auth/google/callback").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/me").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/account/apply", "/api/auth/logout").authenticated()
+                        .requestMatchers("/api/**").access((authentication, context) ->
                                 new AuthorizationDecision(
                                         authentication.get().getPrincipal() instanceof AccountPrincipal.Member member
                                                 && member.status() == UserStatus.APPROVED))
-                        .anyRequest()
-                        .denyAll())
+                        .anyRequest().denyAll())
                 .logout(logout -> logout.logoutRequestMatcher(logoutRequest)
                         .logoutSuccessHandler((request, response, authentication) -> response.setStatus(204)));
 

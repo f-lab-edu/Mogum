@@ -162,15 +162,17 @@ class SecurityConfigurationIntegrationTest extends SecurityScenario {
         var jdbcSession = jdbcIndexedSessionRepository.createSession();
 
         Session stored = jdbcSession;
-        if (condition.equals("wrong-type"))
-                stored.setAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE, "broken");
+        if (condition.equals("wrong-type")) {
+            stored.setAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE, "broken");
+        }
         if (condition.equals("blank-name") || condition.equals("mixed")) {
             stored.setAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE,
                     new AccountPrincipal.NotApplied("google", "sub", "me@example.com", condition.equals("blank-name")
                             ? " " : "이름"));
         }
-        if (condition.equals("mixed"))
-                stored.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, "17");
+        if (condition.equals("mixed")) {
+            stored.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, "17");
+        }
 
         jdbcIndexedSessionRepository.save(jdbcSession);
         var cookie = new Cookie("SESSION", Base64.getEncoder().encodeToString(

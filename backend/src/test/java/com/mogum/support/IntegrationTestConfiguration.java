@@ -193,8 +193,9 @@ public class IntegrationTestConfiguration {
             if (call == 1 && plan.holding) {
                 plan.entered.countDown();
                 try {
-                    if (!plan.released.await(15, TimeUnit.SECONDS))
-                            throw new IllegalStateException("Stub not released");
+                    if (!plan.released.await(15, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Stub not released");
+                    }
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
                     throw new IllegalStateException("Stub interrupted");
