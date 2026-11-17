@@ -109,7 +109,14 @@
     {
       "step": 8,
       "name": "course-screen",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T06:25:17+0900",
+      "summary": "/courses/:courseId CoursePage의 검토 중·학습 중·다 마침·짜기 전/읽기 실패, 시작 후 같은 화면·다시 짜기 작업 이동·제목 수정·한국 날짜; 공통 frontend/src/components/StatusBadge.tsx·ProgressBar.tsx(step 9 재사용), frontend/src/api/useCourse.ts의 읽기/시작/제목 수정·TanStack Query 캐시 교체, useJob.ts receiveJob(ReplanCourseRequest); TDD 실패 확인 뒤 구현, AC test·lint 및 타입 검사·빌드 통과, 화면 테스트 304→351개(47개 추가·29파일·실패 0), UI_GUIDE 반영·backend 변경/실제 OpenAI 호출/커밋 없음.",
+      "completed_at": "2026-11-18T06:31:12+0900",
+      "review_notes": [
+        "frontend/src/pages/CoursePage.tsx:102 — 제목 고치기 칸이 열린 동안에도 「코스 제목 고치기」 버튼이 그대로 보이고 누를 수 있다. 다시 누르면 `setTitle(data.title)`이 입력 중이던 글을 말없이 버린다. → 펼친 동안에는 버튼을 숨기거나 잠그는 방법을 검토한다(동작 영향은 작다).",
+        "frontend/src/pages/CoursePage.tsx:136 — 다시 짜기 입력이 닫혀 있을 때도 `aria-controls=\"course-replan\"`이 DOM에 없는 id를 가리킨다. → 펼쳤을 때만 붙이거나 입력을 `hidden`으로 두는 방법을 검토한다(접근성 권고)."
+      ]
     },
     {
       "step": 9,
