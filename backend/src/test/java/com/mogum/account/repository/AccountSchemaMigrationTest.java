@@ -28,9 +28,11 @@ class AccountSchemaMigrationTest {
         // given
         try (var database = new MigrationDatabase()) {
             var jdbc = database.jdbcTemplate;
+
             for (String status : new String[]{"ACTIVE", "PENDING", "WAITLISTED"}) {
                 database.insertLegacyUser(status);
             }
+
             var before = jdbc.queryForList("SELECT id, provider, subject, email, created_at FROM users ORDER BY id");
             var earliest = jdbc.queryForObject("SELECT now()", Timestamp.class).toInstant();
 
@@ -57,7 +59,9 @@ class AccountSchemaMigrationTest {
                     SELECT count(*) FROM users u WHERE credit_balance <>
                         (SELECT sum(amount) FROM credit_entries WHERE user_id = u.id)
                     """, Integer.class)).isZero();
-            var approved = jdbc.queryForObject("SELECT approved_at FROM users WHERE status = 'APPROVED'", Timestamp.class);
+
+            var approved = jdbc.queryForObject("SELECT approved_at FROM users WHERE status = 'APPROVED'",
+                    Timestamp.class);
             assertThat(approved.toInstant()).isBetween(earliest, latest);
             assertThat(jdbc.queryForObject("""
                     SELECT credit_refill_at =
@@ -69,6 +73,7 @@ class AccountSchemaMigrationTest {
                     SELECT count(*) FROM users WHERE status = 'APPLIED'
                         AND approved_at IS NULL AND credit_refill_at IS NULL
                     """, Integer.class)).isEqualTo(2);
+
             assertThat(jdbc.queryForObject("""
                     SELECT count(*) FROM information_schema.columns WHERE table_schema = ? AND
                         ((table_name = 'users' AND column_name IN ('role', 'terms_agreed_at', 'terms_version'))
@@ -88,7 +93,8 @@ class AccountSchemaMigrationTest {
             var flyway = database.flyway(null);
 
             // when & then
-            assertThatThrownBy(flyway::migrate).isInstanceOf(FlywayException.class)
+            assertThatThrownBy(flyway::migrate)
+                    .isInstanceOf(FlywayException.class)
                     .hasStackTraceContaining("Unsupported legacy user status");
             assertThat(database.jdbcTemplate.queryForList("SELECT * FROM users")).isEqualTo(before);
             assertThat(flyway.info().current().getVersion().toString()).isEqualTo("8");
@@ -102,12 +108,15 @@ class AccountSchemaMigrationTest {
     void calculatesRefillAcrossSeoulDayBoundary(String approval, String expected) throws IOException {
         // given
         try (var database = new MigrationDatabase();
-             var resource = getClass().getResourceAsStream("/db/migration/V9__migrate_account_schema.sql")) {
+                var resource = getClass().getResourceAsStream("/db/migration/V9__migrate_account_schema.sql")) {
             assertThat(resource).isNotNull();
             var sql = new String(resource.readAllBytes(), StandardCharsets.UTF_8);
-            var matcher = Pattern.compile("credit_refill_at = CASE WHEN status = 'ACTIVE' THEN\\s*(.*?)\\s*ELSE NULL END",
-                    Pattern.DOTALL).matcher(sql);
+            var matcher = Pattern.compile(
+                    "credit_refill_at = CASE WHEN status = 'ACTIVE' THEN\\s*(.*?)\\s*ELSE NULL END",
+                    Pattern.DOTALL)
+                    .matcher(sql);
             assertThat(matcher.find()).isTrue();
+
             // 제품 식을 그대로 실행한다. now()만 고정 입력으로 바꾼다.
             var expression = matcher.group(1).replace("now()", "CAST(? AS timestamptz)");
 
@@ -142,9 +151,12 @@ class AccountSchemaMigrationTest {
         }
 
         private Flyway flyway(String target) {
-            var configuration = Flyway.configure().dataSource(url, POSTGRES.getUsername(), POSTGRES.getPassword())
-                    .defaultSchema(schema).schemas(schema);
+            var configuration = Flyway.configure()
+                    .dataSource(url, POSTGRES.getUsername(), POSTGRES.getPassword())
+                    .defaultSchema(schema)
+                    .schemas(schema);
             if (target != null) configuration.target(target);
+
             return configuration.load();
         }
 

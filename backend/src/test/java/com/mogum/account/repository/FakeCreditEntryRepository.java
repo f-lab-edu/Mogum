@@ -26,14 +26,16 @@ public final class FakeCreditEntryRepository implements CreditEntryRepository {
 
     @Override
     public Optional<CreditEntry> findFirstByUserIdAndJobIdOrderByIdDesc(long userId, long jobId) {
-        return entries.values().stream()
+        return entries.values()
+                .stream()
                 .filter(entry -> entry.getUser().getId() == userId && Objects.equals(entry.getJobId(), jobId))
                 .max(Comparator.comparing(CreditEntry::getId));
     }
 
     @Override
     public Optional<CreditEntry> findFirstByUserIdAndTypeOrderByIdDesc(long userId, CreditEntryType type) {
-        return entries.values().stream()
+        return entries.values()
+                .stream()
                 .filter(entry -> entry.getUser().getId() == userId && entry.getType() == type)
                 .max(Comparator.comparing(CreditEntry::getId));
     }

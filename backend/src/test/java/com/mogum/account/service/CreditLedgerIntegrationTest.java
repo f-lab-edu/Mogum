@@ -59,7 +59,8 @@ class CreditLedgerIntegrationTest {
 
         // then
         assertThat(results.stream().filter(result -> result == null).count()).isEqualTo(1);
-        assertThat(results.stream().filter(result -> result != null).toList()).singleElement()
+        assertThat(results.stream().filter(result -> result != null).toList())
+                .singleElement()
                 .satisfies(error -> assertThat(error.errorCode()).isEqualTo(ErrorCode.CREDIT_INSUFFICIENT));
         assertBalance(data.userId(), 0);
         assertThat(entryCount("CONSUME")).isEqualTo(1);
@@ -95,8 +96,10 @@ class CreditLedgerIntegrationTest {
         // given
         var data = prepare();
         creditLedger.consume(data.userId(), data.firstJobId(), 7);
+
         new TransactionTemplate(platformTransactionManager).executeWithoutResult(status -> {
             creditLedger.lock(data.userId());
+
             // 채우기 기능은 후속 TASK다. 여기서는 DB에 계약의 주기 경계를 준비한다.
             jdbcTemplate.update("UPDATE users SET credit_balance = 10, updated_at = ? WHERE id = ?",
                     Timestamp.from(testClock.instant()), data.userId());
@@ -124,6 +127,7 @@ class CreditLedgerIntegrationTest {
             new TransactionTemplate(platformTransactionManager).executeWithoutResult(status -> {
                 creditLedger.lock(data.userId());
                 future.set(executor.submit(() -> creditLedger.consume(data.userId(), data.firstJobId(), 4)));
+
                 assertThat(awaitLockWaiters(1)).isEqualTo(1);
                 assertThat(future.get().isDone()).isFalse();
             });
@@ -141,18 +145,21 @@ class CreditLedgerIntegrationTest {
         // given
         var data = prepare();
         if (restore) creditLedger.consume(data.userId(), data.firstJobId(), 7);
+
         int previousCount = jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries", Integer.class);
 
         // when
         new TransactionTemplate(platformTransactionManager).executeWithoutResult(status -> {
             if (restore) creditLedger.restoreIfOwed(data.userId(), data.firstJobId());
             else creditLedger.consume(data.userId(), data.firstJobId(), 7);
+
             status.setRollbackOnly();
         });
 
         // then
         assertBalance(data.userId(), restore ? 3 : 10);
-        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries", Integer.class)).isEqualTo(previousCount);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries", Integer.class))
+                .isEqualTo(previousCount);
     }
 
     @Test
@@ -186,8 +193,10 @@ class CreditLedgerIntegrationTest {
 
     private Data prepare() {
         return new TransactionTemplate(platformTransactionManager).execute(status -> {
-            var user = userRepository.save(UserFixtures.approved("me@example.com", 10, testClock.instant().plusSeconds(30L * 86400)));
+            var user = userRepository.save(
+                    UserFixtures.approved("me@example.com", 10, testClock.instant().plusSeconds(30L * 86400)));
             creditEntryRepository.save(CreditEntry.refill(user, 10));
+
             var input = new LearningInput("자바", Level.BEGINNER, null, Purpose.WORK, null, null);
             var first = generationJobRepository.save(GenerationJobFixtures.newCourse(user.getId(), input));
             var second = generationJobRepository.save(GenerationJobFixtures.newCourse(user.getId(), input));
@@ -198,14 +207,17 @@ class CreditLedgerIntegrationTest {
     private List<ApiException> concurrently(long userId, Runnable first, Runnable second) throws Exception {
         try (var executor = Executors.newFixedThreadPool(2); var connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
+
             try (var statement = connection.prepareStatement("SELECT id FROM users WHERE id = ? FOR UPDATE")) {
                 statement.setLong(1, userId);
                 statement.execute();
             }
+
             var futures = List.of(executor.submit(outcome(first)), executor.submit(outcome(second)));
             int waiting = awaitLockWaiters(2);
             connection.commit();
             assertThat(waiting).isEqualTo(2);
+
             // 성공은 null이므로 null을 허용하는 목록에 담는다.
             return Arrays.asList(futures.get(0).get(10, TimeUnit.SECONDS), futures.get(1).get(10, TimeUnit.SECONDS));
         }
@@ -225,6 +237,7 @@ class CreditLedgerIntegrationTest {
     private int awaitLockWaiters(int expected) {
         long deadline = System.nanoTime() + Duration.ofSeconds(8).toNanos();
         int waiting;
+
         do {
             // 호출자 트랜잭션 안에서도 다른 세션의 현재 대기 상태를 다시 읽는다.
             jdbcTemplate.execute("SELECT pg_stat_clear_snapshot()");
@@ -233,6 +246,7 @@ class CreditLedgerIntegrationTest {
                     AND wait_event_type = 'Lock' AND query LIKE '%users%'
                     """, Integer.class);
             if (waiting >= expected) return waiting;
+
             try {
                 Thread.sleep(10);
             } catch (InterruptedException exception) {
@@ -240,6 +254,7 @@ class CreditLedgerIntegrationTest {
                 throw new IllegalStateException("Interrupted while awaiting DB locks");
             }
         } while (System.nanoTime() < deadline);
+
         return waiting;
     }
 

@@ -57,12 +57,15 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
     void startsAuthorizationWithMinimalScopeAndShortCookie() throws Exception {
         // when
         var start = start(null);
+
         // then
         var location = Optional.ofNullable(start.response().getResponseHeaders().getFirst("Location")).orElseThrow();
         assertThat(location.startsWith(ORIGIN + "/authorize?")).isTrue();
+
         var query = UriComponentsBuilder.fromUriString(location).build().getQueryParams();
         assertThat(query.getFirst("client_id")).isEqualTo("test-google-client");
-        assertThat(URLDecoder.decode(query.getFirst("redirect_uri"), StandardCharsets.UTF_8)).isEqualTo("http://localhost:5173/auth/google/callback");
+        assertThat(URLDecoder.decode(query.getFirst("redirect_uri"), StandardCharsets.UTF_8))
+                .isEqualTo("http://localhost:5173/auth/google/callback");
         assertThat(URLDecoder.decode(query.getFirst("scope"), StandardCharsets.UTF_8).split(" "))
                 .containsExactlyInAnyOrder("email", "profile");
         assertThat(query.getFirst("prompt")).isEqualTo("select_account");
@@ -70,12 +73,18 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
         assertThat(query.getFirst("code_challenge")).isNotNull();
         assertThat(query.getFirst("code_challenge").matches("[A-Za-z0-9_-]{43}")).isTrue();
         assertThat(start.state().isBlank()).isFalse();
+
         var header = cookieHeader(start.response(), "MOGUM_OAUTH_REQUEST");
         assertCookieSecurity(header);
         assertThat(header).contains("Path=/auth/google");
         assertThat(header).contains("Max-Age=600");
         assertThat(header).doesNotContain("Domain=");
-        assertThat(start.response().getResponseHeaders().getOrEmpty("Set-Cookie").stream().noneMatch(value -> value.startsWith("SESSION="))).isTrue();
+
+        assertThat(start.response()
+                .getResponseHeaders()
+                .getOrEmpty("Set-Cookie")
+                .stream()
+                .noneMatch(value -> value.startsWith("SESSION="))).isTrue();
         assertThat(count("spring_session")).isEqualTo(sessionsBefore);
     }
 
@@ -86,21 +95,27 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
         sub = "LEAKCHECK-oauth-marker";
         userRepository.save(UserFixtures.user("google", sub, email));
         var start = start(null);
+
         // when
         var response = callback(start, "ok", null);
+
         // then
         assertRedirect(response, "https://mogum.example/");
         assertExpired(response);
+
         String sessionHeader = cookieHeader(response, "SESSION");
         assertCookieSecurity(sessionHeader);
         assertThat(sessionHeader).doesNotContain("Domain=");
+
         String sessionCookie = cookiePair(sessionHeader);
-        var row = jdbcTemplate.queryForMap("SELECT id, status FROM users WHERE provider = 'google' AND subject = ?", sub);
+        var row = jdbcTemplate.queryForMap("SELECT id, status FROM users WHERE provider = 'google' AND subject = ?",
+                sub);
         assertThat(row.get("status")).isEqualTo("APPLIED");
         assertIdOnly(sessionCookie, row.get("id").toString());
         assertThat(count("users")).isEqualTo(usersBefore + 1);
         assertThat(count("spring_session")).isEqualTo(sessionsBefore + 1);
         assertThat(TOKEN_CALLS.get()).isEqualTo(1);
+
         var line = loginLine(response, output);
         assertThat(line).contains(" INFO ");
         assertThat(line).contains("login result=success userId=" + row.get("id"));
@@ -115,8 +130,10 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
         userRepository.save(UserFixtures.user("google", sub, email));
         var loggedIn = callback(start(null), "ok", null);
         var cookie = cookiePair(cookieHeader(loggedIn, "SESSION"));
+
         // when
         var response = get("/api/me", cookie);
+
         // then
         assertThat(response.getStatus().value()).isEqualTo(200);
         assertThat(response.getResponseBody()).contains("admin@example.com");
@@ -132,17 +149,22 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
         var oldCookie = cookiePair(cookieHeader(first, "SESSION"));
         long id = user.getId();
         var before = jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", id);
+
         testClock.advance(Duration.ofHours(1));
         email = "changed@example.com";
         name = "changed Google name";
+
         // when
         var second = callback(start(oldCookie), "ok", oldCookie);
+
         // then
         assertRedirect(second, "https://mogum.example/");
         var newCookie = cookiePair(cookieHeader(second, "SESSION"));
         assertThat(newCookie).isNotEqualTo(oldCookie);
-        assertThat(jdbcTemplate.queryForObject("SELECT id FROM users WHERE provider = 'google' AND subject = ?", Long.class, sub)).isEqualTo(id);
-        assertThat(jdbcTemplate.queryForObject("SELECT email FROM users WHERE id = ?", String.class, id)).isEqualTo("admin@example.com");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT id FROM users WHERE provider = 'google' AND subject = ?", Long.class, sub)).isEqualTo(id);
+        assertThat(jdbcTemplate.queryForObject("SELECT email FROM users WHERE id = ?", String.class, id))
+                .isEqualTo("admin@example.com");
         assertThat(jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", id)).isEqualTo(before);
         assertThat(count("users")).isEqualTo(usersBefore + 1);
         assertIdOnly(newCookie, Long.toString(id));
@@ -162,10 +184,13 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
         name = "changed Google name";
         var second = callback(start(oldCookie), "ok", oldCookie);
         var cookie = which.equals("old") ? oldCookie : cookiePair(cookieHeader(second, "SESSION"));
+
         // when
         var response = get("/api/me", cookie);
+
         // then
         assertThat(response.getStatus().value()).isEqualTo(which.equals("old") ? 401 : 200);
+
         if (which.equals("new")) {
             var body = new ObjectMapper().readTree(response.getResponseBody()).get("data");
             assertThat(body.get("email").asString()).isEqualTo("admin@example.com");
@@ -178,9 +203,12 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
     void keepsConfiguredRedirectDespiteUntrustedParameters() throws Exception {
         // when
         var response = get("/auth/google?redirect_uri=https://evil.example&returnTo=https://evil.example", null);
-        // then
-        assertThat(Optional.ofNullable(response.getResponseHeaders().getFirst("Location")).orElseThrow().contains("redirect_uri=http://localhost:5173/auth/google/callback")).isTrue();
 
+        // then
+        assertThat(Optional.ofNullable(response.getResponseHeaders().getFirst("Location"))
+                .orElseThrow()
+                .contains("redirect_uri=http://localhost:5173/auth/google/callback"))
+                .isTrue();
     }
 
     @Test
@@ -188,9 +216,12 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
     void returnsToConfiguredOriginAfterUntrustedStart() throws Exception {
         // given
         userRepository.save(UserFixtures.user("google", sub, email));
-        var start = rememberAuthorization(get("/auth/google?redirect_uri=https://evil.example&returnTo=https://evil.example", null));
+        var start = rememberAuthorization(
+                get("/auth/google?redirect_uri=https://evil.example&returnTo=https://evil.example", null));
+
         // when
         var response = callback(start, "ok", null);
+
         // then
         assertRedirect(response, "https://mogum.example/");
     }
@@ -210,19 +241,23 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
         // then
         assertRedirect(response, "https://mogum.example/");
         assertExpired(response);
+
         var sessionHeader = cookieHeader(response, "SESSION");
         assertCookieSecurity(sessionHeader);
         assertThat(sessionHeader).doesNotContain("Domain=");
+
         var cookie = cookiePair(sessionHeader);
         assertNotAppliedOnly(cookie);
         assertThat(count("users")).isEqualTo(usersBefore);
         assertThat(count("credit_entries")).isZero();
         assertThat(count("spring_session")).isEqualTo(sessionsBefore + 1);
         assertThat(TOKEN_CALLS.get()).isEqualTo(1);
+
         var line = loginLine(response, output);
         assertThat(line).contains(" INFO ").endsWith("login result=not_applied").doesNotContain("userId=");
         assertPrivate(output, email, name, sub, "fake-access-token", "fake-id-token", cookie,
                 start.state(), start.cookie(), verifier(start));
+
         var me = get("/api/me", cookie);
         assertThat(me.getStatus().value()).isEqualTo(200);
         JsonAssert.comparator(JsonCompareMode.STRICT)
@@ -262,13 +297,16 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
     void rotatesAndClearsSessionForNotAppliedAccount(String previous, CapturedOutput output) throws Exception {
         // given
         if (previous.equals("member")) userRepository.save(UserFixtures.user("google", sub, email));
+
         var first = callback(start(null), "ok", null);
         var oldCookie = cookiePair(cookieHeader(first, "SESSION"));
-        var oldId = new String(Base64.getDecoder().decode(oldCookie.substring("SESSION=".length())), StandardCharsets.UTF_8);
+        var oldId = new String(Base64.getDecoder().decode(oldCookie.substring("SESSION=".length())),
+                StandardCharsets.UTF_8);
         var jdbcSession = jdbcIndexedSessionRepository.findById(oldId);
         Session stored = jdbcSession;
         stored.setAttribute("stale", "must-be-cleared");
         jdbcIndexedSessionRepository.save(jdbcSession);
+
         sub = "LEAKCHECK-next-sub";
         email = "LEAKCHECK-next-email@example.com";
         name = "LEAKCHECK-next-name";
@@ -287,20 +325,23 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
         assertThat(count("spring_session")).isEqualTo(sessionsBefore + 1);
         assertThat(get("/api/me", oldCookie).getStatus().value()).isEqualTo(401);
         assertThat(get("/api/me", newCookie).getStatus().value()).isEqualTo(200);
+
         assertThat(loginLine(response, output)).endsWith("login result=not_applied").doesNotContain("userId=");
         assertPrivate(output, sub, email, name);
     }
 
     private void assertNotAppliedOnly(String cookie) {
-        String id = new String(Base64.getDecoder().decode(cookie.substring("SESSION=".length())), StandardCharsets.UTF_8);
-        assertThat(jdbcTemplate.queryForObject("SELECT principal_name FROM spring_session WHERE session_id = ?", String.class, id)).isNull();
+        String id = new String(Base64.getDecoder().decode(cookie.substring("SESSION=".length())),
+                StandardCharsets.UTF_8);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT principal_name FROM spring_session WHERE session_id = ?", String.class, id)).isNull();
         Session stored = jdbcIndexedSessionRepository.findById(id);
         assertThat(stored).isNotNull();
         assertThat(stored.getAttributeNames()).containsExactly(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE);
         assertThat((Object) stored.getAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE))
                 .isEqualTo(new AccountPrincipal.NotApplied("google", sub, email, name));
     }
-
 }
 
 @IntegrationTest
@@ -325,18 +366,25 @@ abstract class OAuthScenario {
         userInfoFailure = false;
         TOKEN_CALLS.set(0);
         CODE_CHALLENGE.set(null);
+
         usersBefore = count("users");
         sessionsBefore = count("spring_session");
     }
+
     static String loginLine(EntityExchangeResult<?> response, CapturedOutput output) throws InterruptedException {
         String id = Optional.ofNullable(response.getResponseHeaders().getFirst("X-Request-Id")).orElseThrow();
         long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
+
         while (output.getOut().lines().noneMatch(line -> line.contains("requestId=" + id)
                 && line.contains("access method=")) && System.nanoTime() < deadline) Thread.sleep(10);
+
         assertThat(output.getOut().lines().filter(line -> line.contains("requestId=" + id)
                 && line.contains("access method=")).count()).isEqualTo(1);
-        var lines = output.getOut().lines().filter(line -> line.contains("requestId=" + id)
-                && line.contains("login result=")).toList();
+
+        var lines = output.getOut()
+                .lines()
+                .filter(line -> line.contains("requestId=" + id) && line.contains("login result="))
+                .toList();
         assertThat(lines).hasSize(1);
         return lines.getFirst();
     }
@@ -347,7 +395,9 @@ abstract class OAuthScenario {
 
     static String verifier(Start start) {
         return new ObjectMapper().readTree(Base64.getUrlDecoder().decode(
-                start.cookie().substring("MOGUM_OAUTH_REQUEST=".length()))).get("code_verifier").asString();
+                start.cookie().substring("MOGUM_OAUTH_REQUEST=".length())))
+                .get("code_verifier")
+                .asString();
     }
 
     String expiredCookie(Start start) {
@@ -355,32 +405,47 @@ abstract class OAuthScenario {
         var saved = (ObjectNode) mapper.readTree(Base64.getUrlDecoder().decode(
                 start.cookie().substring("MOGUM_OAUTH_REQUEST=".length())));
         saved.put("issuedAt", testClock.instant().minusSeconds(601).getEpochSecond());
-        return "MOGUM_OAUTH_REQUEST=" + Base64.getUrlEncoder().withoutPadding().encodeToString(mapper.writeValueAsBytes(saved));
+        return "MOGUM_OAUTH_REQUEST=" + Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(mapper.writeValueAsBytes(saved));
     }
 
     Start withVerifier(Start start, String verifier) {
         var mapper = new ObjectMapper();
         var saved = (ObjectNode) mapper.readTree(
                 Base64.getUrlDecoder().decode(start.cookie().substring("MOGUM_OAUTH_REQUEST=".length())));
+
         if (verifier == null) saved.remove("code_verifier");
         else saved.put("code_verifier", verifier);
-        String cookie = "MOGUM_OAUTH_REQUEST=" + Base64.getUrlEncoder().withoutPadding()
+
+        String cookie = "MOGUM_OAUTH_REQUEST=" + Base64.getUrlEncoder()
+                .withoutPadding()
                 .encodeToString(mapper.writeValueAsBytes(saved));
         return new Start(start.state(), cookie, start.response());
     }
 
     void assertIdOnly(String cookie, String id) {
-        String sessionId = new String(Base64.getDecoder().decode(cookie.substring("SESSION=".length())), StandardCharsets.UTF_8);
-        assertThat(jdbcTemplate.queryForObject("SELECT principal_name FROM spring_session WHERE session_id = ?", String.class, sessionId)).isEqualTo(id);
+        String sessionId = new String(Base64.getDecoder().decode(cookie.substring("SESSION=".length())),
+                StandardCharsets.UTF_8);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT principal_name FROM spring_session WHERE session_id = ?", String.class, sessionId))
+                .isEqualTo(id);
         Session stored = jdbcIndexedSessionRepository.findById(sessionId);
         assertThat(stored).isNotNull();
-        assertThat(stored.getAttributeNames()).isEqualTo(Set.of(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME));
-        assertThat((String) stored.getAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME)).isEqualTo(id);
-        List<byte[]> attributes = jdbcTemplate.query("SELECT attribute_bytes FROM spring_session_attributes WHERE session_primary_id = (SELECT primary_id FROM spring_session WHERE session_id = ?)",
+        assertThat(stored.getAttributeNames())
+                .isEqualTo(Set.of(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME));
+        assertThat((String) stored.getAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME))
+                .isEqualTo(id);
+
+        List<byte[]> attributes = jdbcTemplate.query(
+                "SELECT attribute_bytes FROM spring_session_attributes WHERE session_primary_id = (SELECT primary_id FROM spring_session WHERE session_id = ?)",
                 (rs, row) -> rs.getBytes(1), sessionId);
         assertThat(attributes).hasSize(1);
+
         String bytes = new String(attributes.getFirst(), StandardCharsets.ISO_8859_1);
-        for (String forbidden : List.of(email, sub, name, "fake-access-token", "fake-id-token")) assertThat(bytes).doesNotContain(forbidden);
+        for (String forbidden : List.of(email, sub, name, "fake-access-token", "fake-id-token"))
+                assertThat(bytes).doesNotContain(forbidden);
     }
 
     Start start(String existingCookie) throws Exception {
@@ -390,8 +455,10 @@ abstract class OAuthScenario {
     }
 
     Start rememberAuthorization(EntityExchangeResult<String> response) {
-        var query = UriComponentsBuilder.fromUriString(Optional.ofNullable(response.getResponseHeaders().getFirst("Location")).orElseThrow())
-                .build().getQueryParams();
+        var query = UriComponentsBuilder.fromUriString(
+                Optional.ofNullable(response.getResponseHeaders().getFirst("Location")).orElseThrow())
+                .build()
+                .getQueryParams();
         CODE_CHALLENGE.set(query.getFirst("code_challenge"));
         return new Start(query.getFirst("state"), cookiePair(cookieHeader(response, "MOGUM_OAUTH_REQUEST")), response);
     }
@@ -404,6 +471,7 @@ abstract class OAuthScenario {
     EntityExchangeResult<String> get(String path, String cookie) {
         var request = testRequests.anonymous().get().uri(URI.create("http://localhost:" + port + path));
         if (cookie != null) request.header("Cookie", cookie);
+
         return request.exchange().returnResult(String.class);
     }
 
@@ -412,7 +480,11 @@ abstract class OAuthScenario {
     }
 
     static String cookieHeader(EntityExchangeResult<?> response, String name) {
-        var header = response.getResponseHeaders().getOrEmpty("Set-Cookie").stream().filter(value -> value.startsWith(name + "=")).findFirst();
+        var header = response.getResponseHeaders()
+                .getOrEmpty("Set-Cookie")
+                .stream()
+                .filter(value -> value.startsWith(name + "="))
+                .findFirst();
         assertThat(header.isPresent()).isTrue();
         return header.orElseThrow();
     }
@@ -427,7 +499,8 @@ abstract class OAuthScenario {
 
     static void assertRedirect(EntityExchangeResult<?> response, String target) {
         assertThat(response.getStatus().value()).isEqualTo(302);
-        assertThat(Optional.ofNullable(response.getResponseHeaders().getFirst("Location")).orElseThrow()).isEqualTo(target);
+        assertThat(Optional.ofNullable(response.getResponseHeaders().getFirst("Location")).orElseThrow())
+                .isEqualTo(target);
     }
 
     static void assertExpired(EntityExchangeResult<?> response) {
@@ -440,9 +513,13 @@ abstract class OAuthScenario {
     void assertFailure(EntityExchangeResult<?> response, String error) {
         assertRedirect(response, "https://mogum.example/login?error=" + error);
         assertExpired(response);
+
         assertThat(count("users")).isEqualTo(usersBefore);
         assertThat(count("spring_session")).isEqualTo(sessionsBefore);
-        assertThat(response.getResponseHeaders().getOrEmpty("Set-Cookie").stream().noneMatch(value -> value.startsWith("SESSION="))).isTrue();
+        assertThat(response.getResponseHeaders()
+                .getOrEmpty("Set-Cookie")
+                .stream()
+                .noneMatch(value -> value.startsWith("SESSION="))).isTrue();
     }
 
     record Start(String state, String cookie, EntityExchangeResult<String> response) { }

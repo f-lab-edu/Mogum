@@ -39,6 +39,7 @@ class ApplyServiceTest {
 
             // then
             assertThat(users.count()).isEqualTo(1);
+
             var user = users.findById(result.userId()).orElseThrow();
             assertThat(user.getProvider()).isEqualTo(identity.provider());
             assertThat(user.getSubject()).isEqualTo(identity.subject());
@@ -48,7 +49,9 @@ class ApplyServiceTest {
             assertThat(user.getCreditBalance()).isEqualTo(credit.monthlyAmount());
             assertThat(user.getApprovedAt()).isNull();
             assertThat(user.getCreditRefillAt()).isNull();
-            assertThat(result).isEqualTo(new AccountPrincipal.Member(user.getId(), user.getEmail(), user.getName(), UserStatus.APPLIED));
+            assertThat(result).isEqualTo(new AccountPrincipal.Member(
+                    user.getId(), user.getEmail(), user.getName(), UserStatus.APPLIED));
+
             assertThat(entries.entries()).singleElement().satisfies(entry -> {
                 assertThat(entry.getId()).isPositive();
                 assertThat(entry.getUser()).isSameAs(user);
@@ -77,8 +80,10 @@ class ApplyServiceTest {
             // given
             var users = new FakeUserRepository();
             var entries = new FakeCreditEntryRepository();
-            var existing = users.save(UserFixtures.withStatus(UserFixtures.user("google", "stable-sub", "old@example.com"), status));
+            var existing = users.save(
+                    UserFixtures.withStatus(UserFixtures.user("google", "stable-sub", "old@example.com"), status));
             var service = new ApplyService(users, entries, context.getBean(CreditProperties.class));
+
             AccountPrincipal principal = identitySession
                     ? new AccountPrincipal.NotApplied("google", "stable-sub", "changed@example.com", "바뀐 이름")
                     : new AccountPrincipal.Member(existing.getId(), "stale@example.com", "오래된 이름", UserStatus.APPLIED);
@@ -90,7 +95,8 @@ class ApplyServiceTest {
             var result = service.apply(principal);
 
             // then
-            assertThat(result).isEqualTo(new AccountPrincipal.Member(existing.getId(), "old@example.com", "old", status));
+            assertThat(result)
+                    .isEqualTo(new AccountPrincipal.Member(existing.getId(), "old@example.com", "old", status));
             assertThat(users.count()).isEqualTo(1);
             assertThat(users.findById(existing.getId())).containsSame(existing);
             assertThat(existing.getStatus()).isEqualTo(status);
@@ -99,6 +105,7 @@ class ApplyServiceTest {
             assertThat(existing.getCreditBalance()).isEqualTo(balance);
             assertThat(existing.getApprovedAt()).isEqualTo(approvedAt);
             assertThat(existing.getCreditRefillAt()).isEqualTo(refillAt);
+
             assertThat(entries.entries()).isEmpty();
         });
     }

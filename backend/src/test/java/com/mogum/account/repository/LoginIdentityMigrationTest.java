@@ -43,6 +43,7 @@ class LoginIdentityMigrationTest {
 
             // when
             database.migrateTo("8");
+
             // V7의 초기 Auditing 값은 V9가 실제 갱신하기 전에 확인한다.
             assertThat(jdbc.queryForObject("SELECT count(*) FROM users WHERE updated_at = created_at", Integer.class))
                     .isEqualTo(2);
@@ -86,6 +87,7 @@ class LoginIdentityMigrationTest {
         try (var database = new MigrationDatabase()) {
             var legacy = database.prepareUsersAndSession(version);
             database.flyway().migrate();
+
             // 마이그레이션 전용 스키마에 실제 앱을 연결한다. 공용 통합 컨텍스트를 만들지 않는다.
             try (var app = database.startApplication()) {
                 int port = app.getEnvironment().getRequiredProperty("local.server.port", Integer.class);
@@ -93,8 +95,11 @@ class LoginIdentityMigrationTest {
                 var client = RestTestClient.bindToServer().baseUrl("http://localhost:" + port).build();
 
                 // when
-                var response = client.get().uri("/api/me").cookie("SESSION", cookie)
-                        .exchange().returnResult(String.class);
+                var response = client.get()
+                        .uri("/api/me")
+                        .cookie("SESSION", cookie)
+                        .exchange()
+                        .returnResult(String.class);
 
                 // then
                 assertThat(response.getStatus().value()).isEqualTo(200);
@@ -111,6 +116,7 @@ class LoginIdentityMigrationTest {
         try (var database = new MigrationDatabase()) {
             var legacy = database.prepareUsersAndSession(version);
             database.flyway().migrate();
+
             try (var app = database.startApplication()) {
                 long id = ((Number) legacy.users().getFirst().get("id")).longValue();
                 var login = app.getBean(LoginService.class);
@@ -140,13 +146,18 @@ class LoginIdentityMigrationTest {
                     INSERT INTO users (email, status, role, created_at)
                     VALUES ('old@example.com', 'ACTIVE', 'USER', now()) RETURNING id
                     """, Long.class);
+
             if (!scenario.equals("missing")) {
-                jdbc.update("INSERT INTO user_identities (user_id, provider, subject, created_at) VALUES (?, ?, 'original', now())",
+                jdbc.update(
+                        "INSERT INTO user_identities (user_id, provider, subject, created_at) VALUES (?, ?, 'original', now())",
                         id, scenario.equals("other") ? "other-provider" : "google");
             }
             if (scenario.equals("multiple")) {
-                jdbc.update("INSERT INTO user_identities (user_id, provider, subject, created_at) VALUES (?, 'google', 'second', now())", id);
+                jdbc.update(
+                        "INSERT INTO user_identities (user_id, provider, subject, created_at) VALUES (?, 'google', 'second', now())",
+                        id);
             }
+
             var users = jdbc.queryForList("SELECT * FROM users ORDER BY id");
             var identities = jdbc.queryForList("SELECT * FROM user_identities ORDER BY id");
             var flyway = database.flyway();
@@ -160,7 +171,7 @@ class LoginIdentityMigrationTest {
     }
 
     private record LegacyData(List<Map<String, Object>> users, List<Map<String, Object>> sessions,
-                              String attributeBase64, String sessionId) {
+            String attributeBase64, String sessionId) {
     }
 
     private static final class MigrationDatabase implements AutoCloseable {
@@ -187,19 +198,23 @@ class LoginIdentityMigrationTest {
                            ('other-sub', 'old@example.com', 'ACTIVE', 'ADMIN', NULL, NULL, ?)
                     """, Timestamp.from(created.plusSeconds(10)), Timestamp.from(created),
                     Timestamp.from(created));
+
             var users = jdbcTemplate.queryForList("SELECT id, email, created_at FROM users ORDER BY id");
             String primaryId = UUID.randomUUID().toString();
             String sessionId = UUID.randomUUID().toString();
             long now = System.currentTimeMillis();
             jdbcTemplate.update("INSERT INTO spring_session VALUES (?, ?, ?, ?, 604800, ?, ?)",
                     primaryId, sessionId, now, now, now + 604800000, users.getFirst().get("id").toString());
+
             var serialized = new ByteArrayOutputStream();
             try (var output = new ObjectOutputStream(serialized)) {
                 output.writeObject(users.getFirst().get("id").toString());
             }
+
             byte[] attribute = serialized.toByteArray();
             jdbcTemplate.update("INSERT INTO spring_session_attributes VALUES (?, ?, ?)", primaryId,
                     FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, attribute);
+
             var sessions = jdbcTemplate.queryForList("SELECT * FROM spring_session");
             if (!version.equals("3")) {
                 migrateTo(version);
@@ -213,23 +228,32 @@ class LoginIdentityMigrationTest {
         }
 
         private void migrateTo(String version) {
-            Flyway.configure().dataSource(url, POSTGRES.getUsername(), POSTGRES.getPassword())
-                    .defaultSchema(schema).schemas(schema).target(version).load().migrate();
+            Flyway.configure()
+                    .dataSource(url, POSTGRES.getUsername(), POSTGRES.getPassword())
+                    .defaultSchema(schema)
+                    .schemas(schema)
+                    .target(version)
+                    .load()
+                    .migrate();
         }
 
         private Flyway flyway() {
-            return Flyway.configure().dataSource(url, POSTGRES.getUsername(), POSTGRES.getPassword())
-                    .defaultSchema(schema).schemas(schema).load();
+            return Flyway.configure()
+                    .dataSource(url, POSTGRES.getUsername(), POSTGRES.getPassword())
+                    .defaultSchema(schema)
+                    .schemas(schema)
+                    .load();
         }
 
         private ConfigurableApplicationContext startApplication() {
-            return new SpringApplicationBuilder(MogumApplication.class).registerShutdownHook(false).run(
-                    "--server.port=0", "--spring.datasource.url=" + url,
-                    "--spring.datasource.username=" + POSTGRES.getUsername(),
-                    "--spring.datasource.password=" + POSTGRES.getPassword(),
-                    "--spring.flyway.default-schema=" + schema, "--spring.flyway.schemas=" + schema,
-                    "--app.web.cookie-domain=",
-                    "--debug=false", "--logging.level.org.springframework=INFO");
+            return new SpringApplicationBuilder(MogumApplication.class)
+                    .registerShutdownHook(false)
+                    .run("--server.port=0", "--spring.datasource.url=" + url,
+                            "--spring.datasource.username=" + POSTGRES.getUsername(),
+                            "--spring.datasource.password=" + POSTGRES.getPassword(),
+                            "--spring.flyway.default-schema=" + schema, "--spring.flyway.schemas=" + schema,
+                            "--app.web.cookie-domain=",
+                            "--debug=false", "--logging.level.org.springframework=INFO");
         }
 
         @Override

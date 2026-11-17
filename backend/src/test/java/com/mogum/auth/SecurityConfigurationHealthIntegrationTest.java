@@ -30,8 +30,12 @@ class SecurityConfigurationHealthIntegrationTest {
         var response = testRequests.anonymous().get().uri("/actuator/health").exchange();
 
         // then
-        response.expectStatus().isOk().expectHeader().value("Content-Type", value -> assertThat(value).contains("json"))
-                .expectBody().json("{\"status\":\"UP\"}", JsonCompareMode.STRICT);
+        response.expectStatus()
+                .isOk()
+                .expectHeader()
+                .value("Content-Type", value -> assertThat(value).contains("json"))
+                .expectBody()
+                .json("{\"status\":\"UP\"}", JsonCompareMode.STRICT);
     }
 
     @Test
@@ -41,13 +45,16 @@ class SecurityConfigurationHealthIntegrationTest {
         var probe = (DatabaseProbe) dataSource;
         long before = probe.connectionAttempts();
         probe.failConnections(true);
+
         try {
             // when
             var response = testRequests.anonymous().get().uri("/actuator/health").exchange();
 
             // then
-            response.expectStatus().isEqualTo(503)
-                    .expectBody().json("{\"status\":\"DOWN\"}", JsonCompareMode.STRICT);
+            response.expectStatus()
+                    .isEqualTo(503)
+                    .expectBody()
+                    .json("{\"status\":\"DOWN\"}", JsonCompareMode.STRICT);
             assertThat(probe.connectionAttempts()).isGreaterThan(before);
         } finally {
             probe.failConnections(false);

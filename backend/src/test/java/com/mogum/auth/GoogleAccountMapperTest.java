@@ -31,7 +31,8 @@ class GoogleAccountMapperTest {
         var account = googleAccountMapper.map(authentication);
 
         // then
-        assertThat(account).isEqualTo(new ExternalAccount("google", " Case-Sensitive-Sub ", "Admin@Example.com", "test", true));
+        assertThat(account)
+                .isEqualTo(new ExternalAccount("google", " Case-Sensitive-Sub ", "Admin@Example.com", "test", true));
     }
 
     @Test
@@ -41,7 +42,8 @@ class GoogleAccountMapperTest {
         var authentication = authentication("kakao", attributes());
 
         // when & then
-        assertThatThrownBy(() -> googleAccountMapper.map(authentication)).isInstanceOf(OAuth2AuthenticationException.class);
+        assertThatThrownBy(() -> googleAccountMapper.map(authentication))
+                .isInstanceOf(OAuth2AuthenticationException.class);
     }
 
     @ParameterizedTest(name = "필드 {0} 값 [{1}]")
@@ -50,12 +52,15 @@ class GoogleAccountMapperTest {
     void rejectsInvalidIdentityAttribute(String field, Object invalid) {
         // given
         var values = attributes();
+
         if (invalid == null) values.remove(field);
         else values.put(field, invalid);
+
         var authentication = authentication("google", values);
 
         // when & then
-        assertThatThrownBy(() -> googleAccountMapper.map(authentication)).isInstanceOf(OAuth2AuthenticationException.class);
+        assertThatThrownBy(() -> googleAccountMapper.map(authentication))
+                .isInstanceOf(OAuth2AuthenticationException.class);
     }
 
     @ParameterizedTest(name = "인증 표시 [{0}]")
@@ -64,8 +69,10 @@ class GoogleAccountMapperTest {
     void treatsMissingOrNonBooleanVerificationAsUnverified(Object value) {
         // given
         var values = attributes();
+
         if (value == null) values.remove("email_verified");
         else values.put("email_verified", value);
+
         var authentication = authentication("google", values);
 
         // when
@@ -81,8 +88,10 @@ class GoogleAccountMapperTest {
     void fallsBackToEmailLocalPart(Object name) {
         // given
         var values = attributes();
+
         if (name == null) values.remove("name");
         else values.put("name", name);
+
         var authentication = authentication("google", values);
 
         // when
@@ -97,8 +106,9 @@ class GoogleAccountMapperTest {
     }
 
     private static Stream<Arguments> invalidIdentityAttributes() {
-        return Stream.of("sub", "email").flatMap(field -> Stream.of(null, "", "  ", 123)
-                .map(value -> Arguments.of(field, value)));
+        return Stream.of("sub", "email")
+                .flatMap(field -> Stream.of(null, "", "  ", 123)
+                        .map(value -> Arguments.of(field, value)));
     }
 
     private static Stream<Arguments> unverifiedAttributes() {
@@ -113,6 +123,7 @@ class GoogleAccountMapperTest {
     private static OAuth2AuthenticationToken authentication(String registration, Map<String, Object> attributes) {
         var values = new HashMap<>(attributes);
         values.put("fixture-id", "fixture-principal");
-        return new OAuth2AuthenticationToken(new DefaultOAuth2User(List.of(), values, "fixture-id"), List.of(), registration);
+        return new OAuth2AuthenticationToken(new DefaultOAuth2User(List.of(), values, "fixture-id"), List.of(),
+                registration);
     }
 }

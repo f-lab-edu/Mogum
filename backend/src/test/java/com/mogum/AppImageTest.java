@@ -27,11 +27,13 @@ class AppImageTest {
     void startsImageWithHealthyServer() throws Exception {
         // given
         try (var running = new RunningApp();
-             var client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()) {
+                var client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()) {
             var app = running.genericContainer;
             var request = HttpRequest.newBuilder(URI.create("http://" + app.getHost() + ":"
-                            + app.getMappedPort(8080) + "/actuator/health"))
-                    .timeout(Duration.ofSeconds(5)).GET().build();
+                    + app.getMappedPort(8080) + "/actuator/health"))
+                    .timeout(Duration.ofSeconds(5))
+                    .GET()
+                    .build();
             var mapper = new ObjectMapper();
 
             // when
@@ -54,8 +56,14 @@ class AppImageTest {
             // then
             assertThat(process.getExitCode()).as(process.getStderr()).isZero();
             assertThat(process.getStdout()).startsWith("java\n");
-            var uids = process.getStdout().lines().filter(line -> line.startsWith("Uid:"))
-                    .findFirst().orElseThrow().trim().split("\\s+");
+
+            var uids = process.getStdout()
+                    .lines()
+                    .filter(line -> line.startsWith("Uid:"))
+                    .findFirst()
+                    .orElseThrow()
+                    .trim()
+                    .split("\\s+");
             assertThat(uids).hasSize(5);
             assertThat(Arrays.stream(uids).skip(1).map(Integer::parseInt).toList())
                     .allSatisfy(uid -> assertThat(uid).as("PID 1의 UID").isPositive());
@@ -68,9 +76,9 @@ class AppImageTest {
         // given
         try (var running = new RunningApp()) {
             var app = running.genericContainer;
+
             // stop()은 컨테이너를 삭제하므로 Docker stop 후 삭제 전에 종료 코드를 읽는다.
             // 진행 중인 작업이 없는 검사에서 15초를 넘으면 SIGKILL(137)로 실패한다.
-
             // when
             app.getDockerClient().stopContainerCmd(app.getContainerId()).withTimeout(15).exec();
 
@@ -89,6 +97,7 @@ class AppImageTest {
         private RunningApp() {
             var appImage = System.getProperty("appImage");
             assertThat(appImage).as("appImage 시스템 속성으로 검사할 이미지를 지정해야 한다").isNotBlank();
+
             network = Network.newNetwork();
             postgreSQLContainer = new PostgreSQLContainer("pgvector/pgvector:pg17")
                     .withNetwork(network)
@@ -104,6 +113,7 @@ class AppImageTest {
                     .withEnv("GOOGLE_CLIENT_SECRET", System.getProperty("GOOGLE_CLIENT_SECRET"))
                     .waitingFor(Wait.forHttp("/actuator/health").forStatusCode(200))
                     .withStartupTimeout(Duration.ofMinutes(2));
+
             try {
                 postgreSQLContainer.start();
                 genericContainer.start();

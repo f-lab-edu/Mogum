@@ -50,6 +50,7 @@ class UserRepositoryTest {
         // then
         assertThat(saved.getId()).isPositive();
         assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+
         assertThat(actual.getId()).isEqualTo(saved.getId());
         assertThat(actual.getProvider()).isEqualTo("google");
         assertThat(actual.getSubject()).isEqualTo("Subject");
@@ -57,8 +58,11 @@ class UserRepositoryTest {
         assertThat(actual.getStatus()).isEqualTo(UserStatus.APPLIED);
         assertThat(actual.getCreatedAt()).isEqualTo(testClock.instant());
         assertThat(actual.getUpdatedAt()).isEqualTo(testClock.instant());
+
         assertThat(jdbcTemplate.queryForMap("SELECT provider, subject FROM users WHERE id = ?", saved.getId()))
-                .containsEntry("provider", "google").containsEntry("subject", "Subject");
+                .containsEntry("provider", "google")
+                .containsEntry("subject", "Subject");
+
         assertThat(actual.getName()).isEqualTo("repository");
         assertThat(actual.getCreditBalance()).isEqualTo(100);
         assertThat(actual.getApprovedAt()).isNull();
@@ -120,10 +124,12 @@ class UserRepositoryTest {
                 UserFixtures.user("google", marker, "repository@example.com")))
                 .satisfies(failure -> {
                     assertSqlState("23505", failure);
+
                     StringBuilder messages = new StringBuilder();
                     for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
                         messages.append(cause.getMessage()).append('\n');
                     }
+
                     assertThat(messages.toString()).contains("users_provider_subject_key").doesNotContain(marker);
                 });
         assertThat(output.getAll()).contains("users_provider_subject_key").doesNotContain(marker);
@@ -168,7 +174,8 @@ class UserRepositoryTest {
     }
 
     @ParameterizedTest(name = "제공자 [{0}] 식별자 [{1}]")
-    @CsvSource(value = {"google|''", "google|'  '", "google|'\t\n'", "''|Subject", "'  '|Subject", "'\t\n'|Subject"}, delimiter = '|')
+    @CsvSource(value = {"google|''", "google|'  '", "google|'\t\n'", "''|Subject", "'  '|Subject", "'\t\n'|Subject"},
+            delimiter = '|')
     @DisplayName("빈 값이나 공백뿐인 제공자와 외부 식별자는 거절한다")
     void rejectsBlankIdentityParts(String provider, String subject) {
         // given
@@ -178,8 +185,10 @@ class UserRepositoryTest {
         assertThatThrownBy(() -> userRepository.save(
                 UserFixtures.user(provider, subject, "repository@example.com")))
                 .satisfies(failure -> assertSqlState("23514", failure));
-        assertThat(userRepository.findByProviderAndSubject("google", "Subject")).get()
-                .extracting(User::getId).isEqualTo(existing.getId());
+        assertThat(userRepository.findByProviderAndSubject("google", "Subject"))
+                .get()
+                .extracting(User::getId)
+                .isEqualTo(existing.getId());
     }
 
     @Test
@@ -194,10 +203,14 @@ class UserRepositoryTest {
 
         // then
         assertThat(second.getId()).isNotEqualTo(first.getId());
-        assertThat(userRepository.findByProviderAndSubject("google", "shared")).get()
-                .extracting(User::getId).isEqualTo(first.getId());
-        assertThat(userRepository.findByProviderAndSubject("other-provider", "shared")).get()
-                .extracting(User::getId).isEqualTo(second.getId());
+        assertThat(userRepository.findByProviderAndSubject("google", "shared"))
+                .get()
+                .extracting(User::getId)
+                .isEqualTo(first.getId());
+        assertThat(userRepository.findByProviderAndSubject("other-provider", "shared"))
+                .get()
+                .extracting(User::getId)
+                .isEqualTo(second.getId());
     }
 
     @ParameterizedTest(name = "컬럼 {0}")
@@ -215,7 +228,8 @@ class UserRepositoryTest {
     }
 
     @ParameterizedTest(name = "필수 컬럼 {0}")
-    @ValueSource(strings = {"provider", "subject", "email", "name", "status", "credit_balance", "created_at", "updated_at"})
+    @ValueSource(
+            strings = {"provider", "subject", "email", "name", "status", "credit_balance", "created_at", "updated_at"})
     @DisplayName("회원 필수 컬럼은 NULL을 거절하고 기존 회원을 보존한다")
     void rejectsNullRequiredColumn(String column) {
         // given
@@ -242,6 +256,7 @@ class UserRepositoryTest {
         var emails = transactions.execute(status -> {
             UserFixtures.withEmail(entityManager.find(User.class, saved.getId()), "flushed@example.com");
             entityManager.flush();
+
             return List.of(nativeEmail(saved.getId()), userRepository.findById(saved.getId()).orElseThrow().getEmail());
         });
 
@@ -260,6 +275,7 @@ class UserRepositoryTest {
         // when
         var email = transactions.execute(status -> {
             UserFixtures.withEmail(entityManager.find(User.class, saved.getId()), "auto-flush@example.com");
+
             // 현재 설정의 관찰이다. 제품 코드는 이 자동 flush에 기대지 않는다.
             return nativeEmail(saved.getId());
         });
@@ -284,7 +300,8 @@ class UserRepositoryTest {
         // when & then
         assertThatThrownBy(() -> jdbcTemplate.update("UPDATE users SET " + assignment
                 + ", updated_at = now() WHERE id = ?", saved.getId()))
-                .hasMessageContaining(constraint).satisfies(failure -> assertSqlState("23514", failure));
+                .hasMessageContaining(constraint)
+                .satisfies(failure -> assertSqlState("23514", failure));
         assertUnchanged(saved);
     }
 
@@ -312,14 +329,17 @@ class UserRepositoryTest {
 
     private String nativeEmail(long id) {
         return (String) entityManager.createNativeQuery("SELECT email FROM users WHERE id = :id")
-                .setParameter("id", id).getSingleResult();
+                .setParameter("id", id)
+                .getSingleResult();
     }
 
     private static void assertSqlState(String expected, Throwable failure) {
         assertThat(failure).isNotNull();
         assertThat(failure).hasRootCauseInstanceOf(SQLException.class);
+
         Throwable root = failure;
         while (root.getCause() != null) root = root.getCause();
+
         assertThat(root).isInstanceOfSatisfying(SQLException.class,
                 sql -> assertThat(sql.getSQLState()).isEqualTo(expected));
     }

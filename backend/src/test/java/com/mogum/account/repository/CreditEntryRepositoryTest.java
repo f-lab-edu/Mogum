@@ -48,11 +48,14 @@ class CreditEntryRepositoryTest {
         assertThat(actual.getAmount()).isEqualTo(100);
         assertThat(actual.getCreatedAt()).isEqualTo(testClock.instant());
         assertThat(actual.getUpdatedAt()).isEqualTo(testClock.instant());
+
         assertThat(actual.getUser().getId()).isEqualTo(user.getId());
         assertThat(Hibernate.isInitialized(actual.getUser())).isFalse();
         assertThatThrownBy(() -> actual.getUser().getEmail()).isInstanceOf(LazyInitializationException.class);
-        assertThat(jdbcTemplate.queryForObject("SELECT sum(amount) FROM credit_entries WHERE user_id = ?", Integer.class,
-                user.getId())).isEqualTo(user.getCreditBalance());
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT sum(amount) FROM credit_entries WHERE user_id = ?", Integer.class, user.getId()))
+                .isEqualTo(user.getCreditBalance());
     }
 
     @Test

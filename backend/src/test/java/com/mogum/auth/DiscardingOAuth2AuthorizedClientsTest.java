@@ -17,7 +17,8 @@ import static org.mockito.BDDMockito.then;
 class DiscardingOAuth2AuthorizedClientsTest {
     @Mock private OAuth2AuthorizedClient oAuth2AuthorizedClient;
     @Mock private Authentication authentication;
-    private final DiscardingOAuth2AuthorizedClients discardingOAuth2AuthorizedClients = new DiscardingOAuth2AuthorizedClients();
+    private final DiscardingOAuth2AuthorizedClients discardingOAuth2AuthorizedClients =
+            new DiscardingOAuth2AuthorizedClients();
 
     @Test
     @DisplayName("서비스의 저장은 토큰과 인증 정보를 읽지 않는다")
@@ -38,7 +39,8 @@ class DiscardingOAuth2AuthorizedClientsTest {
         var response = new MockHttpServletResponse();
 
         // when
-        discardingOAuth2AuthorizedClients.saveAuthorizedClient(oAuth2AuthorizedClient, authentication, request, response);
+        discardingOAuth2AuthorizedClients.saveAuthorizedClient(oAuth2AuthorizedClient, authentication, request,
+                response);
 
         // then
         assertThat(request.getSession(false)).isNull();
@@ -66,10 +68,12 @@ class DiscardingOAuth2AuthorizedClientsTest {
     void returnsNoWebTokensAfterSave() {
         // given
         var request = new MockHttpServletRequest();
-        discardingOAuth2AuthorizedClients.saveAuthorizedClient(oAuth2AuthorizedClient, authentication, request, new MockHttpServletResponse());
+        discardingOAuth2AuthorizedClients.saveAuthorizedClient(oAuth2AuthorizedClient, authentication, request,
+                new MockHttpServletResponse());
 
         // when
-        OAuth2AuthorizedClient loaded = discardingOAuth2AuthorizedClients.loadAuthorizedClient("google", authentication, request);
+        OAuth2AuthorizedClient loaded = discardingOAuth2AuthorizedClients.loadAuthorizedClient("google", authentication,
+                request);
 
         // then
         assertThat(loaded).isNull();
@@ -98,7 +102,8 @@ class DiscardingOAuth2AuthorizedClientsTest {
         // given
         var request = new MockHttpServletRequest();
         var response = new MockHttpServletResponse();
-        discardingOAuth2AuthorizedClients.saveAuthorizedClient(oAuth2AuthorizedClient, authentication, request, response);
+        discardingOAuth2AuthorizedClients.saveAuthorizedClient(oAuth2AuthorizedClient, authentication, request,
+                response);
 
         // when
         discardingOAuth2AuthorizedClients.removeAuthorizedClient("google", authentication, request, response);

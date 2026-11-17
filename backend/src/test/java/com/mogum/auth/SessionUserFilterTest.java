@@ -68,6 +68,7 @@ class SessionUserFilterTest {
                 .containsExactly(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME);
         assertThat(request.getSession().getAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME))
                 .isEqualTo("17");
+
         // MDC 정리는 바깥 요청 필터의 책임이다.
         assertThat(MDC.get(RequestLogFilter.USER_ID)).isEqualTo("17");
     }
@@ -169,6 +170,7 @@ class SessionUserFilterTest {
         var session = request.getSession();
         if (userId != null) session.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, userId);
         if (identity != null) session.setAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE, identity);
+
         var response = new MockHttpServletResponse();
         var chainCalled = new AtomicBoolean();
 

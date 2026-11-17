@@ -61,7 +61,8 @@ class LoginServiceTest {
         var login = new LoginService(users);
 
         // when
-        var result = login.login(new ExternalAccount("google", "stable-sub", "changed@example.com", "Google name", true));
+        var result = login.login(
+                new ExternalAccount("google", "stable-sub", "changed@example.com", "Google name", true));
 
         // then
         assertThat(result).isEqualTo(new LoginResult.Success(existing.getId()));

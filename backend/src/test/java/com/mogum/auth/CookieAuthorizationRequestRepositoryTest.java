@@ -25,12 +25,18 @@ class CookieAuthorizationRequestRepositoryTest {
     private static final Instant NOW = Instant.parse("2026-10-12T00:00:00Z");
     private static final String STATE = "random-state-known-only-to-browser";
     private static final String VERIFIER = "aB09-._~".repeat(8);
+
     private final ClientRegistration clientRegistration = ClientRegistration.withRegistrationId("google")
-            .clientId("test-client").clientSecret("test-secret")
-            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE).scope("email")
-            .authorizationUri("https://provider.example/authorize").tokenUri("https://provider.example/token")
-            .userInfoUri("https://provider.example/userinfo").userNameAttributeName("sub")
-            .redirectUri("http://localhost:5173/auth/google/callback").build();
+            .clientId("test-client")
+            .clientSecret("test-secret")
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .scope("email")
+            .authorizationUri("https://provider.example/authorize")
+            .tokenUri("https://provider.example/token")
+            .userInfoUri("https://provider.example/userinfo")
+            .userNameAttributeName("sub")
+            .redirectUri("http://localhost:5173/auth/google/callback")
+            .build();
 
     @Test
     @DisplayName("JSON은 state와 발급시각과 PKCE verifier만 담고 세션을 만들지 않는다")
@@ -45,10 +51,12 @@ class CookieAuthorizationRequestRepositoryTest {
 
         // then
         assertThat(request.getSession(false)).isNull();
+
         var cookie = response.getCookie("MOGUM_OAUTH_REQUEST");
         assertThat(cookie).isNotNull();
         var json = new String(Base64.getUrlDecoder().decode(cookie.getValue()), StandardCharsets.UTF_8);
         assertThat(json).contains(STATE).doesNotContain("redirect", "secret");
+
         var saved = new ObjectMapper().readTree(json);
         assertThat(saved.size()).isEqualTo(3);
         assertThat(saved.get("code_verifier").asText()).isEqualTo(VERIFIER);
@@ -167,7 +175,9 @@ class CookieAuthorizationRequestRepositoryTest {
     private Cookie savedCookie(String verifier) {
         var saved = new ObjectMapper().createObjectNode().put("state", STATE).put("issuedAt", NOW.getEpochSecond());
         if (verifier != null) saved.put("code_verifier", verifier);
-        return new Cookie("MOGUM_OAUTH_REQUEST", Base64.getUrlEncoder().withoutPadding()
+
+        return new Cookie("MOGUM_OAUTH_REQUEST", Base64.getUrlEncoder()
+                .withoutPadding()
                 .encodeToString(saved.toString().getBytes(StandardCharsets.UTF_8)));
     }
 
@@ -193,6 +203,7 @@ class CookieAuthorizationRequestRepositoryTest {
         // given
         var response = new MockHttpServletResponse();
         repository(NOW).saveAuthorizationRequest(authorization(), new MockHttpServletRequest(), response);
+
         var cookie = response.getCookie("MOGUM_OAUTH_REQUEST");
         var instant = switch (condition) {
             case "expired" -> NOW.plusSeconds(601);
@@ -216,12 +227,17 @@ class CookieAuthorizationRequestRepositoryTest {
     }
 
     private OAuth2AuthorizationRequest authorization() {
-        return OAuth2AuthorizationRequest.authorizationCode().authorizationUri(clientRegistration.getProviderDetails().getAuthorizationUri())
-                .clientId(clientRegistration.getClientId()).redirectUri(clientRegistration.getRedirectUri()).scopes(clientRegistration.getScopes())
-                .state(STATE).attributes(attributes -> {
+        return OAuth2AuthorizationRequest.authorizationCode()
+                .authorizationUri(clientRegistration.getProviderDetails().getAuthorizationUri())
+                .clientId(clientRegistration.getClientId())
+                .redirectUri(clientRegistration.getRedirectUri())
+                .scopes(clientRegistration.getScopes())
+                .state(STATE)
+                .attributes(attributes -> {
                     attributes.put("registration_id", "google");
                     attributes.put("code_verifier", VERIFIER);
-                }).build();
+                })
+                .build();
     }
 
     private MockHttpServletRequest callback(Cookie cookie, String state) {

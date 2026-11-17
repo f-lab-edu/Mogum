@@ -25,13 +25,10 @@ class DatabaseSetupIntegrationTest {
     @Autowired private ApplicationContext applicationContext;
     @Autowired
     private DataSource dataSource;
-
     @Autowired
     private EntityManagerFactory entityManagerFactory;
-
     @Autowired
     private Flyway flyway;
-
     @Autowired
     private Environment environment;
 
@@ -40,8 +37,10 @@ class DatabaseSetupIntegrationTest {
     void startsJpaWithSharedPostgres() throws SQLException {
         // when
         boolean open = entityManagerFactory.isOpen();
+
         // then
         assertThat(open).isTrue();
+
         try (var connection = dataSource.getConnection()) {
             assertThat(connection.getMetaData().getURL()).isEqualTo(PostgresTestConfiguration.POSTGRES.getJdbcUrl());
             assertThat(connection.getMetaData().getDatabaseProductName()).isEqualTo("PostgreSQL");
@@ -57,8 +56,10 @@ class DatabaseSetupIntegrationTest {
                 .anyMatch(migration -> migration.getVersion() != null
                         && migration.getVersion().toString().equals("1")
                         && migration.getScript().equals("V1__enable_pgvector.sql"));
+
         // then
         assertThat(applied).isTrue();
+
         try (var entityManager = entityManagerFactory.createEntityManager()) {
             assertThat(((Number) entityManager.createNativeQuery(
                     "SELECT count(*) FROM pg_extension WHERE extname = 'vector'")
@@ -71,6 +72,7 @@ class DatabaseSetupIntegrationTest {
     void disablesOpenInViewAndValidatesSchema() {
         // when
         var openInView = environment.getProperty("spring.jpa.open-in-view", Boolean.class);
+
         // then
         assertThat(openInView).isFalse();
         assertThat(environment.getProperty("spring.jpa.open-in-view", Boolean.class)).isEqualTo(Boolean.FALSE);
@@ -82,21 +84,27 @@ class DatabaseSetupIntegrationTest {
     @DisplayName("서로 다른 컨텍스트가 DB를 공유하고 종료해도 공유 DB는 살아있다")
     void sharesContainerWithRepositoryContextAfterItCloses() throws Exception {
         // given
-        var otherContext = new TestContextManager(Class.forName("com.mogum.account.repository.UserRepositoryTest")).getTestContext();
+        var otherContext = new TestContextManager(Class.forName("com.mogum.account.repository.UserRepositoryTest"))
+                .getTestContext();
+
         try {
             // when
             var other = otherContext.getApplicationContext();
+
             // then
             assertThat(other).isNotSameAs(applicationContext);
             assertThat(other.getBeanNamesForType(IntegrationTestConfiguration.ValidationController.class)).isEmpty();
             assertThat(other.getBeanNamesForType(IntegrationTestConfiguration.FailureController.class)).isEmpty();
+
             var otherDataSource = other.getBean(DataSource.class);
             try (var connection = otherDataSource.getConnection()) {
-                assertThat(connection.getMetaData().getURL()).isEqualTo(PostgresTestConfiguration.POSTGRES.getJdbcUrl());
+                assertThat(connection.getMetaData().getURL())
+                        .isEqualTo(PostgresTestConfiguration.POSTGRES.getJdbcUrl());
             }
         } finally {
             otherContext.markApplicationContextDirty(null);
         }
+
         try (var connection = dataSource.getConnection()) {
             assertThat(connection.isClosed()).isFalse();
             assertThat(connection.isValid(2)).isTrue();
@@ -109,23 +117,31 @@ class DatabaseSetupIntegrationTest {
         // given
         var names = List.of(
                 "auth.SecurityConfigurationIntegrationTest", "auth.SecurityConfigurationErrorIntegrationTest",
-                "auth.SecurityConfigurationLogoutIntegrationTest", "auth.SecurityConfigurationCrossOriginIntegrationTest",
+                "auth.SecurityConfigurationLogoutIntegrationTest",
+                "auth.SecurityConfigurationCrossOriginIntegrationTest",
                 "auth.SecurityConfigurationHealthIntegrationTest", "auth.OAuthLoginHandlerIntegrationTest",
                 "auth.OAuthLoginHandlerFailureIntegrationTest", "auth.OAuthLoginHandlerPkceIntegrationTest",
                 "common.api.RequestValidationIntegrationTest", "common.logging.RequestLogFilterIntegrationTest",
                 "support.TestRequestsIntegrationTest");
+
         // when
         var contexts = new ArrayList<ApplicationContext>();
-        for (String name : names) contexts.add(new TestContextManager(Class.forName("com.mogum." + name))
-                .getTestContext().getApplicationContext());
+        for (String name : names)
+                contexts.add(new TestContextManager(Class.forName("com.mogum." + name))
+                        .getTestContext()
+                        .getApplicationContext());
+
         // then
         assertThat(contexts).allSatisfy(actual -> assertThat(actual).isSameAs(applicationContext));
-        assertThat(applicationContext.getBeanNamesForType(IntegrationTestConfiguration.CookieUnitSupport.SessionCookieConfiguration.class)).isEmpty();
-        var local = new TestContextManager(Class.forName("com.mogum.auth.SecurityConfigurationLocalCookieIntegrationTest"))
-                .getTestContext().getApplicationContext();
+        assertThat(applicationContext.getBeanNamesForType(
+                IntegrationTestConfiguration.CookieUnitSupport.SessionCookieConfiguration.class)).isEmpty();
+
+        var local = new TestContextManager(
+                Class.forName("com.mogum.auth.SecurityConfigurationLocalCookieIntegrationTest"))
+                .getTestContext()
+                .getApplicationContext();
         assertThat(local).isNotSameAs(applicationContext);
         assertThat(local.getEnvironment().getProperty("app.web.cookie-domain")).isEmpty();
         assertThat(applicationContext.getEnvironment().getProperty("app.web.cookie-domain")).isEqualTo("mogum.example");
     }
-
 }

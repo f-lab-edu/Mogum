@@ -38,7 +38,6 @@ class ApplyControllerIntegrationTest {
     @Autowired UserRepository userRepository;
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired CreditProperties creditProperties;
-
     private final AccountPrincipal.NotApplied notApplied = new AccountPrincipal.NotApplied(
             "google", "apply-sub", "LEAKCHECK-apply-email@example.com", "LEAKCHECK-apply-name");
 
@@ -55,20 +54,35 @@ class ApplyControllerIntegrationTest {
 
         // then
         assertApplied(response);
+
         var next = response.getResponseCookies().getFirst("SESSION");
         assertThat(next).isNotNull();
         var nextCookie = new Cookie("SESSION", next.getValue());
         assertThat(helper.id(nextCookie)).isNotEqualTo(helper.id(cookie));
         assertThat(jdbcIndexedSessionRepository.findById(helper.id(cookie))).isNull();
+
         Session stored = jdbcIndexedSessionRepository.findById(helper.id(nextCookie));
         var user = userRepository.findByProviderAndSubject(notApplied.provider(), notApplied.subject()).orElseThrow();
-        assertThat(stored.getAttributeNames()).containsExactly(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME);
-        assertThat((String) stored.getAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME)).isEqualTo(user.getId().toString());
-        assertThat(jdbcTemplate.queryForObject("SELECT principal_name FROM spring_session WHERE session_id = ?", String.class, stored.getId()))
+        assertThat(stored.getAttributeNames())
+                .containsExactly(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME);
+        assertThat((String) stored.getAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME))
                 .isEqualTo(user.getId().toString());
-        assertThat(jdbcIndexedSessionRepository.findByPrincipalName(user.getId().toString())).containsKey(stored.getId());
-        testRequests.anonymous().get().uri("/api/me").cookie("SESSION", next.getValue()).exchange()
-                .expectStatus().isOk().expectBody().json(expectedApplied(), JsonCompareMode.STRICT);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT principal_name FROM spring_session WHERE session_id = ?", String.class, stored.getId()))
+                .isEqualTo(user.getId().toString());
+        assertThat(jdbcIndexedSessionRepository.findByPrincipalName(user.getId().toString()))
+                .containsKey(stored.getId());
+
+        testRequests.anonymous()
+                .get()
+                .uri("/api/me")
+                .cookie("SESSION", next.getValue())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .json(expectedApplied(), JsonCompareMode.STRICT);
+
         assertSingleRefill();
     }
 
@@ -79,6 +93,7 @@ class ApplyControllerIntegrationTest {
         var cookie = new TestSessions(jdbcIndexedSessionRepository).createNotApplied(notApplied);
         var first = withCsrf(cookie).post().uri("/api/account/apply").exchange().returnResult(String.class);
         assertApplied(first);
+
         var next = first.getResponseCookies().getFirst("SESSION");
         var client = withCsrf(new Cookie("SESSION", next.getValue()));
         var before = jdbcTemplate.queryForMap("SELECT * FROM users");
@@ -92,6 +107,7 @@ class ApplyControllerIntegrationTest {
         assertThat(jdbcTemplate.queryForMap("SELECT * FROM users")).isEqualTo(before);
         assertThat(jdbcTemplate.queryForList("SELECT * FROM credit_entries")).isEqualTo(entries);
         assertThat(response.getResponseCookies().getFirst("SESSION")).isNull();
+
         assertSingleRefill();
     }
 
@@ -114,7 +130,8 @@ class ApplyControllerIntegrationTest {
                 """.formatted(status), JsonCompareMode.STRICT);
         assertThat(jdbcTemplate.queryForMap("SELECT * FROM users")).isEqualTo(before);
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries", Integer.class)).isZero();
-        assertThat(jdbcIndexedSessionRepository.findById(new TestSessions(jdbcIndexedSessionRepository).id(cookie))).isNotNull();
+        assertThat(jdbcIndexedSessionRepository.findById(new TestSessions(jdbcIndexedSessionRepository).id(cookie)))
+                .isNotNull();
     }
 
     @Test
@@ -124,14 +141,20 @@ class ApplyControllerIntegrationTest {
         var cookie = new TestSessions(jdbcIndexedSessionRepository).createNotApplied(notApplied);
 
         // when
-        var response = testRequests.anonymous().post().uri("/api/account/apply").cookie("SESSION", cookie.getValue()).exchange();
+        var response = testRequests.anonymous()
+                .post()
+                .uri("/api/account/apply")
+                .cookie("SESSION", cookie.getValue())
+                .exchange();
 
         // then
         response.expectStatus().isForbidden().expectBody().json("""
                 {"code":"CSRF_INVALID","message":"요청을 확인할 수 없습니다"}
                 """, JsonCompareMode.STRICT);
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM users", Integer.class)).isZero();
-        Session stored = jdbcIndexedSessionRepository.findById(new TestSessions(jdbcIndexedSessionRepository).id(cookie));
+
+        Session stored = jdbcIndexedSessionRepository.findById(
+                new TestSessions(jdbcIndexedSessionRepository).id(cookie));
         assertThat((Object) stored.getAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE)).isEqualTo(notApplied);
     }
 
@@ -149,11 +172,17 @@ class ApplyControllerIntegrationTest {
         assertApplied(response);
         String id = response.getResponseHeaders().getFirst("X-Request-Id");
         long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
-        while (!output.getAll().substring(offset).contains("path=/api/account/apply status=200") && System.nanoTime() < deadline) Thread.sleep(10);
+
+        while (!output.getAll().substring(offset).contains("path=/api/account/apply status=200")
+                && System.nanoTime() < deadline) Thread.sleep(10);
+
         var logs = output.getAll().substring(offset);
         assertThat(logs).doesNotContain(notApplied.email(), notApplied.name(), notApplied.subject());
-        assertThat(logs.lines().filter(line -> line.contains(" INFO ") || line.contains(" WARN ") || line.contains(" ERROR ")))
-                .singleElement().satisfies(line -> assertThat(line).contains("requestId=" + id, "access method=POST path=/api/account/apply status=200"));
+        assertThat(logs.lines()
+                .filter(line -> line.contains(" INFO ") || line.contains(" WARN ") || line.contains(" ERROR ")))
+                .singleElement()
+                .satisfies(line -> assertThat(line)
+                        .contains("requestId=" + id, "access method=POST path=/api/account/apply status=200"));
     }
 
     @Test
@@ -164,6 +193,7 @@ class ApplyControllerIntegrationTest {
         var cookie = helper.createNotApplied(notApplied);
         var client = withCsrf(cookie);
         jdbcTemplate.execute("ALTER TABLE credit_entries ADD CONSTRAINT apply_test_refill_failure CHECK (amount = 0)");
+
         try {
             // when
             var response = client.post().uri("/api/account/apply").exchange().returnResult(String.class);
@@ -175,9 +205,11 @@ class ApplyControllerIntegrationTest {
             assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM users", Integer.class)).isZero();
             assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries", Integer.class)).isZero();
             assertThat(response.getResponseCookies().getFirst("SESSION")).isNull();
+
             Session stored = jdbcIndexedSessionRepository.findById(helper.id(cookie));
             assertThat(stored.getAttributeNames()).containsExactly(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE);
-            assertThat((Object) stored.getAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE)).isEqualTo(notApplied);
+            assertThat((Object) stored.getAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE))
+                    .isEqualTo(notApplied);
             assertThat(output.getAll()).doesNotContain(notApplied.email(), notApplied.name(), notApplied.subject());
         } finally {
             jdbcTemplate.execute("ALTER TABLE credit_entries DROP CONSTRAINT apply_test_refill_failure");
@@ -187,11 +219,15 @@ class ApplyControllerIntegrationTest {
     RestTestClient withCsrf(Cookie cookie) {
         var client = testRequests.anonymous().mutate().defaultCookie("SESSION", cookie.getValue()).build();
         var token = client.get().uri("/api/me").exchange().returnResult().getResponseCookies().getFirst("XSRF-TOKEN");
-        return client.mutate().defaultCookie("XSRF-TOKEN", token.getValue()).defaultHeader("X-XSRF-TOKEN", token.getValue()).build();
+        return client.mutate()
+                .defaultCookie("XSRF-TOKEN", token.getValue())
+                .defaultHeader("X-XSRF-TOKEN", token.getValue())
+                .build();
     }
 
     private String expectedApplied() {
-        return "{\"data\":{\"status\":\"APPLIED\",\"email\":\"" + notApplied.email() + "\",\"name\":\"" + notApplied.name() + "\"}}";
+        return "{\"data\":{\"status\":\"APPLIED\",\"email\":\"" + notApplied.email() + "\",\"name\":\""
+                + notApplied.name() + "\"}}";
     }
 
     private void assertApplied(EntityExchangeResult<String> response) {
@@ -203,8 +239,12 @@ class ApplyControllerIntegrationTest {
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM users", Integer.class)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries", Integer.class)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForMap("SELECT type, amount FROM credit_entries"))
-                .containsEntry("type", "REFILL").containsEntry("amount", creditProperties.monthlyAmount());
-        assertThat(jdbcTemplate.queryForObject("SELECT credit_balance FROM users", Integer.class)).isEqualTo(creditProperties.monthlyAmount());
-        assertThat(jdbcTemplate.queryForObject("SELECT u.credit_balance = sum(e.amount) FROM users u JOIN credit_entries e ON e.user_id = u.id GROUP BY u.id", Boolean.class)).isTrue();
+                .containsEntry("type", "REFILL")
+                .containsEntry("amount", creditProperties.monthlyAmount());
+        assertThat(jdbcTemplate.queryForObject("SELECT credit_balance FROM users", Integer.class))
+                .isEqualTo(creditProperties.monthlyAmount());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT u.credit_balance = sum(e.amount) FROM users u JOIN credit_entries e ON e.user_id = u.id GROUP BY u.id",
+                Boolean.class)).isTrue();
     }
 }

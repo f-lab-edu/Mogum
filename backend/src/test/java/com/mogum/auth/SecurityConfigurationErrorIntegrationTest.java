@@ -27,11 +27,14 @@ class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
     void serializesErrorsThroughRealHttp(String path, int status, String code) {
         // given
         var cookie = approvedSession();
+
         // when
         var response = client(cookie).get().uri(path).exchange().returnResult(String.class);
+
         // then
         assertError(response, status, code);
-        assertThat(jdbcIndexedSessionRepository.findById(new TestSessions(jdbcIndexedSessionRepository).id(cookie))).isNotNull();
+        assertThat(jdbcIndexedSessionRepository.findById(new TestSessions(jdbcIndexedSessionRepository).id(cookie)))
+                .isNotNull();
     }
 
     @Test
@@ -41,8 +44,10 @@ class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
         var cookie = approvedSession();
         var user = userRepository.findByProviderAndSubject("google", "session-sub").orElseThrow();
         var client = testRequests.asUser(user.getId());
+
         // when
         var response = client.post().uri("/api/me").exchange().returnResult(String.class);
+
         // then
         assertError(response, 405, "METHOD_NOT_ALLOWED");
         assertThat(response.getResponseHeaders().getFirst("Allow")).contains("GET");
@@ -54,12 +59,21 @@ class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
     void returnsRetryDelayInBodyAndHeader() {
         // given
         var cookie = approvedSession();
+
         // when
         var response = client(cookie).get().uri("/api/test-domain-error?retry=true").exchange();
+
         // then
-        response.expectStatus().isNotFound().expectHeader().doesNotExist("Location")
-                .expectHeader().contentTypeCompatibleWith("application/json").expectHeader().valueEquals("Retry-After", "37")
-                .expectBody().json("""
+        response.expectStatus()
+                .isNotFound()
+                .expectHeader()
+                .doesNotExist("Location")
+                .expectHeader()
+                .contentTypeCompatibleWith("application/json")
+                .expectHeader()
+                .valueEquals("Retry-After", "37")
+                .expectBody()
+                .json("""
                 {"code":"NOT_FOUND","message":"찾을 수 없습니다","retryAfterSeconds":37}
                 """, JsonCompareMode.STRICT);
     }
@@ -72,17 +86,23 @@ class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
         // given
         int logOffset = output.getAll().length();
         var client = authenticated ? client(approvedSession()) : testRequests.anonymous();
+
         // when
         var response = client.get().uri("/auth/foo").exchange().returnResult(String.class);
+
         // then
         assertError(response, 404, "NOT_FOUND");
         assertThat(response.getResponseHeaders().getOrEmpty("X-Test-Dispatch")).containsExactly("ERROR");
         var id = response.getResponseHeaders().getFirst("X-Request-Id");
         assertThat(response.getResponseHeaders().getOrEmpty("X-Test-Dispatch-Request-Id"))
                 .containsExactly(id);
+
         long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
-        while (output.getOut().lines().noneMatch(line -> line.contains("requestId=" + id) && line.contains("access method="))
+        while (output.getOut()
+                .lines()
+                .noneMatch(line -> line.contains("requestId=" + id) && line.contains("access method="))
                 && System.nanoTime() < deadline) Thread.sleep(10);
+
         assertThat(output.getAll().substring(logOffset).lines()).noneMatch(line -> line.contains(" ERROR "));
     }
 }

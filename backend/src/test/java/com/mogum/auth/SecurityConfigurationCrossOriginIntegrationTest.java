@@ -22,10 +22,16 @@ class SecurityConfigurationCrossOriginIntegrationTest extends SecurityScenario {
     void permitsConfiguredPreflight(String method) {
         // when
         var response = preflight(ORIGIN, method, "X-XSRF-TOKEN, Content-Type").exchange();
+
         // then
-        response.expectStatus().isOk().expectHeader().valueEquals("Access-Control-Allow-Origin", ORIGIN)
-                .expectHeader().valueEquals("Access-Control-Allow-Credentials", "true")
-                .expectHeader().valueEquals("Access-Control-Allow-Headers", "X-XSRF-TOKEN, Content-Type");
+        response.expectStatus()
+                .isOk()
+                .expectHeader()
+                .valueEquals("Access-Control-Allow-Origin", ORIGIN)
+                .expectHeader()
+                .valueEquals("Access-Control-Allow-Credentials", "true")
+                .expectHeader()
+                .valueEquals("Access-Control-Allow-Headers", "X-XSRF-TOKEN, Content-Type");
     }
 
     @ParameterizedTest(name = "거절 출처 {0}")
@@ -34,6 +40,7 @@ class SecurityConfigurationCrossOriginIntegrationTest extends SecurityScenario {
     void rejectsOtherOrigins(String origin) {
         // when
         var response = preflight(origin, "POST", "X-XSRF-TOKEN, Content-Type").exchange();
+
         // then
         response.expectStatus().isForbidden().expectHeader().doesNotExist("Access-Control-Allow-Origin");
     }
@@ -45,6 +52,7 @@ class SecurityConfigurationCrossOriginIntegrationTest extends SecurityScenario {
         // when
         var response = preflight(ORIGIN, condition.equals("method") ? "TRACE" : "POST",
                 condition.equals("header") ? "X-Other" : "X-XSRF-TOKEN, Content-Type").exchange();
+
         // then
         response.expectStatus().isForbidden().expectHeader().doesNotExist("Access-Control-Allow-Origin");
     }
@@ -54,6 +62,7 @@ class SecurityConfigurationCrossOriginIntegrationTest extends SecurityScenario {
     void rejectsDefaultLoginPage() {
         // when
         var response = testRequests.anonymous().get().uri("/login").exchange().returnResult(String.class);
+
         // then
         assertError(response, 401, "UNAUTHORIZED");
     }
@@ -62,8 +71,13 @@ class SecurityConfigurationCrossOriginIntegrationTest extends SecurityScenario {
     @DisplayName("CORS는 API 경로에만 적용한다")
     void limitsCorsToApiPaths() {
         // when
-        var response = testRequests.anonymous().options().uri("/auth/google").header("Origin", ORIGIN)
-                .header("Access-Control-Request-Method", "GET").exchange();
+        var response = testRequests.anonymous()
+                .options()
+                .uri("/auth/google")
+                .header("Origin", ORIGIN)
+                .header("Access-Control-Request-Method", "GET")
+                .exchange();
+
         // then
         response.expectHeader().doesNotExist("Access-Control-Allow-Origin");
     }
@@ -73,8 +87,15 @@ class SecurityConfigurationCrossOriginIntegrationTest extends SecurityScenario {
     void issuesSharedDomainCsrfCookie() {
         // given
         var cookie = session();
+
         // when
-        var response = client(cookie).get().uri("/api/me").header("Origin", ORIGIN).exchange().returnResult(String.class);
+        var response = client(cookie)
+                .get()
+                .uri("/api/me")
+                .header("Origin", ORIGIN)
+                .exchange()
+                .returnResult(String.class);
+
         // then
         assertThat(response.getStatus().value()).isEqualTo(200);
         assertThat(response.getResponseHeaders().getFirst("Access-Control-Allow-Origin")).isEqualTo(ORIGIN);
@@ -87,17 +108,31 @@ class SecurityConfigurationCrossOriginIntegrationTest extends SecurityScenario {
     void expiresCookiesAfterCrossOriginLogout() {
         // given
         var cookie = session();
-        var token = client(cookie).get().uri("/api/me").header("Origin", ORIGIN).exchange()
-                .returnResult().getResponseCookies().getFirst("XSRF-TOKEN");
+        var token = client(cookie)
+                .get()
+                .uri("/api/me")
+                .header("Origin", ORIGIN)
+                .exchange()
+                .returnResult()
+                .getResponseCookies()
+                .getFirst("XSRF-TOKEN");
+
         // when
-        var response = client(cookie).post().uri("/api/auth/logout").header("Origin", ORIGIN)
-                .cookie("XSRF-TOKEN", token.getValue()).header("X-XSRF-TOKEN", token.getValue())
-                .exchange().returnResult(String.class);
+        var response = client(cookie)
+                .post()
+                .uri("/api/auth/logout")
+                .header("Origin", ORIGIN)
+                .cookie("XSRF-TOKEN", token.getValue())
+                .header("X-XSRF-TOKEN", token.getValue())
+                .exchange()
+                .returnResult(String.class);
+
         // then
         assertThat(response.getStatus().value()).isEqualTo(204);
         assertThat(response.getResponseHeaders().getFirst("Access-Control-Allow-Origin")).isEqualTo(ORIGIN);
         assertThat(response.getResponseHeaders().getFirst("Access-Control-Allow-Credentials")).isEqualTo("true");
-        assertThat(jdbcIndexedSessionRepository.findById(new TestSessions(jdbcIndexedSessionRepository).id(cookie))).isNull();
+        assertThat(jdbcIndexedSessionRepository.findById(new TestSessions(jdbcIndexedSessionRepository).id(cookie)))
+                .isNull();
         assertCookie(response.getResponseCookies().getFirst("SESSION"), true, null);
         assertThat(response.getResponseCookies().getFirst("SESSION").getMaxAge()).isZero();
         assertCookie(response.getResponseCookies().getFirst("XSRF-TOKEN"), false, "mogum.example");
@@ -109,15 +144,29 @@ class SecurityConfigurationCrossOriginIntegrationTest extends SecurityScenario {
     void rejectsCrossOriginLogoutWithoutCsrfHeader() {
         // given
         var cookie = session();
-        var token = client(cookie).get().uri("/api/me").exchange().returnResult().getResponseCookies().getFirst("XSRF-TOKEN");
+        var token = client(cookie)
+                .get()
+                .uri("/api/me")
+                .exchange()
+                .returnResult()
+                .getResponseCookies()
+                .getFirst("XSRF-TOKEN");
+
         // when
-        var response = client(cookie).post().uri("/api/auth/logout").header("Origin", ORIGIN)
-                .cookie("XSRF-TOKEN", token.getValue()).exchange().returnResult(String.class);
+        var response = client(cookie)
+                .post()
+                .uri("/api/auth/logout")
+                .header("Origin", ORIGIN)
+                .cookie("XSRF-TOKEN", token.getValue())
+                .exchange()
+                .returnResult(String.class);
+
         // then
         assertError(response, 403, "CSRF_INVALID");
         assertThat(response.getResponseHeaders().getFirst("Access-Control-Allow-Origin")).isEqualTo(ORIGIN);
         assertThat(response.getResponseHeaders().getFirst("Access-Control-Allow-Credentials")).isEqualTo("true");
-        assertThat(jdbcIndexedSessionRepository.findById(new TestSessions(jdbcIndexedSessionRepository).id(cookie))).isNotNull();
+        assertThat(jdbcIndexedSessionRepository.findById(new TestSessions(jdbcIndexedSessionRepository).id(cookie)))
+                .isNotNull();
     }
 
     @Test
@@ -125,15 +174,21 @@ class SecurityConfigurationCrossOriginIntegrationTest extends SecurityScenario {
     void rejectsActualRequestFromOtherOrigin() {
         // given
         var cookie = session();
+
         // when
         var response = client(cookie).get().uri("/api/me").header("Origin", "https://evil.example").exchange();
+
         // then
         response.expectStatus().isForbidden().expectHeader().doesNotExist("Access-Control-Allow-Origin");
     }
 
     private RestTestClient.RequestBodySpec preflight(String origin, String method, String headers) {
-        return testRequests.anonymous().method(HttpMethod.OPTIONS).uri("/api/me").header("Origin", origin)
-                .header("Access-Control-Request-Method", method).header("Access-Control-Request-Headers", headers);
+        return testRequests.anonymous()
+                .method(HttpMethod.OPTIONS)
+                .uri("/api/me")
+                .header("Origin", origin)
+                .header("Access-Control-Request-Method", method)
+                .header("Access-Control-Request-Headers", headers);
     }
 
     private static void assertCookie(ResponseCookie cookie, boolean httpOnly, String domain) {

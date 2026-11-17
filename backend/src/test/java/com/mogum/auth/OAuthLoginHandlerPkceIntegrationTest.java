@@ -23,8 +23,10 @@ class OAuthLoginHandlerPkceIntegrationTest extends OAuthScenario {
         // given
         var start = start(null);
         var modified = withVerifier(start, "a".repeat(64));
+
         // when
         var response = callback(modified, "ok", null);
+
         // then
         assertFailure(response, "login_failed");
         assertThat(TOKEN_CALLS.get()).isEqualTo(1);
@@ -43,8 +45,10 @@ class OAuthLoginHandlerPkceIntegrationTest extends OAuthScenario {
             default -> "a".repeat(43) + "!";
         };
         var modified = withVerifier(start, verifier);
+
         // when
         var response = callback(modified, "ok", null);
+
         // then
         assertFailure(response, "login_failed");
         assertThat(TOKEN_CALLS.get()).isEqualTo(0);
@@ -55,13 +59,22 @@ class OAuthLoginHandlerPkceIntegrationTest extends OAuthScenario {
     void fakeProviderRejectsMissingVerifier() throws Exception {
         // given
         start(null);
+
         // when
-        var response = RestTestClient.bindToServer().baseUrl(ORIGIN).build().post().uri("/token")
+        var response = RestTestClient.bindToServer()
+                .baseUrl(ORIGIN)
+                .build()
+                .post()
+                .uri("/token")
                 .header("Content-Type", "application/x-www-form-urlencoded")
-                .body("code=ok&grant_type=authorization_code").exchange().returnResult(String.class);
+                .body("code=ok&grant_type=authorization_code")
+                .exchange()
+                .returnResult(String.class);
+
         // then
         assertThat(response.getStatus().value()).isEqualTo(400);
-        assertThat(new ObjectMapper().readTree(response.getResponseBody()).get("error").asString()).isEqualTo("invalid_grant");
+        assertThat(new ObjectMapper().readTree(response.getResponseBody()).get("error").asString())
+                .isEqualTo("invalid_grant");
         assertThat(count("users")).isEqualTo(usersBefore);
         assertThat(count("spring_session")).isEqualTo(sessionsBefore);
     }

@@ -83,13 +83,14 @@ class ArchitectureTest {
             .withImportOption(location -> !location.contains("/com/mogum/archfixture/")
                     && !location.contains("/namingfixture/"))
             .importClasspath();
-    private static final ArchRule COMPONENT_DEPENDENCIES_USE_TYPE_NAMES = classes().that(
-            new DescribedPredicate<JavaClass>("are Component classes including meta annotations") {
+    private static final ArchRule COMPONENT_DEPENDENCIES_USE_TYPE_NAMES = classes()
+            .that(new DescribedPredicate<JavaClass>("are Component classes including meta annotations") {
                 @Override
                 public boolean test(JavaClass type) {
                     return type.isAnnotatedWith(Component.class) || type.isMetaAnnotatedWith(Component.class);
                 }
-            }).should(new ArchCondition<JavaClass>("name non-static final dependencies after their raw types") {
+            })
+            .should(new ArchCondition<JavaClass>("name non-static final dependencies after their raw types") {
                 @Override
                 public void check(JavaClass type, ConditionEvents events) {
                     for (JavaField field : type.getFields()) {
@@ -97,6 +98,7 @@ class ArchitectureTest {
                         if (field.getModifiers().contains(JavaModifier.STATIC)
                                 || !field.getModifiers().contains(JavaModifier.FINAL)
                                 || rawType.isPrimitive() || rawType.getPackageName().startsWith("java.")) continue;
+
                         String typeName = rawType.getSimpleName();
                         String camelCaseName = Character.toLowerCase(typeName.charAt(0)) + typeName.substring(1);
                         boolean matches = field.getName().equals(camelCaseName) || field.getName().endsWith(typeName);
@@ -136,19 +138,23 @@ class ArchitectureTest {
         assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
     }
 
-    private static final ArchRule TEST_DEPENDENCIES_USE_TYPE_NAMES = fields().that(
-            new DescribedPredicate<JavaField>("are Autowired fields or have Fake raw types") {
+    private static final ArchRule TEST_DEPENDENCIES_USE_TYPE_NAMES = fields()
+            .that(new DescribedPredicate<JavaField>("are Autowired fields or have Fake raw types") {
                 @Override
                 public boolean test(JavaField field) {
-                    return field.isAnnotatedWith(Autowired.class) || field.getRawType().getSimpleName().startsWith("Fake");
+                    return field.isAnnotatedWith(Autowired.class)
+                            || field.getRawType().getSimpleName().startsWith("Fake");
                 }
-            }).should(new ArchCondition<JavaField>("name test dependencies after their types without the Fake prefix") {
+            })
+            .should(new ArchCondition<JavaField>("name test dependencies after their types without the Fake prefix") {
                 @Override
                 public void check(JavaField field, ConditionEvents events) {
                     var rawType = field.getRawType();
                     if (rawType.isPrimitive() || rawType.getPackageName().startsWith("java.")) return;
+
                     String typeName = rawType.getSimpleName();
                     if (typeName.startsWith("Fake")) typeName = typeName.substring(4);
+
                     String camelCaseName = Character.toLowerCase(typeName.charAt(0)) + typeName.substring(1);
                     boolean matches = field.getName().equals(camelCaseName) || field.getName().endsWith(typeName);
                     events.add(new SimpleConditionEvent(field, matches,
@@ -219,23 +225,29 @@ class ArchitectureTest {
         assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
     }
 
-    private static final ArchRule TESTS_USE_ASSERTJ = noClasses().should().dependOnClassesThat()
+    private static final ArchRule TESTS_USE_ASSERTJ = noClasses()
+            .should()
+            .dependOnClassesThat()
             .haveFullyQualifiedName("org.junit.jupiter.api.Assertions");
     private static final ArchRule TEST_NAMES_AVOID_IT = noClasses().should().haveSimpleNameEndingWith("IT");
-    private static final ArchRule REFLECTION_ONLY_IN_FIXTURES_AND_FAKES = classes().that(
-            new DescribedPredicate<JavaClass>("are neither *Fixtures nor Fake*") {
+    private static final ArchRule REFLECTION_ONLY_IN_FIXTURES_AND_FAKES = classes()
+            .that(new DescribedPredicate<JavaClass>("are neither *Fixtures nor Fake*") {
                 @Override
                 public boolean test(JavaClass type) {
                     return !type.getSimpleName().endsWith("Fixtures") && !type.getSimpleName().startsWith("Fake");
                 }
-            }).should(new ArchCondition<JavaClass>("avoid ReflectionTestUtils and setAccessible calls") {
+            })
+            .should(new ArchCondition<JavaClass>("avoid ReflectionTestUtils and setAccessible calls") {
                 @Override
                 public void check(JavaClass type, ConditionEvents events) {
                     for (var dependency : type.getDirectDependenciesFromSelf()) {
-                        if (dependency.getTargetClass().getName().equals("org.springframework.test.util.ReflectionTestUtils")) {
+                        if (dependency.getTargetClass()
+                                .getName()
+                                .equals("org.springframework.test.util.ReflectionTestUtils")) {
                             events.add(SimpleConditionEvent.violated(type, dependency.getDescription()));
                         }
                     }
+
                     for (var call : type.getMethodCallsFromSelf()) {
                         if (call.getTarget().getName().equals("setAccessible")
                                 && call.getTargetOwner().isAssignableTo(AccessibleObject.class)) {
@@ -319,15 +331,22 @@ class ArchitectureTest {
 
     private static final String SPRING_TRANSACTIONAL = "org.springframework.transaction.annotation.Transactional";
     private static final String JAKARTA_TRANSACTIONAL = "jakarta.transaction.Transactional";
-    private static final ArchRule ENTITIES_EXTEND_AUDITED_ENTITY = classes().that()
-            .areAnnotatedWith(Entity.class).should().beAssignableTo(AuditedEntity.class);
-
-    private static final ArchRule REPOSITORIES_DECLARE_DOMAIN_OPERATIONS = noClasses().that()
+    private static final ArchRule ENTITIES_EXTEND_AUDITED_ENTITY = classes()
+            .that()
+            .areAnnotatedWith(Entity.class)
+            .should()
+            .beAssignableTo(AuditedEntity.class);
+    private static final ArchRule REPOSITORIES_DECLARE_DOMAIN_OPERATIONS = noClasses()
+            .that()
             .areAssignableTo(Repository.class)
-            .should().beAssignableTo(JpaRepository.class)
-            .orShould().beAssignableTo(CrudRepository.class)
-            .orShould().beAssignableTo(ListCrudRepository.class)
-            .orShould().beAssignableTo(PagingAndSortingRepository.class);
+            .should()
+            .beAssignableTo(JpaRepository.class)
+            .orShould()
+            .beAssignableTo(CrudRepository.class)
+            .orShould()
+            .beAssignableTo(ListCrudRepository.class)
+            .orShould()
+            .beAssignableTo(PagingAndSortingRepository.class);
 
     @Test
     @DisplayName("제품 레포지토리는 정리와 집계를 제공하는 상위 인터페이스를 상속하지 않는다")
@@ -365,40 +384,62 @@ class ArchitectureTest {
     }
 
     // config 는 API와 워커를 한 서버에 조립한다. 워커 수 0이면 API만 실행한다.
-    private static final ArchRule GENERATION_ONLY_FROM_WORKER = noClasses().that()
+    private static final ArchRule GENERATION_ONLY_FROM_WORKER = noClasses()
+            .that()
             .resideOutsideOfPackages("..generation..", "..worker..", "..config..")
-            .should().dependOnClassesThat().resideInAPackage("..generation..");
-    private static final ArchRule WORKER_ONLY_FROM_CONFIG = noClasses().that()
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("..generation..");
+    private static final ArchRule WORKER_ONLY_FROM_CONFIG = noClasses()
+            .that()
             .resideOutsideOfPackages("..worker..", "..config..")
-            .should().dependOnClassesThat().resideInAPackage("..worker..");
-    private static final ArchRule NO_TRANSACTIONAL_CLASSES_AROUND_LLM_CALLS = noClasses().that()
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("..worker..");
+    private static final ArchRule NO_TRANSACTIONAL_CLASSES_AROUND_LLM_CALLS = noClasses()
+            .that()
             .resideInAnyPackage("..generation..", "..worker..")
-            .should().beAnnotatedWith(SPRING_TRANSACTIONAL).orShould().beAnnotatedWith(JAKARTA_TRANSACTIONAL);
-    private static final ArchRule NO_TRANSACTIONAL_METHODS_AROUND_LLM_CALLS = noMethods().that()
-            .areDeclaredInClassesThat().resideInAnyPackage("..generation..", "..worker..")
-            .should().beAnnotatedWith(SPRING_TRANSACTIONAL).orShould().beAnnotatedWith(JAKARTA_TRANSACTIONAL);
-    private static final ArchRule OPENAI_SDK_ONLY_IN_LLM_ADAPTER = noClasses().that()
+            .should()
+            .beAnnotatedWith(SPRING_TRANSACTIONAL)
+            .orShould()
+            .beAnnotatedWith(JAKARTA_TRANSACTIONAL);
+    private static final ArchRule NO_TRANSACTIONAL_METHODS_AROUND_LLM_CALLS = noMethods()
+            .that()
+            .areDeclaredInClassesThat()
+            .resideInAnyPackage(
+                    "..generation..", "..worker..")
+            .should()
+            .beAnnotatedWith(SPRING_TRANSACTIONAL)
+            .orShould()
+            .beAnnotatedWith(JAKARTA_TRANSACTIONAL);
+    private static final ArchRule OPENAI_SDK_ONLY_IN_LLM_ADAPTER = noClasses()
+            .that()
             .resideOutsideOfPackage("..generation.llm..")
-            .should().dependOnClassesThat().resideInAPackage("com.openai..");
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("com.openai..");
     private static final DescribedPredicate<JavaMethod> REST_REQUEST_MAPPINGS = new DescribedPredicate<JavaMethod>(
             "are request mappings in REST controllers except ApiErrorController") {
         @Override
         public boolean test(JavaMethod method) {
             return method.getOwner().isAnnotatedWith(RestController.class)
                     && !method.getOwner().isEquivalentTo(ApiErrorController.class)
-                    && (method.isAnnotatedWith(RequestMapping.class) || method.isMetaAnnotatedWith(RequestMapping.class));
+                    && (method.isAnnotatedWith(RequestMapping.class)
+                            || method.isMetaAnnotatedWith(RequestMapping.class));
         }
     };
-    private static final ArchRule CONTROLLER_RESPONSE_TYPES = methods().that(REST_REQUEST_MAPPINGS)
+    private static final ArchRule CONTROLLER_RESPONSE_TYPES = methods()
+            .that(REST_REQUEST_MAPPINGS)
             .should(new ArchCondition<JavaMethod>(
-            "return ApiResponse<?>, ResponseEntity<ApiResponse<?>>, ResponseEntity<Void>, or void") {
-        @Override
-        public void check(JavaMethod method, ConditionEvents events) {
-            events.add(new SimpleConditionEvent(method, isAllowedResponseType(method.getReturnType()),
-                    method.getFullName() + " returns " + method.getReturnType().getName()));
-        }
-    });
-    private static final ArchRule REQUEST_BODY_REQUIRES_VALID = methods().that(REST_REQUEST_MAPPINGS)
+                    "return ApiResponse<?>, ResponseEntity<ApiResponse<?>>, ResponseEntity<Void>, or void") {
+                @Override
+                public void check(JavaMethod method, ConditionEvents events) {
+                    events.add(new SimpleConditionEvent(method, isAllowedResponseType(method.getReturnType()),
+                            method.getFullName() + " returns " + method.getReturnType().getName()));
+                }
+            });
+    private static final ArchRule REQUEST_BODY_REQUIRES_VALID = methods()
+            .that(REST_REQUEST_MAPPINGS)
             .should(new ArchCondition<JavaMethod>("annotate each @RequestBody parameter with @Valid") {
                 @Override
                 public void check(JavaMethod method, ConditionEvents events) {
@@ -419,11 +460,13 @@ class ArchitectureTest {
         if (isApiResponse(type)) {
             return true;
         }
+
         if (type instanceof JavaParameterizedType parameterized
                 && type.toErasure().isEquivalentTo(ResponseEntity.class)) {
             JavaType body = parameterized.getActualTypeArguments().getFirst();
             return body.getName().equals(Void.class.getName()) || isApiResponse(body);
         }
+
         return false;
     }
 
@@ -587,7 +630,8 @@ class ArchitectureTest {
         assertThat(classes.contain(AllowedController.class)).isFalse();
         assertThat(classes.contain(UnvalidatedBodyController.class)).isFalse();
         assertThat(classes.contain(ValidatedBodyController.class)).isFalse();
-        assertThat(classes.stream().noneMatch(type -> type.getPackageName().startsWith("com.mogum.archfixture"))).isTrue();
+        assertThat(classes.stream().noneMatch(type -> type.getPackageName().startsWith("com.mogum.archfixture")))
+                .isTrue();
     }
 
     private static void assertViolation(ArchRule rule, Class<?> fixture) {

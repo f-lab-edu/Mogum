@@ -42,10 +42,12 @@ class MeControllerTest {
         // given
         var user = UserFixtures.withId(UserFixtures.user("google", "sub", "me@example.com"), 7L);
         UserFixtures.withStatus(user, status);
+
         // 필터를 거치지 않으므로 인자 해석기가 읽는 현재 스레드의 인증에 회원을 넣는다.
         var securityContext = SecurityContextHolder.createEmptyContext();
         securityContext.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
-                new AccountPrincipal.Member(user.getId(), user.getEmail(), user.getName(), user.getStatus()), null, List.of()));
+                new AccountPrincipal.Member(user.getId(), user.getEmail(), user.getName(), user.getStatus()),
+                null, List.of()));
         SecurityContextHolder.setContext(securityContext);
 
         // when
@@ -61,6 +63,7 @@ class MeControllerTest {
         assertThat(applicationContext.getBeansOfType(UserRepository.class)).isEmpty();
         assertThat(applicationContext.getBeansOfType(SecurityConfiguration.class)).isEmpty();
     }
+
     @Test
     @DisplayName("신청 전 사람은 세션 신원으로 상태와 이메일과 이름만 반환한다")
     void returnsNotAppliedIdentity() {
@@ -78,5 +81,4 @@ class MeControllerTest {
                 {"data":{"status":"NOT_APPLIED","email":"new@example.com","name":"구글 이름"}}
                 """);
     }
-
 }
