@@ -83,7 +83,18 @@
     {
       "step": 6,
       "name": "layout-test-c",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-17T10:34:01+0900",
+      "summary": "deploy·job·worker 아래 Java 26개 파일의 문맥 단위 빈 줄·줄 나누기·들여쓰기 정리를 유지하고 리뷰 지적 JobIntakeServiceIntegrationTest.serializesRetryAndDiscard의 람다 본문 두 줄을 24칸·32칸으로 수정. 대상 26개 모두 HEAD와 공백 외 문자·문자열/문자 리터럴 원문 동일, word diff 변경 표시 없음. ./backend/gradlew -p backend build 통과(compileTestJava 실행, test UP-TO-DATE). 120자 초과 6줄(backend/src/test/java/com/mogum/ 기준): deploy/AwsFilesTest.java:69 — JSON 텍스트 블록 리터럴(124자); deploy/BackupFilesScriptTest.java:134 — 셸 텍스트 블록 리터럴(136자); deploy/OperatorSqlIntegrationTest.java:150 — SQL 문자열 리터럴(139자); deploy/OperatorSqlIntegrationTest.java:165 — SQL 문자열 리터럴(139자); deploy/WorkflowFilesScriptTest.java:183 — 셸 텍스트 블록 리터럴(151자); job/controller/JobControllerIntegrationTest.java:378 — JSON 텍스트 블록 리터럴(134자).",
+      "completed_at": "2026-11-17T15:13:01+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/job/service/JobIntakeServiceIntegrationTest.java:325-329 (appliesSuccessDeduplicationByType) — else 블록은 두 줄짜리 단언인데 그 사이에 빈 줄을 넣었다. 짝인 if 블록에는 빈 줄이 없다. CODE_STYLE §1 의 「같은 일을 하는 두세 줄은 붙인다」와 어긋난다 → 빈 줄을 빼고, 대신 if/else 블록이 끝난 뒤 `assertBalanceMatchesLedger` 앞에 빈 줄을 두는 편이 맞다.",
+        "backend/src/test/java/com/mogum/deploy/WorkflowFilesScriptTest.java:run 의 `for (...)` 본문 · backend/src/test/java/com/mogum/job/service/JobIntakeServiceTest.java:retry 성공 테스트의 `.satisfies(entry -> assertThat(entry.getAmount())` / `.isEqualTo(-2))` — 바깥 줄을 나눈 것만으로 120자 안에 들어오는데 안쪽의 짧은 체인까지 나눴다 → 다음 정리 때 안쪽 체인은 한 줄로 잇는다.",
+        "backend/src/test/java/com/mogum/deploy/WorkflowFilesScriptTest.java:27-29 · DeployFilesScriptTest.java:56-58 의 `@ValueSource(strings = {...})` — 원래 있던 줄바꿈을 살리면서 한 줄에 \"missing-vars\" 하나만 남거나 줄 길이가 들쭉날쭉해졌다 → 의미가 묶이는 것끼리 다시 묶는다(공백만 바뀌므로 step 7 이나 이후 정리에서 가능).",
+        "backend/src/test/java/com/mogum/deploy/DeployFilesScriptTest.java:36-37 (`.matcher(content)` / `.find()).as(...).isTrue()`) · WorkflowFilesTest.java:75-84 (`.collect(Collectors.toSet())).isEqualTo(...)`) — 안쪽 체인은 줄마다 하나씩 나눴는데 바깥 assertThat 체인은 닫는 괄호 뒤에 붙여 두었다. 같은 파일 164행 부근(`.count())` / `.isEqualTo(1)`)과 처리가 다르다 → 한 방식으로 맞춘다.",
+        "backend/src/test/java/com/mogum/job/controller/JobControllerIntegrationTest.java:376-380 (queued) — 텍스트 블록의 닫는 `\"\"\"` 와 `.formatted(id)` 를 나눴다. 호출이 하나뿐이라 나눌 필요가 없었다(내용은 그대로다) → `\"\"\".formatted(id);` 로 잇는 편이 읽기 쉽다.",
+        "backend/src/test/java/com/mogum/worker/WorkerLifecycleTest.java:122-124 — Mockito 의 `willAnswer(...).given(jobRunner).releaseCurrent()` 에서 `.given(jobRunner)` 와 `.releaseCurrent()` 를 나눴다. 대상과 스텁할 메서드가 짝이라 CODE_STYLE §2 의 설정 체인 예외(Spring Security 의 `.requestMatchers().permitAll()` 처럼)에 들어갈 수도 있다 → 테스트 DSL(Mockito · ArchUnit · RestTestClient 의 `.expectStatus().isOk()`)도 예외에 넣을지는 phase `/review` 에서 정한다."
+      ]
     },
     {
       "step": 7,
