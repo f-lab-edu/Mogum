@@ -11,7 +11,7 @@
 
 - 클래스 선언 줄 바로 다음에는 빈 줄을 두지 않는다.
 - 묶음 사이에 빈 줄 하나 — static 상수 묶음 · 인스턴스 필드 묶음 · 생성자 · 메서드 하나하나 · 중첩 타입.
-- 같은 묶음 안의 필드 사이에는 빈 줄을 두지 않는다.
+- 같은 묶음 안의 필드 사이에는 빈 줄을 두지 않는다. 단, 애노테이션을 필드 위 따로 된 줄에 쓴 필드(엔티티의 `@Id` · `@Column` …)는 필드마다 빈 줄로 나눈다 — 붙여 두면 애노테이션 줄이 어느 필드에 붙는지 보이지 않는다. `@Autowired UserRepository userRepository;` 처럼 한 줄인 필드는 붙여 둔다.
 
 **메서드 본문**
 
@@ -48,6 +48,7 @@ public JobResult receive(long userId, JobRequest request) {
     - 연산자(`&&` · `||` · `+` · `?` · `:`)는 **앞에서** 끊고 다음 줄 맨 앞에 둔다.
     - 메서드 체인은 `.` 앞에서 끊고, 끊으면 한 줄에 호출 하나씩 둔다.
     - 예외 — 호출 둘이 뜻 하나를 이루는 설정 체인은 그 둘을 한 줄에 둔다. Spring Security 의 `.requestMatchers(…).permitAll()` 처럼 대상과 규칙이 짝이면 짝마다 한 줄이다 — 나누면 어느 규칙이 어느 경로에 걸리는지 읽기 어렵다.
+    - 테스트 체인도 같다 — 대상을 고르는 호출과 그 대상에 거는 기대 · 동작이 짝이면 짝마다 한 줄이다. `.expectStatus().isOk()` · Mockito 의 `.given(jobRunner).releaseCurrent()` · ArchUnit 의 `.should().beAnnotatedWith(X)` · `.orShould().beAssignableTo(X)`.
     - 인자 · 매개변수는 쉼표 뒤에서 끊는다. 한 줄에 다 들어가지 않으면 의미가 묶이는 것끼리 둔다.
 - 검색할 문구(오류 문구 · 로그 문구 · SQL 조각)를 나눠야만 120자를 지킬 수 있으면 나누지 않고 넘겨도 된다.
 
@@ -69,7 +70,7 @@ return generationJobRepository.findById(jobId)
 
 - **주입받는 의존 필드는 타입 단순 이름을 camelCase 로 쓴다** — `RoadmapRepository roadmapRepository` · `LoginService loginService` · `TransactionTemplate transactionTemplate` · `ObjectMapper objectMapper` · `EntityManager entityManager`. 줄임말(`tx` · `em` · `repo`) · 역할 이름(`roadmaps` · `login` · `reads`)을 쓰지 않는다.
 - **같은 타입이 둘 이상이면 역할을 앞에 붙이고 타입 이름으로 끝낸다** — `transactionTemplate` · `releaseTransactionTemplate`.
-- 직접 쓴 생성자의 매개변수도 필드와 같은 이름이다.
+- 주입받는 매개변수도 같다 — 직접 쓴 생성자와 `@Bean` 메서드의 매개변수(`EntityManager entityManager` · `TestClock testClock`). `java.*` 타입 예외도 같다(`Clock clock`). 빌드는 필드만 검사한다.
 - **테스트도 같다** — `@Autowired UserRepository userRepository`. Fake 는 대신하는 타입의 이름을 쓴다 — `FakeUserRepository userRepository`.
 - **`java.*` 타입은 예외다** — `Clock clock` · `Map<JobType, JobIntakeHandler> handlers` · `ScheduledExecutorService renewals` 처럼 담은 것을 말하는 이름을 쓴다. 범용 타입은 타입 이름이 내용을 말하지 않는다.
 - 이 규칙이 보지 않는 것 — 지역 변수 · 람다 매개변수 · record 칸 · 엔티티 필드 · 설정 값(`*Properties` record 의 칸).
@@ -85,7 +86,7 @@ return generationJobRepository.findById(jobId)
 
 ## 4. Lombok · 생성자 · 로거
 
-- **빈 클래스의 생성자가 final 필드에 대입만 하면 `@RequiredArgsConstructor` 를 쓴다** — 생성자를 직접 쓰지 않는다. 생성자에서 변환 · 계산을 하면(목록을 `Map` 으로 바꾸기 · `TransactionTemplate` 만들기) 직접 쓴다.
+- **생성자가 final 필드에 대입만 하면 `@RequiredArgsConstructor` 를 쓴다** — 빈이 아닌 클래스(`OAuthLoginHandler` 처럼 설정이 `new` 로 만드는 것)도 같다 — 생성자를 직접 쓰지 않는다. 생성자에서 변환 · 계산을 하면(목록을 `Map` 으로 바꾸기 · `TransactionTemplate` 만들기) 직접 쓴다.
 - **로거는 `@Slf4j` 로 둔다**(필드 이름 `log`). `LoggerFactory.getLogger` 를 직접 쓰지 않는다.
 - 엔티티는 `@Getter` · `@NoArgsConstructor(access = PROTECTED)` 만 쓴다([AGENTS.md](../AGENTS.md) 「스택」 · 금지 24).
 - 그 밖의 Lombok(`@Data` · `@Setter` · `@Builder` · `@Value` · `@AllArgsConstructor` · `@EqualsAndHashCode` · `@ToString` …)은 쓰지 않는다.
