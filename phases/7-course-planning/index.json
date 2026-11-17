@@ -80,7 +80,16 @@
     {
       "step": 6,
       "name": "course-api",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T01:33:36+0900",
+      "summary": "GET /api/courses → courses[{id,title,status}](짜기 전 제외), GET /api/roadmaps → roadmaps[{id,title,description,status,completedCourses,totalCourses}](목록 모두 created_at DESC,id DESC·나눠 받지 않음); GET /api/courses/{id} → {id,status,title,roadmapId?,lessons[{id,position,title,description,concepts[{name,definition}],completed}],progress{completedLessons,totalLessons},nextLessonId?,completedAt?}, GET /api/roadmaps/{id} → {id,status,title,description,courses[{id,position,title,description,concepts[{name,definition}],status,progress:NOT_PLANNED|GENERATING|FAILED|GENERATED,jobId?}],nextCourse?{courseId,enabled}}; POST /api/courses/{id}/start(본문 없음), PATCH /api/courses/{id}({title},100 코드 포인트·@Valid) → 코스 하나와 같은 응답(모두 200·ApiResponse); NOT_FOUND(404)·COURSE_START_NOT_ALLOWED(409)·ROADMAP_REPLAN_IN_PROGRESS(409,재사용)·FIELD_INVALID(400,title REQUIRED/TOO_LONG); CourseJobRepository/JpaCourseJobRepository가 작업을 네이티브 SQL 값으로만 읽고 course→job Java 참조는 위반 픽스처 포함 ArchUnit으로 차단, CreditLedger.lock 사용자 행 잠금으로 시작/다시 짜기 받기 직렬화·미완료 다시 짜기 거절·시작 연타 보존·제목 변경 Auditing·소유권/읽기 불변/로그 원문 부재·진행/다음 코스/목록 순서 검증; docs/04·05 반영, 두 AC 통과(대상 836개·전체 build 2042개), 서버 테스트 1939→2042개(103개 추가, 실패/오류/건너뜀 0), 실제 OpenAI 미호출·커밋 없음",
+      "completed_at": "2026-11-18T06:18:14+0900",
+      "review_notes": [
+        "docs/04-jobs-and-cost.md:52 — step 은 §2.3 에 `course` 컨트롤러 · 서비스 한 줄을 적으라고 했지만 §2.2(패키지 경계) 끝에 넣었다. 05 §4 의 링크도 §2.2 를 가리켜 서로 맞기는 하다. 위치가 내용과 맞으므로 그대로 두어도 되고, /review 때 §2.3 표에 한 줄을 더할지 본다.",
+        "backend/src/main/java/com/mogum/common/api/ErrorCode.java:41 — 코스 시작의 거절에 `ROADMAP_REPLAN_IN_PROGRESS` 를 재사용했다. step 이 허용한 선택이지만 이름이 로드맵 전용으로 읽힌다. 화면 step 7~9 가 이 code 로 분기할 때 헷갈리지 않게 05 §1.2 문장을 함께 읽도록 안내한다.",
+        "backend/src/main/java/com/mogum/course/service/RoadmapReadService.java:76 — 첫 코스의 강의 목록 작업이 실패 · 만드는 중이면 nextCourse 가 둘째 코스(enabled:false)를 가리킨다. 계약 문장(작업 없는 짜기 전 코스 가운데 가장 앞)과 같고 테스트도 그렇게 고정했다. 화면 step 에서 이 경우의 표시가 어색하지 않은지 본다.",
+        "backend/src/main/java/com/mogum/course/service/RoadmapReadService.java:51 — 로드맵 목록이 로드맵마다 코스를 따로 조회한다(N+1). 정원 10명이라 MVP 에서 문제는 아니다."
+      ]
     },
     {
       "step": 7,
