@@ -27,7 +27,7 @@ test.each([
   await waitFor(() => expect(screen.getByRole('heading', { name: title })).toHaveFocus())
 })
 
-test.each(['/jobs/12', '/courses/31', '/roadmaps/41', '/courses/31/lessons/51'])('승인 전에는 %s에서 작업이나 결과를 읽지 않는다', async (path) => {
+test.each(['/new', '/jobs/12', '/courses/31', '/roadmaps/41', '/courses/31/lessons/51'])('승인 전에는 %s에서 작업이나 결과를 읽지 않는다', async (path) => {
   window.history.replaceState(null, '', path)
   vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: { status: 'APPLIED', name: '민서', email: 'minseo@example.com' } })))))
   render(<App />)
@@ -115,7 +115,7 @@ test.each(tabPages)('승인된 사람은 $entry 주소에서 틀 안의 $label �
   render(<App />)
   const heading = await screen.findByRole('heading', { level: 1, name: title })
   expect(screen.getByRole('main')).toContainElement(heading)
-  expect(screen.getByRole('main').textContent).toBe(title)
+  expect(screen.getByRole('main').textContent).toBe(entry === '/' ? `${title}새로 배우기` : title)
   expect(screen.getByRole('banner')).toBeVisible()
   for (const navigation of screen.getAllByRole('navigation')) {
     expect(within(navigation).getByRole('link', { name: label })).toHaveAttribute('aria-current', 'page')
@@ -149,4 +149,25 @@ test('홈에서 탭 링크로 다른 자리 화면을 열어도 계정 화면으
     expect(await screen.findByRole('heading', { name: tab.title })).toBeVisible()
     await waitFor(() => expect(window.location.pathname).toBe(tab.entry))
   }
+})
+
+test('임시 홈의 입구에서 새로 배우기로 가고 받기 뒤 실제 기다리는 화면을 연다', async () => {
+  window.history.replaceState(null, '', '/')
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+    ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
+    : { id: 42, type: 'NEW_COURSE', status: 'QUEUED', subject: { topic: '자바', level: 'BEGINNER', purpose: 'WORK' } } })))))
+  render(<App />)
+  fireEvent.click(await screen.findByRole('link', { name: '새로 배우기' }))
+  await waitFor(() => {
+    expect(window.location.pathname).toBe('/new')
+    expect(screen.getByRole('heading', { name: '새로 배우기' })).toHaveFocus()
+  })
+  fireEvent.change(screen.getByRole('textbox', { name: '주제' }), { target: { value: '자바' } })
+  fireEvent.click(screen.getByRole('radio', { name: '처음 배워요' }))
+  fireEvent.click(screen.getByRole('radio', { name: '업무에 쓰려고요' }))
+  fireEvent.click(screen.getByRole('button', { name: '만들기' }))
+  expect(await screen.findByRole('heading', { name: '자바' })).toBeVisible()
+  await waitFor(() => expect(window.location.pathname).toBe('/jobs/42'))
+  expect(screen.getByRole('status')).toHaveTextContent('차례를 기다리고 있어요')
+  expect(fetch).toHaveBeenCalledWith('/api/jobs', expect.objectContaining({ method: 'POST' }))
 })

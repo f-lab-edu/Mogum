@@ -22,6 +22,24 @@ export interface JobResponse {
 
 export const jobKey = (jobId: string) => ['jobs', jobId] as const
 
+export interface NewLearningRequest {
+  type: 'NEW_COURSE' | 'NEW_ROADMAP'
+  topic: string
+  level: 'BEGINNER' | 'BASICS' | 'FAMILIAR' | 'OTHER'
+  levelOther?: string
+  purpose: 'WORK' | 'INTERVIEW' | 'GENERAL' | 'OTHER'
+  purposeOther?: string
+  memo?: string
+}
+
+export function receiveJob(request: NewLearningRequest) {
+  return apiFetch<JobResponse>('/jobs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+}
+
 export function readJob(jobId: string, signal?: AbortSignal) {
   return apiFetch<JobResponse>(`/jobs/${encodeURIComponent(jobId)}`, { signal })
 }

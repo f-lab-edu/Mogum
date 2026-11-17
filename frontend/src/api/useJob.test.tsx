@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
-import { discardJob, jobKey, readJob, retryJob, useJob, useJobAction } from './useJob'
+import { discardJob, jobKey, readJob, receiveJob, retryJob, useJob, useJobAction } from './useJob'
 
 const queued = { id: 12, type: 'NEW_COURSE', status: 'QUEUED', subject: { topic: '자바', level: 'BEGINNER', purpose: 'WORK' } }
 const clients: QueryClient[] = []
@@ -12,6 +12,17 @@ function setup() {
   return { client, wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> }
 }
 function response(data: unknown) { return new Response(JSON.stringify({ data })) }
+
+test.each(['NEW_COURSE', 'NEW_ROADMAP'] as const)('%s 받기는 평평한 JSON·쿠키·CSRF로 보내고 작업을 반환한다', async (type) => {
+  document.cookie = 'XSRF-TOKEN=test-csrf; path=/'
+  const request = { type, topic: '자바', level: 'OTHER' as const, levelOther: '실무 경험', purpose: 'WORK' as const }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ ...queued, type })))
+  expect(await receiveJob(request)).toEqual({ ...queued, type })
+  expect(fetch).toHaveBeenCalledWith('/api/jobs', expect.objectContaining({ method: 'POST', credentials: 'include', body: JSON.stringify(request) }))
+  const headers = new Headers(vi.mocked(fetch).mock.calls[0][1]!.headers)
+  expect(headers.get('Content-Type')).toBe('application/json')
+  expect(headers.get('X-XSRF-TOKEN')).toBe('test-csrf')
+})
 afterEach(() => {
   clients.forEach((client) => client.clear())
   clients.length = 0

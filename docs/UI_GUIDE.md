@@ -75,6 +75,10 @@
 | `Button` · [components/Button.tsx](../frontend/src/components/Button.tsx) | 기본 `variant="primary"`는 보라·흰색 굵은 글자·4px 아래 두께. hover는 진한 보라, 누르면 3px 내려가 두께가 1px. `variant="secondary"`는 보조 동작용으로 안내 바탕·보조 글자·옅은 테두리이며 hover는 `surface-muted`, 아래 두께는 없다. 둘 다 최소 높이 52px·가로 여백 24px·세로 여백 12px·16px 모서리. `disabled`는 옅은 바탕·보조 글자·그림자 없음·클릭 차단·눌림 없음. `focus-visible`은 보라 2px outline과 2px offset. 기본 `type="button"`, 네이티브 버튼 속성을 전달한다. 신청·다시 시도는 기본형, 계정 전환·로그아웃은 보조형을 쓴다. |
 | `AccountIdentity` · [components/AccountIdentity.tsx](../frontend/src/components/AccountIdentity.tsx) | 신청·승인 대기·거절됨에서 공유하는 「신청 계정」 영역. 안내 바탕·옅은 테두리·16px 모서리·안쪽 여백 16px. 이름과 구글 이메일을 `dl`로 세로 표시한다. 긴 값은 자르지 않고 줄바꿈하며 사진·입력 칸은 없다. |
 | `FailureNotice` · [components/FailureNotice.tsx](../frontend/src/components/FailureNotice.tsx) | 무엇이 안 됐는지·안내·전달받은 동작을 함께 담는 `role="alert"` 영역. 안내 바탕·옅은 테두리·16px 모서리·안쪽 여백 16px·요소 사이 12px. 제목은 굵은 오류색, 안내는 작은 본문이며 동작은 공통 `Button`·링크를 쓴다. |
+| `TextField` · [components/TextField.tsx](../frontend/src/components/TextField.tsx) | 한 줄 글 입력·`multiline`이면 4줄 높이의 여러 줄 입력. 굵은 이름과 필수/선택 표시 → 입력 → 선택적인 길이 안내 → 칸 오류 순서. 흰 면·옅은 테두리·16px 모서리·최소 높이 52px·가로 여백 16px·세로 여백 12px. `value`·`onChange`·`required`·`disabled`·`maxCodePoints`·`error`를 받는다. `maxCodePoints`가 있으면 유니코드 코드 포인트 수를 `현재 / 상한자`로 표시하고 초과 시 오류를 알린다. UTF-16 단위인 HTML `maxlength`로 자르지 않는다. 오류는 붉은 테두리·`aria-invalid`·`aria-describedby`로 연결하고, 잠금은 옅은 바탕·보조 글자·네이티브 disabled. 키보드 포커스는 공통 2px 보라 outline·2px offset. |
+| `ChoiceGroup` · [components/ChoiceGroup.tsx](../frontend/src/components/ChoiceGroup.tsx) | 이름·필수/선택 표시와 나란한 선택 버튼 묶음. 모바일 2열·640px부터 4열, 간격 12px. 흰 면·옅은 테두리·16px 모서리·최소 높이 52px·안쪽 여백 가로 16px/세로 12px. 선택은 안내 바탕·보라 글자/테두리/2px ring·채운 원 표시로 구분한다. 미선택은 빈 원, hover는 안내 바탕. `options`·`value`·`onChange`·`required`·`disabled`·`error`를 받으며 기본 선택을 만들지 않는다. 네이티브 radio와 같은 name, 이름 있는 `fieldset role="radiogroup"`으로 단일 선택·키보드 이동을 지원한다. 포커스는 버튼 모양 영역에 공통 outline, 잠금은 네이티브 disabled·옅은 바탕·보조 글자, 오류는 묶음에 `aria-invalid`·`aria-describedby`로 연결한다. |
+| `CheckboxField` · [components/CheckboxField.tsx](../frontend/src/components/CheckboxField.tsx) | 안내 바탕·옅은 테두리·16px 모서리·안쪽 여백 16px. 24px 네이티브 checkbox와 굵은 이름은 최소 높이 44px의 클릭 영역, 선택적 `description`은 그 아래 작은 보조 글자·12px 간격이며 `aria-describedby`로 연결한다. `checked`·`onChange`·`disabled`를 받는다. 선택은 기존 `primary` accent, 키보드 포커스는 공통 outline, 잠금은 네이티브 disabled. |
+| `FieldError` · [components/FieldError.tsx](../frontend/src/components/FieldError.tsx) | 작은 오류색 글자·`role="alert"`. 서버 `fields`의 칸별 `reason`에는 별도 문구가 없으므로 `REQUIRED`는 「필수 입력이에요.」, `TOO_LONG`은 「글자 수 상한을 넘었어요.」, `INVALID_VALUE`는 「보기에서 골라 주세요.」, `NOT_ALLOWED`는 「이 칸은 비워 주세요.」로 설명한다. 모르는 reason은 「입력을 확인해 주세요.」이며 원래 code/reason은 노출하지 않는다. 오류 응답의 `message`는 `FailureNotice`에서 원문 그대로 함께 보인다. |
 
 각 컴포넌트는 같은 폴더의 `{이름}.test.tsx`에 짝 테스트가 있다. `Mogumi`의 공통 크기는 §7을 따른다.
 
@@ -94,7 +98,8 @@ Google 링크는 기존 Roboto 500·44px 높이·흰 바탕·1px 테두리·4px 
 | `/apply` | 신청 · `NOT_APPLIED` |
 | `/waiting-approval` | 승인 대기 · `APPLIED` |
 | `/rejected` | 거절됨 · `REJECTED` |
-| `/` | `APPROVED`의 홈 자리(`PlaceholderPage`, 제목 「머금」). 처음 열리는 탭 |
+| `/` | `APPROVED`의 홈 자리(`PlaceholderPage`, 제목 「머금」). 처음 열리는 탭. 「새로 배우기」 링크 하나로 `/new`에 진입 |
+| `/new` | `APPROVED`의 새로 배우기(`NewLearningPage`). 위 바 제목 「새로 배우기」·뒤로 가기. 받기 성공 시 `/jobs/{id}`로 이동 |
 | `/courses` | `APPROVED`의 코스 탭 자리 |
 | `/roadmaps` | `APPROVED`의 로드맵 탭 자리 |
 | `/review` | `APPROVED`의 복습 탭 자리 |
@@ -106,6 +111,8 @@ Google 링크는 기존 Roboto 500·44px 높이·흰 바탕·1px 테두리·4px 
 | `/privacy` | 개인정보처리방침 자리. 로그인·상태 읽기 없이 제목·준비 중·돌아가기만 표시 |
 
 계정 화면 세 개는 [AccountPage.tsx](../frontend/src/pages/AccountPage.tsx)에서 상태별로 구성한다. `/`와 계정 주소를 열 때 「나」를 읽어 현재 상태의 주소로 보낸다. 모르는 상태는 기존 불러오기 실패·다시 시도로 처리하며 값을 노출하지 않는다. 승인 대기에 폴링·새로고침 버튼을 두지 않는다. `ACCOUNT_NOT_APPROVED`를 받으면 「나」를 다시 읽어 현재 상태를 반영한다.
+
+새로 배우기는 [NewLearningPage.tsx](../frontend/src/pages/NewLearningPage.tsx)에서 안내·모구미 묶음 → 흰 입력 면 순서로 구성한다. 입력 면은 24px 모서리·옅은 테두리·안쪽 여백 24px(640px부터 32px), 입력 묶음 간격 32px이며 §3의 공통 컴포넌트를 쓴다. 내용과 보기는 [06 §5](./06-screens.md#5-새로-배우기) · [03 §1.2](./03-generation.md#12-입력--새로-배우기), 길이와 보내는 칸은 [05 §2](./05-api.md#2-만드는-작업--받기-하나--다시-읽기)를 따른다. 필수 입력과 길이 상한을 만족해야 만들기를 누를 수 있다. 요청 중 입력·선택·만들기를 잠그고, 같은 순간의 중복 제출도 한 번만 보낸다. [useJob.ts](../frontend/src/api/useJob.ts)의 `receiveJob(NewLearningRequest)`가 공통 `apiFetch`로 받기를 보내며 자동 재시도하지 않는다. 실패하면 `FailureNotice`에 서버 문구 원문과 재제출 안내를 보이고, 입력·선택을 보존하며 만들기를 다시 누를 수 있다. 새 토큰은 추가하지 않았다.
 
 시안의 핵심 순서를 맞춰 모구미·제목 → 계정 → 저장 정보 안내 → 신청·계정 전환으로 구성한다. 승인 대기는 제목 뒤에 알림 없음 안내를 먼저 두고, 계정 → 삭제 요청 안내 → 처리방침·로그아웃으로 이어진다. 거절됨은 제목 → 계정 → 남은 정보·삭제 요청 안내 → 처리방침·로그아웃 순서다. 처리방침 링크는 안내 영역에 두며 보라 글자·밑줄·최소 높이 44px·공통 포커스 outline을 쓴다. 처리방침의 돌아가기는 `/`에서 현재 상태를 다시 읽는 방식이다.
 
@@ -124,11 +131,11 @@ sips -Z 384 docs/design/assets/mogumi-reading.png --out frontend/src/assets/mogu
 
 ## 6. 아직 정하지 않은 것 — 처음 쓰는 TASK가 정한다
 
-홈 배치·공통 카드·배지·진도 막대·확인 펼침·추가 버튼 모양·애니메이션은 처음 필요한 TASK에서 정한다. 지금의 중앙 면과 안내 문단을 미리 카드 컴포넌트로 만들지 않는다. 다크 모드는 미정 항목이 아니라 MVP에서 제외한 기능이다(ADR-064).
+홈 배치·공통 카드·배지·진도 막대·확인 펼침·추가 버튼 모양·애니메이션은 처음 필요한 TASK에서 정한다. 글 입력·여러 줄 입력·선택 버튼 묶음·체크·칸 오류는 `7-course-planning` step 7에서 §3의 공통 컴포넌트로 정했다. 지금의 중앙 면과 안내 문단을 미리 카드 컴포넌트로 만들지 않는다. 다크 모드는 미정 항목이 아니라 MVP에서 제외한 기능이다(ADR-064).
 
 ## 7. 승인 뒤 화면의 틀
 
-`6-job-worker` step 6에서 정한다. 주소는 §4.1, 화면 구분과 탭 순서는 [06 §2.1~2.3](./06-screens.md#21-형태와-모양의-원칙)을 따른다. 다섯 탭은 모두 제목 한 줄의 자리이며 내용은 해당 TASK에서 채운다.
+`6-job-worker` step 6에서 정한다. 주소는 §4.1, 화면 구분과 탭 순서는 [06 §2.1~2.3](./06-screens.md#21-형태와-모양의-원칙)을 따른다. 다섯 탭은 제목 한 줄의 자리이며, 홈에는 `7-course-planning` step 7에서 새로 배우기 입구 하나를 더했다. 나머지 내용은 해당 TASK에서 채운다.
 
 | 이름 · 경로 | 모양 · 동작 · 상태 |
 |---|---|
@@ -139,7 +146,7 @@ sips -Z 384 docs/design/assets/mogumi-reading.png --out frontend/src/assets/mogu
 | 위 바 · `AppLayout` 안 | 높이 56px·흰 면·아래 테두리·스크롤 위에 붙는 바. 기본(탭 첫 화면)은 40px 모구미와 「머금」 로고. 1024px 부터 로고는 사이드바에만 둔다. 화면이 `title`을 넘기면 뒤로 가기 버튼과 해당 제목(`h1`)을 보인다. 뒤로 가기는 `navigate(-1)`로 브라우저의 이전 화면으로 간다. 버튼은 최소 44×44px·공통 포커스 outline. 제목은 진입 시 포커스를 받고 문서 제목을 `제목 · 머금`으로 바꾼다. |
 | 탭 아이콘 · `AppLayout` 안 | [guide §3](./design/guide.md#3-표준-내비게이션-5대-탭-아이콘-navigation-icons)의 홈·학사모·경로 노드·카드 덱·프로필 인라인 SVG를 그대로 사용한다. 24×24px·`currentColor`·선 두께 2, `aria-hidden`·`focusable="false"`로 장식 처리하며 접근 가능한 이름은 링크의 글자다. 아이콘 라이브러리는 없다. |
 | `Mogumi` · [components/Mogumi.tsx](../frontend/src/components/Mogumi.tsx) | 기본 `size="page"`는 기존 128px·가운데 정렬. `size="logo"`는 위 바·사이드바의 40px 표시다. 같은 로컬 사본·대체 글·원래 비율을 유지한다. |
-| `PlaceholderPage` · [pages/PlaceholderPage.tsx](../frontend/src/pages/PlaceholderPage.tsx) | 제목만 제공하며 `main`을 중복하지 않는다. 기본 홈 제목은 「머금」·문서 제목은 「홈 · 머금」, 다른 탭은 `title`을 받는다. 제목 진입·변경 시 포커스와 문서 제목을 갱신한다. |
+| `PlaceholderPage` · [pages/PlaceholderPage.tsx](../frontend/src/pages/PlaceholderPage.tsx) | `main`을 중복하지 않는다. 기본 홈 제목은 「머금」·문서 제목은 「홈 · 머금」, 제목 아래 24px 간격으로 「새로 배우기」 링크 하나를 둔다. 링크는 기본 Button과 같은 토큰·모양·포커스·눌림 효과를 쓴다. 다른 탭은 `title`을 받고 제목만 보인다. 제목 진입·변경 시 포커스와 문서 제목을 갱신한다. |
 
 뒤 TASK의 탭에서 들어간 화면은 `RequireAuth` 아래에서 `<AppLayout title="기다리는 화면">…본문…</AppLayout>`처럼 사용한다. 탭 첫 화면은 `title` 없이 감싸고 본문에서 제목을 제공한다. 승인 전 화면과 처리방침은 기존 `AccountLayout`을 유지한다.
 
