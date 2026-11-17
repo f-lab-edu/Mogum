@@ -94,7 +94,17 @@
     {
       "step": 7,
       "name": "new-learning-screen",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T06:18:14+0900",
+      "summary": "/new 새로 배우기(AppLayout 제목·뒤로 가기)와 임시 홈 /의 입구 하나; 공통 frontend/src/components/{TextField,ChoiceGroup,CheckboxField,FieldError}.tsx(한 줄·여러 줄 입력·단일 선택·체크·칸 오류, 코드 포인트 길이 안내·접근성·잠금); frontend/src/api/useJob.ts의 receiveJob(NewLearningRequest) → POST /api/jobs 최상위 JSON·쿠키/CSRF·자동 재시도 없음, 미사용 기타 글·빈 메모 생략, 요청 중 잠금·동시 중복 제출 차단·성공 /jobs/{id} 이동·서버 문구 원문/칸 오류·입력 보존; UI_GUIDE 컴포넌트·주소·홈 입구 반영(새 토큰 없음); TDD 실패 확인 후 구현, AC test·lint 통과 및 타입 검사·빌드 통과, 화면 테스트 267→304개(37개 추가·25파일·실패 0), backend 변경·실제 OpenAI 호출·커밋 없음.",
+      "completed_at": "2026-11-18T06:25:17+0900",
+      "review_notes": [
+        "frontend/src/components/FieldError.tsx:3 — 칸 오류의 reason별 문구(「필수 입력이에요.」 등)는 화면이 만든다. 서버는 `FIELD_INVALID`에 문구를 하나만 주고, code를 그대로 보이면 금지 20에 걸리니 지금 방식이 맞다. 다만 ADR-145(문구는 서버가 정한다)와 겉보기에 충돌하므로, 05 §1.2에 「칸별 reason 설명은 화면이 둔다」는 예외를 한 줄 적어 두면 다음 작업자가 헷갈리지 않는다.",
+        "frontend/src/pages/NewLearningPage.tsx:47 — 서버 칸 오류는 사용자가 그 칸을 고쳐도 다음 제출 전까지 남는다. 예: 주제 REQUIRED를 받은 뒤 주제를 입력해도 붉은 테두리와 문구가 그대로다. 동작은 맞지만 혼란스러울 수 있다. 입력이 바뀌면 `mutation.reset()`으로 지우는 방법을 검토할 만하다.",
+        "frontend/src/pages/NewLearningPage.tsx:48 — 지금 화면에 없는 칸의 오류는 칸 옆에 보이지 않는다. 예: 기타가 아닐 때 받은 `levelOther: NOT_ALLOWED`나 `type`. 이때는 FailureNotice의 공통 문구만 보인다. 화면이 그런 칸을 보내지 않으므로 MVP에서는 넘어가도 된다.",
+        "frontend/src/api/useJob.test.tsx:17 — `document.cookie`에 XSRF-TOKEN을 설정한 뒤 afterEach에서 지우지 않는다. 지금 이 쿠키에 기대는 다른 테스트는 없지만, 테스트 순서에 따라 결과가 달라질 여지를 줄이려면 정리하는 편이 낫다.",
+        "frontend/src/App.test.tsx:118 — `entry === '/' ? `${title}새로 배우기` : title`처럼 textContent를 이어 붙여 비교하는 단언은 깨지기 쉽다. 홈에 칸이 더해지는 TASK 11에서 이 단언을 다시 써야 한다."
+      ]
     },
     {
       "step": 8,
