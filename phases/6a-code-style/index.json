@@ -99,7 +99,13 @@
     {
       "step": 7,
       "name": "brace-and-config-chain",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-17T15:13:01+0900",
+      "summary": "Java 12개 파일의 if 사슬 15곳에 if 16개(else if 포함)·else 1개의 중괄호 17쌍 추가. 파일 목록(backend/src/ 기준): main/java/com/mogum/auth/CookieAuthorizationRequestRepository.java, main/java/com/mogum/auth/SecurityConfiguration.java, main/java/com/mogum/job/dto/JobReceiveRequestValidator.java, main/java/com/mogum/worker/JobRunner.java, test/java/com/mogum/ArchitectureTest.java, test/java/com/mogum/auth/SecurityConfigurationApprovalIntegrationTest.java, test/java/com/mogum/auth/SecurityConfigurationIntegrationTest.java, test/java/com/mogum/course/repository/CourseSchemaRepositoryTest.java, test/java/com/mogum/deploy/DeployFilesScriptTest.java, test/java/com/mogum/deploy/WorkflowFilesScriptTest.java, test/java/com/mogum/support/IntegrationTestConfiguration.java, test/java/com/mogum/worker/JobRunnerIntegrationTest.java. 설정 체인은 main/java/com/mogum/auth/SecurityConfiguration.java의 authorizeHttpRequests 안 대상·접근 규칙 7쌍을 한 줄씩 연결. 전체 if 사슬 250개 재검사에서 여러 줄 중괄호 없는 갈래 0개; 수정 사슬의 모양을 맞춘 한 줄 if·else 각 1개 외 기존 한 줄 갈래 유지. 변경 파일마다 HEAD와 공백·중괄호 제거 문자열 동일 및 추가한 여는/닫는 중괄호 수 동일 확인. AC build 통과(97개 클래스·1,494개 테스트, 실패·오류·건너뛰기 0개); word diff는 {+{+}·{+}+} 추가 표시 34개뿐이며 삭제·공백 재짝짓기 예외 없음. 새 120자 초과 줄 없음.",
+      "completed_at": "2026-11-17T15:16:44+0900",
+      "review_notes": [
+        "phases/6a-code-style/index.json — 이 step 의 build AC 결과는 Gradle up-to-date 캐시에서 나왔다. 테스트를 실제로 다시 돌린 기록이 필요하면 phase 를 끝낼 때 `./backend/gradlew -p backend build --rerun-tasks` 를 한 번 돌린다(중괄호 · 공백만 바뀌어 동작 위험은 없다)."
+      ]
     }
   ],
   "created_at": "2026-11-17T04:54:38+0900"
