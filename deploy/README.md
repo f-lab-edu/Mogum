@@ -76,6 +76,7 @@
    | `API_DOMAIN` | `api.{도메인}` — 스킴/경로 없음 |
    | `DB_USERNAME` · `DB_PASSWORD` | 정한 DB 사용자와 강한 비밀번호. 최초 볼륨 초기화에 쓰이며 기존 DB 비밀번호를 env 변경만으로 바꾸지 않는다 |
    | `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` | 기존 Google OAuth 웹 클라이언트 자격 |
+   | `OPENAI_API_KEY` | OpenAI 대시보드에서 발급한 프로젝트 키. 같은 프로젝트의 월 사용 한도도 사람이 설정한다. 비어 있으면 앱 기동 거부 |
    | `GOOGLE_REDIRECT_URI` | `https://api.{도메인}/auth/google/callback` |
    | `APP_WEB_ORIGIN` | `https://{도메인}` — 끝 `/` 없음 |
    | `APP_WEB_COOKIE_DOMAIN` | `{도메인}` — 스킴/경로 없음 |
@@ -312,12 +313,14 @@ docker exec -i "$postgres" sh -c \
 
 합계는 1664MiB이고 나머지 약 380MiB는 OS · Docker · SSM 에이전트 몫이다. 스왑 없이 측정하며 `16-capacity`가 같은 [compose.yaml](./compose.yaml)로 재서 상한을 확정한다. 앱 힙은 이미지의 `-XX:MaxRAMPercentage=75`로 컨테이너 상한의 75%를 사용한다. `backend`는 Postgres 준비 확인 후 `aws` 프로필로 기동하며, 종료 대기는 **150초**로 Spring의 130초보다 길다. 세 서비스 모두 `restart: always`로 재부팅과 비정상 종료에 대응한다.
 
-환경 변수는 Compose의 `--env-file /etc/mogum/mogum.env`로 읽고 서비스마다 필요한 이름만 전달한다. `API_DOMAIN`은 Caddy에만, Google 비밀은 앱에만, DB 비밀번호는 앱과 Postgres에만 전달한다. `APP_IMAGE`는 `deploy.sh`가 지문 파일을 검증한 뒤 지정한다. DB와 인증서는 이름 있는 볼륨에 보존하며, 고정된 프로젝트 이름과 Caddy 설정 경로 덕분에 릴리스 디렉터리가 바뀌어도 정의가 같은 Postgres와 Caddy는 재생성되지 않는다.
+환경 변수는 Compose의 `--env-file /etc/mogum/mogum.env`로 읽고 서비스마다 필요한 이름만 전달한다. `API_DOMAIN`은 Caddy에만, Google 비밀과 `OPENAI_API_KEY`는 앱에만, DB 비밀번호는 앱과 Postgres에만 전달한다. `APP_IMAGE`는 `deploy.sh`가 지문 파일을 검증한 뒤 지정한다. DB와 인증서는 이름 있는 볼륨에 보존하며, 고정된 프로젝트 이름과 Caddy 설정 경로 덕분에 릴리스 디렉터리가 바뀌어도 정의가 같은 Postgres와 Caddy는 재생성되지 않는다.
 이 변경을 처음 배포할 때는 세 서비스의 정의가 바뀌어 한 번 다시 만들어진다. 데이터 · 인증서는 볼륨에 남고, 그 직전까지의 json-file 로그는 그때 사라진다.
 
 서버 시간대는 `Asia/Seoul`이며 `deploy.sh`가 성공한 배포마다 맞춘다. 계산 · 저장 기준은 UTC이고, 타이머 · 스크립트는 시간대를 명시한다. 컨테이너의 기본 시간대와 Postgres 세션 시간대는 UTC로 유지한다.
 
 세 서비스의 로그는 Docker journald 드라이버로 서버 journald에 모은다. `deploy/journald/mogum.conf`를 `/etc/systemd/journald.conf.d/mogum.conf`에 설치하며, `Storage=persistent`로 디렉터리 존재와 무관하게 디스크에 보관한다. 보관 상한은 **총 14일 · 500MiB 중 먼저 닿는 쪽**이다: `MaxRetentionSec=13day` + 파일 하나의 최대 기간 `MaxFileSec=1day` = **14일**, 크기는 `SystemMaxUse=500M`이다. 서버 전체 저널(백업 서비스 등)에도 적용된다. 헬스 통과 · `current` 갱신 뒤 파일이 바뀌었을 때만 설치하고 `systemctl restart systemd-journald`한다. systemd 258 미만은 SIGHUP으로 설정을 다시 읽지 못하므로 restart를 사용하며 기존 스트림 연결은 유지된다([journald 설정](https://www.freedesktop.org/software/systemd/man/latest/journald.conf.html) · [서비스 문서](https://www.freedesktop.org/software/systemd/man/latest/systemd-journald.service.html)). Postgres는 `log_error_verbosity=terse`로 실행해 오류의 `DETAIL` · `HINT` · `QUERY` · `CONTEXT`에 이메일 등 실제 값이 남지 않게 한다([Postgres 17 문서](https://www.postgresql.org/docs/17/runtime-config-logging.html)). Caddy 접근 로그는 켜지 않는다.
+
+처음 이 채팅 클라이언트를 배포하거나 키를 갱신할 때는 사람이 `/etc/mogum/mogum.env`의 `OPENAI_API_KEY`를 편집기에서 채운 뒤 배포한다. OpenAI 대시보드에서 키 발급과 프로젝트 월 사용 한도 설정을 마치고, 값을 출력하거나 저장소에 넣지 않는다. 갱신된 키는 다음 Compose 앱 재생성 때 반영된다.
 
 SSM은 릴리스 묶음을 푼 뒤 root로 해당 릴리스의 `deploy/deploy.sh {SHA}`를 실행한다. 스크립트는 다음 순서로 동작한다.
 

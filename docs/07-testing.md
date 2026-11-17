@@ -36,6 +36,9 @@
 
 ## 2. LLM 스텁
 
+- `7-course-planning` step 1의 `generation.llm.FakeOpenAiServer`는 테스트 안의 JDK `HttpServer`다. 실제 SDK 4.75.1이 보내는 경로 · 인증 · 모델 · 출력 상한 · reasoning effort · 메시지 역할과 이어 쓰기를 검사한다. 500 · 429 · 시간 초과에서도 요청 수가 한 번인지 확인한다. `ChatCallIntegrationTest`는 호출 전 기록의 커밋 · 트랜잭션과 연결 반환 · 호출별 결과/토큰/비용 · 해석 실패의 마지막 기록 · 원문 로그 부재를 확인한다.
+- 실제 OpenAI 시험 `OpenAiLiveIntegrationTest`는 기본 `test`에서 제외한다. `./backend/gradlew -p backend llmTest`만 실행하며 `OPENAI_API_KEY` 환경 변수가 없거나 공백이면 건너뛴다. 짧은 요청 한 번의 끝남 · 사용량 · 호출 기록을 본다. 유료 호출이며 step 1에서는 실행하지 않았다.
+
 - 생성은 서버가 정한 순서대로 부르므로(ADR-118) 스텁으로 흐름 전체를 시험한다 — 실제 LLM 은 부르지 않는다.
 - 흉내 낼 것 — 정상 응답 · 일시적 실패 · 형식 불합격 · 잘린 출력(이어 쓰기) · 다시 해도 같은 실패(ADR-127).
     - 만드는 작업 TASK 는 테스트 전용 처리기로 정상 · 일시적 실패 · 형식 불합격 · 다시 해도 같은 실패(거절 · 입력이 너무 큼) · 오래 걸림(시한 · 정상 종료 시험)을 흉내 낸다. 잘린 출력(이어 쓰기)은 LLM 호출 안의 일이라, 그 호출을 만드는 강의 목록 TASK 가 LLM 스텁으로 흉내 낸다(README 2026-11-15).

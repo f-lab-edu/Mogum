@@ -109,6 +109,7 @@ class AppImageTest {
                     .withEnv("DB_URL", "jdbc:postgresql://postgres:5432/" + postgreSQLContainer.getDatabaseName())
                     .withEnv("DB_USERNAME", postgreSQLContainer.getUsername())
                     .withEnv("DB_PASSWORD", postgreSQLContainer.getPassword())
+                    .withEnv("OPENAI_API_KEY", "test-only-openai-key")
                     .withEnv("GOOGLE_CLIENT_ID", System.getProperty("GOOGLE_CLIENT_ID"))
                     .withEnv("GOOGLE_CLIENT_SECRET", System.getProperty("GOOGLE_CLIENT_SECRET"))
                     .waitingFor(Wait.forHttp("/actuator/health").forStatusCode(200))

@@ -69,6 +69,8 @@
 
 - **만드는 작업** — `6-job-worker` step 0에서 `V11__create_generation_jobs.sql`로 `generation_jobs`와 `credit_entries.job_id`(작업 삭제 시 `SET NULL`)를 만들었다. 같은 대상 중복을 막는 부분 고유 색인은 [02 §8.5](./02-domain-data.md#85-만들기--호출)에 적었다. `job.domain.GenerationJob`은 `AuditedEntity`를 상속하고 사용자 · 대상은 ID 값, 입력은 기존 `LearningInput`의 `@Embedded` 매핑으로 둔다. 받기 팩토리는 `newCourse(long userId, LearningInput input)` · `newRoadmap(long userId, LearningInput input)` · `planRoadmapCourse(long userId, long courseId)` · `replanCourse(long userId, long courseId, String feedback)` · `replanRoadmap(long userId, long roadmapId, String feedback)` · `material(long userId, long lessonId)`이며 모두 `QUEUED` · `claim_count = 0`으로 시작한다. `JobType` · `JobStatus` · `JobErrorType`을 두었고, `job.repository.GenerationJobRepository`는 `Repository<GenerationJob, Long>`만 상속해 `<S extends GenerationJob> S save(S entity)` · `Optional<GenerationJob> findById(Long id)`만 선언했다. `6-job-worker` step 2에서 `GenerationJob.retry()`로 실패를 기다림으로 돌리고 오류와 끝난 때를 비운다. `job.JobIntakeHandler`는 `type()` · `check(long userId, JobRequest request)` 자리만 두며 운영 구현은 없다. 받기 값은 `JobRequest(JobType type, Long targetId, LearningInput input, String feedback)`다. `job.service.JobIntakeService`의 `receive(long userId, JobRequest request)` · `retry(long userId, long jobId)`는 `JobResult(long id, JobStatus status)`를 돌려주고, `discard(long userId, long jobId)`는 반환값이 없다. 세 동작은 한 `@Transactional` 안에서 `CreditLedger.lock(userId)`를 먼저 부른다. 받기는 주인 → 처리기 → 같은 대상 → 건 수 → 작업 저장 · 크레딧 사용 순서다. 처리기가 없으면 `INVALID_REQUEST`로 거절한다. 레포지토리에 같은 대상 조회(`findSameTarget`) · 사용자별 진행 건 수(`countByUserIdAndStatusIn`) · 버리기(`delete`)를 더했다.
 
+- **채팅 호출** — `7-course-planning` step 1: `generation.ChatProvider.send(Request): Reply`는 SDK 없는 단일 요청 인터페이스이고, `generation.llm.OpenAiChatProvider`가 SDK 4.75.1을 사용한다. `generation.ChatCall.<T>call(JobSnapshot, ChatSettings, String system, String user, Function<String, Optional<T>>): ChatResult<T>`는 최초 호출과 이어 쓰기 · 해석 · 호출 기록을 맡는다. `ChatResult.Success<T>(value)` 또는 `ChatResult.Failed<T>(GenerationOutcome.Failure)`를 돌려준다. `config.LlmConfiguration`이 조립한다. 시작 기록 실패 때는 요청하지 않고, 종료 기록 실패는 이미 받은 결과를 버리거나 재호출하게 하지 않는다. DB 자체가 실패하면 종료 칸과 사용량을 채우지 못할 수 있다.
+
 - **호출 기록** — `7-course-planning` step 0에서 `V12__create_llm_calls.sql`과 `generation.call.domain.LlmCall` · `LlmCallType` · `LlmCallOutcome`, `generation.call.repository.LlmCallRepository`를 더했다. `generation.call.LlmCallWriter`의 `long start(Long jobId, Long userId, JobType jobType, LlmCallType callType, String model)` · `void finish(long callId, LlmCallOutcome outcome, Integer inputTokens, Integer outputTokens, BigDecimal cost, int durationMs)`는 각각 `TransactionTemplate`의 `REQUIRES_NEW`로 짧게 커밋한다. 존재하지 않는 작업 · 사용자 연결만 비우고, 확인 직후 삭제되어 FK 위반이면 롤백 후 새 트랜잭션에서 연결을 재확인해 한 번 재시도한다. `job_type`은 남기며 종료는 끊긴 행도 채운다. `outcome`과 `duration_ms`는 함께 비거나 함께 찬다. JPA 쓰기의 시각은 공용 `Clock`의 Auditing이 채우고, 빈은 `config.GenerationConfiguration.llmCallWriter`가 조립한다.
 
 - `6-job-worker` step 3 구현: `job.controller.JobController`가 받기 · 작업 하나 읽기 · 다시 시도 · 버리기를 HTTP에 연결한다. `job.dto.JobReceiveRequest`의 칸 사이 검증은 `FieldViolation.Reason`으로 공통 오류 경로에 전달한다. `job.service.JobReadService`는 `@Transactional(readOnly = true)`에서 작업 주인을 확인하고 `course` 패키지의 레포지토리로 대상 제목과 강의의 코스 ID를 읽어 값 객체만 반환한다. 경로 · 요청/응답 칸 · 실패 묶음은 [05 §2](./05-api.md#2-만드는-작업--받기-하나--다시-읽기)에 적었다.
@@ -267,8 +269,8 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 |---|---|
 | 한 사람이 동시에 걸 수 있는 수 — `app.job.max-in-progress-per-user` 임시 값 3(`JobProperties.maxInProgressPerUser()`). `6-job-worker` step 2에서 사용자 행 잠금으로 동시 요청을 직렬화했다(§6). 실제 운영 값은 재 보고 정한다 | ADR-104 · ADR-133 |
 | 서버마다 워커 수 · 빈손/예외 뒤 쉬는 간격 · 정상 종료 대기는 아래 임시 설정. 배포는 기존 `deploy/deploy.sh`의 Compose `up -d --no-build`로 옛 컨테이너를 끄고 새 컨테이너를 켠다. 겹치는 배포 장치는 없다 | ADR-105 · ADR-126 · ADR-133 |
-| 시한 · 늘리는 간격은 아래 임시 설정. 각 워커의 `ScheduledExecutorService.scheduleWithFixedDelay`로 만드는 동안과 정상 종료 대기 중에 갱신한다. 시한 식은 아래와 같고, 호출 시간 제한과 이어 쓰기 값은 강의 목록 TASK에서 정한 뒤 다시 대입한다 | ADR-126 |
-| 자동 다시 시도는 아래 임시 설정. 이어 쓰기 횟수 · 간격 · 프로바이더 오류 분류는 강의 목록 TASK에서 정한다(갈래 자체는 ADR-163) | ADR-127 |
+| 시한 · 늘리는 간격은 아래 임시 설정. 각 워커의 `ScheduledExecutorService.scheduleWithFixedDelay`로 만드는 동안과 정상 종료 대기 중에 갱신한다. 시한 식과 강의 목록 TASK에서 정한 호출 값은 아래에 적었다 | ADR-126 |
+| 자동 다시 시도는 아래 임시 설정. 이어 쓰기 횟수 · 간격 · 프로바이더 오류 분류는 아래 step 1 구현 값이다(갈래 자체는 ADR-163) | ADR-127 |
 | 꺼내기는 PostgreSQL CTE 하나에서 `SELECT … ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1` → `UPDATE … RETURNING id`. `QUEUED` 또는 같은 `Clock`의 현재 시각보다 `lease_until`이 작은 `RUNNING` 하나를 집고 `claim_count + 1` · 시한 · 시작/수정 시각을 바꾼다 | ADR-129 |
 | 종류별 크레딧 값 · 한 달 몫 — 한 달 몫은 계정 TASK 가 설정 한 곳에 임시 값 100 으로 두고, 홈 · 크레딧 TASK 에서 M1 · M2 동안 쌓인 호출 기록(`llm_calls`)으로 정한다(README 2026-11-17 — 처음에는 강의 목록 TASK 였다). 종류별 값은 `6-job-worker` step 1에서 아래 설정에 모두 임시 값 1로 두었다 | ADR-107 · ADR-115 |
 | 크레딧 채우기를 여러 서버에서 한 번만 일어나게 하는 방법 · 새벽 4시에 서버가 꺼져 있었을 때 따라잡는 방법 | ADR-133 · ADR-173 |
@@ -278,7 +280,7 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 
 | 설정 키 | 읽는 메서드 | 임시 값 |
 |---|---|---|
-| `app.worker.lease-duration` | `leaseDuration()` | `5m` |
+| `app.worker.lease-duration` | `leaseDuration()` | `6m` |
 | `app.worker.renewal-interval` | `renewalInterval()` | `30s` |
 | `app.worker.max-retries` | `maxRetries()` | `2`(최대 호출 3번) |
 | `app.worker.retry-delay` | `retryDelay()` | `1s` |
@@ -290,10 +292,41 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 
 ```text
 시한 > (R + 1) × ((C + 1) × T호출 + C × D이어쓰기) + R × D다시시도 + T_DB
-현재: 300초 > 3 × ((C + 1) × T호출 + C × D이어쓰기) + 2초 + T_DB
+현재: 360초 > 3 × (2 × 50초 + 1 × 0초) + 2 × 1초 + 10초 = 312초
 ```
 
-운영 생성 처리기와 유료 호출은 아직 없으므로 `T호출` · `C` · `D이어쓰기` · 실제 `T_DB` 상한을 확인한 것은 아니다. 강의 목록 TASK에서 이를 정하고 시한을 다시 계산한다. 호출 시간 제한 · 이어 쓰기 · 다시 시도 횟수/간격 중 하나를 바꿔도 식을 다시 확인한다.
+`7-course-planning` step 1에서 `T호출=50초`, `C=1`, `D이어쓰기=0초`, `T_DB=10초`의 임시 여유를 정했다. `T_DB`는 재료 읽기 · 호출 기록 · 시한 처리 · 결과/실패 쓰기에 남기는 예산이며 실측 상한은 아니다. 운영 프롬프트와 DB 부하로 다시 잰다. `config.LlmConfiguration`의 생성자는 모든 채팅 묶음 중 `(C + 1) × T호출`이 가장 큰 값을 식에 넣고 엄격한 부등식을 검사하며, 각 호출 시간 제한보다 정상 종료 대기(100초)가 길어야 한다. 깨지면 빈 생성 실패로 기동을 거부한다.
+
+채팅 설정은 `application.yml`의 `app.llm` 한 곳이고 `config.LlmProperties` record로 읽는다. 아직 쓰지 않는 용도의 묶음은 없다.
+
+| 설정 키 | 값 |
+|---|---|
+| `app.llm.openai.api-key` | `${OPENAI_API_KEY:}` — 비어 있으면 기동 거부 |
+| `app.llm.openai.base-url` | 빈 문자열이면 SDK 기본 주소. 가짜 HTTP 서버에서 바꾼다 |
+| `app.llm.chats.planning.model` | `gpt-5.6-terra` |
+| `app.llm.chats.planning.max-completion-tokens` | 출력 상한 — [03 §7](./03-generation.md#7-아직-정하지-않은-값) |
+| `app.llm.chats.planning.timeout` | `50s` |
+| `app.llm.chats.planning.max-continuations` | `1` |
+| `app.llm.database-allowance` | `10s` |
+| `app.llm.prices[gpt-5.6-terra].input` | `2.00` USD / 1M 토큰 |
+| `app.llm.prices[gpt-5.6-terra].cached-input` | `0.20` USD / 1M 토큰 |
+| `app.llm.prices[gpt-5.6-terra].output` | `12.00` USD / 1M 토큰 |
+
+모든 채팅 모델에 단가가 있어야 기동한다. 비용은 `(입력 − 캐시 입력) × 입력 단가 + 캐시 입력 × 캐시 단가 + 출력 × 출력 단가`를 1,000,000으로 나눈 USD다. 사용량이 없으면 비용도 비우고, 캐시 정보만 없으면 캐시 입력을 0으로 계산한다. SDK 자동 재시도는 `maxRetries(0)`이며, `RequestOptions`로 요청별 시간 제한을 건다. `CompletionUsage.PromptTokensDetails.cachedTokens()`, `ChatCompletionCreateParams.Builder.addAssistantMessage(String)`, `OpenAIServiceException.statusCode()/code()`, `OpenAIIoException` · `OpenAIInvalidDataException`과 그 `InterruptedIOException` 원인을 4.75.1 소스 JAR로 확인했다. `JsonHandler`가 본문 읽기 시간 초과를 데이터 예외로 감싸므로 원인 타입으로도 검사한다. SDK `OkHttpClient`는 `retryOnConnectionFailure(false)`도 적용한다.
+
+| 프로바이더 결과 | 호출 결과 | 작업 실패 |
+|---|---|---|
+| `stop` | `SUCCEEDED`, 해석 실패는 `INVALID_OUTPUT` | 해석 실패면 `INVALID_OUTPUT` |
+| `length` | `TRUNCATED` | 이어 쓰기 한도 뒤에도 잘리면 `INVALID_OUTPUT` |
+| 그 밖의 종료 · 빈 내용 · 응답 해석 오류 | `INVALID_OUTPUT` | `INVALID_OUTPUT` |
+| 시간 초과 | `TIMEOUT` | `PROVIDER_UNAVAILABLE` |
+| 429 (`insufficient_quota` 제외) | `RATE_LIMITED` | `PROVIDER_UNAVAILABLE` |
+| 429 `insufficient_quota` | `REJECTED` | `PROVIDER_REJECTED` |
+| 5xx · 연결 오류 | `PROVIDER_ERROR` | `PROVIDER_UNAVAILABLE` |
+| 401 · 403 · 그 밖의 4xx | `REJECTED` | `PROVIDER_REJECTED` |
+| 400 `context_length_exceeded` | `REJECTED` | `INPUT_TOO_LARGE` |
+
+실제 유료 호출은 실행하지 않았다. 가짜 서버가 요청 형식 · 요청 수 · 이어 쓰기와 오류 분류를 확인한다([07 §2](./07-testing.md#2-llm-스텁)).
 
 현재 계산할 수 있는 제약은 `WorkerProperties`의 생성자에서 검사해 설정 바인딩 실패로 기동을 거부한다: 시한 · 갱신/쉬는 간격 · 종료 대기는 양수, `갱신 간격 < 시한`, 워커 수 · 추가 다시 시도 횟수/간격은 0 이상, `종료 대기 < 120초`다. Spring의 130초와 컨테이너의 150초는 늘리지 않고, 반환 트랜잭션 제한 5초를 위한 여유를 남긴다. 워커(단계 `Integer.MAX_VALUE`)는 Tomcat 정상 종료보다 먼저, 따로 멈춘다 — 그래서 실제 종료 시간은 `종료 대기(100초) + 반환(최대 5초) + Tomcat 정상 종료` 의 합이고, 이 합이 컨테이너의 150초 안에 들어와야 한다. 지금 API 요청은 짧아 여유가 있다. 종료 대기 상한 120초는 `WorkerProperties` 에 상수로 있으니 130초를 바꾸면 함께 본다. `WorkerPropertiesTest`는 잘못된 설정의 기동 거부와 실제 Spring 종료 설정이 120초보다 긴 것을 검사하고, 기존 배포 파일 시험이 컨테이너 대기와 Spring 대기의 관계를 검사한다.
 

@@ -111,7 +111,8 @@ class JobRunnerIntegrationTest {
         var values = configuredWorkerProperties;
 
         // then
-        assertThat(values).isEqualTo(new WorkerProperties(LEASE, Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
+        assertThat(values).isEqualTo(new WorkerProperties(
+                Duration.ofMinutes(6), Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
                 0, Duration.ofSeconds(1), Duration.ofSeconds(100)));
     }
 
