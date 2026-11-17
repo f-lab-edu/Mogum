@@ -110,7 +110,15 @@
     {
       "step": 8,
       "name": "review-fixes",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-17T15:33:48+0900",
+      "summary": "Java 45개 파일 정리(항목별 중복 포함: 1 애노테이션 필드 빈 줄 15개, 2 테스트 체인 짝 8개, 4 리뷰 권고 및 같은 모양 13개, 5 import 순서·묶음 8개). 3 주입 매개변수 33개(8개 파일·17개 생성자/메서드) 이름 대응: SecurityConfiguration.apiSecurity: http → httpSecurity, users → userRepository, mapper → objectMapper, web → webProperties, login → loginService, registrations → clientRegistrationRepository, clients → discardingOAuth2AuthorizedClients; SecurityConfiguration.discardedGoogleTokens: registrations → clientRegistrationRepository; RequestLogConfiguration.requestLogCompletion: requestLogFilter → filterRegistrationBean; WorkerConfiguration.workerLifecycle: em → entityManager, transactions → platformTransactionManager, ledger → creditLedger, properties → workerProperties; JobRunner.JobRunner: transactions → platformTransactionManager; IntegrationTestConfiguration.DatabaseProbe.DatabaseProbe: source → dataSource; IntegrationTestConfiguration.FilterFailure.filterFailure: security → abstractFilterRegistrationBean; IntegrationTestConfiguration.JobGenerators.materialGenerator: em → entityManager, clock → testClock; IntegrationTestConfiguration.JobGenerators.newCourseGenerator: em → entityManager, clock → testClock; IntegrationTestConfiguration.JobGenerators.newRoadmapGenerator: em → entityManager, clock → testClock; IntegrationTestConfiguration.JobGenerators.planRoadmapCourseGenerator: em → entityManager, clock → testClock; IntegrationTestConfiguration.JobGenerators.replanCourseGenerator: em → entityManager, clock → testClock; IntegrationTestConfiguration.JobGenerators.replanRoadmapGenerator: em → entityManager, clock → testClock; IntegrationTestConfiguration.testRequests: client → restTestClient, sessions → jdbcIndexedSessionRepository; TestRequests.TestRequests: repository → jdbcIndexedSessionRepository; TestSessions.TestSessions: sessionRepository → jdbcIndexedSessionRepository; ShortDependency.ShortDependency: users → userRepository. 6 변경 Java 45개 모두 HEAD와 import 집합 동일, 메서드 범위에서 바꾼 매개변수 이름을 원복하고 import 줄·공백을 제거한 문자열 동일; 문자열·문자 리터럴과 텍스트 블록 원문(닫는 줄 들여쓰기 포함) 동일. AC ./backend/gradlew -p backend build 통과(test 실제 실행: 97개 클래스·1,494개 테스트, 실패·오류·건너뛰기 0개); 지정 word diff 실행 결과 글자 변경 표시는 3의 매개변수 이름·import 줄뿐. 새 120자 초과 줄 없음, git diff --check 통과.",
+      "completed_at": "2026-11-17T15:40:57+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/support/IntegrationTestConfiguration.java:519-520 — 이름이 길어져 `@Qualifier(\"securityFilterChainRegistration\")` 와 매개변수 선언이 같은 들여쓰기의 두 줄로 나뉘었다. 동작은 같다. 앞으로 매개변수 애노테이션을 줄로 나눌 때의 모양을 CODE_STYLE §2 에 정할지 검토할 만하다.",
+        "phases/6a-code-style/step8.md 4 — 메서드 이름 `followsLoggedInRequests` 는 실제 파일에 없다. 고친 곳은 `cleansUserMdcForNextAnonymousRequests` 의 for 본문이고, 그 파일의 for 는 이것 하나뿐이라 결과는 맞다. step 을 쓸 때 메서드 이름을 확인하면 구현 담당이 덜 헤맨다.",
+        "AC build 는 UP-TO-DATE 캐시로 통과했다. 입력이 같아 문제는 없지만, 리뷰에서 다시 실행하려면 `--rerun-tasks` 가 필요하다."
+      ]
     }
   ],
   "created_at": "2026-11-17T04:54:38+0900",
