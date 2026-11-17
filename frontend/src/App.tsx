@@ -11,6 +11,7 @@ import PrivacyPage from './pages/PrivacyPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import WaitingPage from './pages/WaitingPage'
 import NewLearningPage from './pages/NewLearningPage'
+import CoursePage from './pages/CoursePage'
 
 function ApplicationRoutes() {
   const navigate = useNavigate()
@@ -31,7 +32,7 @@ function ApplicationRoutes() {
           <Route path="/profile" element={<AppLayout><PlaceholderPage title="내 정보" /></AppLayout>} />
           <Route path="/new" element={<AppLayout title="새로 배우기"><NewLearningPage /></AppLayout>} />
           <Route path="/jobs/:jobId" element={<AppLayout title="기다리는 화면"><WaitingPage key={pathname} /></AppLayout>} />
-          <Route path="/courses/:courseId" element={<AppLayout title="코스">{null}</AppLayout>} />
+          <Route path="/courses/:courseId" element={<AppLayout title="코스"><CoursePage key={pathname} /></AppLayout>} />
           <Route path="/roadmaps/:roadmapId" element={<AppLayout title="로드맵">{null}</AppLayout>} />
           <Route path="/courses/:courseId/lessons/:lessonId" element={<AppLayout title="강의">{null}</AppLayout>} />
         </Route>

@@ -14,7 +14,6 @@ test('작업 주소를 직접 열면 승인 뒤 작업을 읽고 기다리는 �
 })
 
 test.each([
-  ['/courses/31', '코스'],
   ['/roadmaps/41', '로드맵'],
   ['/courses/31/lessons/51', '강의'],
 ])('결과 주소 %s는 승인 뒤 제목 %s와 뒤로 가기만 있는 자리를 표시한다', async (path, title) => {
@@ -170,4 +169,17 @@ test('임시 홈의 입구에서 새로 배우기로 가고 받기 뒤 실제 �
   await waitFor(() => expect(window.location.pathname).toBe('/jobs/42'))
   expect(screen.getByRole('status')).toHaveTextContent('차례를 기다리고 있어요')
   expect(fetch).toHaveBeenCalledWith('/api/jobs', expect.objectContaining({ method: 'POST' }))
+})
+
+test('코스 주소를 직접 열면 승인 뒤 실제 코스를 읽고 같은 주소에 표시한다', async () => {
+  window.history.replaceState(null, '', '/courses/31')
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+    ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
+    : { id: 31, status: 'REVIEWING', title: '자바 기초', lessons: [], progress: { completedLessons: 0, totalLessons: 0 } } })))))
+  render(<App />)
+  expect(await screen.findByRole('heading', { name: '자바 기초' })).toBeVisible()
+  expect(screen.getByText('검토 중')).toBeVisible()
+  expect(fetch).toHaveBeenCalledWith('/api/courses/31', expect.objectContaining({ method: 'GET' }))
+  await waitFor(() => expect(screen.getByRole('heading', { name: '코스' })).toHaveFocus())
+  expect(window.location.pathname).toBe('/courses/31')
 })

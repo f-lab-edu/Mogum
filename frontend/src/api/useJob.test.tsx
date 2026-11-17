@@ -84,3 +84,10 @@ test('늦은 작업 읽기는 다시 시도 성공의 캐시를 덮어쓰지 않
   await act(async () => { finishRead(response({ ...queued, status: 'FAILED' })) })
   expect(query.result.current.data).toEqual(queued)
 })
+
+test('코스 다시 짜기는 대상·선택 피드백만 최상위 JSON으로 보낸다', async () => {
+  const request = { type: 'REPLAN_COURSE' as const, courseId: 31, feedback: '예제를 더해 주세요' }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ ...queued, type: 'REPLAN_COURSE' })))
+  expect(await receiveJob(request)).toMatchObject({ type: 'REPLAN_COURSE' })
+  expect(fetch).toHaveBeenCalledWith('/api/jobs', expect.objectContaining({ method: 'POST', body: JSON.stringify(request) }))
+})

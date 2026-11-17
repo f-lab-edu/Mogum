@@ -32,7 +32,13 @@ export interface NewLearningRequest {
   memo?: string
 }
 
-export function receiveJob(request: NewLearningRequest) {
+export interface ReplanCourseRequest {
+  type: 'REPLAN_COURSE'
+  courseId: number
+  feedback?: string
+}
+
+export function receiveJob(request: NewLearningRequest | ReplanCourseRequest) {
   return apiFetch<JobResponse>('/jobs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
