@@ -55,7 +55,14 @@
     {
       "step": 4,
       "name": "roadmap-course-job",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T01:12:07+0900",
+      "summary": "job.PlanRoadmapCourseIntakeHandler + generation.PlanRoadmapCourseGenerator를 짝으로 조립; 첫 코스 check에서 Roadmap.start()로 같은 받기 트랜잭션의 진행 중 전환(건 수·크레딧 거절 시 전체 롤백), 끝나지 않은 REPLAN_ROADMAP 차단·가장 앞선 짜기 전·바로 앞 코스 COMPLETED 검사·동시 중복 하나·소유권 검증; 새 오류는 모두 409: COURSE_PLAN_NOT_ALLOWED(지금은 이 코스의 강의 목록을 만들 수 없어요), PREVIOUS_COURSE_NOT_COMPLETED(앞 코스를 다 마치면 만들 수 있어요), ROADMAP_REPLAN_IN_PROGRESS(다시 짜는 중에는 시작할 수 없어요); generation.RoadmapCoursePlanReader.read(courseId): 읽기 전용 TransactionTemplate에서 CoursePlanInput.RoadmapCourse 값으로 입력(수준은 첫 코스만)·현재 계획·바로 앞 실제 목록·뒤 계획만 복사하고 호출 전에 트랜잭션 종료(step 5 재사용), CourseRepository.findByRoadmapIdOrderByPositionAsc·LessonRepository.findByCourseIdOrderByPositionAsc 사용; parseLessons·planning 채팅 뒤 소유권 확인 저장 트랜잭션에서 강의와 Course.planLessons()의 NOT_PLANNED→REVIEWING, 제목·계획 유지·원래 코스 ResultRef; 운영 워커+LLM 스텁·실패/복구·로그 원문 부재·저장 불변식 검증, 기존 미지원 PLAN_ROADMAP_COURSE HTTP 거절은 성공·상태 거절 시험으로 이전; 두 AC 통과(대상 1069개·전체 build 1881개), 서버 테스트 1823→1881개(순증 58개, 실패/오류/건너뜀 0); 문서 반영·실제 OpenAI 미호출·커밋 없음.",
+      "completed_at": "2026-11-18T01:23:05+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/generation/RoadmapCoursePlanReader.java:49 — 바로 앞 코스가 없으면 `orElseThrow()`의 예외를 generate가 잡아 PROVIDER_UNAVAILABLE(일시적 실패 — 다시 시도 가능)로 돌린다. 받기 규칙이 막으므로 실제로는 오지 않는 경우지만, 다시 해도 같은 실패라는 점을 주석으로 남겨 두면 step 5에서 재사용할 때 덜 헷갈린다.",
+        "backend/src/main/java/com/mogum/job/PlanRoadmapCourseIntakeHandler.java:34 — 순서 1 코스에서 로드맵이 REVIEWING · IN_PROGRESS · COMPLETED 밖의 상태일 때의 처리는 RoadmapStatus 값이 늘어날 때 다시 봐야 한다. 지금 enum으로는 동작에 영향이 없다."
+      ]
     },
     {
       "step": 5,
