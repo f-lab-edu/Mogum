@@ -67,7 +67,15 @@
     {
       "step": 5,
       "name": "replan-jobs",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T01:23:05+0900",
+      "summary": "job.ReplanCourseIntakeHandler · ReplanRoadmapIntakeHandler + generation.ReplanCourseGenerator · ReplanRoadmapGenerator를 config.GenerationConfiguration에서 짝으로 조립; 검토 중에만 받으며 상태 거절은 공통 REPLAN_NOT_ALLOWED(409, 검토 중일 때만 다시 짤 수 있어요); 읽기 전용 TransactionTemplate에서 이전 목록·계획·피드백·입력을 값으로 복사하고 로드맵 코스는 RoadmapCoursePlanReader 재사용; 워커 소유권 확인 저장 트랜잭션에서 EntityManager.remove → flush() → 순서 1부터 새 자식 저장, 코스 제목·계획 유지 및 로드맵 제목·설명·NOT_PLANNED 코스 전체 교체, 원래 대상 ResultRef; 불변식 위반 저장 거절·교체 저장 롤백·모든 생성 실패/버리기 이전 결과 보존·크레딧 한 번 복구·동시 중복/소유권·로그 원문 부재 검증; 두 AC 통과(대상 1123개·전체 build 1939개), 서버 테스트 1881→1939개(순증 58개, 실패/오류/건너뜀 0); 문서 반영·실제 OpenAI 미호출·커밋 없음.",
+      "completed_at": "2026-11-18T01:33:36+0900",
+      "review_notes": [
+        "docs/04-jobs-and-cost.md:84 — The step 5 entry sits between the `6-job-worker` step 3 and step 4 bullets, so it breaks up the run of 6-job-worker items. → Move it under the step 4 `**로드맵 코스 처리기**` bullet with the same pattern (e.g. a `**다시 짜기 처리기**` heading) so the order matches the step 3 and step 4 entries.",
+        "backend/src/test/java/com/mogum/job/ReplanCourseIntakeHandlerIntegrationTest.java:64 — This class also contains the REPLAN_ROADMAP intake integration tests. → The name says course only; consider a name that covers both kinds, or splitting the roadmap tests into their own class.",
+        "AC — I did not run the full build (`./backend/gradlew -p backend build`). Check that it passes before merging."
+      ]
     },
     {
       "step": 6,
