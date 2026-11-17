@@ -13,6 +13,8 @@ import java.lang.annotation.Target;
 @Constraint(validatedBy = JobReceiveRequestValidator.class)
 public @interface ValidJobRequest {
     String message() default "field.INVALID_VALUE";
+
     Class<?>[] groups() default {};
+
     Class<? extends Payload>[] payload() default {};
 }

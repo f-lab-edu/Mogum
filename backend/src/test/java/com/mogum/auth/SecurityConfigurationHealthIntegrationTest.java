@@ -3,6 +3,7 @@ package com.mogum.auth;
 import com.mogum.support.IntegrationTest;
 import com.mogum.support.IntegrationTestConfiguration.DatabaseProbe;
 import com.mogum.support.TestRequests;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -12,14 +13,13 @@ import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.Environment;
 import org.springframework.test.json.JsonCompareMode;
 
-import javax.sql.DataSource;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @IntegrationTest
 class SecurityConfigurationHealthIntegrationTest {
-    @Autowired private TestRequests requests;
+    @Autowired private TestRequests testRequests;
     @Autowired private Environment environment;
     @Autowired private DataSource dataSource;
 
@@ -27,10 +27,11 @@ class SecurityConfigurationHealthIntegrationTest {
     @DisplayName("로그인 없는 헬스는 세부 정보 없이 UP만 반환한다")
     void returnsOnlyUpWithoutAuthentication() {
         // when
-        var response = requests.anonymous().get().uri("/actuator/health").exchange();
+        var response = testRequests.anonymous().get().uri("/actuator/health").exchange();
 
         // then
-        response.expectStatus().isOk().expectHeader().value("Content-Type", value -> assertThat(value).contains("json"))
+        response.expectStatus().isOk()
+                .expectHeader().value("Content-Type", value -> assertThat(value).contains("json"))
                 .expectBody().json("{\"status\":\"UP\"}", JsonCompareMode.STRICT);
     }
 
@@ -41,9 +42,10 @@ class SecurityConfigurationHealthIntegrationTest {
         var probe = (DatabaseProbe) dataSource;
         long before = probe.connectionAttempts();
         probe.failConnections(true);
+
         try {
             // when
-            var response = requests.anonymous().get().uri("/actuator/health").exchange();
+            var response = testRequests.anonymous().get().uri("/actuator/health").exchange();
 
             // then
             response.expectStatus().isEqualTo(503)
@@ -59,7 +61,7 @@ class SecurityConfigurationHealthIntegrationTest {
     @DisplayName("다른 관리 경로는 설정값 없이 거절한다")
     void rejectsOtherManagementPaths(String path) {
         // when
-        var response = requests.anonymous().get().uri(path).exchange();
+        var response = testRequests.anonymous().get().uri(path).exchange();
 
         // then
         response.expectStatus().isUnauthorized().expectBody().json("""
@@ -71,7 +73,7 @@ class SecurityConfigurationHealthIntegrationTest {
     @DisplayName("헬스의 HEAD 요청은 인증 없이 허용하지 않는다")
     void rejectsAnonymousHeadHealthRequest() {
         // when
-        var response = requests.anonymous().head().uri("/actuator/health").exchange();
+        var response = testRequests.anonymous().head().uri("/actuator/health").exchange();
 
         // then
         response.expectStatus().isUnauthorized();

@@ -60,7 +60,8 @@ class BackupFilesTest {
         // then
         assertThat(script).contains("mogum_restore_check");
         assertThat(script).contains("pg_restore --exit-on-error");
-        assertThat(Pattern.compile("(?:-d|--dbname[= ])\\s*['\"]?mogum(?:['\"\\s]|$)").matcher(script).find()).isFalse();
+        assertThat(Pattern.compile("(?:-d|--dbname[= ])\\s*['\"]?mogum(?:['\"\\s]|$)").matcher(script).find())
+                .isFalse();
         assertThat(script).doesNotContain("POSTGRES_DB");
         assertThat(script).as("latest는 모든 페이지를 합친 뒤 고른다").contains("--output json");
     }

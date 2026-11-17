@@ -10,16 +10,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @IntegrationTest
 class IntegrationTestSharedContextIntegrationTest {
-    @Autowired private ApplicationContext context;
+    @Autowired private ApplicationContext applicationContext;
 
     @Test
     @DisplayName("두 번째 통합 테스트도 첫 클래스와 같은 컨텍스트를 사용한다")
     void reusesFirstTestContext() {
         // when
         var other = new TestContextManager(IntegrationTestContextIntegrationTest.class)
-                .getTestContext().getApplicationContext();
+                .getTestContext()
+                .getApplicationContext();
 
         // then
-        assertThat(other).isSameAs(context);
+        assertThat(other).isSameAs(applicationContext);
     }
 }

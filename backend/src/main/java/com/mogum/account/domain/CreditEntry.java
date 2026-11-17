@@ -51,6 +51,7 @@ public class CreditEntry extends AuditedEntity {
 
     private static CreditEntry movement(User user, long jobId, CreditEntryType type, int amount, int sign) {
         if (amount <= 0) throw new IllegalArgumentException("amount must be positive");
+
         var entry = new CreditEntry();
         entry.user = user;
         entry.jobId = jobId;

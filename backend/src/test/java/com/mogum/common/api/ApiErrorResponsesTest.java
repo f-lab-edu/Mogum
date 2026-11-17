@@ -19,7 +19,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static com.mogum.common.api.FieldViolation.Reason.*;
+import static com.mogum.common.api.FieldViolation.Reason.REQUIRED;
+import static com.mogum.common.api.FieldViolation.Reason.TOO_LONG;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

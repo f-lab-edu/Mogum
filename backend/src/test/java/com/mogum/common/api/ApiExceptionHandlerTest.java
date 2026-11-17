@@ -1,5 +1,6 @@
 package com.mogum.common.api;
 
+import com.mogum.job.dto.JobReceiveRequest;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.ServletWebRequest;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -107,7 +109,7 @@ class ApiExceptionHandlerTest {
     @DisplayName("객체 위반이 섞이면 fields를 생략한다")
     void omitsFieldsWhenObjectViolationIsPresent() throws Exception {
         // given
-        var errors = new java.util.ArrayList<>(validate(new ValidationRequest("private-topic", "학습")));
+        var errors = new ArrayList<>(validate(new ValidationRequest("private-topic", "학습")));
         errors.add(new ObjectError("request", new String[]{"Consistency"}, null, "private constraint message"));
         var exception = validationException(errors);
         var request = webRequest();
@@ -241,7 +243,8 @@ class ApiExceptionHandlerTest {
     @DisplayName("잘못된 JSON은 상세 원문 없이 공통 400으로 변환한다")
     void convertsMalformedJsonWithoutPrivateDetails() throws Exception {
         // given
-        var exception = new HttpMessageNotReadableException("private JSON input", new MockHttpInputMessage(new byte[0]));
+        var exception = new HttpMessageNotReadableException("private JSON input",
+                new MockHttpInputMessage(new byte[0]));
         var request = webRequest();
 
         // when
@@ -272,7 +275,7 @@ class ApiExceptionHandlerTest {
     @DisplayName("칸 사이 제약도 값 원문 없이 안전한 reason과 칸 이름으로 반환한다")
     void returnsCrossFieldReasons() throws Exception {
         // given
-        var request = new com.mogum.job.dto.JobReceiveRequest("NEW_COURSE", null, null, null,
+        var request = new JobReceiveRequest("NEW_COURSE", null, null, null,
                 "자바", "BEGINNER", "private input", "WORK", null, null, null);
         var exception = validationException(validate(request));
 
@@ -288,7 +291,8 @@ class ApiExceptionHandlerTest {
 
     private MockMvcTester mvc(RuntimeException failure) {
         return MockMvcTester.of(List.of(new Controllers.FailingController(failure)), builder -> builder
-                .setControllerAdvice(new ApiExceptionHandler()).build());
+                .setControllerAdvice(new ApiExceptionHandler())
+                .build());
     }
 
     // standalone 전용 컨트롤러가 다른 슬라이스나 통합 컨텍스트의 스캔에 섞이지 않게 한다.
@@ -319,14 +323,17 @@ class ApiExceptionHandlerTest {
             validator.afterPropertiesSet();
             validator.validate(target, binding);
         }
+
         return binding.getAllErrors();
     }
 
     private static MethodArgumentNotValidException validationException(List<ObjectError> errors) throws Exception {
         var binding = new BeanPropertyBindingResult(new Object(), "request");
         errors.forEach(binding::addError);
+
         var parameter = new MethodParameter(ApiExceptionHandlerTest.class
                 .getDeclaredMethod("validationTarget", Object.class), 0);
+
         return new MethodArgumentNotValidException(parameter, binding);
     }
 
@@ -344,8 +351,10 @@ class ApiExceptionHandlerTest {
     static final class SizedValues {
         @Size(min = 1, max = 1)
         private final List<String> list;
+
         @Size(min = 1, max = 1)
         private final Map<String, String> map;
+
         @Size(min = 1, max = 1)
         private final String[] array;
 

@@ -3,17 +3,17 @@ package com.mogum.course.domain;
 import com.mogum.common.persistence.AuditedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.UniqueConstraint;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -51,7 +51,7 @@ public class Lesson extends AuditedEntity {
     private Instant completedAt;
 
     public static Lesson listed(Course course, int position, String title, String description,
-                                List<PlannedConcept> concepts) {
+            List<PlannedConcept> concepts) {
         var lesson = new Lesson();
         lesson.course = course;
         lesson.position = position;

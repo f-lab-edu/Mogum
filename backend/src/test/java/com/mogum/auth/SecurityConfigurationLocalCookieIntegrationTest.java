@@ -13,7 +13,8 @@ class SecurityConfigurationLocalCookieIntegrationTest extends SecurityScenario {
     @DisplayName("로컬 CSRF 쿠키도 Domain 없이 발급된다")
     void issuesHostOnlyCsrfCookie() {
         // when
-        var response = requests.anonymous().get().uri("/api/me").exchange().returnResult(String.class);
+        var response = testRequests.anonymous().get().uri("/api/me").exchange().returnResult(String.class);
+
         // then
         assertError(response, 401, "UNAUTHORIZED");
         assertCookie(response.getResponseCookies().getFirst("XSRF-TOKEN"));
@@ -24,10 +25,23 @@ class SecurityConfigurationLocalCookieIntegrationTest extends SecurityScenario {
     void expiresHostOnlyCookiesOnLogout() {
         // given
         var cookie = session();
-        var token = client(cookie).get().uri("/api/me").exchange().returnResult().getResponseCookies().getFirst("XSRF-TOKEN");
+        var token = client(cookie)
+                .get()
+                .uri("/api/me")
+                .exchange()
+                .returnResult()
+                .getResponseCookies()
+                .getFirst("XSRF-TOKEN");
+
         // when
-        var response = client(cookie).post().uri("/api/auth/logout").cookie("XSRF-TOKEN", token.getValue())
-                .header("X-XSRF-TOKEN", token.getValue()).exchange().returnResult(String.class);
+        var response = client(cookie)
+                .post()
+                .uri("/api/auth/logout")
+                .cookie("XSRF-TOKEN", token.getValue())
+                .header("X-XSRF-TOKEN", token.getValue())
+                .exchange()
+                .returnResult(String.class);
+
         // then
         assertThat(response.getStatus().value()).isEqualTo(204);
         assertCookie(response.getResponseCookies().getFirst("XSRF-TOKEN"));

@@ -22,6 +22,7 @@ class LessonTest {
         assertThat(lesson.getId()).isNull();
         assertThat(lesson.getCreatedAt()).isNull();
         assertThat(lesson.getUpdatedAt()).isNull();
+
         assertThat(lesson.getCourse()).isSameAs(course);
         assertThat(lesson.getPosition()).isEqualTo(3);
         assertThat(lesson.getTitle()).isEqualTo("변수와 타입");

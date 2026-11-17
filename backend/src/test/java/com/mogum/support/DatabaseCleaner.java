@@ -1,10 +1,10 @@
 package com.mogum.support;
 
+import javax.sql.DataSource;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
-import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -22,6 +22,7 @@ public final class DatabaseCleaner implements BeforeEachCallback {
     public void clean(DataSource dataSource) {
         try (var connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
+
             try {
                 var tables = tables(connection);
                 if (!tables.isEmpty()) {
@@ -30,6 +31,7 @@ public final class DatabaseCleaner implements BeforeEachCallback {
                         statement.execute("TRUNCATE TABLE " + String.join(", ", tables) + " CASCADE");
                     }
                 }
+
                 connection.commit();
             } catch (SQLException | RuntimeException exception) {
                 connection.rollback();
@@ -42,9 +44,10 @@ public final class DatabaseCleaner implements BeforeEachCallback {
 
     private List<String> tables(Connection connection) throws SQLException {
         List<String> tables = new ArrayList<>();
+
         // 테이블을 매번 카탈로그에서 읽고 식별자 quoting도 DB에 맡긴다.
         try (var statement = connection.createStatement();
-             var rows = statement.executeQuery("""
+                var rows = statement.executeQuery("""
                      SELECT quote_ident(schemaname) || '.' || quote_ident(tablename)
                      FROM pg_catalog.pg_tables
                      WHERE schemaname = current_schema() AND tablename <> 'flyway_schema_history'
@@ -53,6 +56,7 @@ public final class DatabaseCleaner implements BeforeEachCallback {
                 tables.add(rows.getString(1));
             }
         }
+
         return tables;
     }
 }

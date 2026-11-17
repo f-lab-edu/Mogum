@@ -21,8 +21,10 @@ class ReviewTest {
         assertThat(review.getId()).isNull();
         assertThat(review.getCreatedAt()).isNull();
         assertThat(review.getUpdatedAt()).isNull();
+
         assertThat(review.getCard()).isSameAs(card);
         assertThat(review.getRating()).isEqualTo(rating);
+
         assertThat(card.getFsrsState()).isEqualTo(FsrsState.LEARNING);
         assertThat(card.getFsrsStep()).isZero();
         assertThat(card.getStatus()).isEqualTo(CardStatus.ACTIVE);

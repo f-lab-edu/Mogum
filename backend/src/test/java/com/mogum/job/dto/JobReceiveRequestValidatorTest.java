@@ -14,7 +14,9 @@ class JobReceiveRequestValidatorTest {
     void acceptsCharacterLimits(String character) {
         // given
         var request = new JobReceiveRequest("NEW_COURSE", null, null, null,
-                character.repeat(100), "OTHER", character.repeat(50), "OTHER", character.repeat(50), character.repeat(500), null);
+                character.repeat(100), "OTHER", character.repeat(50),
+                "OTHER", character.repeat(50), character.repeat(500), null);
+
         try (var factory = Validation.buildDefaultValidatorFactory()) {
             // when
             var violations = factory.getValidator().validate(request);
@@ -31,6 +33,7 @@ class JobReceiveRequestValidatorTest {
         // given
         var request = new JobReceiveRequest("REPLAN_COURSE", 1L, null, null,
                 null, null, null, null, null, null, character.repeat(500));
+
         try (var factory = Validation.buildDefaultValidatorFactory()) {
             // when
             var violations = factory.getValidator().validate(request);

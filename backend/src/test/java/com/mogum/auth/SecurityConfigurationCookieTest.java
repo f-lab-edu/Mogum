@@ -18,19 +18,23 @@ class SecurityConfigurationCookieTest {
     @DisplayName("로컬과 등록 도메인 설정 모두 세션 쿠키에는 Domain 없이 보안 속성을 강제한다")
     void keepsSessionCookieHostOnlyForEitherDomainSetting(String domain) {
         // given
-        var runner = new ApplicationContextRunner().withUserConfiguration(SessionCookieConfiguration.class)
+        var runner = new ApplicationContextRunner()
+                .withUserConfiguration(SessionCookieConfiguration.class)
                 .withPropertyValues("app.web.cookie-domain=" + domain);
+
         // when
         runner.run(context -> {
             // then
             assertThat(context).hasNotFailed();
             assertThat(context.getBean(WebProperties.class).cookieDomain()).isEqualTo(domain);
+
             var request = new MockHttpServletRequest();
             request.setServerName("api.mogum.example");
             request.setSecure(!domain.isEmpty());
             var response = new MockHttpServletResponse();
             context.getBean(CookieSerializer.class).writeCookieValue(
                     new CookieSerializer.CookieValue(request, response, "test-session"));
+
             var cookie = response.getCookie("SESSION");
             assertThat(cookie).isNotNull();
             assertThat(cookie.getDomain()).isNull();

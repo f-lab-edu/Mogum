@@ -15,7 +15,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class WebPropertiesTest {
-    private final ApplicationContextRunner runner = new ApplicationContextRunner()
+    private final ApplicationContextRunner applicationContextRunner = new ApplicationContextRunner()
             .withInitializer(new ConfigDataApplicationContextInitializer())
             .withUserConfiguration(PropertiesConfiguration.class);
 
@@ -23,7 +23,7 @@ class WebPropertiesTest {
     @DisplayName("로컬 기본값은 Vite 출처와 빈 쿠키 도메인이다")
     void defaultsToViteOriginAndHostOnlyCookie() {
         // when
-        runner.run(context -> {
+        applicationContextRunner.run(context -> {
             // then
             assertThat(context).hasNotFailed();
             var properties = context.getBean(WebProperties.class);
@@ -36,7 +36,8 @@ class WebPropertiesTest {
     @DisplayName("설정 키로 단일 출처와 쿠키 도메인을 바인딩한다")
     void bindsOriginAndCookieDomain() {
         // given
-        var configured = runner.withPropertyValues("app.web.origin=https://mogum.example", "app.web.cookie-domain=mogum.example");
+        var configured = applicationContextRunner.withPropertyValues("app.web.origin=https://mogum.example",
+                "app.web.cookie-domain=mogum.example");
 
         // when
         configured.run(context -> {
@@ -52,8 +53,9 @@ class WebPropertiesTest {
     @DisplayName("환경 변수로 출처와 쿠키 도메인을 덮어쓴다")
     void overridesOriginAndDomainFromEnvironment() {
         // given
-        var configured = runner.withInitializer(context -> context.getEnvironment().getPropertySources().addFirst(
-                new SystemEnvironmentPropertySource("test-env", Map.of(
+        var configured = applicationContextRunner.withInitializer(context -> context.getEnvironment()
+                .getPropertySources()
+                .addFirst(new SystemEnvironmentPropertySource("test-env", Map.of(
                         "APP_WEB_ORIGIN", "https://mogum.example",
                         "APP_WEB_COOKIE_DOMAIN", "mogum.example"))));
 
@@ -74,7 +76,7 @@ class WebPropertiesTest {
     @DisplayName("출처는 경로와 패턴과 목록 없는 단일 HTTP 출처여야 한다")
     void rejectsInvalidSingleHttpOrigin(String origin) {
         // given
-        var configured = runner.withPropertyValues("app.web.origin=" + origin);
+        var configured = applicationContextRunner.withPropertyValues("app.web.origin=" + origin);
 
         // when
         configured.run(context -> {

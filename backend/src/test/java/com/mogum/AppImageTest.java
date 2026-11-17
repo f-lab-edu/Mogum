@@ -27,11 +27,13 @@ class AppImageTest {
     void startsImageWithHealthyServer() throws Exception {
         // given
         try (var running = new RunningApp();
-             var client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()) {
-            var app = running.app;
+                var client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()) {
+            var app = running.genericContainer;
             var request = HttpRequest.newBuilder(URI.create("http://" + app.getHost() + ":"
-                            + app.getMappedPort(8080) + "/actuator/health"))
-                    .timeout(Duration.ofSeconds(5)).GET().build();
+                    + app.getMappedPort(8080) + "/actuator/health"))
+                    .timeout(Duration.ofSeconds(5))
+                    .GET()
+                    .build();
             var mapper = new ObjectMapper();
 
             // when
@@ -49,13 +51,19 @@ class AppImageTest {
         // given
         try (var running = new RunningApp()) {
             // when — exec 사용자가 아니라 PID 1의 실제 java/UID를 확인한다.
-            var process = running.app.execInContainer("cat", "/proc/1/comm", "/proc/1/status");
+            var process = running.genericContainer.execInContainer("cat", "/proc/1/comm", "/proc/1/status");
 
             // then
             assertThat(process.getExitCode()).as(process.getStderr()).isZero();
             assertThat(process.getStdout()).startsWith("java\n");
-            var uids = process.getStdout().lines().filter(line -> line.startsWith("Uid:"))
-                    .findFirst().orElseThrow().trim().split("\\s+");
+
+            var uids = process.getStdout()
+                    .lines()
+                    .filter(line -> line.startsWith("Uid:"))
+                    .findFirst()
+                    .orElseThrow()
+                    .trim()
+                    .split("\\s+");
             assertThat(uids).hasSize(5);
             assertThat(Arrays.stream(uids).skip(1).map(Integer::parseInt).toList())
                     .allSatisfy(uid -> assertThat(uid).as("PID 1의 UID").isPositive());
@@ -67,10 +75,10 @@ class AppImageTest {
     void exitsGracefullyOnSigterm() {
         // given
         try (var running = new RunningApp()) {
-            var app = running.app;
+            var app = running.genericContainer;
+
             // stop()은 컨테이너를 삭제하므로 Docker stop 후 삭제 전에 종료 코드를 읽는다.
             // 진행 중인 작업이 없는 검사에서 15초를 넘으면 SIGKILL(137)로 실패한다.
-
             // when
             app.getDockerClient().stopContainerCmd(app.getContainerId()).withTimeout(15).exec();
 
@@ -83,30 +91,32 @@ class AppImageTest {
 
     private static final class RunningApp implements AutoCloseable {
         private final Network network;
-        private final PostgreSQLContainer postgres;
-        private final GenericContainer<?> app;
+        private final PostgreSQLContainer postgreSQLContainer;
+        private final GenericContainer<?> genericContainer;
 
         private RunningApp() {
             var appImage = System.getProperty("appImage");
             assertThat(appImage).as("appImage 시스템 속성으로 검사할 이미지를 지정해야 한다").isNotBlank();
+
             network = Network.newNetwork();
-            postgres = new PostgreSQLContainer("pgvector/pgvector:pg17")
+            postgreSQLContainer = new PostgreSQLContainer("pgvector/pgvector:pg17")
                     .withNetwork(network)
                     .withNetworkAliases("postgres")
                     .withStartupTimeout(Duration.ofMinutes(2));
-            app = new GenericContainer<>(DockerImageName.parse(appImage))
+            genericContainer = new GenericContainer<>(DockerImageName.parse(appImage))
                     .withNetwork(network)
                     .withExposedPorts(8080)
-                    .withEnv("DB_URL", "jdbc:postgresql://postgres:5432/" + postgres.getDatabaseName())
-                    .withEnv("DB_USERNAME", postgres.getUsername())
-                    .withEnv("DB_PASSWORD", postgres.getPassword())
+                    .withEnv("DB_URL", "jdbc:postgresql://postgres:5432/" + postgreSQLContainer.getDatabaseName())
+                    .withEnv("DB_USERNAME", postgreSQLContainer.getUsername())
+                    .withEnv("DB_PASSWORD", postgreSQLContainer.getPassword())
                     .withEnv("GOOGLE_CLIENT_ID", System.getProperty("GOOGLE_CLIENT_ID"))
                     .withEnv("GOOGLE_CLIENT_SECRET", System.getProperty("GOOGLE_CLIENT_SECRET"))
                     .waitingFor(Wait.forHttp("/actuator/health").forStatusCode(200))
                     .withStartupTimeout(Duration.ofMinutes(2));
+
             try {
-                postgres.start();
-                app.start();
+                postgreSQLContainer.start();
+                genericContainer.start();
             } catch (RuntimeException | Error failure) {
                 close();
                 throw failure;
@@ -115,7 +125,7 @@ class AppImageTest {
 
         @Override
         public void close() {
-            try (network; postgres; app) {
+            try (network; postgreSQLContainer; genericContainer) {
                 // 선언의 역순으로 앱 · DB · 네트워크를 닫는다.
             }
         }

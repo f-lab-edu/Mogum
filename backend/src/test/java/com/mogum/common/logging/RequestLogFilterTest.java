@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(OutputCaptureExtension.class)
 class RequestLogFilterTest {
-    private final RequestLogFilter filter = new RequestLogFilter();
+    private final RequestLogFilter requestLogFilter = new RequestLogFilter();
 
     @BeforeEach
     @AfterEach
@@ -34,6 +34,7 @@ class RequestLogFilterTest {
     void exposesJobMdcKey() {
         // when
         var key = RequestLogFilter.JOB_ID;
+
         // then
         assertThat(key).isEqualTo("jobId");
     }
@@ -47,7 +48,7 @@ class RequestLogFilterTest {
         var failure = new ServletException("test failure");
 
         // when & then
-        assertThatThrownBy(() -> filter.doFilter(request, response, (req, res) -> {
+        assertThatThrownBy(() -> requestLogFilter.doFilter(request, response, (req, res) -> {
             assertThat(MDC.get(RequestLogFilter.REQUEST_ID)).isEqualTo(response.getHeader("X-Request-Id"));
             MDC.put(RequestLogFilter.USER_ID, "42");
             throw failure;
@@ -62,13 +63,13 @@ class RequestLogFilterTest {
         // given
         var request = new MockHttpServletRequest("GET", "/api/failure");
         var response = new MockHttpServletResponse();
-        assertThatThrownBy(() -> filter.doFilter(request, response, (req, res) -> {
+        assertThatThrownBy(() -> requestLogFilter.doFilter(request, response, (req, res) -> {
             MDC.put(RequestLogFilter.USER_ID, "42");
             throw new ServletException("test failure");
         })).isInstanceOf(ServletException.class);
 
         // when
-        filter.requestDestroyed(new ServletRequestEvent(request.getServletContext(), request));
+        requestLogFilter.requestDestroyed(new ServletRequestEvent(request.getServletContext(), request));
 
         // then
         assertThat(accessLines(output, "/api/failure")).singleElement().asString().contains("status=500");
@@ -84,7 +85,7 @@ class RequestLogFilterTest {
         var response = new MockHttpServletResponse();
 
         // when
-        filter.doFilter(request, response, (req, res) -> {
+        requestLogFilter.doFilter(request, response, (req, res) -> {
             MDC.put(RequestLogFilter.USER_ID, "42");
             response.sendError(404);
         });
@@ -105,7 +106,7 @@ class RequestLogFilterTest {
         response.reset();
 
         // when
-        filter.doFilter(request, response, (req, res) -> {
+        requestLogFilter.doFilter(request, response, (req, res) -> {
             assertThat(MDC.get(RequestLogFilter.REQUEST_ID)).isEqualTo(id);
             assertThat(MDC.get(RequestLogFilter.USER_ID)).isEqualTo("42");
             response.setStatus(503);
@@ -125,10 +126,10 @@ class RequestLogFilterTest {
         var request = new MockHttpServletRequest("GET", "/auth/unknown");
         var response = new MockHttpServletResponse();
         prepareErrorDispatch(request, response);
-        filter.doFilter(request, response, (req, res) -> response.setStatus(503));
+        requestLogFilter.doFilter(request, response, (req, res) -> response.setStatus(503));
 
         // when
-        filter.requestDestroyed(new ServletRequestEvent(request.getServletContext(), request));
+        requestLogFilter.requestDestroyed(new ServletRequestEvent(request.getServletContext(), request));
 
         // then
         assertThat(accessLines(output, "/auth/unknown")).singleElement().asString().contains("status=503");
@@ -143,12 +144,12 @@ class RequestLogFilterTest {
         var request = new MockHttpServletRequest("GET", "/auth/unknown");
         var response = new MockHttpServletResponse();
         prepareErrorDispatch(request, response);
-        filter.doFilter(request, response, (req, res) -> response.setStatus(503));
+        requestLogFilter.doFilter(request, response, (req, res) -> response.setStatus(503));
         var event = new ServletRequestEvent(request.getServletContext(), request);
-        filter.requestDestroyed(event);
+        requestLogFilter.requestDestroyed(event);
 
         // when
-        filter.requestDestroyed(event);
+        requestLogFilter.requestDestroyed(event);
 
         // then
         assertThat(accessLines(output, "/auth/unknown")).singleElement().asString().contains("status=503");
@@ -156,8 +157,9 @@ class RequestLogFilterTest {
         assertThat(MDC.get(RequestLogFilter.USER_ID)).isNull();
     }
 
-    private void prepareErrorDispatch(MockHttpServletRequest request, MockHttpServletResponse response) throws Exception {
-        filter.doFilter(request, response, (req, res) -> {
+    private void prepareErrorDispatch(MockHttpServletRequest request,
+            MockHttpServletResponse response) throws Exception {
+        requestLogFilter.doFilter(request, response, (req, res) -> {
             MDC.put(RequestLogFilter.USER_ID, "42");
             response.sendError(404);
         });

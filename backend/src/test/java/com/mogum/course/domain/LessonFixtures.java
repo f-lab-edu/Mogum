@@ -10,7 +10,7 @@ public final class LessonFixtures {
     }
 
     public static Lesson lesson(Course course, int position, String title, String description,
-                                List<PlannedConcept> concepts) {
+            List<PlannedConcept> concepts) {
         return Lesson.listed(course, position, title, description, concepts);
     }
 }

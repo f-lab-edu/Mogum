@@ -50,7 +50,8 @@ class SonarAnalysisFilesTest {
             assertThat(text.lines().filter(line -> line.matches(
                     "\\s*uses: " + Pattern.quote(release.getKey())
                             + " # " + Pattern.quote(release.getValue()) + "\\s*")).count())
-                    .as("액션 SHA와 릴리스 주석: " + release.getKey()).isEqualTo(1);
+                    .as("액션 SHA와 릴리스 주석: " + release.getKey())
+                    .isEqualTo(1);
         }
     }
 
@@ -75,9 +76,11 @@ class SonarAnalysisFilesTest {
                 .containsEntry("sonar.tests", "backend/src/test")
                 .containsEntry("sonar.java.binaries", "backend/build/classes/java/main")
                 .containsEntry("sonar.java.test.binaries", "backend/build/classes/java/test")
-                .containsEntry("sonar.coverage.jacoco.xmlReportPaths", "backend/build/reports/jacoco/test/jacocoTestReport.xml")
+                .containsEntry("sonar.coverage.jacoco.xmlReportPaths",
+                        "backend/build/reports/jacoco/test/jacocoTestReport.xml")
                 .containsEntry("sonar.coverage.exclusions", "frontend/**,scripts/**")
                 .containsEntry("sonar.sources", ".");
+
         assertThat(properties.getProperty("sonar.exclusions").split(","))
                 .containsExactlyInAnyOrder("docs/design/**", "**/*.jar",
                         "backend/src/main/resources/db/migration/**", "backend/src/test/**");
@@ -95,9 +98,11 @@ class SonarAnalysisFilesTest {
 
     private static Properties properties() throws Exception {
         var properties = new Properties();
+
         try (var reader = Files.newBufferedReader(Path.of("../sonar-project.properties"))) {
             properties.load(reader);
         }
+
         return properties;
     }
 

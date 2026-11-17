@@ -12,36 +12,34 @@ import com.mogum.job.domain.JobStatus;
 import com.mogum.job.domain.JobType;
 import com.mogum.job.dto.JobResponse;
 import com.mogum.job.repository.GenerationJobRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class JobReadService {
-    private final GenerationJobRepository jobs;
-    private final CourseRepository courses;
-    private final RoadmapRepository roadmaps;
-    private final LessonRepository lessons;
-
-    public JobReadService(GenerationJobRepository jobs, CourseRepository courses,
-                          RoadmapRepository roadmaps, LessonRepository lessons) {
-        this.jobs = jobs;
-        this.courses = courses;
-        this.roadmaps = roadmaps;
-        this.lessons = lessons;
-    }
+    private final GenerationJobRepository generationJobRepository;
+    private final CourseRepository courseRepository;
+    private final RoadmapRepository roadmapRepository;
+    private final LessonRepository lessonRepository;
 
     public JobResponse read(long userId, long jobId) {
-        var job = jobs.findById(jobId).filter(value -> value.getUserId() == userId)
+        var job = generationJobRepository.findById(jobId)
+                .filter(value -> value.getUserId() == userId)
                 .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
+
         var subject = subject(job);
         var result = job.getStatus() == JobStatus.SUCCEEDED ? result(job) : null;
         ApiError error = null;
+
         if (job.getStatus() == JobStatus.FAILED) {
             var code = job.getErrorType() == JobErrorType.INPUT_TOO_LARGE
                     ? ErrorCode.JOB_INPUT_FAILURE : ErrorCode.JOB_TEMPORARY_FAILURE;
             error = new ApiError(code.name(), code.message(), null, null);
         }
+
         return new JobResponse(job.getId(), job.getType(), job.getStatus(), subject, result, error);
     }
 
@@ -51,13 +49,17 @@ public class JobReadService {
             return new JobResponse.Subject(input.getTopic(), input.getLevel().name(), input.getLevelOther(),
                     input.getPurpose().name(), input.getPurposeOther(), null);
         }
+
         String title = switch (job.getType()) {
-            case PLAN_ROADMAP_COURSE, REPLAN_COURSE -> courses.findById(job.getCourseId())
-                    .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND)).getTitle();
-            case REPLAN_ROADMAP -> roadmaps.findById(job.getRoadmapId())
-                    .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND)).getTitle();
-            case MATERIAL -> lessons.findById(job.getLessonId())
-                    .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND)).getTitle();
+            case PLAN_ROADMAP_COURSE, REPLAN_COURSE -> courseRepository.findById(job.getCourseId())
+                    .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND))
+                    .getTitle();
+            case REPLAN_ROADMAP -> roadmapRepository.findById(job.getRoadmapId())
+                    .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND))
+                    .getTitle();
+            case MATERIAL -> lessonRepository.findById(job.getLessonId())
+                    .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND))
+                    .getTitle();
             default -> throw new IllegalStateException("Unsupported job type");
         };
         return new JobResponse.Subject(null, null, null, null, null, title);
@@ -65,10 +67,14 @@ public class JobReadService {
 
     private JobResponse.Result result(GenerationJob job) {
         return switch (job.getType()) {
-            case NEW_COURSE, PLAN_ROADMAP_COURSE, REPLAN_COURSE -> new JobResponse.Result("COURSE", job.getCourseId(), null);
+            case NEW_COURSE, PLAN_ROADMAP_COURSE, REPLAN_COURSE ->
+                    new JobResponse.Result("COURSE", job.getCourseId(), null);
             case NEW_ROADMAP, REPLAN_ROADMAP -> new JobResponse.Result("ROADMAP", job.getRoadmapId(), null);
-            case MATERIAL -> new JobResponse.Result("LESSON", job.getLessonId(), lessons.findById(job.getLessonId())
-                    .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND)).getCourse().getId());
+            case MATERIAL -> new JobResponse.Result("LESSON", job.getLessonId(),
+                    lessonRepository.findById(job.getLessonId())
+                            .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND))
+                            .getCourse()
+                            .getId());
         };
     }
 }

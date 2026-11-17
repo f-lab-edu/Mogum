@@ -9,7 +9,12 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
-import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.*;
+import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.TOKEN_CALLS;
+import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.email;
+import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.sub;
+import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.tokenFailure;
+import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.userInfoFailure;
+import static com.mogum.support.IntegrationTestConfiguration.FakeGoogle.verified;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @IntegrationTest
@@ -28,6 +33,7 @@ class OAuthLoginHandlerFailureIntegrationTest extends OAuthScenario {
         String reason;
         String level = "INFO";
         String result = "login_failed";
+
         switch (condition) {
             case "unverified" -> {
                 email = marker + "@example.com";
@@ -63,12 +69,15 @@ class OAuthLoginHandlerFailureIntegrationTest extends OAuthScenario {
             }
             default -> throw new AssertionError(condition);
         }
+
         // when
         var response = get(path, cookie);
+
         // then
         assertFailure(response, result);
         assertThat(TOKEN_CALLS.get()).isEqualTo(condition.equals("unverified")
                 || condition.equals("token") || condition.equals("userinfo") ? 1 : 0);
+
         var line = loginLine(response, output);
         assertThat(line).contains(" " + level + " ");
         assertThat(line.endsWith("login result=" + result + " reason=" + reason)).isTrue();
@@ -82,8 +91,10 @@ class OAuthLoginHandlerFailureIntegrationTest extends OAuthScenario {
         // given
         verified = false;
         var start = start(null);
+
         // when
         var response = callback(start, "ok", null);
+
         // then
         assertFailure(response, "login_failed");
     }
@@ -100,9 +111,12 @@ class OAuthLoginHandlerFailureIntegrationTest extends OAuthScenario {
             case "corrupt-cookie" -> "MOGUM_OAUTH_REQUEST=broken";
             default -> start.cookie();
         };
-        String params = condition.equals("cancel") ? "error=access_denied" : condition.equals("missing-code") ? "" : "code=ok";
+        String params = condition.equals("cancel") ? "error=access_denied" : condition.equals("missing-code") ? ""
+                : "code=ok";
+
         // when
         var response = get("/auth/google/callback?" + params + "&state=" + state, cookie);
+
         // then
         assertFailure(response, "login_failed");
         assertThat(TOKEN_CALLS.get()).isEqualTo(0);
@@ -113,8 +127,10 @@ class OAuthLoginHandlerFailureIntegrationTest extends OAuthScenario {
     void redirectsAfterTokenFailure() throws Exception {
         // given
         var start = start(null);
+
         // when
         var response = callback(start, "bad-token", null);
+
         // then
         assertFailure(response, "login_failed");
         assertThat(TOKEN_CALLS.get()).isEqualTo(1);

@@ -20,6 +20,7 @@ public final class FakeUserRepository implements UserRepository {
             while (users.containsKey(nextId)) nextId++;
             UserFixtures.withId(entity, nextId++);
         }
+
         users.put(entity.getId(), entity);
         return entity;
     }
@@ -36,7 +37,8 @@ public final class FakeUserRepository implements UserRepository {
 
     @Override
     public Optional<User> findByProviderAndSubject(String provider, String subject) {
-        return users.values().stream()
+        return users.values()
+                .stream()
                 .filter(user -> user.getProvider().equals(provider) && user.getSubject().equals(subject))
                 .findFirst();
     }

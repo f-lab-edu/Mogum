@@ -4,6 +4,7 @@ import java.util.Objects;
 
 public final class ApiException extends RuntimeException {
     private static final long serialVersionUID = 1L;
+
     private final ErrorCode errorCode;
     private final Integer retryAfterSeconds;
     private final String responseMessage;
@@ -21,6 +22,7 @@ public final class ApiException extends RuntimeException {
         if (retryAfterSeconds != null && retryAfterSeconds <= 0) {
             throw new IllegalArgumentException("retryAfterSeconds must be positive");
         }
+
         this.errorCode = errorCode;
         this.retryAfterSeconds = retryAfterSeconds;
         this.responseMessage = Objects.requireNonNull(responseMessage);

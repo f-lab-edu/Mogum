@@ -21,14 +21,17 @@ class CourseTest {
         assertThat(course.getId()).isNull();
         assertThat(course.getCreatedAt()).isNull();
         assertThat(course.getUpdatedAt()).isNull();
+
         assertThat(course.getUserId()).isEqualTo(17L);
         assertThat(course.getInput()).isSameAs(input);
         assertThat(course.getTitle()).isEqualTo("자바 기초");
+
         assertThat(course.getStatus()).isEqualTo(CourseStatus.REVIEWING);
         assertThat(course.getRoadmap()).isNull();
         assertThat(course.getPosition()).isNull();
         assertThat(course.getPlanDescription()).isNull();
         assertThat(course.getPlanConcepts()).isNull();
+
         assertThat(course.getStartedAt()).isNull();
         assertThat(course.getLastLessonOpenedAt()).isNull();
         assertThat(course.getCompletedAt()).isNull();
@@ -48,14 +51,17 @@ class CourseTest {
         assertThat(course.getId()).isNull();
         assertThat(course.getCreatedAt()).isNull();
         assertThat(course.getUpdatedAt()).isNull();
+
         assertThat(course.getUserId()).isEqualTo(91L);
         assertThat(course.getRoadmap()).isSameAs(roadmap);
         assertThat(course.getPosition()).isEqualTo(2);
         assertThat(course.getTitle()).isEqualTo("자바 문법");
         assertThat(course.getPlanDescription()).isEqualTo("기본 문법을 익혀요");
         assertThat(course.getPlanConcepts()).containsExactlyElementsOf(concepts);
+
         assertThat(course.getStatus()).isEqualTo(CourseStatus.NOT_PLANNED);
         assertThat(course.getInput()).isNull();
+
         assertThat(course.getStartedAt()).isNull();
         assertThat(course.getLastLessonOpenedAt()).isNull();
         assertThat(course.getCompletedAt()).isNull();

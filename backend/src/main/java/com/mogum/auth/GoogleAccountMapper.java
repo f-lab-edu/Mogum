@@ -12,6 +12,7 @@ public final class GoogleAccountMapper {
                 || !"google".equals(oauth.getAuthorizedClientRegistrationId())) {
             throw invalidAccount();
         }
+
         var principal = oauth.getPrincipal();
         Object sub = principal.getAttribute("sub");
         Object email = principal.getAttribute("email");
@@ -19,6 +20,7 @@ public final class GoogleAccountMapper {
                 || !(email instanceof String address) || address.isBlank()) {
             throw invalidAccount();
         }
+
         Object name = principal.getAttribute("name");
         String accountName = name instanceof String value && !value.isBlank()
                 ? value : address.split("@", 2)[0];

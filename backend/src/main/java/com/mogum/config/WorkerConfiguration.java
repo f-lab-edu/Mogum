@@ -15,10 +15,12 @@ import java.util.List;
 @Configuration(proxyBeanMethods = false)
 public class WorkerConfiguration {
     @Bean
-    public WorkerLifecycle workerLifecycle(EntityManager em, PlatformTransactionManager transactions,
-                                           CreditLedger ledger, Clock clock, WorkerProperties properties,
-                                           List<JobGenerator> generators) {
-        return new WorkerLifecycle(properties, scheduler ->
-                new JobRunner(em, transactions, ledger, clock, properties, generators, scheduler));
+    public WorkerLifecycle workerLifecycle(EntityManager entityManager,
+            PlatformTransactionManager platformTransactionManager,
+            CreditLedger creditLedger, Clock clock, WorkerProperties workerProperties,
+            List<JobGenerator> generators) {
+        return new WorkerLifecycle(workerProperties, scheduler ->
+                new JobRunner(entityManager, platformTransactionManager, creditLedger, clock, workerProperties,
+                        generators, scheduler));
     }
 }

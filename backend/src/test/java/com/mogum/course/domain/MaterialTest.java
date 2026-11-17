@@ -19,6 +19,7 @@ class MaterialTest {
         assertThat(material.getId()).isNull();
         assertThat(material.getCreatedAt()).isNull();
         assertThat(material.getUpdatedAt()).isNull();
+
         assertThat(material.getLesson()).isSameAs(lesson);
         assertThat(material.getBody()).isEqualTo("# 변수\n값을 담는 이름이에요.");
     }

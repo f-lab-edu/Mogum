@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -33,7 +34,7 @@ class AwsFilesTest {
         // when
         try (var files = Files.list(AWS)) {
             // then
-            assertThat(files.map(path -> path.getFileName().toString()).collect(java.util.stream.Collectors.toSet()))
+            assertThat(files.map(path -> path.getFileName().toString()).collect(Collectors.toSet()))
                     .isEqualTo(FILES);
         }
     }
@@ -57,7 +58,8 @@ class AwsFilesTest {
         var sample = read("github-oidc-trust.json");
 
         // then
-        assertThat(sample).isEqualTo(JSON.readTree("""
+        assertThat(sample)
+                .isEqualTo(JSON.readTree("""
                 {"Version":"2012-10-17","Statement":[{
                   "Effect":"Allow",
                   "Principal":{"Federated":"arn:aws:iam::ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"},
@@ -96,23 +98,32 @@ class AwsFilesTest {
         assertThat(policy.path("Version").asText()).isEqualTo("2012-10-17");
         assertThat(policy.path("Statement").isArray()).isTrue();
         assertThat(policy.path("Statement")).isNotEmpty();
+
         for (var statement : policy.path("Statement")) {
-            assertThat(Set.of("Sid", "Effect", "Action", "Resource", "Condition").containsAll(fields(statement))).isTrue();
+            assertThat(Set.of("Sid", "Effect", "Action", "Resource", "Condition").containsAll(fields(statement)))
+                    .isTrue();
             assertThat(statement.path("Effect").asText()).isEqualTo("Allow");
+
             var actions = strings(statement.path("Action"));
             var resources = strings(statement.path("Resource"));
+
             for (var action : actions) {
                 var lower = action.toLowerCase(Locale.ROOT);
                 assertThat(action.contains("*") || action.contains("?")).as(action).isFalse();
                 assertThat(lower.contains("delete") || lower.contains("policy") || lower.contains("lifecycle")
                         || lower.contains("versioning")).as(action).isFalse();
                 assertThat(action.startsWith("ecr:") || action.startsWith("s3:") || action.startsWith("ssm:"))
-                        .as(action).isTrue();
+                        .as(action)
+                        .isTrue();
+
                 if (resources.contains("*")) {
                     assertThat(resources).isEqualTo(Set.of("*"));
-                    assertThat(Set.of("ecr:GetAuthorizationToken", "ssm:GetCommandInvocation")).as(action).contains(action);
+                    assertThat(Set.of("ecr:GetAuthorizationToken", "ssm:GetCommandInvocation"))
+                            .as(action)
+                            .contains(action);
                 }
             }
+
             if (statement.has("Condition")) {
                 assertThat(actions).as("목록 접두사 조건만 사용한다").isEqualTo(Set.of("s3:ListBucket"));
             }
@@ -171,6 +182,7 @@ class AwsFilesTest {
                 "ecr:BatchGetImage", Set.of(ECR),
                 "ecr:GetDownloadUrlForLayer", Set.of(ECR),
                 "ecr:BatchCheckLayerAvailability", Set.of(ECR)));
+
         assertThat(grants(policy, "ssm:")).as("SSM은 관리형 정책으로 붙인다").isEmpty();
     }
 
@@ -183,10 +195,12 @@ class AwsFilesTest {
         // then
         assertThat(grants(policy, "s3:"))
                 .isEqualTo(Map.of("s3:GetObject", Set.of(BUCKET + "/releases/*", BUCKET + "/backups/*"),
-                "s3:PutObject", Set.of(BUCKET + "/backups/*"),
-                "s3:AbortMultipartUpload", Set.of(BUCKET + "/backups/*"),
-                "s3:ListBucket", Set.of(BUCKET)));
+                        "s3:PutObject", Set.of(BUCKET + "/backups/*"),
+                        "s3:AbortMultipartUpload", Set.of(BUCKET + "/backups/*"),
+                        "s3:ListBucket", Set.of(BUCKET)));
+
         int listings = 0;
+
         for (var statement : policy.path("Statement")) {
             if (strings(statement.path("Action")).contains("s3:ListBucket")) {
                 listings++;
@@ -195,6 +209,7 @@ class AwsFilesTest {
                         """));
             }
         }
+
         assertThat(listings).isEqualTo(1);
     }
 
@@ -207,24 +222,31 @@ class AwsFilesTest {
         // then
         assertThat(rules.isArray()).isTrue();
         assertThat(rules.size()).isEqualTo(2);
+
         var prefixes = new HashSet<String>();
         for (var rule : rules) {
-            assertThat(fields(rule)).isEqualTo(Set.of("ID", "Status", "Filter", "Expiration", "NoncurrentVersionExpiration",
-                    "AbortIncompleteMultipartUpload"));
+            assertThat(fields(rule))
+                    .isEqualTo(Set.of("ID", "Status", "Filter", "Expiration", "NoncurrentVersionExpiration",
+                            "AbortIncompleteMultipartUpload"));
             assertThat(rule.path("Status").asText()).isEqualTo("Enabled");
             assertThat(fields(rule.path("Filter"))).isEqualTo(Set.of("Prefix"));
+
             var prefix = rule.path("Filter").path("Prefix").asText();
             assertThat(prefixes.add(prefix)).isTrue();
+
             int currentDays = rule.path("Expiration").path("Days").asInt();
             int previousDays = rule.path("NoncurrentVersionExpiration").path("NoncurrentDays").asInt();
             assertThat(currentDays).isEqualTo(prefix.equals("backups/") ? 6 : 30);
             assertThat(previousDays).isEqualTo(1);
             if (prefix.equals("backups/")) assertThat(currentDays + previousDays <= 7).isTrue();
+
             // Days 만료는 이전 버전이 사라진 뒤 삭제 표시도 정리한다. 두 필드의 병기는 S3가 거부한다.
             assertThat(fields(rule.path("Expiration"))).isEqualTo(Set.of("Days"));
             assertThat(fields(rule.path("NoncurrentVersionExpiration"))).isEqualTo(Set.of("NoncurrentDays"));
-            assertThat(rule.path("AbortIncompleteMultipartUpload")).isEqualTo(JSON.readTree("{\"DaysAfterInitiation\":1}"));
+            assertThat(rule.path("AbortIncompleteMultipartUpload"))
+                    .isEqualTo(JSON.readTree("{\"DaysAfterInitiation\":1}"));
         }
+
         assertThat(prefixes).isEqualTo(Set.of("backups/", "releases/"));
     }
 
@@ -237,6 +259,7 @@ class AwsFilesTest {
         // then
         assertThat(rules.isArray()).isTrue();
         assertThat(rules.size()).isEqualTo(1);
+
         var rule = rules.get(0);
         assertThat(rule.path("rulePriority").asInt()).isEqualTo(1);
         assertThat(rule.path("selection")).isEqualTo(JSON.readTree("""
@@ -256,6 +279,7 @@ class AwsFilesTest {
 
     private static Set<String> strings(JsonNode node) {
         var values = new HashSet<String>();
+
         if (node.isString()) values.add(node.asText());
         else {
             assertThat(node.isArray()).isTrue();
@@ -264,6 +288,7 @@ class AwsFilesTest {
                 assertThat(values.add(value.asText())).as("중복 항목").isTrue();
             }
         }
+
         assertThat(values).isNotEmpty();
         assertThat(values).doesNotContain("");
         return values;
@@ -271,13 +296,16 @@ class AwsFilesTest {
 
     private static Map<String, Set<String>> grants(JsonNode policy, String service) {
         var grants = new HashMap<String, Set<String>>();
+
         for (var statement : policy.path("Statement")) {
             for (var action : strings(statement.path("Action"))) {
                 if (action.startsWith(service)) {
-                    grants.computeIfAbsent(action, ignored -> new HashSet<>()).addAll(strings(statement.path("Resource")));
+                    grants.computeIfAbsent(action, ignored -> new HashSet<>())
+                            .addAll(strings(statement.path("Resource")));
                 }
             }
         }
+
         return grants;
     }
 }

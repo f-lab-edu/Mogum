@@ -19,14 +19,17 @@ class RoadmapTest {
         assertThat(roadmap.getId()).isNull();
         assertThat(roadmap.getCreatedAt()).isNull();
         assertThat(roadmap.getUpdatedAt()).isNull();
+
         assertThat(roadmap.getUserId()).isEqualTo(42L);
         assertThat(roadmap.getInput()).isSameAs(input);
+
         assertThat(input.getTopic()).isEqualTo("서버 개발");
         assertThat(input.getLevel()).isEqualTo(Level.OTHER);
         assertThat(input.getLevelOther()).isEqualTo("실습 경험");
         assertThat(input.getPurpose()).isEqualTo(Purpose.OTHER);
         assertThat(input.getPurposeOther()).isEqualTo("개인 프로젝트");
         assertThat(input.getMemo()).isEqualTo("자바 예제");
+
         assertThat(roadmap.getTitle()).isEqualTo("서버 개발 로드맵");
         assertThat(roadmap.getDescription()).isEqualTo("서버를 만들 수 있어요");
         assertThat(roadmap.getStatus()).isEqualTo(RoadmapStatus.REVIEWING);

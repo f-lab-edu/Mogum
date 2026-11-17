@@ -38,7 +38,8 @@ public final class UserFixtures {
         ReflectionTestUtils.setField(user, "status", status);
         Instant approvedAt = status == UserStatus.APPROVED ? Instant.parse("2026-11-08T00:00:00Z") : null;
         ReflectionTestUtils.setField(user, "approvedAt", approvedAt);
-        ReflectionTestUtils.setField(user, "creditRefillAt", approvedAt == null ? null : approvedAt.plusSeconds(30L * 86400));
+        ReflectionTestUtils.setField(user, "creditRefillAt",
+                approvedAt == null ? null : approvedAt.plusSeconds(30L * 86400));
         return user;
     }
 

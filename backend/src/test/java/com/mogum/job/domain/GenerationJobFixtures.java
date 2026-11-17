@@ -2,6 +2,7 @@ package com.mogum.job.domain;
 
 import com.mogum.course.domain.LearningInput;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -35,14 +36,14 @@ public final class GenerationJobFixtures {
 
     public static void failed(GenerationJob job, JobErrorType error) {
         withStatus(job, JobStatus.FAILED);
-        org.springframework.test.util.ReflectionTestUtils.setField(job, "errorType", error);
-        org.springframework.test.util.ReflectionTestUtils.setField(job, "finishedAt", Instant.parse("2026-11-15T00:00:00Z"));
+        ReflectionTestUtils.setField(job, "errorType", error);
+        ReflectionTestUtils.setField(job, "finishedAt", Instant.parse("2026-11-15T00:00:00Z"));
     }
 
     public static void running(GenerationJob job) { withStatus(job, JobStatus.RUNNING); }
 
     public static void withStatus(GenerationJob job, JobStatus status) {
-        org.springframework.test.util.ReflectionTestUtils.setField(job, "status", status);
+        ReflectionTestUtils.setField(job, "status", status);
     }
 
     public static void running(JdbcTemplate jdbc, long id, int claimCount, Instant startedAt, Instant leaseUntil) {
@@ -60,7 +61,7 @@ public final class GenerationJobFixtures {
     }
 
     public static void succeeded(JdbcTemplate jdbc, long id, Long courseId, Long roadmapId, Long lessonId,
-                                 Instant finishedAt) {
+            Instant finishedAt) {
         jdbc.update("""
                 UPDATE generation_jobs SET status = 'SUCCEEDED', course_id = ?, roadmap_id = ?, lesson_id = ?,
                 lease_until = NULL, error_type = NULL, finished_at = ?, updated_at = ? WHERE id = ?

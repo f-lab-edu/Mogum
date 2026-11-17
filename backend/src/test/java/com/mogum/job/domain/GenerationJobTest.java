@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class GenerationJobTest {
-
     @Test
     @DisplayName("새 코스 작업은 입력을 담고 대상 없이 기다림으로 시작한다")
     void createsNewCourse() {
@@ -89,18 +88,21 @@ class GenerationJobTest {
     }
 
     private void assertQueued(GenerationJob job, JobType type, LearningInput input, String feedback,
-                              Long courseId, Long roadmapId, Long lessonId) {
+            Long courseId, Long roadmapId, Long lessonId) {
         assertThat(job.getId()).isNull();
         assertThat(job.getCreatedAt()).isNull();
         assertThat(job.getUpdatedAt()).isNull();
+
         assertThat(job.getUserId()).isEqualTo(17L);
         assertThat(job.getType()).isEqualTo(type);
         assertThat(job.getStatus()).isEqualTo(JobStatus.QUEUED);
+
         assertThat(job.getInput()).isSameAs(input);
         assertThat(job.getFeedback()).isEqualTo(feedback);
         assertThat(job.getCourseId()).isEqualTo(courseId);
         assertThat(job.getRoadmapId()).isEqualTo(roadmapId);
         assertThat(job.getLessonId()).isEqualTo(lessonId);
+
         assertThat(job.getClaimCount()).isZero();
         assertThat(job.getLeaseUntil()).isNull();
         assertThat(job.getErrorType()).isNull();

@@ -36,6 +36,7 @@ class FsrsLibraryLearningTest {
         assertThat(scheduler.getDesiredRetention()).isEqualTo(defaults.getDesiredRetention());
         assertThat(scheduler.getMaximumInterval()).isEqualTo(defaults.getMaximumInterval());
         assertThat(scheduler.isEnableFuzzing()).isEqualTo(defaults.isEnableFuzzing());
+
         assertThat(scheduler.getLearningSteps()).isEmpty();
         assertThat(scheduler.getRelearningSteps()).isEmpty();
         assertThat(scheduler.getDECAY()).isCloseTo(DECAY, within(1e-15));
@@ -57,6 +58,7 @@ class FsrsLibraryLearningTest {
         assertThat(reviewed.getState()).isEqualTo(State.REVIEW);
         assertThat(reviewed.getStep()).isNull();
         assertThat(reviewed.getLastReview()).isEqualTo(REVIEWED_AT);
+
         Duration interval = Duration.between(REVIEWED_AT, reviewed.getDue());
         assertThat(interval).as(rating + " 다음 복습 간격: " + interval).isGreaterThanOrEqualTo(Duration.ofDays(1));
     }
@@ -76,6 +78,7 @@ class FsrsLibraryLearningTest {
         assertThat(reviewed.getState()).isEqualTo(State.REVIEW);
         assertThat(reviewed.getStep()).isNull();
         assertThat(reviewed.getLastReview()).isEqualTo(REVIEWED_AT);
+
         Duration interval = Duration.between(REVIEWED_AT, reviewed.getDue());
         assertThat(interval).as("AGAIN 다음 복습 간격: " + interval).isGreaterThanOrEqualTo(Duration.ofDays(1));
     }

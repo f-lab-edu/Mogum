@@ -28,45 +28,48 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @NoJobHandlersIntegrationTest
 class JobControllerNoHandlersIntegrationTest {
-    @Autowired TestRequests requests;
-    @Autowired UserRepository users;
-    @Autowired CreditEntryRepository entries;
-    @Autowired CourseRepository courses;
-    @Autowired RoadmapRepository roadmaps;
-    @Autowired LessonRepository lessons;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired ApplicationContext context;
+    @Autowired TestRequests testRequests;
+    @Autowired UserRepository userRepository;
+    @Autowired CreditEntryRepository creditEntryRepository;
+    @Autowired CourseRepository courseRepository;
+    @Autowired RoadmapRepository roadmapRepository;
+    @Autowired LessonRepository lessonRepository;
+    @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired ApplicationContext applicationContext;
 
     @ParameterizedTest(name = "종류={0}")
     @EnumSource(JobType.class)
     @DisplayName("처리기가 없는 종류는 HTTP 받기를 거절하고 작업과 크레딧을 보존한다")
     void rejectsTypesWithoutHandlers(JobType type) {
         // given
-        var user = users.save(UserFixtures.approved("me@example.com"));
-        entries.save(CreditEntry.refill(user, 100));
-        var course = courses.save(CourseFixtures.single(user.getId()));
-        var roadmap = roadmaps.save(RoadmapFixtures.roadmap(user.getId()));
-        var lesson = lessons.save(LessonFixtures.lesson(course, 1));
+        var user = userRepository.save(UserFixtures.approved("me@example.com"));
+        creditEntryRepository.save(CreditEntry.refill(user, 100));
+
+        var course = courseRepository.save(CourseFixtures.single(user.getId()));
+        var roadmap = roadmapRepository.save(RoadmapFixtures.roadmap(user.getId()));
+        var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
+
         Map<String, Object> body = switch (type) {
             case NEW_COURSE, NEW_ROADMAP -> Map.of("type", type, "topic", "자바", "level", "BEGINNER", "purpose", "WORK");
             case PLAN_ROADMAP_COURSE, REPLAN_COURSE -> Map.of("type", type, "courseId", course.getId());
             case REPLAN_ROADMAP -> Map.of("type", type, "roadmapId", roadmap.getId());
             case MATERIAL -> Map.of("type", type, "lessonId", lesson.getId());
         };
-        var beforeUser = jdbc.queryForMap("SELECT * FROM users");
-        var beforeEntries = jdbc.queryForList("SELECT * FROM credit_entries");
-        var client = requests.asUser(user.getId());
+
+        var beforeUser = jdbcTemplate.queryForMap("SELECT * FROM users");
+        var beforeEntries = jdbcTemplate.queryForList("SELECT * FROM credit_entries");
+        var client = testRequests.asUser(user.getId());
 
         // when
         var result = client.post().uri("/api/jobs").body(body).exchange();
 
         // then
-        assertThat(context.getBeansOfType(JobIntakeHandler.class)).isEmpty();
+        assertThat(applicationContext.getBeansOfType(JobIntakeHandler.class)).isEmpty();
         result.expectStatus().isBadRequest().expectBody().json("""
                 {"code":"INVALID_REQUEST","message":"요청을 확인할 수 없습니다"}
                 """, JsonCompareMode.STRICT);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM generation_jobs", Integer.class)).isZero();
-        assertThat(jdbc.queryForMap("SELECT * FROM users")).isEqualTo(beforeUser);
-        assertThat(jdbc.queryForList("SELECT * FROM credit_entries")).isEqualTo(beforeEntries);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM generation_jobs", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForMap("SELECT * FROM users")).isEqualTo(beforeUser);
+        assertThat(jdbcTemplate.queryForList("SELECT * FROM credit_entries")).isEqualTo(beforeEntries);
     }
 }

@@ -29,11 +29,13 @@ class WorkflowFilesTest {
 
         // then
         assertThat(triggers.keySet()).isEqualTo(Set.of("push", "workflow_dispatch"));
+
         var push = map(triggers.get("push"));
         assertThat(push.keySet()).isEqualTo(Set.of("branches", "paths"));
         assertThat(push.get("branches")).isEqualTo(List.of("main"));
         assertThat(Set.copyOf(list(push.get("paths"))))
                 .isEqualTo(Set.of("backend/**", "deploy/**", ".github/workflows/deploy.yml"));
+
         var inputs = map(map(triggers.get("workflow_dispatch")).get("inputs"));
         assertThat(inputs.keySet()).isEqualTo(Set.of("sha"));
         assertThat(map(inputs.get("sha")).get("required")).isEqualTo(false);
@@ -48,6 +50,7 @@ class WorkflowFilesTest {
 
         // then
         assertThat(definition.get("permissions")).isEqualTo(Map.of("contents", "read", "id-token", "write"));
+
         var concurrency = map(workflow().get("concurrency"));
         assertThat(concurrency.get("cancel-in-progress")).isEqualTo(false);
         assertThat(concurrency.get("group").toString()).isNotBlank();
@@ -55,6 +58,7 @@ class WorkflowFilesTest {
         assertThat(map(workflow().get("jobs")).keySet()).isEqualTo(Set.of("deploy"));
         assertThat(job().get("if")).isEqualTo("${{ vars.DEPLOY_ENABLED == 'true' }}");
         assertThat(job().get("runs-on")).isEqualTo("ubuntu-24.04-arm");
+
         for (var value : map(workflow().get("jobs")).values()) {
             assertThat(map(value)).doesNotContainKey("environment");
             assertThat(map(value)).doesNotContainKey("permissions");
@@ -68,17 +72,29 @@ class WorkflowFilesTest {
         var text = Files.readString(WORKFLOW);
 
         // then
-        assertThat(Pattern.compile("vars\\.([A-Za-z0-9_]+)").matcher(text).results()
-                .map(match -> match.group(1)).collect(Collectors.toSet())).isEqualTo(VARIABLES);
-        assertThat(Pattern.compile("secrets\\.([A-Za-z0-9_]+)").matcher(text).results()
-                .map(match -> match.group(1)).collect(Collectors.toSet())).isEqualTo(SECRETS);
+        assertThat(Pattern.compile("vars\\.([A-Za-z0-9_]+)")
+                .matcher(text)
+                .results()
+                .map(match -> match.group(1))
+                .collect(Collectors.toSet()))
+                .isEqualTo(VARIABLES);
+        assertThat(Pattern.compile("secrets\\.([A-Za-z0-9_]+)")
+                .matcher(text)
+                .results()
+                .map(match -> match.group(1))
+                .collect(Collectors.toSet()))
+                .isEqualTo(SECRETS);
+
         var environment = map(job().get("env"));
         for (var secret : SECRETS) assertThat(environment.get(secret)).isEqualTo("${{ secrets." + secret + " }}");
+
         for (var variable : List.of("AWS_REGION", "API_ORIGIN")) {
             assertThat(environment.get(variable)).isEqualTo("${{ vars." + variable + " }}");
         }
+
         assertThat(text).doesNotContain("aws-access-key-id");
         assertThat(text).doesNotContain("aws-secret-access-key");
+
         var actions = new ArrayList<String>();
         for (var step : steps()) {
             if (step.containsKey("uses")) actions.add(step.get("uses").toString());
@@ -88,23 +104,29 @@ class WorkflowFilesTest {
                 assertThat(script).doesNotContain("set -x");
             }
         }
+
         var actionReleases = Map.of(
                 "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09", "v5.1.0",
                 "actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961", "v5.7.0",
                 "aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708", "v5.1.1");
         for (var action : actions) {
             assertThat(action)
-                    .as("액션은 전체 40자 소문자 커밋 SHA로 고정한다: " + action).matches("[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}");
+                    .as("액션은 전체 40자 소문자 커밋 SHA로 고정한다: " + action)
+                    .matches("[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}");
         }
+
         assertThat(Set.copyOf(actions)).isEqualTo(actionReleases.keySet());
+
         var usesLines = text.lines().filter(line -> line.matches("\\s*(?:-\\s+)?uses\\s*:.*")).toList();
         assertThat(usesLines.size()).isEqualTo(actions.size());
         for (var line : usesLines) {
             assertThat(actionReleases.entrySet().stream().anyMatch(action -> line.matches(
                     "\\s*(?:-\\s+)?uses: " + Pattern.quote(action.getKey())
                             + " # " + Pattern.quote(action.getValue()) + "\\s*")))
-                    .as("uses 줄 끝에 고정한 릴리스 주석을 남긴다: " + line).isTrue();
+                    .as("uses 줄 끝에 고정한 릴리스 주석을 남긴다: " + line)
+                    .isTrue();
         }
+
         assertThat(map(step("java").get("with")).get("java-version")).isEqualTo("21");
         var credentials = map(step("credentials").get("with"));
         assertThat(credentials.get("role-to-assume")).isEqualTo("${{ secrets.AWS_DEPLOY_ROLE_ARN }}");
@@ -124,8 +146,12 @@ class WorkflowFilesTest {
         assertThat(mask).isNotNegative();
         assertThat(mask).isLessThan(validation.indexOf("registry="));
         assertThat(mask).isLessThan(validation.indexOf("Missing repository"));
-        var scripts = steps().stream().filter(step -> step.containsKey("run"))
-                .map(step -> step.get("run").toString()).collect(Collectors.joining("\n"));
+
+        var scripts = steps()
+                .stream()
+                .filter(step -> step.containsKey("run"))
+                .map(step -> step.get("run").toString())
+                .collect(Collectors.joining("\n"));
         int aws = scripts.indexOf("aws ");
         assertThat(aws).isNotNegative();
         assertThat(scripts.indexOf("::add-mask::")).isLessThan(aws);
@@ -140,18 +166,26 @@ class WorkflowFilesTest {
 
         // then
         assertThat(build).contains("./backend/gradlew -p backend build");
-        assertThat(steps().stream().filter(step -> step.containsKey("run"))
-                .flatMap(step -> step.get("run").toString().lines()).filter(line -> line.strip().startsWith("docker build ")).count()).isEqualTo(1);
+        assertThat(steps()
+                .stream()
+                .filter(step -> step.containsKey("run"))
+                .flatMap(step -> step.get("run").toString().lines())
+                .filter(line -> line.strip().startsWith("docker build "))
+                .count())
+                .isEqualTo(1);
         assertThat(script("build")).contains("docker build -t \"$LOCAL_IMAGE\" backend");
         assertThat(script("build")).contains("imageTest -PappImage=\"$LOCAL_IMAGE\"");
         assertThat(script("publish")).contains("docker tag \"$LOCAL_IMAGE\" \"$REGISTRY/mogum-app:$RELEASE_SHA\"");
         assertThat(script("publish")).contains("docker push \"$REGISTRY/mogum-app:$RELEASE_SHA\"");
+
         for (var id : List.of("java", "build", "publish")) {
             assertThat(step(id).get("if")).isEqualTo("${{ steps.image.outputs.exists == 'false' }}");
         }
+
         for (var id : List.of("checkout", "bundle")) {
             assertThat(step(id).get("if")).isEqualTo("${{ steps.validate.outputs.redeploy == 'false' }}");
         }
+
         assertThat(script("bundle")).contains("deploy app-image.ref");
         assertThat(Files.readString(WORKFLOW)).doesNotContain(":latest");
         assertThat(script("inspect-release")).contains("tar -xOf");
@@ -169,15 +203,21 @@ class WorkflowFilesTest {
     }
 
     private Map<String, Object> workflow() throws Exception { return new Yaml().load(Files.readString(WORKFLOW)); }
+
     private Map<String, Object> job() throws Exception { return map(map(workflow().get("jobs")).get("deploy")); }
+
     private List<Map<String, Object>> steps() throws Exception {
         return list(job().get("steps")).stream().map(WorkflowFilesTest::map).toList();
     }
+
     private Map<String, Object> step(String id) throws Exception {
         return steps().stream().filter(step -> id.equals(step.get("id"))).findFirst().orElseThrow();
     }
+
     private String script(String id) throws Exception { return step(id).get("run").toString(); }
+
     @SuppressWarnings("unchecked")
     private static Map<String, Object> map(Object value) { return (Map<String, Object>) value; }
+
     private static List<?> list(Object value) { return (List<?>) value; }
 }

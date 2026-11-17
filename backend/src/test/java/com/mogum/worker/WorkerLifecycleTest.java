@@ -12,18 +12,21 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 import java.time.Duration;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.mockito.BDDMockito.*;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.times;
+import static org.mockito.BDDMockito.willAnswer;
 
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class WorkerLifecycleTest {
-    @Mock JobRunner runner;
+    @Mock JobRunner jobRunner;
 
     @Test
     @DisplayName("연속 예외에도 루프는 살아 있고 스택은 첫 실패에만 남기며 성공 뒤 다시 허용한다")
@@ -32,15 +35,18 @@ class WorkerLifecycleTest {
         var attempts = new AtomicInteger();
         var failure = new IllegalStateException("LEAKCHECK-message", new RuntimeException("LEAKCHECK-cause"));
         failure.addSuppressed(new RuntimeException("LEAKCHECK-suppressed"));
-        given(runner.runOnce()).willAnswer(invocation -> {
+
+        given(jobRunner.runOnce()).willAnswer(invocation -> {
             int attempt = attempts.incrementAndGet();
             if (attempt <= 3 || attempt == 5) throw failure;
             return attempt == 4;
         });
-        var lifecycle = new WorkerLifecycle(settings(1, Duration.ofMillis(10)), scheduler -> runner);
+
+        var lifecycle = new WorkerLifecycle(settings(1, Duration.ofMillis(10)), scheduler -> jobRunner);
 
         // when
         lifecycle.start();
+
         try {
             await().atMost(Duration.ofSeconds(5)).until(() -> attempts.get() >= 6);
         } finally {
@@ -49,10 +55,13 @@ class WorkerLifecycleTest {
 
         // then
         assertThat(output.getAll().lines().filter(line -> line.contains("worker poll failed"))).hasSize(4);
-        assertThat(output.getAll().lines().filter(line -> line.contains("RuntimeException: java.lang.IllegalStateException")))
+        assertThat(output.getAll()
+                .lines()
+                .filter(line -> line.contains("RuntimeException: java.lang.IllegalStateException")))
                 .hasSize(2);
         assertThat(output.getAll()).doesNotContain("LEAKCHECK");
-        then(runner).should().stopClaiming();
+
+        then(jobRunner).should().stopClaiming();
         assertThat(lifecycle.isRunning()).isFalse();
     }
 
@@ -61,8 +70,10 @@ class WorkerLifecycleTest {
     void wakesIdleWorkerOnStop() {
         // given
         var attempts = new AtomicInteger();
-        given(runner.runOnce()).willAnswer(invocation -> { attempts.incrementAndGet(); return false; });
-        var lifecycle = new WorkerLifecycle(settings(1, Duration.ofSeconds(30)), scheduler -> runner);
+
+        given(jobRunner.runOnce()).willAnswer(invocation -> { attempts.incrementAndGet(); return false; });
+
+        var lifecycle = new WorkerLifecycle(settings(1, Duration.ofSeconds(30)), scheduler -> jobRunner);
         lifecycle.start();
         await().atMost(Duration.ofSeconds(5)).until(() -> attempts.get() == 1);
 
@@ -72,7 +83,7 @@ class WorkerLifecycleTest {
 
         // then
         assertThat(Duration.ofNanos(System.nanoTime() - began)).isLessThan(Duration.ofSeconds(1));
-        then(runner).should(times(1)).runOnce();
+        then(jobRunner).should(times(1)).runOnce();
     }
 
     @Test
@@ -80,16 +91,19 @@ class WorkerLifecycleTest {
     void createsNothingWhenDisabled() {
         // given
         var factories = new AtomicInteger();
+
         var lifecycle = new WorkerLifecycle(settings(0, Duration.ofMillis(10)), scheduler -> {
             factories.incrementAndGet();
-            return runner;
+            return jobRunner;
         });
+
         // when
         lifecycle.start();
         lifecycle.stop();
+
         // then
         assertThat(factories).hasValue(0);
-        then(runner).shouldHaveNoInteractions();
+        then(jobRunner).shouldHaveNoInteractions();
         assertThat(lifecycle.isRunning()).isFalse();
     }
 
@@ -101,18 +115,22 @@ class WorkerLifecycleTest {
         var finish = new CountDownLatch(1);
         var releasedWithOpenPool = new AtomicBoolean();
         var pool = new HikariDataSource();
-        given(runner.runOnce()).willAnswer(invocation -> {
+
+        given(jobRunner.runOnce()).willAnswer(invocation -> {
             entered.countDown();
             finish.await(5, TimeUnit.SECONDS);
             return true;
         });
+
         willAnswer(invocation -> { releasedWithOpenPool.set(!pool.isClosed()); return null; })
-                .given(runner).releaseCurrent();
+                .given(jobRunner).releaseCurrent();
+
         var context = new AnnotationConfigApplicationContext();
-        context.registerBean("dataSource", HikariDataSource.class, () -> pool, definition -> definition.setDestroyMethodName("close"));
+        context.registerBean("dataSource", HikariDataSource.class, () -> pool,
+                definition -> definition.setDestroyMethodName("close"));
         context.registerBean(WorkerLifecycle.class, () -> new WorkerLifecycle(
                 new WorkerProperties(Duration.ofMinutes(5), Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
-                        1, Duration.ofMillis(10), Duration.ofMillis(50)), scheduler -> runner));
+                        1, Duration.ofMillis(10), Duration.ofMillis(50)), scheduler -> jobRunner));
         context.refresh();
         assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
 
@@ -126,8 +144,9 @@ class WorkerLifecycleTest {
         // then
         assertThat(releasedWithOpenPool).isTrue();
         assertThat(pool.isClosed()).isTrue();
-        then(runner).should().stopClaiming();
-        then(runner).should().releaseCurrent();
+
+        then(jobRunner).should().stopClaiming();
+        then(jobRunner).should().releaseCurrent();
     }
 
     private WorkerProperties settings(int count, Duration poll) {

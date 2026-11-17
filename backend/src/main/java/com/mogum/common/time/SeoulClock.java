@@ -1,18 +1,17 @@
 package com.mogum.common.time;
 
+import lombok.RequiredArgsConstructor;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
+@RequiredArgsConstructor
 public final class SeoulClock {
     public static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
 
     private final Clock clock;
-
-    public SeoulClock(Clock clock) {
-        this.clock = clock;
-    }
 
     public Instant now() {
         return clock.instant();

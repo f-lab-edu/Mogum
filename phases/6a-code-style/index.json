@@ -1,0 +1,134 @@
+{
+  "project": "Mogum",
+  "phase": "6a-code-style",
+  "steps": [
+    {
+      "step": 0,
+      "name": "main-naming",
+      "status": "completed",
+      "started_at": "2026-11-17T04:54:38+0900",
+      "summary": "운영 의존 필드 33개 이름·Lombok·import 정리 및 운영 빈 의존 필드 ArchUnit 규칙과 namingfixture 위반/통과 픽스처 추가. 필드 대응: LoginService.users → userRepository; ApplyService.users → userRepository; ApplyService.entries → creditEntryRepository; ApplyService.credit → creditProperties; CreditLedger.users → userRepository; CreditLedger.entries → creditEntryRepository; ApplyController.applications → applyService; JobReadService.jobs → generationJobRepository; JobReadService.courses → courseRepository; JobReadService.roadmaps → roadmapRepository; JobReadService.lessons → lessonRepository; JobController.intake → jobIntakeService; JobController.reads → jobReadService; JobIntakeService.jobs → generationJobRepository; JobIntakeService.courses → courseRepository; JobIntakeService.roadmaps → roadmapRepository; JobIntakeService.lessons → lessonRepository; JobIntakeService.ledger → creditLedger; JobIntakeService.credits → creditProperties; JobIntakeService.properties → jobProperties; JobRunner.em → entityManager; JobRunner.tx → transactionTemplate; JobRunner.releaseTx → releaseTransactionTemplate; JobRunner.ledger → creditLedger; JobRunner.properties → workerProperties; WorkerLifecycle.properties → workerProperties; OAuthLoginHandler.login → loginService; OAuthLoginHandler.accounts → googleAccountMapper; OAuthLoginHandler.requests → cookieAuthorizationRequestRepository; CookieAuthorizationRequestRepository.registrations → clientRegistrationRepository; CookieAuthorizationRequestRepository.mapper → objectMapper; SessionUserFilter.users → userRepository; SessionUserFilter.entryPoint → authenticationEntryPoint. @RequiredArgsConstructor 전환(각 클래스의 기존 생성자와 필드 선언 순서·타입 일치, 순서 확인): SessionUserFilter, CookieAuthorizationRequestRepository, OAuthLoginHandler, SeoulClock, JobController, JobReadService, UserIdentityLockImpl, ApplyController, ApplyService, CreditLedger, LoginService, WorkerLifecycle. 직접 생성자 유지: JobIntakeService(handlers List를 Map으로 변환), JobRunner(TransactionTemplate 생성·timeout 설정 및 generators List를 Map으로 변환). @Slf4j 전환: RequestLogFilter, OAuthLoginHandler, JobIntakeService, JobRunner, WorkerLifecycle. 코드 내 완전 경로 타입과 와일드카드 import 제거·수정 파일 import 세 묶음 정렬 및 build.gradle Lombok 주석 갱신. 검증: 새 규칙의 운영 코드 실패를 먼저 확인한 뒤 ArchitectureTest 36개 통과, ./backend/gradlew -p backend build 통과; 운영 본문·주석·문자열·기존 줄 나누기는 이름/import/Lombok 변환 외 동일.",
+      "completed_at": "2026-11-17T05:00:05+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/auth/OAuthLoginHandler.java:22 · SessionUserFilter.java:22 · CookieAuthorizationRequestRepository.java:21 — 세 클래스는 SecurityConfiguration에서 `new`로 만드는 빈이 아닌 클래스인데 @RequiredArgsConstructor를 달았다. step · CODE_STYLE §4는 「빈 클래스」라고 적었다. 생성되는 생성자가 같아 동작은 같다 → 빈이 아닌 클래스에도 적용하는지 CODE_STYLE §4 문구를 분명히 할지 사람이 정한다.",
+        "backend/src/main/java/com/mogum/worker/JobRunner.java:51 (`PlatformTransactionManager transactions`) · config/WorkerConfiguration.java · auth/SecurityConfiguration.java · config/ClockConfiguration.java의 @Bean 메서드 매개변수(`em` · `ledger` · `properties` · `login` · `users` · `registrations` · `mapper`) — 필드가 아니어서 §3 규칙 대상은 아니지만 줄임 이름이 남아 있다 → 맞출지는 CODE_STYLE에서 정한 뒤 이후 step에서 다룬다.",
+        "backend/src/test/java/com/mogum/ArchitectureTest.java:1-160 — 허용된 파일이지만 import 전체 재정렬과 기존 완전 경로(`java.lang.reflect.AccessibleObject` · `com.mogum.support.TestSessions`)의 import 전환은 테스트 정리 범위(step 1 · 2)에 가깝다. 동작 영향은 없다 → step 2가 이 파일을 다시 볼 때 중복으로 고치지 않게 참고한다.",
+        "backend/src/test/java/com/mogum/ArchitectureTest.java:81-133 — 새 규칙 필드와 @Test 메서드 3개가 TEST_CLASSES와 TESTS_USE_ASSERTJ 사이, 곧 static 필드 선언 한가운데에 끼어 있다 → 다른 규칙 테스트들 옆으로 옮기면 읽기 쉽다(step 2 또는 step 3에서)."
+      ]
+    },
+    {
+      "step": 1,
+      "name": "test-naming-a",
+      "status": "completed",
+      "started_at": "2026-11-17T05:00:05+0900",
+      "summary": "대상 테스트 39개 파일의 필드 79개 이름·import 정리(users/FakeUserRepository users → userRepository, jdbc → jdbcTemplate, mvc → mockMvcTester, sessions → jdbcIndexedSessionRepository, runner → applicationContextRunner). 와일드카드 import 제거 4개 파일·코드 내 완전 경로 타입 제거 15개 파일 및 수정 파일 import 세 묶음 정렬. ./backend/gradlew -p backend build 통과: 기존과 동일한 97개 클래스·1,486개 테스트, 실패·건너뛰기 0개. 본문 토큰은 필드 이름·완전 경로 타입 전환 외 동일하고 줄 나누기·빈 줄·문자열·주석·지역 변수·매개변수·테스트 이름 유지.",
+      "completed_at": "2026-11-17T05:05:47+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/account/controller/ApplyControllerIntegrationTest.java:42 — 테스트 데이터 값인 `AccountPrincipal.NotApplied identity` 를 `notApplied` 로 바꿨다. step 규칙(java.* 가 아닌 타입의 필드)의 문자 그대로는 맞지만, 의존 · 협력 객체가 아닌 값 필드라 CODE_STYLE §3 의 취지(주입받는 의존 필드)와는 거리가 있다. step 2 를 쓸 때 값 · 픽스처 필드를 대상에 넣을지 한 줄로 정해 두면 두 step 의 기준이 갈리지 않는다.",
+        "backend/src/test/java/com/mogum/common/logging/RequestLogFilterIntegrationTest.java:50 — `Cookie session` → `cookie` 도 같은 경우다. 다른 쿠키와 섞이지 않아 지금은 읽는 데 문제가 없다.",
+        "backend/src/test/java/com/mogum/account/repository/AccountSchemaMigrationTest.java:123 · LoginIdentityMigrationTest.java:167 — 중첩 도우미 클래스 MigrationDatabase 의 필드도 `admin` → `adminJdbcTemplate`, `jdbc` → `jdbcTemplate` 로 바꿨다. 같은 타입이 둘일 때 역할을 앞에 붙이는 규칙에 맞다. 다만 쓰는 쪽의 지역 변수 `var jdbc = database.jdbcTemplate` 은 규칙대로 그대로 두었다."
+      ]
+    },
+    {
+      "step": 2,
+      "name": "test-naming-b",
+      "status": "completed",
+      "started_at": "2026-11-17T05:05:47+0900",
+      "summary": "기존 Java 40개 파일의 이름·import·규칙 정리 및 새 픽스처 3개 추가(문서·상태 포함 총 45개 파일). 대표 대응: jobs → generationJobRepository, courses → courseRepository, jdbc → jdbcTemplate, tx → transactionTemplate, em → entityManager, clock → testClock, client → restTestClient, sessions → testSessions; 직접 쓴 생성자 매개변수도 필드 이름에 맞춤. TEST_DEPENDENCIES_USE_TYPE_NAMES 추가 및 COMPONENT_DEPENDENCIES_USE_TYPE_NAMES를 TEST_CLASSES에도 적용. 새 픽스처: backend/src/test/java/namingfixture/{ShortAutowiredDependency,ShortFakeDependency,NamedTestDependencies}.java. TEST_GUIDE §7에 규칙·픽스처 패키지 반영. AC 두 명령 통과: ArchitectureTest 44개(8개 증가), 전체 97개 클래스·1,494개 테스트(8개 증가), 실패·오류·건너뛰기 0개. 기존 본문 줄 나누기·빈 줄·문자열·주석 유지, 와일드카드 import·코드 내 완전 경로 타입 없음.",
+      "completed_at": "2026-11-17T05:16:04+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/support/IntegrationTestConfiguration.java:129-145 — `JobGenerators`의 `@Bean` 메서드 매개변수가 아직 `EntityManager em, TestClock clock`이다. 규칙과 step 범위(필드·생성자 매개변수) 밖이라 반려 사유는 아니다 → 같은 클래스의 `TestJobGenerator` 생성자 매개변수(`entityManager`·`testClock`)와 맞추려면 이후 정리 때 함께 바꾸면 된다.",
+        "backend/src/test/java/namingfixture/ShortAutowiredDependency.java:9 — `@Autowired private final ... = null` 하나로 두 규칙(테스트 Autowired 필드·테스트 컴포넌트 final 필드)을 함께 위반하게 만든 픽스처다. 실제 코드에서는 나올 수 없는 조합이라 읽는 사람이 헷갈릴 수 있다 → 필요하면 규칙마다 픽스처를 나눠 의도를 드러낸다.",
+        "backend/src/test/java/com/mogum/ArchitectureTest.java:139-157 — 테스트 규칙은 `@Autowired` 필드와 `Fake*` 타입 필드만 보고, `@MockitoBean`·`@Mock` 필드는 보지 않는다. 문서 표와 같은 범위라 지금은 문제가 없다. 다만 목(mock) 필드에도 이름 규칙을 걸려면 CODE_STYLE §3을 먼저 고친다."
+      ]
+    },
+    {
+      "step": 3,
+      "name": "layout-main",
+      "status": "completed",
+      "started_at": "2026-11-17T05:16:05+0900",
+      "summary": "운영 Java 58개 파일의 문맥 단위 빈 줄·줄 나누기·들여쓰기를 공백만으로 정리하고 리뷰 지적 5곳(조건식·빌더 체인 안 빈 줄 2곳, 중괄호 없는 if 본문 들여쓰기 2곳, SQL 연결 연산자 이어쓰기 1곳)을 수정. ./backend/gradlew -p backend build 통과(97개 클래스·1,494개 테스트, 실패·오류·건너뛰기 0개); HEAD 기준 word diff 변경 표시 없음 및 공백 외 문자 동일 확인. 120자 넘는 줄 없음.",
+      "completed_at": "2026-11-17T05:25:22+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/auth/SecurityConfiguration.java:171-180 — `authorizeHttpRequests` 안에서 `.requestMatchers(...)`와 `.permitAll()` · `.authenticated()` · `.denyAll()`을 줄마다 하나씩 나눴다. 한 줄에 호출 하나라는 규칙을 그대로 따른 결과다. 하지만 이 DSL에서는 매처와 접근 규칙 한 쌍이 뜻 하나라서, 나눠 두면 어느 규칙이 어느 경로에 걸리는지 오히려 읽기 어렵다 → CODE_STYLE §2에 'Spring Security DSL처럼 호출 둘이 뜻 하나를 이루면 한 줄에 둔다' 같은 예외를 둘지 사람이 판단한다(phase `/review` 때).",
+        "backend/src/main/java/com/mogum/auth/SecurityConfiguration.java:115-117 · backend/src/main/java/com/mogum/job/dto/JobReceiveRequestValidator.java:88-89 — 중괄호 없는 `if`가 두세 줄에 걸쳐 남았다. CODE_STYLE §6은 '한 줄에 들어가지 않으면 중괄호를 쓴다'고 하지만, 이 step은 글자를 바꾸면 안 되므로 지금 고치지 않은 것이 맞다 → 글자 변경을 허용하는 다음 step이나 수정 step에서 중괄호 블록으로 바꾼다."
+      ]
+    },
+    {
+      "step": 4,
+      "name": "layout-test-a",
+      "status": "completed",
+      "started_at": "2026-11-17T05:25:22+0900",
+      "summary": "대상 Java 36개 중 33개 파일의 문맥 단위 빈 줄·줄 나누기·들여쓰기 정리를 유지하고 중괄호 없는 if·for 본문 5곳의 이어쓰기를 8칸으로 보완. 공백 외 문자·문자열 리터럴은 36개 모두 HEAD와 동일. ./backend/gradlew -p backend build 통과(test UP-TO-DATE, 기존 97개 클래스·1,494개 테스트 결과 재사용, 실패·오류·건너뛰기 0개). word diff의 변경 표시 7줄은 auth/OAuthLoginHandlerIntegrationTest.java:keepsConfiguredRedirectDespiteUntrustedParameters 한 곳이며, 삭제 2줄과 추가 5줄의 공백 제거 내용이 동일함을 확인. 120자 초과 8줄(backend/src/test/java/com/mogum/ 기준): account/controller/ApplyControllerIntegrationTest.java:247 — SQL 문자열 리터럴(127자); account/repository/LoginIdentityMigrationTest.java:152 — SQL 문자열 리터럴(128자); account/repository/LoginIdentityMigrationTest.java:157 — SQL 문자열 리터럴(133자); account/repository/UserIdentityLockImplIntegrationTest.java:78 — SQL 문자열 리터럴(127자); account/repository/UserIdentityLockImplIntegrationTest.java:105 — SQL 문자열 리터럴(131자); auth/OAuthLoginHandlerIntegrationTest.java:265 — JSON 텍스트 블록 리터럴(133자); auth/OAuthLoginHandlerIntegrationTest.java:442 — SQL 문자열 리터럴(160자); auth/SecurityConfigurationApprovalIntegrationTest.java:126 — SQL 문자열 리터럴(144자).",
+      "completed_at": "2026-11-17T10:19:08+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/ArchitectureTest.java:~409 — `NO_TRANSACTIONAL_METHODS_AROUND_LLM_CALLS` 의 `.resideInAnyPackage(\\n\"..generation..\", \"..worker..\")` 는 한 줄에 충분히 들어가는데도 인자를 나눴다 → step 7 이나 이후 정리 때 한 줄로 잇는 것을 권한다(동작 영향 없음).",
+        "backend/src/test/java/com/mogum/ArchitectureTest.java:331-449 — ArchUnit 의 `.should().beAnnotatedWith(X)` · `.orShould().beAssignableTo(X)` 를 호출마다 한 줄로 나눴다. 일반 체인 규칙에는 맞지만, CODE_STYLE §2 의 「호출 둘이 뜻 하나인 설정 체인」 예외(대상 + 규칙 짝)에 ArchUnit 규칙도 들어가는지는 문서가 정하지 않았다 → 필요하면 CODE_STYLE §2 에 ArchUnit 예시를 넣을지 정한다.",
+        "backend/src/test/java/com/mogum/DatabaseSetupIntegrationTest.java:108-111 — `new TestContextManager(\\n Class.forName(...))` 와 이어지는 `.getTestContext()` 가 같은 +8 칸에 있어 인자 줄과 체인 줄의 구분이 약하다 → 규칙 위반은 아니고, 읽기 어렵다면 이후 정리 때 다시 본다."
+      ]
+    },
+    {
+      "step": 5,
+      "name": "layout-test-b",
+      "status": "completed",
+      "started_at": "2026-11-17T10:19:08+0900",
+      "summary": "대상 Java 81개 중 42개 파일의 문맥 단위 빈 줄·줄 나누기·들여쓰기 정리를 유지하고 리뷰 지적 CourseSchemaRepositoryTest.otherInputRow의 문자열 연결 이어쓰기를 24칸(앞줄 +8칸)으로 수정. 공백 외 문자는 대상 81개 모두 HEAD와 동일하고 word diff 변경 표시 없음. ./backend/gradlew -p backend build 통과(compileTestJava 실행, test UP-TO-DATE). 120자 초과 12줄(backend/src/test/java/com/mogum/ 기준): card/repository/CardSchemaRepositoryTest.java:107 — SQL 문자열 리터럴(150자); card/repository/CardSchemaRepositoryTest.java:126 — SQL 문자열 리터럴(150자); card/repository/CardSchemaRepositoryTest.java:338 — SQL 텍스트 블록 리터럴(123자); card/repository/CardSchemaRepositoryTest.java:346 — SQL 텍스트 블록 리터럴(137자); common/api/RequestValidationIntegrationTest.java:87 — JSON 문자열 리터럴(126자); common/api/RequestValidationIntegrationTest.java:137 — JSON 문자열 리터럴(126자); common/api/RequestValidationIntegrationTest.java:152 — JSON 문자열 리터럴(124자); common/logging/RequestLogFilterIntegrationTest.java:101 — 로그 검색 문자열 리터럴(133자); course/repository/CourseSchemaRepositoryTest.java:364 — SQL 텍스트 블록 리터럴(121자); course/repository/CourseSchemaRepositoryTest.java:378 — SQL 텍스트 블록 리터럴(139자); course/repository/CourseSchemaRepositoryTest.java:406 — SQL 문자열 리터럴(143자); support/IntegrationTestConfiguration.java:416 — JSON 문자열 리터럴(150자).",
+      "completed_at": "2026-11-17T10:34:01+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/card/repository/CardSchemaRepositoryTest.java:setFsrs — 인자를 `state,` / `step, card` 로 나눠 짝인 state·step 이 갈라졌다 → 다음 정리 때 문자열 뒤에서 끊고 `state, step, card` 를 한 줄에 두는 편이 §2의 '의미가 묶이는 것끼리'에 맞는다(공백만 바뀌므로 step 7 이나 이후 정리에서 가능).",
+        "backend/src/test/java/com/mogum/common/api/RequestValidationIntegrationTest.java:645 — while 조건의 `&& System.nanoTime() < deadline` 이 줄 중간에 남아 있다(연산자는 줄 앞에서 끊는다는 규칙과 어긋나지만 120자 이내라 허용 범위다) → step 7 에서 이 while 에 중괄호를 달 때 조건 줄 나누기도 함께 정리하면 좋다.",
+        "backend/src/test/java/com/mogum/common/logging/RequestLogFilterIntegrationTest.java:followsLoggedInRequests 쪽 for 루프 — `var earlier = send(...)` 뒤의 빈 줄은 같은 반복 하나의 요청→검사를 갈라 놓아 다소 기계적이다. 취향 차이라 반려 사유는 아니다."
+      ]
+    },
+    {
+      "step": 6,
+      "name": "layout-test-c",
+      "status": "completed",
+      "started_at": "2026-11-17T10:34:01+0900",
+      "summary": "deploy·job·worker 아래 Java 26개 파일의 문맥 단위 빈 줄·줄 나누기·들여쓰기 정리를 유지하고 리뷰 지적 JobIntakeServiceIntegrationTest.serializesRetryAndDiscard의 람다 본문 두 줄을 24칸·32칸으로 수정. 대상 26개 모두 HEAD와 공백 외 문자·문자열/문자 리터럴 원문 동일, word diff 변경 표시 없음. ./backend/gradlew -p backend build 통과(compileTestJava 실행, test UP-TO-DATE). 120자 초과 6줄(backend/src/test/java/com/mogum/ 기준): deploy/AwsFilesTest.java:69 — JSON 텍스트 블록 리터럴(124자); deploy/BackupFilesScriptTest.java:134 — 셸 텍스트 블록 리터럴(136자); deploy/OperatorSqlIntegrationTest.java:150 — SQL 문자열 리터럴(139자); deploy/OperatorSqlIntegrationTest.java:165 — SQL 문자열 리터럴(139자); deploy/WorkflowFilesScriptTest.java:183 — 셸 텍스트 블록 리터럴(151자); job/controller/JobControllerIntegrationTest.java:378 — JSON 텍스트 블록 리터럴(134자).",
+      "completed_at": "2026-11-17T15:13:01+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/job/service/JobIntakeServiceIntegrationTest.java:325-329 (appliesSuccessDeduplicationByType) — else 블록은 두 줄짜리 단언인데 그 사이에 빈 줄을 넣었다. 짝인 if 블록에는 빈 줄이 없다. CODE_STYLE §1 의 「같은 일을 하는 두세 줄은 붙인다」와 어긋난다 → 빈 줄을 빼고, 대신 if/else 블록이 끝난 뒤 `assertBalanceMatchesLedger` 앞에 빈 줄을 두는 편이 맞다.",
+        "backend/src/test/java/com/mogum/deploy/WorkflowFilesScriptTest.java:run 의 `for (...)` 본문 · backend/src/test/java/com/mogum/job/service/JobIntakeServiceTest.java:retry 성공 테스트의 `.satisfies(entry -> assertThat(entry.getAmount())` / `.isEqualTo(-2))` — 바깥 줄을 나눈 것만으로 120자 안에 들어오는데 안쪽의 짧은 체인까지 나눴다 → 다음 정리 때 안쪽 체인은 한 줄로 잇는다.",
+        "backend/src/test/java/com/mogum/deploy/WorkflowFilesScriptTest.java:27-29 · DeployFilesScriptTest.java:56-58 의 `@ValueSource(strings = {...})` — 원래 있던 줄바꿈을 살리면서 한 줄에 \"missing-vars\" 하나만 남거나 줄 길이가 들쭉날쭉해졌다 → 의미가 묶이는 것끼리 다시 묶는다(공백만 바뀌므로 step 7 이나 이후 정리에서 가능).",
+        "backend/src/test/java/com/mogum/deploy/DeployFilesScriptTest.java:36-37 (`.matcher(content)` / `.find()).as(...).isTrue()`) · WorkflowFilesTest.java:75-84 (`.collect(Collectors.toSet())).isEqualTo(...)`) — 안쪽 체인은 줄마다 하나씩 나눴는데 바깥 assertThat 체인은 닫는 괄호 뒤에 붙여 두었다. 같은 파일 164행 부근(`.count())` / `.isEqualTo(1)`)과 처리가 다르다 → 한 방식으로 맞춘다.",
+        "backend/src/test/java/com/mogum/job/controller/JobControllerIntegrationTest.java:376-380 (queued) — 텍스트 블록의 닫는 `\"\"\"` 와 `.formatted(id)` 를 나눴다. 호출이 하나뿐이라 나눌 필요가 없었다(내용은 그대로다) → `\"\"\".formatted(id);` 로 잇는 편이 읽기 쉽다.",
+        "backend/src/test/java/com/mogum/worker/WorkerLifecycleTest.java:122-124 — Mockito 의 `willAnswer(...).given(jobRunner).releaseCurrent()` 에서 `.given(jobRunner)` 와 `.releaseCurrent()` 를 나눴다. 대상과 스텁할 메서드가 짝이라 CODE_STYLE §2 의 설정 체인 예외(Spring Security 의 `.requestMatchers().permitAll()` 처럼)에 들어갈 수도 있다 → 테스트 DSL(Mockito · ArchUnit · RestTestClient 의 `.expectStatus().isOk()`)도 예외에 넣을지는 phase `/review` 에서 정한다."
+      ]
+    },
+    {
+      "step": 7,
+      "name": "brace-and-config-chain",
+      "status": "completed",
+      "started_at": "2026-11-17T15:13:01+0900",
+      "summary": "Java 12개 파일의 if 사슬 15곳에 if 16개(else if 포함)·else 1개의 중괄호 17쌍 추가. 파일 목록(backend/src/ 기준): main/java/com/mogum/auth/CookieAuthorizationRequestRepository.java, main/java/com/mogum/auth/SecurityConfiguration.java, main/java/com/mogum/job/dto/JobReceiveRequestValidator.java, main/java/com/mogum/worker/JobRunner.java, test/java/com/mogum/ArchitectureTest.java, test/java/com/mogum/auth/SecurityConfigurationApprovalIntegrationTest.java, test/java/com/mogum/auth/SecurityConfigurationIntegrationTest.java, test/java/com/mogum/course/repository/CourseSchemaRepositoryTest.java, test/java/com/mogum/deploy/DeployFilesScriptTest.java, test/java/com/mogum/deploy/WorkflowFilesScriptTest.java, test/java/com/mogum/support/IntegrationTestConfiguration.java, test/java/com/mogum/worker/JobRunnerIntegrationTest.java. 설정 체인은 main/java/com/mogum/auth/SecurityConfiguration.java의 authorizeHttpRequests 안 대상·접근 규칙 7쌍을 한 줄씩 연결. 전체 if 사슬 250개 재검사에서 여러 줄 중괄호 없는 갈래 0개; 수정 사슬의 모양을 맞춘 한 줄 if·else 각 1개 외 기존 한 줄 갈래 유지. 변경 파일마다 HEAD와 공백·중괄호 제거 문자열 동일 및 추가한 여는/닫는 중괄호 수 동일 확인. AC build 통과(97개 클래스·1,494개 테스트, 실패·오류·건너뛰기 0개); word diff는 {+{+}·{+}+} 추가 표시 34개뿐이며 삭제·공백 재짝짓기 예외 없음. 새 120자 초과 줄 없음.",
+      "completed_at": "2026-11-17T15:16:44+0900",
+      "review_notes": [
+        "phases/6a-code-style/index.json — 이 step 의 build AC 결과는 Gradle up-to-date 캐시에서 나왔다. 테스트를 실제로 다시 돌린 기록이 필요하면 phase 를 끝낼 때 `./backend/gradlew -p backend build --rerun-tasks` 를 한 번 돌린다(중괄호 · 공백만 바뀌어 동작 위험은 없다)."
+      ]
+    },
+    {
+      "step": 8,
+      "name": "review-fixes",
+      "status": "completed",
+      "started_at": "2026-11-17T15:33:48+0900",
+      "summary": "Java 45개 파일 정리(항목별 중복 포함: 1 애노테이션 필드 빈 줄 15개, 2 테스트 체인 짝 8개, 4 리뷰 권고 및 같은 모양 13개, 5 import 순서·묶음 8개). 3 주입 매개변수 33개(8개 파일·17개 생성자/메서드) 이름 대응: SecurityConfiguration.apiSecurity: http → httpSecurity, users → userRepository, mapper → objectMapper, web → webProperties, login → loginService, registrations → clientRegistrationRepository, clients → discardingOAuth2AuthorizedClients; SecurityConfiguration.discardedGoogleTokens: registrations → clientRegistrationRepository; RequestLogConfiguration.requestLogCompletion: requestLogFilter → filterRegistrationBean; WorkerConfiguration.workerLifecycle: em → entityManager, transactions → platformTransactionManager, ledger → creditLedger, properties → workerProperties; JobRunner.JobRunner: transactions → platformTransactionManager; IntegrationTestConfiguration.DatabaseProbe.DatabaseProbe: source → dataSource; IntegrationTestConfiguration.FilterFailure.filterFailure: security → abstractFilterRegistrationBean; IntegrationTestConfiguration.JobGenerators.materialGenerator: em → entityManager, clock → testClock; IntegrationTestConfiguration.JobGenerators.newCourseGenerator: em → entityManager, clock → testClock; IntegrationTestConfiguration.JobGenerators.newRoadmapGenerator: em → entityManager, clock → testClock; IntegrationTestConfiguration.JobGenerators.planRoadmapCourseGenerator: em → entityManager, clock → testClock; IntegrationTestConfiguration.JobGenerators.replanCourseGenerator: em → entityManager, clock → testClock; IntegrationTestConfiguration.JobGenerators.replanRoadmapGenerator: em → entityManager, clock → testClock; IntegrationTestConfiguration.testRequests: client → restTestClient, sessions → jdbcIndexedSessionRepository; TestRequests.TestRequests: repository → jdbcIndexedSessionRepository; TestSessions.TestSessions: sessionRepository → jdbcIndexedSessionRepository; ShortDependency.ShortDependency: users → userRepository. 6 변경 Java 45개 모두 HEAD와 import 집합 동일, 메서드 범위에서 바꾼 매개변수 이름을 원복하고 import 줄·공백을 제거한 문자열 동일; 문자열·문자 리터럴과 텍스트 블록 원문(닫는 줄 들여쓰기 포함) 동일. AC ./backend/gradlew -p backend build 통과(test 실제 실행: 97개 클래스·1,494개 테스트, 실패·오류·건너뛰기 0개); 지정 word diff 실행 결과 글자 변경 표시는 3의 매개변수 이름·import 줄뿐. 새 120자 초과 줄 없음, git diff --check 통과.",
+      "completed_at": "2026-11-17T15:40:57+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/support/IntegrationTestConfiguration.java:519-520 — 이름이 길어져 `@Qualifier(\"securityFilterChainRegistration\")` 와 매개변수 선언이 같은 들여쓰기의 두 줄로 나뉘었다. 동작은 같다. 앞으로 매개변수 애노테이션을 줄로 나눌 때의 모양을 CODE_STYLE §2 에 정할지 검토할 만하다.",
+        "phases/6a-code-style/step8.md 4 — 메서드 이름 `followsLoggedInRequests` 는 실제 파일에 없다. 고친 곳은 `cleansUserMdcForNextAnonymousRequests` 의 for 본문이고, 그 파일의 for 는 이것 하나뿐이라 결과는 맞다. step 을 쓸 때 메서드 이름을 확인하면 구현 담당이 덜 헤맨다.",
+        "AC build 는 UP-TO-DATE 캐시로 통과했다. 입력이 같아 문제는 없지만, 리뷰에서 다시 실행하려면 `--rerun-tasks` 가 필요하다."
+      ]
+    },
+    {
+      "step": 9,
+      "name": "role-prefixed-names",
+      "status": "completed",
+      "summary": "requestLogCompletion의 filterRegistrationBean → requestLogFilterRegistrationBean, FilterFailure.filterFailure의 abstractFilterRegistrationBean → securityFilterRegistrationBean으로 매개변수와 사용처 총 4곳만 변경. 줄 배치 유지·변경 줄 120자 이내, git diff HEAD로 지정 이름 외 코드 변경 없음 확인. ./backend/gradlew -p backend build 통과(테스트 실제 실행: 97개 클래스·1,494개 테스트, 실패·오류·건너뛰기 0개).",
+      "started_at": "2026-11-17T15:43:29+0900",
+      "completed_at": "2026-11-17T15:45:14+0900"
+    }
+  ],
+  "created_at": "2026-11-17T04:54:38+0900",
+  "completed_at": "2026-11-17T15:45:14+0900"
+}

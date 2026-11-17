@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DeployFilesTest {
     private static final Path DEPLOY = Path.of("../deploy");
     private static final Pattern VARIABLE = Pattern.compile("(?<!\\$)\\$\\{([A-Z][A-Z0-9_]*)(?::[^}]*)?}");
+
     private static final Set<String> OPERATING_VARIABLES = Set.of("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
             "GOOGLE_REDIRECT_URI", "APP_WEB_ORIGIN", "APP_WEB_COOKIE_DOMAIN");
 
@@ -32,6 +33,7 @@ class DeployFilesTest {
         assertThat(service("backend").get("image").toString()).matches("\\$\\{APP_IMAGE:\\?[^}]+}");
         assertThat(service("postgres").get("image")).isEqualTo("pgvector/pgvector:pg17");
         assertThat(service("caddy").get("image")).isEqualTo("caddy:2");
+
         for (var name : services().keySet()) {
             assertThat(service(name)).doesNotContainKey("build");
             assertThat(service(name).get("restart")).isEqualTo("always");
@@ -46,19 +48,24 @@ class DeployFilesTest {
 
         // then
         assertThat(gracePeriod).isGreaterThanOrEqualTo(150);
+
         long total = 0;
+
         for (var name : services().keySet()) {
             long memory = mebibytes(service(name).get("mem_limit"));
             assertThat(memory).isPositive();
             total += memory;
         }
+
         assertThat(total).isLessThanOrEqualTo(1664);
         assertThat(mebibytes(service("backend").get("mem_limit"))).isEqualTo(1024);
         assertThat(mebibytes(service("postgres").get("mem_limit"))).isEqualTo(512);
         assertThat(mebibytes(service("caddy").get("mem_limit"))).isEqualTo(128);
+
         var dependency = map(map(service("backend").get("depends_on")).get("postgres"));
         assertThat(dependency.get("condition")).isEqualTo("service_healthy");
         assertThat(map(service("postgres").get("healthcheck")).get("test")).isNotNull();
+
         var environment = map(service("backend").get("environment"));
         assertThat(environment.get("SPRING_PROFILES_ACTIVE")).isEqualTo("aws");
         assertThat(environment.get("DB_URL")).isEqualTo("jdbc:postgresql://postgres:5432/mogum");
@@ -74,6 +81,7 @@ class DeployFilesTest {
         for (var name : definitions.keySet()) {
             assertThat(map(service(name).get("logging"))).isEqualTo(Map.of("driver", "journald"));
         }
+
         assertThat(service("postgres").get("command"))
                 .isEqualTo(List.of("postgres", "-c", "log_error_verbosity=terse", "-c", "log_timezone=Asia/Seoul"));
     }
@@ -86,9 +94,11 @@ class DeployFilesTest {
 
         // then
         assertThat(databasePorts).isEmpty();
+
         for (var port : ports("backend")) {
             assertThat(port.toString()).matches("127\\.0\\.0\\.1:[0-9]+:8080(?:/tcp)?");
         }
+
         // 배포 헬스 확인에 쓰는 서버 내부 주소다.
         assertThat(ports("backend")).isEqualTo(List.of("127.0.0.1:8080:8080"));
         assertThat(new HashSet<>(ports("caddy"))).isEqualTo(Set.of("80:80/tcp", "443:443/tcp"));
@@ -105,6 +115,7 @@ class DeployFilesTest {
         assertNamedVolume("caddy", "/data", volumes);
         assertNamedVolume("caddy", "/config", volumes);
         assertThat(list(service("caddy").get("volumes")).contains("/etc/mogum/caddy:/etc/caddy:ro")).isTrue();
+
         for (var name : services().keySet()) {
             for (var volume : list(service(name).getOrDefault("volumes", List.of()))) {
                 assertThat(volume.toString()).as("릴리스 상대 경로에 의존하면 매번 재생성된다").doesNotContain("./");
@@ -123,9 +134,11 @@ class DeployFilesTest {
         assertThat(proxyEnvironment.keySet()).isEqualTo(Set.of("API_DOMAIN"));
         assertThat(map(service("postgres").get("environment")).keySet())
                 .isEqualTo(Set.of("POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD"));
+
         var backendKeys = new HashSet<>(OPERATING_VARIABLES);
         backendKeys.addAll(Set.of("SPRING_PROFILES_ACTIVE", "DB_URL", "DB_USERNAME", "DB_PASSWORD"));
         assertThat(map(service("backend").get("environment")).keySet()).isEqualTo(backendKeys);
+
         for (var name : services().keySet()) {
             assertThat(service(name)).as("전체 env 파일을 컨테이너에 넘기지 않는다").doesNotContainKey("env_file");
             var environment = map(service(name).get("environment"));
@@ -143,9 +156,11 @@ class DeployFilesTest {
         // given
         var expected = new HashSet<>(OPERATING_VARIABLES);
         var matcher = VARIABLE.matcher(Files.readString(DEPLOY.resolve("compose.yaml")));
+
         while (matcher.find()) {
             if (!matcher.group(1).equals("APP_IMAGE")) expected.add(matcher.group(1));
         }
+
         expected.add("API_DOMAIN");
         expected.add("MOGUM_BUCKET");
         var actual = new HashSet<String>();
@@ -156,12 +171,15 @@ class DeployFilesTest {
         // then
         for (var line : lines) {
             if (line.isBlank() || line.startsWith("#")) continue;
+
             var parts = line.split("=", 2);
             assertThat(parts.length).isEqualTo(2);
             assertThat(actual.add(parts[0])).as("중복 변수: " + parts[0]).isTrue();
             assertThat(parts[1].isEmpty() || parts[1].contains("{도메인}")).isTrue();
         }
+
         assertThat(actual).isEqualTo(expected);
+
         var example = Files.readString(DEPLOY.resolve("mogum.env.example"));
         assertThat(example).contains("GOOGLE_REDIRECT_URI=https://api.{도메인}/auth/google/callback");
         assertThat(example).contains("APP_WEB_ORIGIN=https://{도메인}");
@@ -179,8 +197,12 @@ class DeployFilesTest {
     }
 
     private void assertNamedVolume(String service, String target, Map<String, Object> volumes) throws Exception {
-        var mount = list(service(service).get("volumes")).stream().map(Object::toString)
-                .filter(value -> value.endsWith(":" + target)).findFirst().orElseThrow();
+        var mount = list(service(service).get("volumes"))
+                .stream()
+                .map(Object::toString)
+                .filter(value -> value.endsWith(":" + target))
+                .findFirst()
+                .orElseThrow();
         assertThat(volumes).containsKey(mount.split(":")[0]);
     }
 
@@ -191,11 +213,14 @@ class DeployFilesTest {
     }
 
     private Map<String, Object> services() throws Exception { return map(compose().get("services")); }
+
     private Map<String, Object> service(String name) throws Exception { return map(services().get(name)); }
+
     private List<?> ports(String name) throws Exception { return list(service(name).getOrDefault("ports", List.of())); }
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> map(Object value) { return (Map<String, Object>) value; }
+
     private static List<?> list(Object value) { return (List<?>) value; }
 
     private static long seconds(Object value) {

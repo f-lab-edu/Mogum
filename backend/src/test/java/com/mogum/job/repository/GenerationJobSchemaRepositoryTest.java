@@ -2,11 +2,19 @@ package com.mogum.job.repository;
 
 import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.UserRepository;
-import com.mogum.course.domain.*;
+import com.mogum.course.domain.CourseFixtures;
+import com.mogum.course.domain.LearningInput;
+import com.mogum.course.domain.LessonFixtures;
+import com.mogum.course.domain.Level;
+import com.mogum.course.domain.Purpose;
+import com.mogum.course.domain.RoadmapFixtures;
 import com.mogum.course.repository.CourseRepository;
 import com.mogum.course.repository.LessonRepository;
 import com.mogum.course.repository.RoadmapRepository;
-import com.mogum.job.domain.*;
+import com.mogum.job.domain.GenerationJobFixtures;
+import com.mogum.job.domain.JobErrorType;
+import com.mogum.job.domain.JobStatus;
+import com.mogum.job.domain.JobType;
 import com.mogum.support.RepositoryTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,12 +37,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @RepositoryTest
 class GenerationJobSchemaRepositoryTest {
-    @Autowired private GenerationJobRepository jobs;
-    @Autowired private UserRepository users;
-    @Autowired private RoadmapRepository roadmaps;
-    @Autowired private CourseRepository courses;
-    @Autowired private LessonRepository lessons;
-    @Autowired private JdbcTemplate jdbc;
+    @Autowired private GenerationJobRepository generationJobRepository;
+    @Autowired private UserRepository userRepository;
+    @Autowired private RoadmapRepository roadmapRepository;
+    @Autowired private CourseRepository courseRepository;
+    @Autowired private LessonRepository lessonRepository;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     @ParameterizedTest(name = "종류 {0}, 상태 {1}, 대상 칸 {2}")
     @MethodSource("targetCombinations")
@@ -43,7 +51,8 @@ class GenerationJobSchemaRepositoryTest {
         // given
         var context = context();
         long id = job(type, context);
-        Runnable change = () -> jdbc.update("""
+
+        Runnable change = () -> jdbcTemplate.update("""
                 UPDATE generation_jobs SET status = ?, course_id = ?, roadmap_id = ?, lesson_id = ?,
                 lease_until = CASE WHEN ? = 'RUNNING' THEN now() ELSE NULL END,
                 error_type = CASE WHEN ? = 'FAILED' THEN 'INVALID_OUTPUT' ELSE NULL END,
@@ -54,7 +63,7 @@ class GenerationJobSchemaRepositoryTest {
         // when & then
         if (valid) {
             change.run();
-            assertThat(jdbc.queryForObject("SELECT status FROM generation_jobs WHERE id = ?", String.class, id))
+            assertThat(jdbcTemplate.queryForObject("SELECT status FROM generation_jobs WHERE id = ?", String.class, id))
                     .isEqualTo(status.name());
         } else {
             assertConstraint("23514", "generation_jobs_target_type_check", change);
@@ -70,7 +79,7 @@ class GenerationJobSchemaRepositoryTest {
         long id = job(JobType.MATERIAL, context);
 
         // when & then
-        assertConstraint("23514", "generation_jobs_target_count_check", () -> jdbc.update("""
+        assertConstraint("23514", "generation_jobs_target_count_check", () -> jdbcTemplate.update("""
                 UPDATE generation_jobs SET course_id = ?, roadmap_id = ?, lesson_id = ?, updated_at = now() WHERE id = ?
                 """, course ? context.course() : null, roadmap ? context.roadmap() : null,
                 lesson ? context.lesson() : null, id));
@@ -117,8 +126,9 @@ class GenerationJobSchemaRepositoryTest {
         long id = job(JobType.NEW_COURSE, context());
 
         // when & then
-        assertConstraint("23514", "generation_jobs_" + column + "_other_check", () -> jdbc.update(
-                "UPDATE generation_jobs SET " + column + " = ?, " + column + "_other = ?, updated_at = now() WHERE id = ?",
+        assertConstraint("23514", "generation_jobs_" + column + "_other_check", () -> jdbcTemplate.update(
+                "UPDATE generation_jobs SET " + column + " = ?, "
+                        + column + "_other = ?, updated_at = now() WHERE id = ?",
                 other ? "OTHER" : column.equals("level") ? "BEGINNER" : "WORK", text ? "기타" : null, id));
     }
 
@@ -168,7 +178,8 @@ class GenerationJobSchemaRepositoryTest {
         long id = job(JobType.NEW_COURSE, context());
 
         // when & then
-        assertConstraint("23502", column, () -> jdbc.update("UPDATE generation_jobs SET " + column + " = NULL WHERE id = ?", id));
+        assertConstraint("23502", column, () -> jdbcTemplate.update(
+                "UPDATE generation_jobs SET " + column + " = NULL WHERE id = ?", id));
     }
 
     @Test
@@ -178,14 +189,16 @@ class GenerationJobSchemaRepositoryTest {
         var context = context();
 
         // when
-        long id = jdbc.queryForObject("""
+        long id = jdbcTemplate.queryForObject("""
                 INSERT INTO generation_jobs (user_id, type, status, topic, level, purpose, created_at, updated_at)
                 VALUES (?, 'NEW_COURSE', 'QUEUED', '주제', 'BEGINNER', 'WORK', now(), now()) RETURNING id
                 """, Long.class, context.user());
 
         // then
-        assertThat(jdbc.queryForObject("SELECT claim_count FROM generation_jobs WHERE id = ?", Integer.class, id)).isZero();
-        assertThat(jdbc.queryForList("""
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT claim_count FROM generation_jobs WHERE id = ?", Integer.class, id))
+                .isZero();
+        assertThat(jdbcTemplate.queryForList("""
                 SELECT column_name FROM information_schema.columns WHERE table_schema = 'public'
                 AND table_name = 'generation_jobs' AND column_name IN ('created_at', 'updated_at')
                 AND data_type = 'timestamp with time zone' AND is_nullable = 'NO' AND column_default IS NULL
@@ -200,14 +213,19 @@ class GenerationJobSchemaRepositoryTest {
         // given
         long id = textJob(column);
         String text = "가".repeat(limit + (exceeds ? 1 : 0));
-        Runnable change = () -> jdbc.update("UPDATE generation_jobs SET " + column + " = ?, updated_at = now() WHERE id = ?", text, id);
+
+        Runnable change = () -> jdbcTemplate.update(
+                "UPDATE generation_jobs SET " + column + " = ?, updated_at = now() WHERE id = ?", text, id);
 
         // when & then
         if (exceeds) {
-            assertConstraint("23514", "generation_jobs_" + column + (column.equals("feedback") ? "_length_check" : "_check"), change);
+            assertConstraint("23514",
+                    "generation_jobs_" + column + (column.equals("feedback") ? "_length_check" : "_check"), change);
         } else {
             change.run();
-            assertThat(jdbc.queryForObject("SELECT " + column + " FROM generation_jobs WHERE id = ?", String.class, id)).isEqualTo(text);
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT " + column + " FROM generation_jobs WHERE id = ?", String.class, id))
+                    .isEqualTo(text);
         }
     }
 
@@ -219,7 +237,7 @@ class GenerationJobSchemaRepositoryTest {
         long id = textJob(column);
 
         // when & then
-        assertConstraint("23514", "generation_jobs_" + column + "_not_blank", () -> jdbc.update(
+        assertConstraint("23514", "generation_jobs_" + column + "_not_blank", () -> jdbcTemplate.update(
                 "UPDATE generation_jobs SET " + column + " = ?, updated_at = now() WHERE id = ?", blank, id));
     }
 
@@ -230,10 +248,12 @@ class GenerationJobSchemaRepositoryTest {
         // given
         var context = context();
         long id = job(column.equals("type") ? JobType.MATERIAL : JobType.NEW_COURSE, context);
+
         if (column.equals("error_type")) setState(id, JobStatus.FAILED, context);
 
         // when & then
-        assertConstraint("23514", "generation_jobs_" + column + (column.equals("error_type") ? "_values_check" : "_check"),
+        assertConstraint("23514",
+                "generation_jobs_" + column + (column.equals("error_type") ? "_values_check" : "_check"),
                 () -> update(id, column, "'UNKNOWN'"));
     }
 
@@ -246,11 +266,14 @@ class GenerationJobSchemaRepositoryTest {
         long id = job(JobType.NEW_ROADMAP, context());
 
         // when
-        jdbc.update("UPDATE generation_jobs SET " + column + " = ?, " + column + "_other = ?, updated_at = now() WHERE id = ?",
+        jdbcTemplate.update("UPDATE generation_jobs SET " + column + " = ?, "
+                + column + "_other = ?, updated_at = now() WHERE id = ?",
                 value, value.equals("OTHER") ? "기타" : null, id);
 
         // then
-        assertThat(jdbc.queryForObject("SELECT " + column + " FROM generation_jobs WHERE id = ?", String.class, id)).isEqualTo(value);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT " + column + " FROM generation_jobs WHERE id = ?", String.class, id))
+                .isEqualTo(value);
     }
 
     @ParameterizedTest(name = "실패한 까닭 {0}")
@@ -261,10 +284,10 @@ class GenerationJobSchemaRepositoryTest {
         long id = job(JobType.NEW_COURSE, context());
 
         // when
-        GenerationJobFixtures.failed(jdbc, id, type, Instant.parse("2026-11-15T00:00:00Z"));
+        GenerationJobFixtures.failed(jdbcTemplate, id, type, Instant.parse("2026-11-15T00:00:00Z"));
 
         // then
-        assertThat(jobs.findById(id).orElseThrow().getErrorType()).isEqualTo(type);
+        assertThat(generationJobRepository.findById(id).orElseThrow().getErrorType()).isEqualTo(type);
     }
 
     @ParameterizedTest(name = "종류 {0}, 앞 작업 상태 {1}")
@@ -294,7 +317,7 @@ class GenerationJobSchemaRepositoryTest {
 
         // then
         assertThat(next).isNotEqualTo(previous);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM generation_jobs", Long.class)).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM generation_jobs", Long.class)).isEqualTo(2);
     }
 
     @ParameterizedTest(name = "대상이 있는 종류 {0}")
@@ -304,17 +327,18 @@ class GenerationJobSchemaRepositoryTest {
         // given
         var first = context();
         job(type, first);
-        var roadmap = roadmaps.save(RoadmapFixtures.roadmap(first.user()));
-        var course = courses.save(CourseFixtures.single(first.user()));
-        var lesson = lessons.save(LessonFixtures.lesson(course, 1));
+
+        var roadmap = roadmapRepository.save(RoadmapFixtures.roadmap(first.user()));
+        var course = courseRepository.save(CourseFixtures.single(first.user()));
+        var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
         var second = new Context(first.user(), course.getId(), roadmap.getId(), lesson.getId());
 
         // when
         long next = job(type, second);
 
         // then
-        assertThat(jobs.findById(next)).isPresent();
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM generation_jobs", Long.class)).isEqualTo(2);
+        assertThat(generationJobRepository.findById(next)).isPresent();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM generation_jobs", Long.class)).isEqualTo(2);
     }
 
     @Test
@@ -328,8 +352,8 @@ class GenerationJobSchemaRepositoryTest {
         long next = job(JobType.REPLAN_COURSE, context);
 
         // then
-        assertThat(jobs.findById(next).orElseThrow().getCourseId()).isEqualTo(context.course());
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM generation_jobs", Long.class)).isEqualTo(2);
+        assertThat(generationJobRepository.findById(next).orElseThrow().getCourseId()).isEqualTo(context.course());
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM generation_jobs", Long.class)).isEqualTo(2);
     }
 
     @Test
@@ -344,8 +368,8 @@ class GenerationJobSchemaRepositoryTest {
         long next = job(JobType.NEW_COURSE, context);
 
         // then
-        assertThat(jobs.findById(next)).isPresent();
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM generation_jobs", Long.class)).isEqualTo(3);
+        assertThat(generationJobRepository.findById(next)).isPresent();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM generation_jobs", Long.class)).isEqualTo(3);
     }
 
     @Test
@@ -354,17 +378,19 @@ class GenerationJobSchemaRepositoryTest {
         // given
         var context = context();
         long id = job(JobType.NEW_COURSE, context);
-        long entry = jdbc.queryForObject("""
+        long entry = jdbcTemplate.queryForObject("""
                 INSERT INTO credit_entries (user_id, type, amount, job_id, created_at, updated_at)
                 VALUES (?, 'CONSUME', -1, ?, now(), now()) RETURNING id
                 """, Long.class, context.user(), id);
 
         // when
-        jdbc.update("DELETE FROM generation_jobs WHERE id = ?", id);
+        jdbcTemplate.update("DELETE FROM generation_jobs WHERE id = ?", id);
 
         // then
-        assertThat(jdbc.queryForObject("SELECT job_id FROM credit_entries WHERE id = ?", Long.class, entry)).isNull();
-        assertThat(jdbc.queryForObject("SELECT amount FROM credit_entries WHERE id = ?", Integer.class, entry)).isEqualTo(-1);
+        assertThat(jdbcTemplate.queryForObject("SELECT job_id FROM credit_entries WHERE id = ?", Long.class, entry))
+                .isNull();
+        assertThat(jdbcTemplate.queryForObject("SELECT amount FROM credit_entries WHERE id = ?", Integer.class, entry))
+                .isEqualTo(-1);
     }
 
     @ParameterizedTest(name = "외래 키 {0}")
@@ -391,7 +417,9 @@ class GenerationJobSchemaRepositoryTest {
         // given
         var context = context();
         job(type, context);
-        if (table.equals("courses")) jdbc.update("DELETE FROM lessons WHERE id = ?", context.lesson());
+
+        if (table.equals("courses")) jdbcTemplate.update("DELETE FROM lessons WHERE id = ?", context.lesson());
+
         long target = switch (type) {
             case REPLAN_COURSE -> context.course();
             case REPLAN_ROADMAP -> context.roadmap();
@@ -399,33 +427,40 @@ class GenerationJobSchemaRepositoryTest {
         };
 
         // when & then
-        assertConstraint("23503", "generation_jobs_" + column + "_fkey", () -> jdbc.update("DELETE FROM " + table + " WHERE id = ?", target));
+        assertConstraint("23503", "generation_jobs_" + column + "_fkey", () -> jdbcTemplate.update(
+                "DELETE FROM " + table + " WHERE id = ?", target));
     }
 
     @Test
     @DisplayName("꺼내기와 사람별 조회 및 중복 방지와 크레딧 복구용 색인을 둔다")
     void preservesContractIndexes() {
         // when
-        var indexes = jdbc.queryForList("SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'generation_jobs'", String.class);
+        var indexes = jdbcTemplate.queryForList(
+                "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'generation_jobs'",
+                String.class);
 
         // then
         assertThat(indexes).containsExactlyInAnyOrder("generation_jobs_pkey", "generation_jobs_status_created_at_idx",
                 "generation_jobs_user_id_status_idx", "generation_jobs_material_lesson_id_key",
                 "generation_jobs_plan_roadmap_course_course_id_key", "generation_jobs_replan_course_course_id_key",
                 "generation_jobs_replan_roadmap_roadmap_id_key");
-        assertThat(jdbc.queryForObject("SELECT indexdef FROM pg_indexes WHERE indexname = 'generation_jobs_status_created_at_idx'", String.class))
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT indexdef FROM pg_indexes WHERE indexname = 'generation_jobs_status_created_at_idx'",
+                String.class))
                 .contains("(status, created_at)");
-        assertThat(jdbc.queryForObject("SELECT indexdef FROM pg_indexes WHERE indexname = 'generation_jobs_user_id_status_idx'", String.class))
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT indexdef FROM pg_indexes WHERE indexname = 'generation_jobs_user_id_status_idx'", String.class))
                 .contains("(user_id, status)");
-        assertThat(jdbc.queryForObject("SELECT indexdef FROM pg_indexes WHERE indexname = 'credit_entries_job_id_idx'", String.class))
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT indexdef FROM pg_indexes WHERE indexname = 'credit_entries_job_id_idx'", String.class))
                 .contains("(job_id)");
     }
 
     private Context context() {
-        long user = users.save(UserFixtures.user("owner@example.com")).getId();
-        long roadmap = roadmaps.save(RoadmapFixtures.roadmap(user)).getId();
-        var course = courses.save(CourseFixtures.single(user));
-        long lesson = lessons.save(LessonFixtures.lesson(course, 1)).getId();
+        long user = userRepository.save(UserFixtures.user("owner@example.com")).getId();
+        long roadmap = roadmapRepository.save(RoadmapFixtures.roadmap(user)).getId();
+        var course = courseRepository.save(CourseFixtures.single(user));
+        long lesson = lessonRepository.save(LessonFixtures.lesson(course, 1)).getId();
         return new Context(user, course.getId(), roadmap, lesson);
     }
 
@@ -439,32 +474,38 @@ class GenerationJobSchemaRepositoryTest {
             case REPLAN_ROADMAP -> GenerationJobFixtures.replanRoadmap(context.user(), context.roadmap(), null);
             case MATERIAL -> GenerationJobFixtures.material(context.user(), context.lesson());
         };
-        return jobs.save(job).getId();
+
+        return generationJobRepository.save(job).getId();
     }
 
     private long textJob(String column) {
         long id = job(column.equals("feedback") ? JobType.REPLAN_COURSE : JobType.NEW_COURSE, context());
+
         if (column.endsWith("_other")) {
             update(id, column.substring(0, column.length() - 6), "'OTHER', " + column + " = '기타'");
         }
+
         return id;
     }
 
     private void setState(long id, JobStatus status, Context context) {
         var instant = Instant.parse("2026-11-15T00:00:00Z");
+
         switch (status) {
             case QUEUED -> { }
-            case RUNNING -> GenerationJobFixtures.running(jdbc, id, 1, instant, instant.plusSeconds(300));
-            case FAILED -> GenerationJobFixtures.failed(jdbc, id, JobErrorType.INVALID_OUTPUT, instant);
+            case RUNNING -> GenerationJobFixtures.running(jdbcTemplate, id, 1, instant, instant.plusSeconds(300));
+            case FAILED -> GenerationJobFixtures.failed(jdbcTemplate, id, JobErrorType.INVALID_OUTPUT, instant);
             case SUCCEEDED -> {
-                var job = jobs.findById(id).orElseThrow();
-                GenerationJobFixtures.succeeded(jdbc, id, job.getCourseId(), job.getRoadmapId(), job.getLessonId(), instant);
+                var job = generationJobRepository.findById(id).orElseThrow();
+                GenerationJobFixtures.succeeded(jdbcTemplate, id, job.getCourseId(), job.getRoadmapId(),
+                        job.getLessonId(), instant);
             }
         }
     }
 
     private void update(long id, String column, String expression) {
-        jdbc.update("UPDATE generation_jobs SET " + column + " = " + expression + ", updated_at = now() WHERE id = ?", id);
+        jdbcTemplate.update("UPDATE generation_jobs SET " + column + " = " + expression
+                + ", updated_at = now() WHERE id = ?", id);
     }
 
     private static String duplicateIndex(JobType type) {
@@ -485,17 +526,19 @@ class GenerationJobSchemaRepositoryTest {
     }
 
     static Stream<Arguments> targetCombinations() {
-        return Arrays.stream(JobType.values()).flatMap(type -> Arrays.stream(JobStatus.values()).flatMap(status ->
-                Stream.of(0, 1, 2, 3).map(target -> {
-                    int expected = switch (type) {
-                        case NEW_COURSE -> status == JobStatus.SUCCEEDED ? 1 : 0;
-                        case NEW_ROADMAP -> status == JobStatus.SUCCEEDED ? 2 : 0;
-                        case PLAN_ROADMAP_COURSE, REPLAN_COURSE -> 1;
-                        case REPLAN_ROADMAP -> 2;
-                        case MATERIAL -> 3;
-                    };
-                    return Arguments.of(type, status, target, target == expected);
-                })));
+        return Arrays.stream(JobType.values())
+                .flatMap(type -> Arrays.stream(JobStatus.values())
+                        .flatMap(status -> Stream.of(0, 1, 2, 3).map(target -> {
+                            int expected = switch (type) {
+                                case NEW_COURSE -> status == JobStatus.SUCCEEDED ? 1 : 0;
+                                case NEW_ROADMAP -> status == JobStatus.SUCCEEDED ? 2 : 0;
+                                case PLAN_ROADMAP_COURSE, REPLAN_COURSE -> 1;
+                                case REPLAN_ROADMAP -> 2;
+                                case MATERIAL -> 3;
+                            };
+
+                            return Arguments.of(type, status, target, target == expected);
+                        })));
     }
 
     static Stream<Arguments> missingNewInput() {
@@ -505,14 +548,16 @@ class GenerationJobSchemaRepositoryTest {
 
     static Stream<Arguments> unexpectedInput() {
         return Stream.of(JobType.PLAN_ROADMAP_COURSE, JobType.REPLAN_COURSE, JobType.REPLAN_ROADMAP, JobType.MATERIAL)
-                .flatMap(type -> Stream.of(Arguments.of(type, "topic", "'주제'"), Arguments.of(type, "level", "'BEGINNER'"),
+                .flatMap(type -> Stream.of(Arguments.of(type, "topic", "'주제'"),
+                        Arguments.of(type, "level", "'BEGINNER'"),
                         Arguments.of(type, "purpose", "'WORK'"), Arguments.of(type, "level_other", "'기타'"),
                         Arguments.of(type, "purpose_other", "'기타'"), Arguments.of(type, "memo", "'메모'")));
     }
 
     static Stream<Arguments> lengthBoundaries() {
         return Stream.of("topic,100", "level_other,50", "purpose_other,50", "memo,500", "feedback,500")
-                .map(pair -> pair.split(",")).flatMap(pair -> Stream.of(false, true)
+                .map(pair -> pair.split(","))
+                .flatMap(pair -> Stream.of(false, true)
                         .map(exceeds -> Arguments.of(pair[0], Integer.parseInt(pair[1]), exceeds)));
     }
 
@@ -524,7 +569,8 @@ class GenerationJobSchemaRepositoryTest {
     static Stream<Arguments> duplicateTargets() {
         return Stream.of(JobType.MATERIAL, JobType.PLAN_ROADMAP_COURSE, JobType.REPLAN_COURSE, JobType.REPLAN_ROADMAP)
                 .flatMap(type -> Arrays.stream(JobStatus.values())
-                        .filter(status -> status != JobStatus.SUCCEEDED || type == JobType.MATERIAL || type == JobType.PLAN_ROADMAP_COURSE)
+                        .filter(status -> status != JobStatus.SUCCEEDED
+                                || type == JobType.MATERIAL || type == JobType.PLAN_ROADMAP_COURSE)
                         .map(status -> Arguments.of(type, status)));
     }
 
