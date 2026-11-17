@@ -20,9 +20,11 @@ import org.springframework.data.domain.Persistable;
 public class CardConcept extends AuditedEntity implements Persistable<CardConceptId> {
     @EmbeddedId
     private CardConceptId id;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "card_id", nullable = false, insertable = false, updatable = false)
     private Card card;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "concept_id", nullable = false, insertable = false, updatable = false)
     private Concept concept;

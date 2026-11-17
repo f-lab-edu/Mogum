@@ -78,10 +78,8 @@ class ApplyControllerIntegrationTest {
                 .uri("/api/me")
                 .cookie("SESSION", next.getValue())
                 .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .json(expectedApplied(), JsonCompareMode.STRICT);
+                .expectStatus().isOk()
+                .expectBody().json(expectedApplied(), JsonCompareMode.STRICT);
 
         assertSingleRefill();
     }

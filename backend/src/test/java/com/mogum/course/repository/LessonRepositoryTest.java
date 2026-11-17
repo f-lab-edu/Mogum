@@ -53,7 +53,8 @@ class LessonRepositoryTest {
 
         assertThat(entityManagerFactory.unwrap(SessionFactoryImplementor.class)
                 .getSessionFactoryOptions()
-                .getJsonFormatMapper()).isInstanceOf(Jackson3JsonFormatMapper.class);
+                .getJsonFormatMapper())
+                .isInstanceOf(Jackson3JsonFormatMapper.class);
 
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT concepts = '[{"name":"변수","definition":"값을 담는 이름"},

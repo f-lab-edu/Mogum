@@ -43,12 +43,12 @@ public final class JobRunner {
     private volatile boolean stopping;
     private Lease current;
 
-    public JobRunner(EntityManager entityManager, PlatformTransactionManager transactions,
+    public JobRunner(EntityManager entityManager, PlatformTransactionManager platformTransactionManager,
             CreditLedger creditLedger, Clock clock, WorkerProperties workerProperties,
             List<JobGenerator> generators, ScheduledExecutorService renewals) {
         this.entityManager = entityManager;
-        this.transactionTemplate = new TransactionTemplate(transactions);
-        this.releaseTransactionTemplate = new TransactionTemplate(transactions);
+        this.transactionTemplate = new TransactionTemplate(platformTransactionManager);
+        this.releaseTransactionTemplate = new TransactionTemplate(platformTransactionManager);
         this.releaseTransactionTemplate.setTimeout(5);
         this.creditLedger = creditLedger;
         this.clock = clock;

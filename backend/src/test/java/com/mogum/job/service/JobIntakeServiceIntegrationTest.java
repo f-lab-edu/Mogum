@@ -324,9 +324,9 @@ class JobIntakeServiceIntegrationTest {
             assertThat(entryCount("CONSUME")).isEqualTo(1);
         } else {
             assertThat(second.id()).isNotEqualTo(first.id());
-
             assertThat(entryCount("CONSUME")).isEqualTo(2);
         }
+
         assertBalanceMatchesLedger(userId);
     }
 

@@ -123,8 +123,7 @@ class WorkerLifecycleTest {
         });
 
         willAnswer(invocation -> { releasedWithOpenPool.set(!pool.isClosed()); return null; })
-                .given(jobRunner)
-                .releaseCurrent();
+                .given(jobRunner).releaseCurrent();
 
         var context = new AnnotationConfigApplicationContext();
         context.registerBean("dataSource", HikariDataSource.class, () -> pool,

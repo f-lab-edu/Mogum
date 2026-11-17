@@ -23,12 +23,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 @IntegrationTest
 class DatabaseSetupIntegrationTest {
     @Autowired private ApplicationContext applicationContext;
+
     @Autowired
     private DataSource dataSource;
+
     @Autowired
     private EntityManagerFactory entityManagerFactory;
+
     @Autowired
     private Flyway flyway;
+
     @Autowired
     private Environment environment;
 
@@ -63,7 +67,8 @@ class DatabaseSetupIntegrationTest {
         try (var entityManager = entityManagerFactory.createEntityManager()) {
             assertThat(((Number) entityManager.createNativeQuery(
                     "SELECT count(*) FROM pg_extension WHERE extname = 'vector'")
-                    .getSingleResult()).longValue()).isEqualTo(1L);
+                    .getSingleResult()).longValue())
+                    .isEqualTo(1L);
         }
     }
 

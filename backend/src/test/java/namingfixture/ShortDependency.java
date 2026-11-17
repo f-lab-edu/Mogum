@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 public class ShortDependency {
     private final UserRepository users;
 
-    public ShortDependency(UserRepository users) {
-        this.users = users;
+    public ShortDependency(UserRepository userRepository) {
+        this.users = userRepository;
     }
 }

@@ -228,8 +228,7 @@ class ArchitectureTest {
     }
 
     private static final ArchRule TESTS_USE_ASSERTJ = noClasses()
-            .should()
-            .dependOnClassesThat()
+            .should().dependOnClassesThat()
             .haveFullyQualifiedName("org.junit.jupiter.api.Assertions");
     private static final ArchRule TEST_NAMES_AVOID_IT = noClasses().should().haveSimpleNameEndingWith("IT");
     private static final ArchRule REFLECTION_ONLY_IN_FIXTURES_AND_FAKES = classes()
@@ -334,21 +333,14 @@ class ArchitectureTest {
     private static final String SPRING_TRANSACTIONAL = "org.springframework.transaction.annotation.Transactional";
     private static final String JAKARTA_TRANSACTIONAL = "jakarta.transaction.Transactional";
     private static final ArchRule ENTITIES_EXTEND_AUDITED_ENTITY = classes()
-            .that()
-            .areAnnotatedWith(Entity.class)
-            .should()
-            .beAssignableTo(AuditedEntity.class);
+            .that().areAnnotatedWith(Entity.class)
+            .should().beAssignableTo(AuditedEntity.class);
     private static final ArchRule REPOSITORIES_DECLARE_DOMAIN_OPERATIONS = noClasses()
-            .that()
-            .areAssignableTo(Repository.class)
-            .should()
-            .beAssignableTo(JpaRepository.class)
-            .orShould()
-            .beAssignableTo(CrudRepository.class)
-            .orShould()
-            .beAssignableTo(ListCrudRepository.class)
-            .orShould()
-            .beAssignableTo(PagingAndSortingRepository.class);
+            .that().areAssignableTo(Repository.class)
+            .should().beAssignableTo(JpaRepository.class)
+            .orShould().beAssignableTo(CrudRepository.class)
+            .orShould().beAssignableTo(ListCrudRepository.class)
+            .orShould().beAssignableTo(PagingAndSortingRepository.class);
 
     @Test
     @DisplayName("제품 레포지토리는 정리와 집계를 제공하는 상위 인터페이스를 상속하지 않는다")
@@ -387,38 +379,25 @@ class ArchitectureTest {
 
     // config 는 API와 워커를 한 서버에 조립한다. 워커 수 0이면 API만 실행한다.
     private static final ArchRule GENERATION_ONLY_FROM_WORKER = noClasses()
-            .that()
-            .resideOutsideOfPackages("..generation..", "..worker..", "..config..")
-            .should()
-            .dependOnClassesThat()
+            .that().resideOutsideOfPackages("..generation..", "..worker..", "..config..")
+            .should().dependOnClassesThat()
             .resideInAPackage("..generation..");
     private static final ArchRule WORKER_ONLY_FROM_CONFIG = noClasses()
-            .that()
-            .resideOutsideOfPackages("..worker..", "..config..")
-            .should()
-            .dependOnClassesThat()
+            .that().resideOutsideOfPackages("..worker..", "..config..")
+            .should().dependOnClassesThat()
             .resideInAPackage("..worker..");
     private static final ArchRule NO_TRANSACTIONAL_CLASSES_AROUND_LLM_CALLS = noClasses()
-            .that()
-            .resideInAnyPackage("..generation..", "..worker..")
-            .should()
-            .beAnnotatedWith(SPRING_TRANSACTIONAL)
-            .orShould()
-            .beAnnotatedWith(JAKARTA_TRANSACTIONAL);
+            .that().resideInAnyPackage("..generation..", "..worker..")
+            .should().beAnnotatedWith(SPRING_TRANSACTIONAL)
+            .orShould().beAnnotatedWith(JAKARTA_TRANSACTIONAL);
     private static final ArchRule NO_TRANSACTIONAL_METHODS_AROUND_LLM_CALLS = noMethods()
-            .that()
-            .areDeclaredInClassesThat()
-            .resideInAnyPackage(
-                    "..generation..", "..worker..")
-            .should()
-            .beAnnotatedWith(SPRING_TRANSACTIONAL)
-            .orShould()
-            .beAnnotatedWith(JAKARTA_TRANSACTIONAL);
+            .that().areDeclaredInClassesThat()
+            .resideInAnyPackage("..generation..", "..worker..")
+            .should().beAnnotatedWith(SPRING_TRANSACTIONAL)
+            .orShould().beAnnotatedWith(JAKARTA_TRANSACTIONAL);
     private static final ArchRule OPENAI_SDK_ONLY_IN_LLM_ADAPTER = noClasses()
-            .that()
-            .resideOutsideOfPackage("..generation.llm..")
-            .should()
-            .dependOnClassesThat()
+            .that().resideOutsideOfPackage("..generation.llm..")
+            .should().dependOnClassesThat()
             .resideInAPackage("com.openai..");
     private static final DescribedPredicate<JavaMethod> REST_REQUEST_MAPPINGS = new DescribedPredicate<JavaMethod>(
             "are request mappings in REST controllers except ApiErrorController") {

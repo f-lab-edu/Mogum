@@ -356,8 +356,8 @@ class CardSchemaRepositoryTest {
     }
 
     private void setFsrs(long card, String state, Integer step) {
-        jdbcTemplate.update("UPDATE cards SET fsrs_state = ?, fsrs_step = ?, updated_at = now() WHERE id = ?", state,
-                step, card);
+        jdbcTemplate.update("UPDATE cards SET fsrs_state = ?, fsrs_step = ?, updated_at = now() WHERE id = ?",
+                state, step, card);
     }
 
     private void update(String table, long id, String column, Object value) {

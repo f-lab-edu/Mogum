@@ -256,7 +256,8 @@ class RequestValidationIntegrationTest {
         String id = Optional.ofNullable(response.getResponseHeaders().getFirst("X-Request-Id")).orElseThrow();
         long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
         while (output.getOut().lines().noneMatch(line -> line.contains("requestId=" + id)
-                && line.contains("access method=")) && System.nanoTime() < deadline)
+                && line.contains("access method="))
+                && System.nanoTime() < deadline)
                 Thread.sleep(10);
 
         var requestLines = output.getOut().lines().filter(line -> line.contains("requestId=" + id)).toList();

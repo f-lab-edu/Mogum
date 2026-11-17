@@ -137,28 +137,28 @@ public class IntegrationTestConfiguration {
 
     @TestConfiguration(proxyBeanMethods = false)
     public static class JobGenerators {
-        @Bean public TestJobGenerator newCourseGenerator(EntityManager em, TestClock clock) {
-            return new TestJobGenerator(JobType.NEW_COURSE, em, clock);
+        @Bean public TestJobGenerator newCourseGenerator(EntityManager entityManager, TestClock testClock) {
+            return new TestJobGenerator(JobType.NEW_COURSE, entityManager, testClock);
         }
 
-        @Bean public TestJobGenerator newRoadmapGenerator(EntityManager em, TestClock clock) {
-            return new TestJobGenerator(JobType.NEW_ROADMAP, em, clock);
+        @Bean public TestJobGenerator newRoadmapGenerator(EntityManager entityManager, TestClock testClock) {
+            return new TestJobGenerator(JobType.NEW_ROADMAP, entityManager, testClock);
         }
 
-        @Bean public TestJobGenerator planRoadmapCourseGenerator(EntityManager em, TestClock clock) {
-            return new TestJobGenerator(JobType.PLAN_ROADMAP_COURSE, em, clock);
+        @Bean public TestJobGenerator planRoadmapCourseGenerator(EntityManager entityManager, TestClock testClock) {
+            return new TestJobGenerator(JobType.PLAN_ROADMAP_COURSE, entityManager, testClock);
         }
 
-        @Bean public TestJobGenerator replanCourseGenerator(EntityManager em, TestClock clock) {
-            return new TestJobGenerator(JobType.REPLAN_COURSE, em, clock);
+        @Bean public TestJobGenerator replanCourseGenerator(EntityManager entityManager, TestClock testClock) {
+            return new TestJobGenerator(JobType.REPLAN_COURSE, entityManager, testClock);
         }
 
-        @Bean public TestJobGenerator replanRoadmapGenerator(EntityManager em, TestClock clock) {
-            return new TestJobGenerator(JobType.REPLAN_ROADMAP, em, clock);
+        @Bean public TestJobGenerator replanRoadmapGenerator(EntityManager entityManager, TestClock testClock) {
+            return new TestJobGenerator(JobType.REPLAN_ROADMAP, entityManager, testClock);
         }
 
-        @Bean public TestJobGenerator materialGenerator(EntityManager em, TestClock clock) {
-            return new TestJobGenerator(JobType.MATERIAL, em, clock);
+        @Bean public TestJobGenerator materialGenerator(EntityManager entityManager, TestClock testClock) {
+            return new TestJobGenerator(JobType.MATERIAL, entityManager, testClock);
         }
     }
 
@@ -327,8 +327,9 @@ public class IntegrationTestConfiguration {
     }
 
     @Bean
-    public TestRequests testRequests(RestTestClient client, JdbcIndexedSessionRepository sessions) {
-        return new TestRequests(client, sessions);
+    public TestRequests testRequests(RestTestClient restTestClient,
+            JdbcIndexedSessionRepository jdbcIndexedSessionRepository) {
+        return new TestRequests(restTestClient, jdbcIndexedSessionRepository);
     }
 
     /** 스파이 대신 연결 경계에서 실패를 주입한다. 각 검사는 finally에서 복구한다. */
@@ -346,7 +347,7 @@ public class IntegrationTestConfiguration {
         private volatile boolean failing;
         private final AtomicLong attempts = new AtomicLong();
 
-        public DatabaseProbe(DataSource source) { super(source); }
+        public DatabaseProbe(DataSource dataSource) { super(dataSource); }
 
         public void failConnections(boolean value) { failing = value; }
 
@@ -515,7 +516,8 @@ public class IntegrationTestConfiguration {
     public static class FilterFailure {
         @Bean
         FilterRegistrationBean<Filter> filterFailure(
-                @Qualifier("securityFilterChainRegistration") AbstractFilterRegistrationBean<?> security) {
+                @Qualifier("securityFilterChainRegistration")
+                AbstractFilterRegistrationBean<?> abstractFilterRegistrationBean) {
             Filter failure = (request, response, chain) -> {
                 if ("/api/test-request-log-filter-failure".equals(((HttpServletRequest) request).getRequestURI())) {
                     throw new RuntimeException("request log filter failure marker");
@@ -525,7 +527,7 @@ public class IntegrationTestConfiguration {
             };
 
             var registration = new FilterRegistrationBean<>(failure);
-            registration.setOrder(security.getOrder() + 1);
+            registration.setOrder(abstractFilterRegistrationBean.getOrder() + 1);
             registration.setDispatcherTypes(DispatcherType.REQUEST);
             return registration;
         }

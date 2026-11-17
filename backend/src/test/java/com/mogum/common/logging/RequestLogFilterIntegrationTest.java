@@ -167,7 +167,6 @@ class RequestLogFilterIntegrationTest {
 
         for (int i = 1; i < sequence; i++) {
             var earlier = send("GET", "/api/me", false, null);
-
             var line = assertAccess(earlier, 401, "GET", "/api/me", false, output);
             assertThat(thread(line)).isEqualTo(thread(loggedIn));
             assertThat(ids.add(requestId(earlier))).isTrue();

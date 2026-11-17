@@ -34,7 +34,9 @@ class DeployFilesScriptTest {
         assertThat(content).contains("set -euo pipefail");
         assertThat(Pattern.compile("(?m)^for command in [^\\n]*\\btimedatectl\\b[^\\n]*; do$")
                 .matcher(content)
-                .find()).as("필수 명령 검사에 timedatectl을 포함한다").isTrue();
+                .find())
+                .as("필수 명령 검사에 timedatectl을 포함한다")
+                .isTrue();
         assertThat(Pattern.compile("(?m)^\\s*set\\s+[^\\n]*[+-]x").matcher(content).find()).isFalse();
     }
 
@@ -54,8 +56,8 @@ class DeployFilesScriptTest {
 
     @ParameterizedTest(name = "시나리오 {0}")
     @ValueSource(strings = {"success", "unchanged-units", "changed-unit", "unchanged-journal", "changed-journal",
-            "unhealthy", "up-failure", "pull-failure", "first-failure",
-            "rollback-failure", "link-failure", "invalid-sha", "invalid-reference"})
+            "unhealthy", "up-failure", "pull-failure", "first-failure", "rollback-failure", "link-failure",
+            "invalid-sha", "invalid-reference"})
     @Timeout(20)
     @DisplayName("배포 실패는 직전으로 복귀하고 성공만 링크와 보존 대상을 바꾼다")
     void rollsBackFailureAndUpdatesLinksOnlyAfterSuccess(String scenario, @TempDir Path root) throws Exception {

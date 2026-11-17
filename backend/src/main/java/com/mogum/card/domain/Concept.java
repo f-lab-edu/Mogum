@@ -21,12 +21,16 @@ public class Concept extends AuditedEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @Column(name = "user_id", nullable = false)
     private Long userId;
+
     @Column(nullable = false, columnDefinition = "text")
     private String name;
+
     @Column(nullable = false, columnDefinition = "text")
     private String definition;
+
     @JdbcTypeCode(SqlTypes.VECTOR)
     @Column(nullable = false, columnDefinition = "vector")
     private float[] embedding;

@@ -28,11 +28,8 @@ class SecurityConfigurationApprovalIntegrationTest extends SecurityScenario {
         client.get()
                 .uri("/api/me")
                 .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.data.status")
-                .isEqualTo(status);
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$.data.status").isEqualTo(status);
 
         var apply = client.post().uri("/api/account/apply").exchange().returnResult(String.class);
         assertThat(apply.getStatus().value()).isEqualTo(200);

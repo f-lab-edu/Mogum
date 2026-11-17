@@ -351,8 +351,10 @@ class ApiExceptionHandlerTest {
     static final class SizedValues {
         @Size(min = 1, max = 1)
         private final List<String> list;
+
         @Size(min = 1, max = 1)
         private final Map<String, String> map;
+
         @Size(min = 1, max = 1)
         private final String[] array;
 

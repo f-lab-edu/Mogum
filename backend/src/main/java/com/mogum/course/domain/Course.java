@@ -2,21 +2,21 @@ package com.mogum.course.domain;
 
 import com.mogum.common.persistence.AuditedEntity;
 import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
 import jakarta.persistence.Embedded;
+import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -32,29 +32,40 @@ public class Course extends AuditedEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @Column(name = "user_id", nullable = false)
     private Long userId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "roadmap_id")
     private Roadmap roadmap;
+
     @Column
     private Integer position;
+
     @Column(nullable = false, columnDefinition = "text")
     private String title;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, columnDefinition = "text")
     private CourseStatus status;
+
     @Embedded
     private LearningInput input;
+
     @Column(name = "plan_description", columnDefinition = "text")
     private String planDescription;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "plan_concepts", columnDefinition = "jsonb")
     private List<PlannedConcept> planConcepts;
+
     @Column(name = "started_at")
     private Instant startedAt;
+
     @Column(name = "last_lesson_opened_at")
     private Instant lastLessonOpenedAt;
+
     @Column(name = "completed_at")
     private Instant completedAt;
 

@@ -272,8 +272,7 @@ class JobIntakeServiceTest {
         assertThat(job.getFinishedAt()).isNull();
         assertThat(creditEntryRepository.entries())
                 .last()
-                .satisfies(entry -> assertThat(entry.getAmount())
-                        .isEqualTo(-2));
+                .satisfies(entry -> assertThat(entry.getAmount()).isEqualTo(-2));
     }
 
     @ParameterizedTest

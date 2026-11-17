@@ -76,10 +76,8 @@ class JobControllerIntegrationTest {
         client.get()
                 .uri("/api/jobs/" + id)
                 .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .json(queued(id), JsonCompareMode.STRICT);
+                .expectStatus().isOk()
+                .expectBody().json(queued(id), JsonCompareMode.STRICT);
         assertThat(userRepository.findById(user.getId()).orElseThrow().getCreditBalance()).isEqualTo(99);
 
         // given — 워커의 실패 · 복구를 SQL 픽스처와 원장으로 준비한다.
@@ -110,10 +108,8 @@ class JobControllerIntegrationTest {
         client.get()
                 .uri("/api/jobs/" + id)
                 .exchange()
-                .expectStatus()
-                .isNotFound()
-                .expectBody()
-                .json(notFound(), JsonCompareMode.STRICT);
+                .expectStatus().isNotFound()
+                .expectBody().json(notFound(), JsonCompareMode.STRICT);
         assertThat(userRepository.findById(user.getId()).orElseThrow().getCreditBalance()).isEqualTo(100);
         assertThat(jdbcTemplate.queryForObject("SELECT sum(amount) FROM credit_entries", Integer.class)).isEqualTo(100);
     }
@@ -376,8 +372,7 @@ class JobControllerIntegrationTest {
     private String queued(long id) {
         return """
                 {"data":{"id":%d,"type":"NEW_COURSE","status":"QUEUED", "subject":{"topic":"자바","level":"BEGINNER","purpose":"WORK"}}}
-                """
-                .formatted(id);
+                """.formatted(id);
     }
 
     private String notFound() { return "{\"code\":\"NOT_FOUND\",\"message\":\"찾을 수 없습니다\"}"; }

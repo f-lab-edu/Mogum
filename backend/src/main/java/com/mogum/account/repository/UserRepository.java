@@ -2,7 +2,6 @@ package com.mogum.account.repository;
 
 import com.mogum.account.domain.User;
 import jakarta.persistence.LockModeType;
-
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;

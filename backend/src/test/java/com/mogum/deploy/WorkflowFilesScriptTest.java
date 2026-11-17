@@ -24,8 +24,8 @@ class WorkflowFilesScriptTest {
     private static final Set<String> SECRETS = Set.of("AWS_DEPLOY_ROLE_ARN", "DEPLOY_BUCKET", "DEPLOY_INSTANCE_ID");
 
     @ParameterizedTest(name = "시나리오 {0}")
-    @ValueSource(strings = {"push", "manual", "rollback", "invalid-sha", "uppercase-sha", "other-branch",
-            "missing-vars",
+    @ValueSource(strings = {"push", "manual", "rollback",
+            "invalid-sha", "uppercase-sha", "other-branch", "missing-vars",
             "invalid-region", "invalid-role", "invalid-bucket", "invalid-instance"})
     @Timeout(15)
     @DisplayName("AWS와 빌드 전에 입력과 변수를 검사한다")
@@ -227,8 +227,7 @@ class WorkflowFilesScriptTest {
         Files.writeString(bin.resolve("curl"), "#!/usr/bin/env bash\n"
                 + "printf '%s\\n' \"$*\" >> \"$TEST_ROOT/commands\"\nprintf '%s' \"$SCENARIO\"\n");
         for (var name : List.of("aws", "sleep", "curl"))
-                assertThat(bin.resolve(name).toFile().setExecutable(true))
-                        .isTrue();
+                assertThat(bin.resolve(name).toFile().setExecutable(true)).isTrue();
 
         var source = script(id);
         if (environment.getOrDefault("SCENARIO", "").equals("poll-timeout")) {

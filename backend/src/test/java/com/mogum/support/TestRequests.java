@@ -8,9 +8,9 @@ public final class TestRequests {
     private final RestTestClient restTestClient;
     private final TestSessions testSessions;
 
-    public TestRequests(RestTestClient restTestClient, JdbcIndexedSessionRepository repository) {
+    public TestRequests(RestTestClient restTestClient, JdbcIndexedSessionRepository jdbcIndexedSessionRepository) {
         this.restTestClient = restTestClient;
-        this.testSessions = new TestSessions(repository);
+        this.testSessions = new TestSessions(jdbcIndexedSessionRepository);
     }
 
     public RestTestClient anonymous() {

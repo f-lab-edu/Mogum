@@ -25,30 +25,42 @@ public class Card extends AuditedEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @Column(name = "user_id", nullable = false)
     private Long userId;
+
     @Column(name = "lesson_id")
     private Long lessonId;
+
     @Column(nullable = false)
     private int position;
+
     @Column(nullable = false, columnDefinition = "text")
     private String question;
+
     @Column(nullable = false, columnDefinition = "text")
     private String answer;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, columnDefinition = "text")
     private CardStatus status;
+
     @Column(name = "due_at")
     private Instant dueAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "fsrs_state", nullable = false, columnDefinition = "text")
     private FsrsState fsrsState;
+
     @Column(name = "fsrs_step")
     private Integer fsrsStep;
+
     @Column
     private Double stability;
+
     @Column
     private Double difficulty;
+
     @Column(name = "last_reviewed_at")
     private Instant lastReviewedAt;
 

@@ -15,8 +15,8 @@ public final class TestSessions {
     private final SessionRepository<Session> sessionRepository;
 
     @SuppressWarnings("unchecked")
-    public TestSessions(JdbcIndexedSessionRepository sessionRepository) {
-        this.sessionRepository = (SessionRepository<Session>) (SessionRepository<?>) sessionRepository;
+    public TestSessions(JdbcIndexedSessionRepository jdbcIndexedSessionRepository) {
+        this.sessionRepository = (SessionRepository<Session>) (SessionRepository<?>) jdbcIndexedSessionRepository;
     }
 
     public Cookie create(long userId) {

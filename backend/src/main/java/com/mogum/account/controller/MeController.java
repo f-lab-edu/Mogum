@@ -1,9 +1,8 @@
 package com.mogum.account.controller;
 
-import com.mogum.auth.AccountPrincipal;
 import com.mogum.account.dto.MeResponse;
+import com.mogum.auth.AccountPrincipal;
 import com.mogum.common.api.ApiResponse;
-
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;

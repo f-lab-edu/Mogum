@@ -64,16 +64,11 @@ class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
         var response = client(cookie).get().uri("/api/test-domain-error?retry=true").exchange();
 
         // then
-        response.expectStatus()
-                .isNotFound()
-                .expectHeader()
-                .doesNotExist("Location")
-                .expectHeader()
-                .contentTypeCompatibleWith("application/json")
-                .expectHeader()
-                .valueEquals("Retry-After", "37")
-                .expectBody()
-                .json("""
+        response.expectStatus().isNotFound()
+                .expectHeader().doesNotExist("Location")
+                .expectHeader().contentTypeCompatibleWith("application/json")
+                .expectHeader().valueEquals("Retry-After", "37")
+                .expectBody().json("""
                 {"code":"NOT_FOUND","message":"찾을 수 없습니다","retryAfterSeconds":37}
                 """, JsonCompareMode.STRICT);
     }

@@ -84,7 +84,8 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
                 .getResponseHeaders()
                 .getOrEmpty("Set-Cookie")
                 .stream()
-                .noneMatch(value -> value.startsWith("SESSION="))).isTrue();
+                .noneMatch(value -> value.startsWith("SESSION=")))
+                .isTrue();
         assertThat(count("spring_session")).isEqualTo(sessionsBefore);
     }
 
@@ -519,7 +520,8 @@ abstract class OAuthScenario {
         assertThat(response.getResponseHeaders()
                 .getOrEmpty("Set-Cookie")
                 .stream()
-                .noneMatch(value -> value.startsWith("SESSION="))).isTrue();
+                .noneMatch(value -> value.startsWith("SESSION=")))
+                .isTrue();
     }
 
     record Start(String state, String cookie, EntityExchangeResult<String> response) { }

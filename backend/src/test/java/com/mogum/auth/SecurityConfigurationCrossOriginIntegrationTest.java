@@ -24,14 +24,10 @@ class SecurityConfigurationCrossOriginIntegrationTest extends SecurityScenario {
         var response = preflight(ORIGIN, method, "X-XSRF-TOKEN, Content-Type").exchange();
 
         // then
-        response.expectStatus()
-                .isOk()
-                .expectHeader()
-                .valueEquals("Access-Control-Allow-Origin", ORIGIN)
-                .expectHeader()
-                .valueEquals("Access-Control-Allow-Credentials", "true")
-                .expectHeader()
-                .valueEquals("Access-Control-Allow-Headers", "X-XSRF-TOKEN, Content-Type");
+        response.expectStatus().isOk()
+                .expectHeader().valueEquals("Access-Control-Allow-Origin", ORIGIN)
+                .expectHeader().valueEquals("Access-Control-Allow-Credentials", "true")
+                .expectHeader().valueEquals("Access-Control-Allow-Headers", "X-XSRF-TOKEN, Content-Type");
     }
 
     @ParameterizedTest(name = "거절 출처 {0}")

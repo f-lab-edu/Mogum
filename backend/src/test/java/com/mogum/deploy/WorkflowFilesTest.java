@@ -76,12 +76,14 @@ class WorkflowFilesTest {
                 .matcher(text)
                 .results()
                 .map(match -> match.group(1))
-                .collect(Collectors.toSet())).isEqualTo(VARIABLES);
+                .collect(Collectors.toSet()))
+                .isEqualTo(VARIABLES);
         assertThat(Pattern.compile("secrets\\.([A-Za-z0-9_]+)")
                 .matcher(text)
                 .results()
                 .map(match -> match.group(1))
-                .collect(Collectors.toSet())).isEqualTo(SECRETS);
+                .collect(Collectors.toSet()))
+                .isEqualTo(SECRETS);
 
         var environment = map(job().get("env"));
         for (var secret : SECRETS) assertThat(environment.get(secret)).isEqualTo("${{ secrets." + secret + " }}");
