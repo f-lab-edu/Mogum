@@ -158,7 +158,14 @@
     {
       "step": 12,
       "name": "parameter-wrapping",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T16:23:46+0900",
+      "summary": "백엔드 Java 56개 파일의 선언 85곳 매개변수 줄 배치 정리(여러 줄 82곳·120자 이내 한 줄로 합친 3곳); 임시 스크립트로 변경한 56개 파일의 공백 제거 내용이 변경 전 및 HEAD와 모두 같음을 확인(전체 Java 332개 검사), 선언 밖 줄 배치 보존·들여쓰기/괄호/120자 검사 통과; AC 전체 build 통과, 서버 테스트 전후 2049→2049개(실패·오류·건너뜀 0), docs/frontend 변경·커밋 없음.",
+      "completed_at": "2026-11-18T16:30:43+0900",
+      "review_notes": [
+        "The step file estimated about 57 files and 102 declarations; Codex changed 56 files and 85 declarations. My searches found no unconverted multi-line declarations left, so the estimate was probably counted on a different basis. A person may want to confirm the gap so the harness backlog does not record it as a dropped item.",
+        "phases/index.json — the 7-course-planning entry still reads \"status\": \"blocked\" (with a blocked_at) from the first run. This is harness metadata, so it is outside this review, but the harness or a person should check that it is restored to completed when the commit is made."
+      ]
     }
   ],
   "created_at": "2026-11-17T18:36:01+0900",
