@@ -121,7 +121,15 @@
     {
       "step": 9,
       "name": "roadmap-screen-and-tabs",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T06:31:12+0900",
+      "summary": "/roadmaps/:roadmapId RoadmapPage의 검토 중·진행 중·다 마침, 첫 코스/다음 코스 받기·다시 짜기 작업 이동·계획 코스 제목 고치기·잠금 안내·코스/작업 링크; /courses CoursesPage의 제목+상태·/roadmaps RoadmapsPage의 제목+설명+진행 한 줄·빈 목록 안내; 새 공통 컴포넌트 없이 StatusBadge·ProgressBar·TextField·Button·FailureNotice 재사용, useRoadmap/useRoadmaps/useCourses의 TanStack Query 캐시·useCourseAction의 목록/로드맵 캐시 갱신과 늦은 읽기 차단; 이전 실행의 TDD 실패 확인 뒤 구현을 이어 완료, AC test·lint 및 타입 검사·빌드 통과, 화면 테스트 351→404개(53개 추가·33파일·실패 0), UI_GUIDE 반영·backend 변경/실제 OpenAI 호출/커밋 없음.",
+      "completed_at": "2026-11-18T14:04:03+0900",
+      "review_notes": [
+        "frontend/src/pages/CoursesPage.test.tsx:54 — 테스트 이름 「코스이 없으면」의 조사가 틀렸다 → 「코스가 없으면」으로 고친다.",
+        "frontend/src/api/useCourse.ts:3 · frontend/src/api/useRoadmap.ts:3 — 두 모듈이 서로를 import한다. useRoadmap 쪽은 type-only라 런타임 순환은 없다. 다만 나중에 useRoadmap이 useCourse의 값을 import하면 순환이 생기므로, 그때 공통 키를 따로 모은다.",
+        "frontend/src/pages/RoadmapPage.tsx:135 — 진행 값이 `GENERATING`/`FAILED`인데 서버가 `jobId`를 주지 않으면 링크 없이 상태만 보인다. 05 §3은 그때 반드시 `jobId`를 싣는다고 정했으니 동작은 맞다. 다만 그 경우를 다루는 테스트는 없다."
+      ]
     }
   ],
   "created_at": "2026-11-17T18:36:01+0900"
