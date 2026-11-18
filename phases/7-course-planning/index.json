@@ -134,7 +134,15 @@
     {
       "step": 10,
       "name": "generation-fixes",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T14:14:15+0900",
+      "summary": "generation.GenerationFailures.unavailable 공통 자리에서 다섯 생성 처리기의 예상 밖 예외를 job generate failed ERROR로 기록(타입·스택 위치만, 메시지·cause·suppressed 제외)하고 PROVIDER_UNAVAILABLE 유지; config.LlmProperties 생성자의 planning 필수 검사와 planning() 단일 접근자로 기동 거부·조립; PlanJson 미완성 괄호 건너뛰기·계획 둘 거절 유지; REPLAN_IN_PROGRESS로 백엔드 code·HTTP 시험 통일; TDD 실패 확인 후 두 AC 통과(대상 1453개·전체 build 2049개), 서버 테스트 2042→2049개(7개 추가, 실패/오류/건너뜀 0); docs/04 로그 실출력·기동 검사 반영, frontend 변경·실제 OpenAI 호출·커밋 없음.",
+      "completed_at": "2026-11-18T14:22:50+0900",
+      "review_notes": [
+        "frontend/src/pages/CoursePage.test.tsx:91,98 · frontend/src/pages/RoadmapPage.test.tsx:79 — 화면 테스트의 가짜 응답에 옛 code `ROADMAP_REPLAN_IN_PROGRESS` 가 아직 있다. 화면이 code 로 분기하지 않아 동작에는 영향이 없고, 이 step 은 화면 수정을 금지했다 → step 11 에서 `REPLAN_IN_PROGRESS` 로 맞춘다.",
+        "backend/src/test/java/com/mogum/generation/ChatCallIntegrationTest.java:256 · generation/llm/OpenAiLiveIntegrationTest.java:33 — 테스트는 아직 `chats().get(\"planning\")` 문자열로 읽는다. 동작에는 영향이 없다 → 다음에 손댈 때 `llmProperties.planning()` 으로 맞추면 이름이 한 곳에만 남는다.",
+        "backend/src/main/java/com/mogum/generation/plan/PlanJson.java:27 — 이제 닫히지 않은 괄호마다 그 자리에서 끝까지 다시 훑으므로 최악의 경우 O(n²) 이다. 출력 상한(4000 토큰) 안이라 문제는 없다. 출력 상한을 크게 올리면 다시 본다."
+      ]
     },
     {
       "step": 11,
