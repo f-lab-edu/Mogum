@@ -147,7 +147,13 @@
     {
       "step": 11,
       "name": "course-screen-fixes",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T14:22:50+0900",
+      "summary": "제목 편집 중 열기 버튼 비활성화로 입력 보존·취소/저장 성공 뒤 재활성화 및 효과에서 포커스 복귀, 다시 짜기는 펼친 동안만 aria-controls 연결·aria-expanded 유지, 코스 목록 테스트 조사 수정; 회귀 테스트 실패 확인 뒤 구현·포커스 waitFor 단언, 두 AC test·lint 통과, 화면 테스트 404→408개(4개 추가·33파일·실패 0), UI_GUIDE 반영·backend 변경/커밋 없음.",
+      "completed_at": "2026-11-18T14:25:16+0900",
+      "review_notes": [
+        "phases/7-course-planning/index.json — 이번 step 의 summary 에 화면 테스트 수(전후)를 적으라고 했다. 지금은 408개다. 하네스 메타데이터라 리뷰 대상에서는 뺐으니, 수가 맞게 적혔는지 사람이 확인한다."
+      ]
     }
   ],
   "created_at": "2026-11-17T18:36:01+0900",
