@@ -232,6 +232,14 @@
 
 `6-job-worker` step 4의 워커 줄은 커밋 뒤 `INFO`의 `job finished status={SUCCEEDED|FAILED}`, 소유권 확인이 0행이면 한 시도에 한 번 `WARN`의 `job lease lost`, 결과 저장 트랜잭션의 예외에는 스택과 함께 `ERROR`의 `job save failed`다. 처리와 갱신 중 `jobId` · `userId`를 넣고 끝나면 지운다. 저장 예외는 원래 메시지 · cause · suppressed를 넘기지 않고 예외 타입 이름과 스택 위치만 남긴다.
 
+`7-course-planning` step 10의 `generation.GenerationFailures`는 다섯 생성 처리기의 재료 읽기 · 프롬프트 준비 등에서 예상 밖 `RuntimeException`을 잡으면 `ERROR`의 `job generate failed`를 한 번 남기고 `PROVIDER_UNAVAILABLE`을 반환한다. 자동 다시 시도마다 한 줄씩 남을 수 있다. `jobId` · `userId`는 워커가 넣은 MDC를 그대로 쓰며, 스택에는 원래 메시지 · cause · suppressed 없이 예외 타입 이름과 위치만 싣는다. 정상 생성과 프로바이더 실패에는 이 줄을 남기지 않는다.
+
+`NewCourseGeneratorIntegrationTest`의 `OutputCaptureExtension`이 캡처한 실제 출력:
+
+```text
+2026-11-18T14:17:15.618+09:00 ERROR jobId=1, userId=1 77732 --- [mogum] [    Test worker] c.mogum.generation.GenerationFailures    : job generate failed
+```
+
 `6-job-worker` step 5의 줄은 정상 종료 한도 뒤 조건부 반환이 커밋된 때 `INFO`의 `job released`(`jobId` · `userId`)와 한 바퀴 밖 예외의 `ERROR`인 `worker poll failed`다. 정상 종료 중 반환(`releaseCurrent`)이 실패해도 같은 줄이다(`WorkerLifecycle` 의 종료 스레드). 루프는 같은 예외 타입의 연속 실패에서 첫 번째만 스택을 남기고, 다음 실패는 같은 한 줄만 남긴다. 성공한 꺼내기(빈손 포함) 뒤에는 연속 실패 표시를 비운다. 스택에는 원래 메시지 · cause · suppressed 없이 타입 이름과 위치만 싣는다.
 
 `WorkerLifecycleIntegrationTest` · `WorkerLifecycleTest`의 `OutputCaptureExtension`이 캡처한 실제 출력:
@@ -307,7 +315,7 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 
 `7-course-planning` step 1에서 `T호출=50초`, `C=1`, `D이어쓰기=0초`, `T_DB=10초`의 임시 여유를 정했다. `T_DB`는 재료 읽기 · 호출 기록 · 시한 처리 · 결과/실패 쓰기에 남기는 예산이며 실측 상한은 아니다. 운영 프롬프트와 DB 부하로 다시 잰다. `config.LlmConfiguration`의 생성자는 모든 채팅 묶음 중 `(C + 1) × T호출`이 가장 큰 값을 식에 넣고 엄격한 부등식을 검사하며, 각 호출 시간 제한보다 정상 종료 대기(100초)가 길어야 한다. 깨지면 빈 생성 실패로 기동을 거부한다.
 
-채팅 설정은 `application.yml`의 `app.llm` 한 곳이고 `config.LlmProperties` record로 읽는다. 아직 쓰지 않는 용도의 묶음은 없다.
+채팅 설정은 `application.yml`의 `app.llm` 한 곳이고 `config.LlmProperties` record로 읽는다. 아직 쓰지 않는 용도의 묶음은 없다. `7-course-planning` step 10에서 `LlmProperties` 생성자가 `planning` 묶음의 누락을 검사해 설정 바인딩 실패로 기동을 거부한다. `GenerationConfiguration`은 `LlmProperties.planning()`으로 이 묶음을 받아 다섯 생성 처리기에 넘긴다.
 
 | 설정 키 | 값 |
 |---|---|

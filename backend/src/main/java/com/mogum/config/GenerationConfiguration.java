@@ -24,14 +24,14 @@ public class GenerationConfiguration {
     @Bean
     public NewCourseGenerator newCourseGenerator(ChatCall chatCall, LlmProperties llmProperties,
             CourseRepository courseRepository, LessonRepository lessonRepository) {
-        return new NewCourseGenerator(chatCall, llmProperties.chats().get("planning"), new CoursePlanFormat(),
+        return new NewCourseGenerator(chatCall, llmProperties.planning(), new CoursePlanFormat(),
                 courseRepository, lessonRepository);
     }
 
     @Bean
     public NewRoadmapGenerator newRoadmapGenerator(ChatCall chatCall, LlmProperties llmProperties,
             CourseRepository courseRepository, RoadmapRepository roadmapRepository) {
-        return new NewRoadmapGenerator(chatCall, llmProperties.chats().get("planning"), new RoadmapPlanFormat(),
+        return new NewRoadmapGenerator(chatCall, llmProperties.planning(), new RoadmapPlanFormat(),
                 courseRepository, roadmapRepository);
     }
 
@@ -45,7 +45,7 @@ public class GenerationConfiguration {
     public PlanRoadmapCourseGenerator planRoadmapCourseGenerator(ChatCall chatCall, LlmProperties llmProperties,
             RoadmapCoursePlanReader roadmapCoursePlanReader, CourseRepository courseRepository,
             LessonRepository lessonRepository) {
-        return new PlanRoadmapCourseGenerator(chatCall, llmProperties.chats().get("planning"), new CoursePlanFormat(),
+        return new PlanRoadmapCourseGenerator(chatCall, llmProperties.planning(), new CoursePlanFormat(),
                 roadmapCoursePlanReader, courseRepository, lessonRepository);
     }
 
@@ -54,7 +54,7 @@ public class GenerationConfiguration {
             RoadmapCoursePlanReader roadmapCoursePlanReader, CourseRepository courseRepository,
             LessonRepository lessonRepository, EntityManager entityManager,
             PlatformTransactionManager platformTransactionManager) {
-        return new ReplanCourseGenerator(chatCall, llmProperties.chats().get("planning"), new CoursePlanFormat(),
+        return new ReplanCourseGenerator(chatCall, llmProperties.planning(), new CoursePlanFormat(),
                 roadmapCoursePlanReader, courseRepository, lessonRepository, entityManager, platformTransactionManager);
     }
 
@@ -62,7 +62,7 @@ public class GenerationConfiguration {
     public ReplanRoadmapGenerator replanRoadmapGenerator(ChatCall chatCall, LlmProperties llmProperties,
             CourseRepository courseRepository, RoadmapRepository roadmapRepository, EntityManager entityManager,
             PlatformTransactionManager platformTransactionManager) {
-        return new ReplanRoadmapGenerator(chatCall, llmProperties.chats().get("planning"), new RoadmapPlanFormat(),
+        return new ReplanRoadmapGenerator(chatCall, llmProperties.planning(), new RoadmapPlanFormat(),
                 courseRepository, roadmapRepository, entityManager, platformTransactionManager);
     }
 

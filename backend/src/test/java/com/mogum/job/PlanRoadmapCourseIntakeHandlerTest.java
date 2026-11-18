@@ -77,7 +77,7 @@ class PlanRoadmapCourseIntakeHandlerTest {
         generationJobRepository.save(replan);
 
         // when & then
-        assertRejected(course, ErrorCode.ROADMAP_REPLAN_IN_PROGRESS);
+        assertRejected(course, ErrorCode.REPLAN_IN_PROGRESS);
         assertThat(roadmap.getStatus()).isEqualTo(RoadmapStatus.REVIEWING);
     }
 

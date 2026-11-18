@@ -119,13 +119,14 @@ class PlanRoadmapCourseGeneratorIntegrationTest {
         }
         assertThat(userRepository.findById(course.getUserId()).orElseThrow().getCreditBalance())
                 .isEqualTo(100 - creditProperties.planRoadmapCourse());
-        assertThat(output.getAll()).doesNotContain("LEAKCHECK-", "계획개념-", "실제개념-");
+        assertThat(output.getAll()).doesNotContain("job generate failed", "LEAKCHECK-", "계획개념-", "실제개념-");
     }
 
     @ParameterizedTest(name = "실패={0}")
     @EnumSource(GenerationOutcome.Failure.class)
     @DisplayName("생성 실패는 코스를 짜기 전으로 남기고 빈 강의 없이 크레딧을 복구한다")
-    void keepsCourseUnplannedOnFailure(GenerationOutcome.Failure failure) throws InterruptedException {
+    void keepsCourseUnplannedOnFailure(GenerationOutcome.Failure failure, CapturedOutput output)
+            throws InterruptedException {
         // given
         testChatProvider.reset();
         var course = course(1);
@@ -139,6 +140,7 @@ class PlanRoadmapCourseGeneratorIntegrationTest {
         runOnce();
 
         // then
+        assertThat(output.getAll()).doesNotContain("job generate failed");
         assertThat(jdbcTemplate.queryForMap("SELECT * FROM courses WHERE id = ?", course.getId())).isEqualTo(before);
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM lessons WHERE course_id = ?",
                 Integer.class, course.getId())).isZero();
@@ -151,7 +153,7 @@ class PlanRoadmapCourseGeneratorIntegrationTest {
 
     @Test
     @DisplayName("재료를 읽지 못해도 예외 대신 실패를 반환한다")
-    void returnsFailureWhenMaterialsAreMissing() {
+    void returnsFailureWhenMaterialsAreMissing(CapturedOutput output) {
         // given
         var job = new JobSnapshot(1L, 1L, JobType.PLAN_ROADMAP_COURSE, 99999L, null, null, 1);
 
@@ -160,6 +162,11 @@ class PlanRoadmapCourseGeneratorIntegrationTest {
 
         // then
         assertThat(outcome).isEqualTo(GenerationOutcome.Failure.PROVIDER_UNAVAILABLE);
+        assertThat(output.getAll().lines().filter(line -> line.contains("job generate failed")))
+                .singleElement()
+                .asString()
+                .contains(" ERROR ");
+        assertThat(output.getAll()).contains("at com.mogum.generation.PlanRoadmapCourseGenerator.generate");
     }
 
     @Test

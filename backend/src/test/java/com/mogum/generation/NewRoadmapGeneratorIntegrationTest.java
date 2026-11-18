@@ -23,7 +23,10 @@ import com.mogum.worker.JobRunner;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -36,6 +39,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @IntegrationTest
+@ExtendWith(OutputCaptureExtension.class)
 class NewRoadmapGeneratorIntegrationTest {
     @Autowired EntityManager entityManager;
     @Autowired PlatformTransactionManager platformTransactionManager;
@@ -53,7 +57,7 @@ class NewRoadmapGeneratorIntegrationTest {
 
     @Test
     @DisplayName("운영 로드맵 처리기는 입력과 계획을 저장하고 모든 코스를 강의 없는 짜기 전으로 만든다")
-    void createsRoadmapAndUnplannedCourses() throws InterruptedException {
+    void createsRoadmapAndUnplannedCourses(CapturedOutput output) throws InterruptedException {
         // given
         testChatProvider.reset();
         var user = userRepository.save(UserFixtures.approved(
@@ -70,6 +74,7 @@ class NewRoadmapGeneratorIntegrationTest {
 
             // then
             assertThat(processed).isTrue();
+            assertThat(output.getAll()).doesNotContain("job generate failed");
             assertThat(testChatProvider.outsideTransaction(id)).isTrue();
             var job = jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", id);
             assertThat(job).containsEntry("status", "SUCCEEDED");

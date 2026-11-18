@@ -45,7 +45,7 @@ public final class PlanRoadmapCourseIntakeHandler implements JobIntakeHandler {
         if (position == 1) {
             if (generationJobRepository.findSameTarget(userId, JobType.REPLAN_ROADMAP, roadmap.getId(), false)
                     .isPresent()) {
-                throw new ApiException(ErrorCode.ROADMAP_REPLAN_IN_PROGRESS);
+                throw new ApiException(ErrorCode.REPLAN_IN_PROGRESS);
             }
             if (roadmap.getStatus() == RoadmapStatus.REVIEWING) roadmap.start();
         } else {

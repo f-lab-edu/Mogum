@@ -125,7 +125,7 @@ class CourseCommandServiceIntegrationTest {
             result.expectStatus().isOk().expectBody().jsonPath("$.data.status").isEqualTo("LEARNING");
         } else {
             result.expectStatus().isEqualTo(409).expectBody()
-                    .jsonPath("$.code").isEqualTo("ROADMAP_REPLAN_IN_PROGRESS")
+                    .jsonPath("$.code").isEqualTo("REPLAN_IN_PROGRESS")
                     .jsonPath("$.message").isEqualTo("다시 짜는 중에는 시작할 수 없어요");
             assertThat(state()).isEqualTo(before);
         }
@@ -177,7 +177,7 @@ class CourseCommandServiceIntegrationTest {
 
             // then
             assertThat(rejection).isEqualTo(startFirst
-                    ? ErrorCode.REPLAN_NOT_ALLOWED : ErrorCode.ROADMAP_REPLAN_IN_PROGRESS);
+                    ? ErrorCode.REPLAN_NOT_ALLOWED : ErrorCode.REPLAN_IN_PROGRESS);
             assertThat(courseRepository.findById(course.getId()).orElseThrow().getStatus())
                     .isEqualTo(startFirst ? CourseStatus.LEARNING : CourseStatus.REVIEWING);
             assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM generation_jobs", Integer.class))

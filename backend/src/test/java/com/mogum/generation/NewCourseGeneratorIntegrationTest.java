@@ -5,6 +5,7 @@ import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.CreditEntryRepository;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.account.service.CreditLedger;
+import com.mogum.common.logging.RequestLogFilter;
 import com.mogum.config.CreditProperties;
 import com.mogum.config.WorkerProperties;
 import com.mogum.course.domain.LearningInput;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -111,7 +113,7 @@ class NewCourseGeneratorIntegrationTest {
         assertThat(testChatProvider.outsideTransaction(id)).isTrue();
         assertThat(request.messages().get(1).text()).contains("LEAKCHECK-topic", "LEAKCHECK-level",
                 "LEAKCHECK-purpose", "LEAKCHECK-memo");
-        assertThat(output.getAll()).doesNotContain("LEAKCHECK-", "값을 담는 이름", "자바 코스");
+        assertThat(output.getAll()).doesNotContain("job generate failed", "LEAKCHECK-", "값을 담는 이름", "자바 코스");
     }
 
     @ParameterizedTest(name = "종류={0}")
@@ -173,7 +175,7 @@ class NewCourseGeneratorIntegrationTest {
     @ParameterizedTest(name = "종류={0}")
     @EnumSource(value = JobType.class, names = {"NEW_COURSE", "NEW_ROADMAP"})
     @DisplayName("일시적 실패 뒤에는 다시 호출해 성공한다")
-    void retriesTemporaryFailure(JobType type) {
+    void retriesTemporaryFailure(JobType type, CapturedOutput output) {
         // given
         long id = receive(type);
         testChatProvider.reply(id, TestChatProvider.failure(GenerationOutcome.Failure.PROVIDER_UNAVAILABLE));
@@ -186,6 +188,7 @@ class NewCourseGeneratorIntegrationTest {
         assertThat(testChatProvider.requests(id)).hasSize(2);
         assertThat(jdbcTemplate.queryForList("SELECT outcome FROM llm_calls ORDER BY id", String.class))
                 .containsExactly("PROVIDER_ERROR", "SUCCEEDED");
+        assertThat(output.getAll()).doesNotContain("job generate failed");
     }
 
     @ParameterizedTest(name = "종류={0}, 실패={1}")
@@ -207,16 +210,27 @@ class NewCourseGeneratorIntegrationTest {
     @ParameterizedTest(name = "종류={0}")
     @EnumSource(value = JobType.class, names = {"NEW_COURSE", "NEW_ROADMAP"})
     @DisplayName("재료 준비의 예외도 밖으로 던지지 않고 작업 실패로 돌린다")
-    void returnsFailureWhenPreparingThrows(JobType type) {
+    void returnsFailureWhenPreparingThrows(JobType type, CapturedOutput output) {
         // given
         var generator = generators.stream().filter(candidate -> candidate.type() == type).findFirst().orElseThrow();
         var invalid = new JobSnapshot(1L, 1L, type, null, null, null, 1);
 
-        // when
-        var outcome = generator.generate(invalid);
+        try (var jobId = MDC.putCloseable(RequestLogFilter.JOB_ID, "1");
+                var userId = MDC.putCloseable(RequestLogFilter.USER_ID, "1")) {
+            // when
+            var outcome = generator.generate(invalid);
 
-        // then
-        assertThat(outcome).isEqualTo(GenerationOutcome.Failure.PROVIDER_UNAVAILABLE);
+            // then
+            assertThat(outcome).isEqualTo(GenerationOutcome.Failure.PROVIDER_UNAVAILABLE);
+            assertThat(MDC.get(RequestLogFilter.JOB_ID)).isEqualTo("1");
+            assertThat(MDC.get(RequestLogFilter.USER_ID)).isEqualTo("1");
+            assertThat(output.getAll().lines().filter(line -> line.contains("job generate failed")))
+                    .singleElement()
+                    .asString()
+                    .contains(" ERROR ", "jobId=1", "userId=1");
+            assertThat(output.getAll())
+                    .contains("at com.mogum.generation." + generator.getClass().getSimpleName() + ".generate");
+        }
     }
 
     private JobRunner runner() {

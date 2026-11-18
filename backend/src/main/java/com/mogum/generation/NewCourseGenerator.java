@@ -39,9 +39,8 @@ public final class NewCourseGenerator implements JobGenerator {
                         new GenerationOutcome.Success(new Result(success.value()));
                 case ChatResult.Failed<CoursePlan> failed -> failed.failure();
             };
-        } catch (RuntimeException ignored) {
-            // 원문을 담을 수 있는 예외를 내보내지 않고 작업 실패로 돌린다.
-            return GenerationOutcome.Failure.PROVIDER_UNAVAILABLE;
+        } catch (RuntimeException exception) {
+            return GenerationFailures.unavailable(exception);
         }
     }
 

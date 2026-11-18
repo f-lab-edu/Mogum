@@ -26,7 +26,8 @@ class LlmPropertiesTest {
             // then
             assertThat(context).hasNotFailed();
             var properties = context.getBean(LlmProperties.class);
-            var planning = properties.chats().get("planning");
+            var planning = properties.planning();
+            assertThat(planning).isSameAs(properties.chats().get("planning"));
             assertThat(planning.model()).isEqualTo("gpt-5.6-terra");
             assertThat(planning.maxCompletionTokens()).isEqualTo(4000);
             assertThat(planning.timeout()).isEqualTo(Duration.ofSeconds(50));
@@ -53,6 +54,28 @@ class LlmPropertiesTest {
             // then
             assertThat(context).hasFailed();
             assertThat(context.getStartupFailure()).hasRootCauseInstanceOf(IllegalArgumentException.class);
+        });
+    }
+
+    @Test
+    @DisplayName("다른 채팅 묶음만 있고 planning이 없으면 설정 바인딩으로 기동을 거부한다")
+    void rejectsMissingPlanningSettings() {
+        // given
+        var runner = new ApplicationContextRunner()
+                .withUserConfiguration(PropertiesConfiguration.class)
+                .withPropertyValues("app.llm.openai.api-key=fake-key", "app.llm.database-allowance=10s",
+                        "app.llm.chats.other.model=test-model", "app.llm.chats.other.max-completion-tokens=4000",
+                        "app.llm.chats.other.timeout=50s", "app.llm.chats.other.max-continuations=1",
+                        "app.llm.prices[test-model].input=1", "app.llm.prices[test-model].cached-input=1",
+                        "app.llm.prices[test-model].output=1");
+
+        // when
+        runner.run(context -> {
+            // then
+            assertThat(context).hasFailed();
+            assertThat(context.getStartupFailure())
+                    .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                    .hasStackTraceContaining("Planning chat settings must be set");
         });
     }
 

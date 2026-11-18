@@ -117,13 +117,14 @@ class ReplanRoadmapGeneratorIntegrationTest {
                 "이전 개념-1", "이전 정의-1", "사용자가 고친 제목-" + previousCount, "LEAKCHECK-feedback");
         assertThat(userRepository.findById(roadmap.getUserId()).orElseThrow().getCreditBalance())
                 .isEqualTo(100 - creditProperties.replanRoadmap());
-        assertThat(output.getAll()).doesNotContain("LEAKCHECK-", "이전 로드맵", "사용자가 고친 제목");
+        assertThat(output.getAll()).doesNotContain("job generate failed", "LEAKCHECK-", "이전 로드맵", "사용자가 고친 제목");
     }
 
     @ParameterizedTest(name = "실패={0}")
     @EnumSource(GenerationOutcome.Failure.class)
     @DisplayName("로드맵 다시 짜기 실패와 버리기는 제목과 설명과 코스를 보존하고 크레딧을 한 번 복구한다")
-    void preservesPreviousPlanOnFailureAndDiscard(GenerationOutcome.Failure failure) throws InterruptedException {
+    void preservesPreviousPlanOnFailureAndDiscard(GenerationOutcome.Failure failure, CapturedOutput output)
+            throws InterruptedException {
         // given
         testChatProvider.reset();
         var roadmap = roadmap(3);
@@ -141,6 +142,7 @@ class ReplanRoadmapGeneratorIntegrationTest {
         jobIntakeService.discard(roadmap.getUserId(), id);
 
         // then
+        assertThat(output.getAll()).doesNotContain("job generate failed");
         assertThat(content()).isEqualTo(before);
         assertThat(userRepository.findById(roadmap.getUserId()).orElseThrow().getCreditBalance()).isEqualTo(100);
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries WHERE type = 'RESTORE'",
@@ -150,7 +152,7 @@ class ReplanRoadmapGeneratorIntegrationTest {
 
     @Test
     @DisplayName("없는 로드맵 재료는 예외 대신 실패로 반환한다")
-    void returnsFailureWhenMaterialsAreMissing() {
+    void returnsFailureWhenMaterialsAreMissing(CapturedOutput output) {
         // given
         var job = new JobSnapshot(1L, 1L, JobType.REPLAN_ROADMAP, 99999L, null, null, 1);
 
@@ -159,6 +161,11 @@ class ReplanRoadmapGeneratorIntegrationTest {
 
         // then
         assertThat(outcome).isEqualTo(GenerationOutcome.Failure.PROVIDER_UNAVAILABLE);
+        assertThat(output.getAll().lines().filter(line -> line.contains("job generate failed")))
+                .singleElement()
+                .asString()
+                .contains(" ERROR ");
+        assertThat(output.getAll()).contains("at com.mogum.generation.ReplanRoadmapGenerator.generate");
     }
 
     @ParameterizedTest(name = "위반={0}")

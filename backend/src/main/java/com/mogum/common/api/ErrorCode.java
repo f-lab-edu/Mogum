@@ -37,8 +37,8 @@ public enum ErrorCode {
     /** 앞선 짜기 전 코스가 있거나 바로 앞 코스가 다 마침이 아니면 409로 반환한다. */
     PREVIOUS_COURSE_NOT_COMPLETED(HttpStatus.CONFLICT, "앞 코스를 다 마치면 만들 수 있어요"),
 
-    /** 성공하지 않은 다시 짜기가 있으면 코스 시작이나 로드맵 첫 코스의 받기를 409로 거절한다. */
-    ROADMAP_REPLAN_IN_PROGRESS(HttpStatus.CONFLICT, "다시 짜는 중에는 시작할 수 없어요"),
+    /** 성공하지 않은 코스·로드맵 다시 짜기가 있으면 코스 시작·로드맵 첫 코스 받기를 409로 거절한다. */
+    REPLAN_IN_PROGRESS(HttpStatus.CONFLICT, "다시 짜는 중에는 시작할 수 없어요"),
 
     /** 코스나 로드맵이 검토 중이 아니면 다시 짜기 받기를 409로 거절한다. */
     REPLAN_NOT_ALLOWED(HttpStatus.CONFLICT, "검토 중일 때만 다시 짤 수 있어요"),

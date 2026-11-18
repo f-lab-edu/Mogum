@@ -33,7 +33,7 @@ public class CourseCommandService {
         }
         if (course.getStatus() == CourseStatus.REVIEWING) {
             if (courseJobRepository.hasUnfinishedReplan(userId, courseId)) {
-                throw new ApiException(ErrorCode.ROADMAP_REPLAN_IN_PROGRESS);
+                throw new ApiException(ErrorCode.REPLAN_IN_PROGRESS);
             }
             course.start(clock.instant());
         }

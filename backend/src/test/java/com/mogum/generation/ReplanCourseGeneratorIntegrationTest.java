@@ -123,14 +123,15 @@ class ReplanCourseGeneratorIntegrationTest {
         }
         assertThat(userRepository.findById(course.getUserId()).orElseThrow().getCreditBalance())
                 .isEqualTo(100 - creditProperties.replanCourse());
-        assertThat(output.getAll()).doesNotContain("LEAKCHECK-", "이전 강의", "사용자가 고친 제목");
+        assertThat(output.getAll()).doesNotContain("job generate failed", "LEAKCHECK-", "이전 강의", "사용자가 고친 제목");
     }
 
     @ParameterizedTest(name = "위치={0}, 실패={1}")
     @CsvSource({"0,PROVIDER_UNAVAILABLE", "0,INVALID_OUTPUT", "0,PROVIDER_REJECTED", "0,INPUT_TOO_LARGE",
             "3,PROVIDER_UNAVAILABLE", "3,INVALID_OUTPUT", "3,PROVIDER_REJECTED", "3,INPUT_TOO_LARGE"})
     @DisplayName("코스 다시 짜기 실패와 버리기는 이전 강의와 제목과 계획을 보존하고 크레딧을 한 번 복구한다")
-    void preservesPreviousContentOnFailureAndDiscard(int position, GenerationOutcome.Failure failure)
+    void preservesPreviousContentOnFailureAndDiscard(int position, GenerationOutcome.Failure failure,
+            CapturedOutput output)
             throws InterruptedException {
         // given
         testChatProvider.reset();
@@ -149,6 +150,7 @@ class ReplanCourseGeneratorIntegrationTest {
         jobIntakeService.discard(course.getUserId(), id);
 
         // then
+        assertThat(output.getAll()).doesNotContain("job generate failed");
         assertThat(content()).isEqualTo(before);
         assertThat(userRepository.findById(course.getUserId()).orElseThrow().getCreditBalance()).isEqualTo(100);
         assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries WHERE type = 'RESTORE'",
@@ -158,7 +160,7 @@ class ReplanCourseGeneratorIntegrationTest {
 
     @Test
     @DisplayName("없는 코스 재료는 예외 대신 실패로 반환한다")
-    void returnsFailureWhenMaterialsAreMissing() {
+    void returnsFailureWhenMaterialsAreMissing(CapturedOutput output) {
         // given
         var job = new JobSnapshot(1L, 1L, JobType.REPLAN_COURSE, 99999L, null, null, 1);
 
@@ -167,6 +169,11 @@ class ReplanCourseGeneratorIntegrationTest {
 
         // then
         assertThat(outcome).isEqualTo(GenerationOutcome.Failure.PROVIDER_UNAVAILABLE);
+        assertThat(output.getAll().lines().filter(line -> line.contains("job generate failed")))
+                .singleElement()
+                .asString()
+                .contains(" ERROR ");
+        assertThat(output.getAll()).contains("at com.mogum.generation.ReplanCourseGenerator.generate");
     }
 
     @ParameterizedTest(name = "상태={0}")

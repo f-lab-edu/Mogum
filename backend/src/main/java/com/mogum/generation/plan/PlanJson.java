@@ -24,7 +24,7 @@ final class PlanJson {
             if (first != '{' && first != '[') continue;
 
             int end = endOfValue(text, start);
-            if (end < 0) return Optional.empty();
+            if (end < 0) continue;
             try {
                 var node = JSON_MAPPER.readTree(text.substring(start, end + 1));
                 if (node.isObject() && (node.has("lessons") || node.has("courses"))) {

@@ -79,7 +79,7 @@ class CourseCommandServiceTest {
         // when & then
         assertThatThrownBy(() -> courseCommandService.start(user.getId(), course.getId()))
                 .isInstanceOfSatisfying(ApiException.class,
-                        e -> assertThat(e.errorCode()).isEqualTo(ErrorCode.ROADMAP_REPLAN_IN_PROGRESS));
+                        e -> assertThat(e.errorCode()).isEqualTo(ErrorCode.REPLAN_IN_PROGRESS));
         assertThat(course.getStatus()).isEqualTo(CourseStatus.REVIEWING);
         assertThat(course.getStartedAt()).isNull();
     }

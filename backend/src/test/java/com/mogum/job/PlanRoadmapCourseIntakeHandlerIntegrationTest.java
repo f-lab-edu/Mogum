@@ -133,7 +133,7 @@ class PlanRoadmapCourseIntakeHandlerIntegrationTest {
         var before = state();
 
         // when & then
-        assertRejected(userId, course.getId(), ErrorCode.ROADMAP_REPLAN_IN_PROGRESS);
+        assertRejected(userId, course.getId(), ErrorCode.REPLAN_IN_PROGRESS);
         assertThat(state()).isEqualTo(before);
     }
 
@@ -272,7 +272,7 @@ class PlanRoadmapCourseIntakeHandlerIntegrationTest {
     @ParameterizedTest(name = "오류={0}, 문구={1}")
     @CsvSource({"COURSE_PLAN_NOT_ALLOWED,지금은 이 코스의 강의 목록을 만들 수 없어요",
             "PREVIOUS_COURSE_NOT_COMPLETED,앞 코스를 다 마치면 만들 수 있어요",
-            "ROADMAP_REPLAN_IN_PROGRESS,다시 짜는 중에는 시작할 수 없어요"})
+            "REPLAN_IN_PROGRESS,다시 짜는 중에는 시작할 수 없어요"})
     @DisplayName("로드맵 코스 받기 거절은 공통 오류 응답으로 할 일에 맞는 문구와 409를 반환한다")
     void returnsActionableHttpErrors(ErrorCode error, String message) {
         // given
@@ -284,7 +284,7 @@ class PlanRoadmapCourseIntakeHandlerIntegrationTest {
             course = course(roadmap, 2, CourseStatus.NOT_PLANNED);
             new TransactionTemplate(platformTransactionManager).executeWithoutResult(tx ->
                     roadmapRepository.findById(roadmap.getId()).orElseThrow().start());
-        } else if (error == ErrorCode.ROADMAP_REPLAN_IN_PROGRESS) {
+        } else if (error == ErrorCode.REPLAN_IN_PROGRESS) {
             generationJobRepository.save(GenerationJobFixtures.replanRoadmap(userId, roadmap.getId(), null));
         }
         var before = state();
