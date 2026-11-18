@@ -1,0 +1,110 @@
+{
+  "title": "claim_count 로 주인 가리기",
+  "eyebrow": "머금 · 예시 · 코드 설명",
+  "foot": "형식 예시입니다. 코드 발췌는 `main`(`701be90`)의 실제 파일에서 줄 번호와 함께 가져왔습니다. ← → 로 넘깁니다.",
+  "source": { "rev": "701be90" },
+  "snippets": {
+    "claim": { "file": "backend/src/main/java/com/mogum/worker/JobRunner.java", "from": "private JobSnapshot claim", "to": "^    }$" },
+    "guard": { "file": "backend/src/main/java/com/mogum/worker/JobRunner.java", "from": "private boolean guard", "to": "^    }$", "from_offset": -1 }
+  },
+  "lists": {
+    "where": { "title": "claim_count 를 조건에 넣는 워커의 쓰기", "items": [
+      "`guard` — 결과 저장 트랜잭션의 첫 쓰기",
+      "성공 처리 — `SUCCEEDED` 와 결과 ID",
+      "`fail` — `FAILED` 와 오류 종류",
+      "`Lease.refresh` — 시한 늘리기",
+      "`Lease.release` — 종료 때 기다림으로 반납"
+    ] }
+  },
+  "chapters": [
+    {
+      "title": "집을 때 번호를 올린다",
+      "nodes": [
+        { "id": "jobs", "x": 250, "y": 40, "w": 150, "h": 60, "k": "db", "l": "작업 표", "s": "generation_jobs" },
+        { "id": "a", "x": 60, "y": 230, "w": 140, "h": 60, "l": "워커 A", "s": "claim 1" },
+        { "id": "b", "x": 440, "y": 230, "w": 140, "h": 60, "l": "워커 B", "s": "claim 2" }
+      ],
+      "edges": [
+        { "f": "jobs", "t": "a", "l": "처음 집기" },
+        { "f": "jobs", "t": "b", "l": "시한 뒤 되찾기", "k": "dash" }
+      ],
+      "beats": [
+        {
+          "say": "워커가 작업을 집을 때마다 `claim_count` 가 1씩 오릅니다. 이 숫자가 「지금 이 작업의 주인은 몇 번째로 집은 워커인가」를 가리킵니다.",
+          "detail": [
+            "집기는 SQL 한 문장입니다. 기다리는 작업(`QUEUED`)이나 시한(`lease_until`)이 지난 「만드는 중」 작업 하나를 잠그고, 같은 문장 안에서 `RUNNING` 으로 바꾸면서 `claim_count` 를 올립니다.",
+            "워커는 이 값을 `JobSnapshot.claimCount` 로 들고 다닙니다. 뒤의 모든 쓰기가 「내가 집었을 때의 번호」와 지금 표의 번호를 비교합니다.",
+            "`FOR UPDATE SKIP LOCKED` 는 다른 워커가 잠근 행을 기다리지 않고 건너뜁니다. 빼면 워커들이 같은 행 앞에서 줄을 서는데, 기능 테스트는 통과하고 부하에서만 드러납니다."
+          ],
+          "refs": ["AGENTS 금지 8", "ADR-129"],
+          "on": ["jobs", "a"],
+          "e": ["jobs-a"],
+          "code": "claim",
+          "hl": ["claim_count = j.claim_count + 1", "FOR UPDATE SKIP LOCKED"]
+        },
+        {
+          "say": "시한이 지나면 다른 워커가 같은 작업을 다시 집고, 번호는 2가 됩니다.",
+          "detail": [
+            "워커 A 의 호출이 유난히 길어져 시한(5분)을 넘겼다고 해 봅시다. 표에는 아직 `RUNNING` 이지만 `lease_until < now` 라 집기 조건에 맞습니다.",
+            "워커 B 가 이 작업을 집으면 `claim_count` 는 2가 됩니다. A 는 이 사실을 모른 채 여전히 번호 1을 들고 일하고 있습니다.",
+            "상태만으로는 둘을 가를 수 없습니다 — 둘 다 `RUNNING` 입니다. 번호가 있어야 「지금 주인은 B」라고 말할 수 있습니다."
+          ],
+          "on": ["jobs", "b"],
+          "e": ["jobs-b"],
+          "hl": ["lease_until < :now"]
+        }
+      ]
+    },
+    {
+      "title": "쓰기마다 번호를 확인한다",
+      "nodes": [
+        { "id": "late", "x": 40, "y": 60, "w": 170, "h": 60, "l": "늦게 끝난 A", "s": "claim 1" },
+        { "id": "guard", "x": 260, "y": 60, "w": 150, "h": 60, "l": "guard", "s": "첫 쓰기", "m": true },
+        { "id": "zero", "x": 460, "y": 60, "w": 140, "h": 60, "k": "err", "l": "0 rows", "s": "저장 안 함" },
+        { "id": "now", "x": 40, "y": 240, "w": 170, "h": 60, "l": "주인 B", "s": "claim 2" },
+        { "id": "one", "x": 460, "y": 240, "w": 140, "h": 60, "k": "ok", "l": "1 row", "s": "결과 저장" }
+      ],
+      "edges": [
+        { "f": "late", "t": "guard" },
+        { "f": "guard", "t": "zero", "k": "err" },
+        { "f": "now", "t": "guard" },
+        { "f": "guard", "t": "one" }
+      ],
+      "beats": [
+        {
+          "say": "결과를 저장하는 트랜잭션은 번호를 조건에 넣은 UPDATE 로 시작합니다.",
+          "detail": [
+            "`WHERE id = :id AND claim_count = :claim AND status = 'RUNNING'` — 내가 집었을 때의 번호가 아직 표의 번호와 같고, 여전히 만드는 중일 때만 한 줄이 바뀝니다.",
+            "이 UPDATE 가 트랜잭션의 **첫 쓰기**인 것이 중요합니다. 행 잠금을 먼저 잡아 두므로, 결과를 쓰는 동안 다른 워커가 끼어들 수 없습니다. 결과를 먼저 쓰고 확인하면, 확인에 실패했을 때 결과가 주인 없이 남습니다."
+          ],
+          "refs": ["AGENTS 금지 9", "04 §4.1"],
+          "on": ["guard"],
+          "code": "guard",
+          "hl": ["claim_count = :claim", "첫 쓰기"]
+        },
+        {
+          "say": "늦게 끝난 A 는 0 rows 를 받고 결과를 버립니다.",
+          "detail": [
+            "A 는 번호 1로 확인하지만 표는 이미 2입니다. 바뀐 줄이 없으니 `guard` 는 `false` 이고, A 는 결과를 쓰지 않고 손을 뗍니다.",
+            "작업이 그사이 지워졌을 때도 같습니다 — 행이 없으니 0 rows 입니다. 그래서 지운 결과가 늦은 응답으로 되살아나지 않습니다.",
+            "다만 A 가 이미 부른 LLM 호출의 기록(`llm_calls`)은 남깁니다. 돈은 이미 나갔으니 비용을 맞출 근거는 버리지 않습니다."
+          ],
+          "refs": ["AGENTS 금지 14"],
+          "on": ["late", "guard", "zero"],
+          "e": ["late-guard", "guard-zero"],
+          "hl": ["executeUpdate() == 1"]
+        },
+        {
+          "say": "같은 조건은 워커의 모든 쓰기에 붙습니다.",
+          "detail": [
+            "시한 늘리기 · 성공 처리 · 실패 기록 · 종료 때 반납까지, 워커가 작업 행을 바꾸는 곳은 모두 같은 `WHERE` 를 씁니다. 하나라도 빠지면 그 길로 옛 워커가 새 주인의 작업을 덮어씁니다.",
+            "리뷰할 때는 `generation_jobs` 를 바꾸는 SQL 을 모두 찾아 이 조건이 있는지 보면 됩니다."
+          ],
+          "on": ["now", "guard", "one"],
+          "e": ["now-guard", "guard-one"],
+          "code": "list:where"
+        }
+      ]
+    }
+  ]
+}
