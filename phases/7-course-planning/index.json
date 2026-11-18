@@ -130,6 +130,16 @@
         "frontend/src/api/useCourse.ts:3 · frontend/src/api/useRoadmap.ts:3 — 두 모듈이 서로를 import한다. useRoadmap 쪽은 type-only라 런타임 순환은 없다. 다만 나중에 useRoadmap이 useCourse의 값을 import하면 순환이 생기므로, 그때 공통 키를 따로 모은다.",
         "frontend/src/pages/RoadmapPage.tsx:135 — 진행 값이 `GENERATING`/`FAILED`인데 서버가 `jobId`를 주지 않으면 링크 없이 상태만 보인다. 05 §3은 그때 반드시 `jobId`를 싣는다고 정했으니 동작은 맞다. 다만 그 경우를 다루는 테스트는 없다."
       ]
+    },
+    {
+      "step": 10,
+      "name": "generation-fixes",
+      "status": "pending"
+    },
+    {
+      "step": 11,
+      "name": "course-screen-fixes",
+      "status": "pending"
     }
   ],
   "created_at": "2026-11-17T18:36:01+0900",
