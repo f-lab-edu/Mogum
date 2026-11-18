@@ -45,6 +45,7 @@
 - 강의 목록 TASK(`7-course-planning` step 4) 구현: 로드맵 코스 받기의 상태 거절은 `COURSE_PLAN_NOT_ALLOWED`(409), 「지금은 이 코스의 강의 목록을 만들 수 없어요」다. 앞선 짜기 전 코스가 있거나 바로 앞 코스가 다 마침이 아니면 `PREVIOUS_COURSE_NOT_COMPLETED`(409), 「앞 코스를 다 마치면 만들 수 있어요」다. 첫 코스의 받기에서 성공하지 않은 로드맵 다시 짜기가 있으면 `ROADMAP_REPLAN_IN_PROGRESS`(409), 「다시 짜는 중에는 시작할 수 없어요」다. 각각 현재 코스 상태 확인 · 앞 코스 학습 완료 · 다시 짜기 종료(실패면 다시 시도 또는 버리기)를 안내한다. 단일 코스를 로드맵 코스 받기의 대상으로 보내면 `NOT_FOUND`(404)다.
 - 강의 목록 TASK(`7-course-planning` step 5) 구현: 코스 · 로드맵의 다시 짜기 받기는 검토 중이 아니면 `REPLAN_NOT_ALLOWED`(409), 「검토 중일 때만 다시 짤 수 있어요」로 거절한다. 화면에서 현재 대상 상태를 확인하도록 두 종류가 같은 묶음을 쓴다.
 - 강의 목록 TASK(`7-course-planning` step 6) 구현: 짜기 전 코스의 「이대로 시작」은 `COURSE_START_NOT_ALLOWED`(409), 「강의 목록이 만들어진 뒤 시작할 수 있어요」로 거절한다. 검토 중 코스에 성공하지 않은 코스 다시 짜기(`QUEUED` · `RUNNING` · `FAILED`)가 있으면 step 4의 `ROADMAP_REPLAN_IN_PROGRESS`(409)와 같은 문구를 재사용한다. 제목의 누락 · 빈 글 · 공백만 있는 글은 `FIELD_INVALID`(400)의 `title: REQUIRED`, 100 코드 포인트 초과는 `title: TOO_LONG`이다.
+- 강의 목록 TASK(`7-course-planning` step 7) 구현: 칸 오류(`FIELD_INVALID`)의 서버 문구는 「입력을 확인해 주십시오」 하나이고, 칸 옆의 설명은 화면이 `reason`(`REQUIRED` · `TOO_LONG` · `INVALID_VALUE` · `NOT_ALLOWED`)으로 고른다(`frontend/src/components/FieldError.tsx`). 오류 code · `reason` 자체는 화면에 보이지 않는다(§1.4).
 - 기술적인 원인(응답이 잘림 · 서버 응답 없음 등)은 싣지 않는다(ADR-088).
 - 만들기 실패도 작업을 읽을 때 같은 모양으로 싣는다.
 
