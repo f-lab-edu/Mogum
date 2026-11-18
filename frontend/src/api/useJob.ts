@@ -38,7 +38,18 @@ export interface ReplanCourseRequest {
   feedback?: string
 }
 
-export function receiveJob(request: NewLearningRequest | ReplanCourseRequest) {
+export interface PlanRoadmapCourseRequest {
+  type: 'PLAN_ROADMAP_COURSE'
+  courseId: number
+}
+
+export interface ReplanRoadmapRequest {
+  type: 'REPLAN_ROADMAP'
+  roadmapId: number
+  feedback?: string
+}
+
+export function receiveJob(request: NewLearningRequest | ReplanCourseRequest | PlanRoadmapCourseRequest | ReplanRoadmapRequest) {
   return apiFetch<JobResponse>('/jobs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

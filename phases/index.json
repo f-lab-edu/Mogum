@@ -63,7 +63,8 @@
     },
     {
       "dir": "7-course-planning",
-      "status": "pending"
+      "status": "blocked",
+      "blocked_at": "2026-11-18T06:36:47+0900"
     }
   ]
 }

@@ -1,8 +1,9 @@
+import { useRoadmap } from './useRoadmap'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
-import { courseKey, readCourse, startCourse, updateCourseTitle, useCourse, useCourseAction } from './useCourse'
+import { coursesKey, useCourses, courseKey, readCourse, startCourse, updateCourseTitle, useCourse, useCourseAction } from './useCourse'
 
 const course = { id: 31, title: '자바', status: 'REVIEWING', lessons: [], progress: { completedLessons: 0, totalLessons: 0 } }
 const clients: QueryClient[] = []
@@ -65,4 +66,47 @@ test('쓰기 실패를 자동 재시도하지 않고 원래 코스 캐시를 보
   await act(async () => { await expect(result.current.mutateAsync({ type: 'title', title: '' })).rejects.toThrow('입력을 확인해 주십시오') })
   expect(client.getQueryData(courseKey('31'))).toEqual(course)
   expect(fetch).toHaveBeenCalledTimes(1)
+})
+
+test('코스 목록은 쿠키·중단 신호로 읽고 별도 목록 키에 캐시한다', async () => {
+  const data = { courses: [course] }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(data)))
+  const { client, wrapper } = setup()
+  const { result } = renderHook(() => useCourses(), { wrapper })
+  await waitFor(() => expect(result.current.data).toEqual(data))
+  expect(client.getQueryData(coursesKey)).toEqual(data)
+  expect(fetch).toHaveBeenCalledWith('/api/courses', expect.objectContaining({ method: 'GET', credentials: 'include', signal: expect.any(AbortSignal) }))
+})
+
+test.each(['start', 'title'] as const)('%s 성공은 목록과 소속 로드맵 캐시도 맞추고 다른 행을 보존한다', async (type) => {
+  const updated = { ...course, title: '고친 이름', status: 'LEARNING', roadmapId: 41 }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(updated)))
+  const { client, wrapper } = setup()
+  const other = { id: 32, title: '다른 코스', status: 'REVIEWING' }
+  const planCourse = { id: 31, title: '자바', status: 'REVIEWING', position: 1, description: '설명', concepts: [], progress: 'GENERATED' }
+  const roadmap = { id: 41, title: '로드맵', status: 'IN_PROGRESS', description: '로드맵 설명', courses: [planCourse, other] }
+  client.setQueryData(coursesKey, { courses: [course, other] })
+  client.setQueryData(['roadmaps', '41'], roadmap)
+  client.setQueryData(['roadmaps', '42'], { ...roadmap, id: 42 })
+  const { result } = renderHook(() => useCourseAction('31'), { wrapper })
+  await act(async () => { await result.current.mutateAsync(type === 'start' ? { type } : { type, title: updated.title }) })
+  expect(client.getQueryData(coursesKey)).toEqual({ courses: [{ ...course, title: updated.title, status: updated.status }, other] })
+  expect(client.getQueryData(['roadmaps', '41'])).toEqual({ ...roadmap, courses: [{ ...planCourse, title: updated.title, status: updated.status }, other] })
+  expect(client.getQueryData(['roadmaps', '42'])).toEqual({ ...roadmap, id: 42 })
+})
+
+test('늦은 로드맵 읽기는 저장한 코스 제목을 덮어쓰지 않는다', async () => {
+  const { client, wrapper } = setup()
+  const old = { id: 41, title: '로드맵', status: 'REVIEWING', description: '설명', courses: [{ id: 31, title: '자바', status: 'NOT_PLANNED', position: 1, description: '계획', concepts: [], progress: 'NOT_PLANNED' }] }
+  const updated = { ...course, title: '고친 이름', status: 'NOT_PLANNED', roadmapId: 41 }
+  let finish!: (response: Response) => void
+  client.setQueryData(['roadmaps', '41'], old)
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((_path, options) => options.method === 'GET'
+    ? new Promise<Response>((resolve) => { finish = resolve }) : Promise.resolve(response(updated))))
+  const read = renderHook(() => useRoadmap('41'), { wrapper })
+  const action = renderHook(() => useCourseAction('31'), { wrapper })
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
+  await act(async () => { await action.result.current.mutateAsync({ type: 'title', title: updated.title }) })
+  await act(async () => { finish(response(old)) })
+  await waitFor(() => expect(read.result.current.data?.courses[0].title).toBe(updated.title))
 })

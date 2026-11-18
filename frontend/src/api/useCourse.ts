@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client'
+import { roadmapKey } from './useRoadmap'
+import type { RoadmapResponse } from './useRoadmap'
 
 export interface CourseResponse {
   id: number
@@ -20,6 +22,25 @@ export interface CourseResponse {
 }
 
 export const courseKey = (courseId: string) => ['courses', courseId] as const
+export const coursesKey = ['courses'] as const
+
+export interface CoursesResponse {
+  courses: { id: number; title: string; status: CourseResponse['status'] }[]
+}
+
+export function readCourses(signal?: AbortSignal) {
+  return apiFetch<CoursesResponse>('/courses', { signal })
+}
+
+export function useCourses() {
+  return useQuery({
+    queryKey: coursesKey,
+    queryFn: ({ signal }) => readCourses(signal),
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+}
 
 export function readCourse(courseId: string, signal?: AbortSignal) {
   return apiFetch<CourseResponse>(`/courses/${encodeURIComponent(courseId)}`, { signal })
@@ -57,7 +78,21 @@ export function useCourseAction(courseId: string) {
     retry: false,
     onSuccess: async (result) => {
       await client.cancelQueries({ queryKey: courseKey(courseId), exact: true })
+      await client.cancelQueries({ queryKey: coursesKey, exact: true })
+      if (result.roadmapId !== undefined) {
+        await client.cancelQueries({ queryKey: roadmapKey(String(result.roadmapId)), exact: true })
+        client.setQueryData<RoadmapResponse>(roadmapKey(String(result.roadmapId)), (previous) => previous && ({
+          ...previous,
+          courses: previous.courses.map((course) => course.id === result.id
+            ? { ...course, title: result.title, status: result.status } : course),
+        }))
+      }
       client.setQueryData(courseKey(courseId), result)
+      client.setQueryData<CoursesResponse>(coursesKey, (previous) => previous && ({
+        ...previous,
+        courses: previous.courses.map((course) => course.id === result.id
+          ? { ...course, title: result.title, status: result.status } : course),
+      }))
     },
   })
 }

@@ -91,3 +91,14 @@ test('코스 다시 짜기는 대상·선택 피드백만 최상위 JSON으로 �
   expect(await receiveJob(request)).toMatchObject({ type: 'REPLAN_COURSE' })
   expect(fetch).toHaveBeenCalledWith('/api/jobs', expect.objectContaining({ method: 'POST', body: JSON.stringify(request) }))
 })
+
+test.each([
+  { type: 'PLAN_ROADMAP_COURSE' as const, courseId: 31 },
+  { type: 'REPLAN_ROADMAP' as const, roadmapId: 41, feedback: '기초를 더해 주세요' },
+])('$type 받기는 대상·선택 피드백만 쿠키·CSRF와 함께 보낸다', async (request) => {
+  document.cookie = 'XSRF-TOKEN=roadmap-csrf; path=/'
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ ...queued, type: request.type })))
+  expect(await receiveJob(request)).toMatchObject({ type: request.type })
+  expect(fetch).toHaveBeenCalledWith('/api/jobs', expect.objectContaining({ method: 'POST', credentials: 'include', body: JSON.stringify(request) }))
+  expect(new Headers(vi.mocked(fetch).mock.calls[0][1]!.headers).get('X-XSRF-TOKEN')).toBe('roadmap-csrf')
+})
