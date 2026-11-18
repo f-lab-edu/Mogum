@@ -137,6 +137,28 @@ test('피드백은 선택이며 비었으면 보내지 않는다', async () => {
   expect(fetch).toHaveBeenLastCalledWith('/api/jobs', expect.objectContaining({ body: JSON.stringify({ type: 'REPLAN_COURSE', courseId: 31 }) }))
 })
 
+test('다시 짜기 펼침 버튼은 열린 입력만 aria-controls로 가리킨다', async () => {
+  open()
+  const button = await screen.findByRole('button', { name: '다시 짜기' })
+  expect(button).toHaveAttribute('aria-expanded', 'false')
+  expect(button).not.toHaveAttribute('aria-controls')
+
+  for (const closeWith of ['다시 짜기', '다시 짜기 취소']) {
+    fireEvent.click(button)
+    const input = screen.getByRole('textbox', { name: '고칠 점' })
+    expect(button).toHaveAttribute('aria-expanded', 'true')
+    expect(button).toHaveAttribute('aria-controls', 'course-replan')
+    expect(document.getElementById(button.getAttribute('aria-controls')!)).toContainElement(input)
+    await waitFor(() => expect(input).toHaveFocus())
+
+    fireEvent.click(screen.getByRole('button', { name: closeWith }))
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+    expect(button).not.toHaveAttribute('aria-controls')
+    expect(screen.queryByRole('textbox', { name: '고칠 점' })).not.toBeInTheDocument()
+    if (closeWith === '다시 짜기 취소') await waitFor(() => expect(button).toHaveFocus())
+  }
+})
+
 test('피드백은 코드 포인트 500자까지 보내며 초과하면 막는다', async () => {
   open()
   const input = await replan()
@@ -213,6 +235,30 @@ test('다 마친 로드맵 코스의 링크가 로드맵으로 이동한다', as
   fireEvent.click(await screen.findByRole('link', { name: '로드맵 화면으로 가기' }))
   expect(await screen.findByRole('heading', { name: '로드맵 자리' })).toBeVisible()
   expect(router.state.location.pathname).toBe('/roadmaps/41')
+})
+
+test.each([review, learning, done])('$status 제목 편집 중에는 다시 열기를 막아 입력을 보존하고 취소 뒤 다시 연다', async (data) => {
+  open(data)
+  const button = await screen.findByRole('button', { name: '코스 제목 고치기' })
+  fireEvent.click(button)
+  const input = screen.getByRole('textbox', { name: '코스 제목' })
+  await waitFor(() => expect(input).toHaveFocus())
+  fireEvent.change(input, { target: { value: '입력 중인 이름' } })
+
+  expect(button).toBeDisabled()
+  fireEvent.click(button)
+  expect(input).toHaveValue('입력 중인 이름')
+
+  fireEvent.click(screen.getByRole('button', { name: '제목 수정 취소' }))
+  expect(button).toBeEnabled()
+  expect(screen.queryByRole('textbox', { name: '코스 제목' })).not.toBeInTheDocument()
+  await waitFor(() => expect(button).toHaveFocus())
+
+  fireEvent.click(button)
+  const reopened = screen.getByRole('textbox', { name: '코스 제목' })
+  expect(reopened).toHaveValue(data.title)
+  await waitFor(() => expect(reopened).toHaveFocus())
+  expect(fetch).toHaveBeenCalledTimes(1)
 })
 
 test.each([review, learning, done])('$status 제목 저장은 응답을 표시하고 같은 화면에 남는다', async (data) => {

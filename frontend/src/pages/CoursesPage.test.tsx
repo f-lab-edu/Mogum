@@ -51,7 +51,7 @@ test('코스 행을 누르면 같은 탭의 상세 주소로 이동한다', asyn
   expect(router.state.location.pathname).toBe(`/courses/${rows[0].id}`)
 })
 
-test('코스이 없으면 안내 한 줄만 보인다', async () => {
+test('코스가 없으면 안내 한 줄만 보인다', async () => {
   open({ courses: [] })
   expect(await screen.findByText('아직 만든 코스가 없어요')).toBeVisible()
   expect(screen.queryByRole('list', { name: '코스 목록' })).not.toBeInTheDocument()
