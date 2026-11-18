@@ -96,6 +96,7 @@
 | 2026-11-17 | 강의 목록 TASK(`7-course-planning`) — 채팅은 옛 1단계 실측대로 OpenAI `gpt-5.6-terra` · SDK `openai-java` 4.75.1(ADR-181) · 이번 TASK 는 관련 개념 검색 · 숙련도 판정 · 숙련도 반영 내역을 넣지 않는다 — 숙련도 고리 TASK 의 일이고 개념 사전은 강의 자료 TASK 부터 채워진다(사용자 결정) |
 | 2026-11-17 | 강의 목록 TASK(`7-course-planning`) — 코스 탭 · 로드맵 탭을 이 TASK 에서 만든다. 한 줄은 제목 + 상태, 비면 안내 한 줄(06 §15.1) · 새로 배우기를 두 번 눌렀을 때는 화면이 요청 중 버튼을 막는 것만 하고 서버 장치는 두지 않는다(ADR-157 이 감수한 그대로 — 05 §5) · 종류별 크레딧 값과 한 달 몫은 홈 · 크레딧 TASK 에서 M1 · M2 동안의 호출 기록으로 정한다(04 §10) · OpenAI 키가 없으면 서버가 기동을 거부한다(사용자 결정 — Claude 추천) |
 | 2026-11-17 | 강의 목록 TASK(`7-course-planning`) — 끝나지 않은 다시 짜기가 있으면 「이대로 시작」을 받지 않는다(ADR-182) · 코스 다시 짜기는 제목을 바꾸지 않는다(ADR-183)(사용자 결정 — Claude 추천) |
+| 2026-11-18 | 강의 목록 TASK(`7-course-planning`) 브랜치 리뷰 — 오류 code `ROADMAP_REPLAN_IN_PROGRESS` 를 `REPLAN_IN_PROGRESS` 로 바꿨고(05 §1.2), 화면 테스트 가짜 응답에 남은 옛 이름 세 줄(`frontend/src/pages/CoursePage.test.tsx:91,98` · `RoadmapPage.test.tsx:79`)은 강의 자료 TASK 가 코스 화면 테스트를 고칠 때 함께 맞춘다 — 동작 영향 없음(사용자 결정 — Claude 추천) |
 
 ## 규칙
 
