@@ -20,7 +20,8 @@ public class RequestLogConfiguration {
 
     @Bean
     public ServletListenerRegistrationBean<RequestLogFilter> requestLogCompletion(
-            FilterRegistrationBean<RequestLogFilter> requestLogFilterRegistrationBean) {
+            FilterRegistrationBean<RequestLogFilter> requestLogFilterRegistrationBean
+    ) {
         return new ServletListenerRegistrationBean<>(requestLogFilterRegistrationBean.getFilter());
     }
 }

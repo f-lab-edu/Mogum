@@ -63,8 +63,9 @@
     },
     {
       "dir": "7-course-planning",
-      "status": "completed",
-      "completed_at": "2026-11-18T14:25:17+0900"
+      "status": "blocked",
+      "completed_at": "2026-11-18T14:25:17+0900",
+      "blocked_at": "2026-11-18T16:25:24+0900"
     }
   ]
 }

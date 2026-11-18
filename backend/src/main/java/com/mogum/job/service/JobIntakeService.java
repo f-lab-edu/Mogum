@@ -41,10 +41,12 @@ public class JobIntakeService {
     private final JobProperties jobProperties;
     private final Map<JobType, JobIntakeHandler> handlers;
 
-    public JobIntakeService(GenerationJobRepository generationJobRepository,
+    public JobIntakeService(
+            GenerationJobRepository generationJobRepository,
             CourseRepository courseRepository, RoadmapRepository roadmapRepository, LessonRepository lessonRepository,
             CreditLedger creditLedger, CreditProperties creditProperties, JobProperties jobProperties,
-            List<JobIntakeHandler> handlers) {
+            List<JobIntakeHandler> handlers
+    ) {
         this.generationJobRepository = generationJobRepository;
         this.courseRepository = courseRepository;
         this.roadmapRepository = roadmapRepository;

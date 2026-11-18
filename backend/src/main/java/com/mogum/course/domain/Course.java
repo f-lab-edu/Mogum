@@ -79,8 +79,10 @@ public class Course extends AuditedEntity {
         return course;
     }
 
-    public static Course inRoadmap(Roadmap roadmap, int position, String title, String planDescription,
-            List<PlannedConcept> planConcepts) {
+    public static Course inRoadmap(
+            Roadmap roadmap, int position, String title, String planDescription,
+            List<PlannedConcept> planConcepts
+    ) {
         var course = new Course();
         course.roadmap = roadmap;
         course.userId = roadmap.getUserId();

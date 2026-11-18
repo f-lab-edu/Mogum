@@ -130,9 +130,10 @@ class ReplanCourseGeneratorIntegrationTest {
     @CsvSource({"0,PROVIDER_UNAVAILABLE", "0,INVALID_OUTPUT", "0,PROVIDER_REJECTED", "0,INPUT_TOO_LARGE",
             "3,PROVIDER_UNAVAILABLE", "3,INVALID_OUTPUT", "3,PROVIDER_REJECTED", "3,INPUT_TOO_LARGE"})
     @DisplayName("코스 다시 짜기 실패와 버리기는 이전 강의와 제목과 계획을 보존하고 크레딧을 한 번 복구한다")
-    void preservesPreviousContentOnFailureAndDiscard(int position, GenerationOutcome.Failure failure,
-            CapturedOutput output)
-            throws InterruptedException {
+    void preservesPreviousContentOnFailureAndDiscard(
+            int position, GenerationOutcome.Failure failure,
+            CapturedOutput output
+    ) throws InterruptedException {
         // given
         testChatProvider.reset();
         var course = course(position);

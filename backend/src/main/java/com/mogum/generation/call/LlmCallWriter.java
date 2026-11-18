@@ -19,8 +19,10 @@ public final class LlmCallWriter {
     private final LlmCallRepository llmCallRepository;
     private final TransactionTemplate transactionTemplate;
 
-    public LlmCallWriter(EntityManager entityManager, LlmCallRepository llmCallRepository,
-            PlatformTransactionManager platformTransactionManager) {
+    public LlmCallWriter(
+            EntityManager entityManager, LlmCallRepository llmCallRepository,
+            PlatformTransactionManager platformTransactionManager
+    ) {
         this.entityManager = entityManager;
         this.llmCallRepository = llmCallRepository;
         this.transactionTemplate = new TransactionTemplate(platformTransactionManager);
@@ -40,8 +42,10 @@ public final class LlmCallWriter {
     }
 
     /** 연결이 끊긴 호출도 결과를 채운다. 프로바이더가 주지 않은 사용량은 null이다. */
-    public void finish(long callId, LlmCallOutcome outcome, Integer inputTokens, Integer outputTokens,
-            BigDecimal cost, int durationMs) {
+    public void finish(
+            long callId, LlmCallOutcome outcome, Integer inputTokens, Integer outputTokens,
+            BigDecimal cost, int durationMs
+    ) {
         transactionTemplate.executeWithoutResult(status -> {
             var call = llmCallRepository.findById(callId)
                     .orElseThrow(() -> new IllegalStateException("Call record is missing"));

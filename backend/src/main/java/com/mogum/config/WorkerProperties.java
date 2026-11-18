@@ -5,8 +5,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.time.Duration;
 
 @ConfigurationProperties("app.worker")
-public record WorkerProperties(Duration leaseDuration, Duration renewalInterval, int maxRetries, Duration retryDelay,
-        int count, Duration pollInterval, Duration shutdownWait) {
+public record WorkerProperties(
+        Duration leaseDuration, Duration renewalInterval, int maxRetries, Duration retryDelay,
+        int count, Duration pollInterval, Duration shutdownWait
+) {
     public WorkerProperties {
         if (leaseDuration == null || leaseDuration.isNegative() || leaseDuration.isZero()
                 || renewalInterval == null || renewalInterval.isNegative() || renewalInterval.isZero()

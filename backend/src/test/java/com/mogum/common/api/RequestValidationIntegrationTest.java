@@ -288,8 +288,10 @@ class RequestValidationIntegrationTest {
                 .returnResult(String.class);
     }
 
-    private static void assertError(EntityExchangeResult<String> response, String code, String fields,
-            String... inputs) {
+    private static void assertError(
+            EntityExchangeResult<String> response, String code, String fields,
+            String... inputs
+    ) {
         assertThat(response.getStatus().value()).isEqualTo(400);
         assertThat(Optional.ofNullable(response.getResponseHeaders().getFirst("Content-Type"))
                 .orElseThrow()

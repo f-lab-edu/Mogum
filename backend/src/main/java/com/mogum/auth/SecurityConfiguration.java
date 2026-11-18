@@ -44,7 +44,8 @@ import java.util.List;
 public class SecurityConfiguration {
     @Bean
     public DiscardingOAuth2AuthorizedClients discardedGoogleTokens(
-            ClientRegistrationRepository clientRegistrationRepository) {
+            ClientRegistrationRepository clientRegistrationRepository
+    ) {
         var google = clientRegistrationRepository.findByRegistrationId("google");
         Assert.hasText(google.getClientId(), "GOOGLE_CLIENT_ID must be set");
         Assert.hasText(google.getClientSecret(), "GOOGLE_CLIENT_SECRET must be set");
@@ -62,10 +63,12 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    public SecurityFilterChain apiSecurity(HttpSecurity httpSecurity, UserRepository userRepository,
+    public SecurityFilterChain apiSecurity(
+            HttpSecurity httpSecurity, UserRepository userRepository,
             ObjectMapper objectMapper, WebProperties webProperties, LoginService loginService, Clock clock,
             ClientRegistrationRepository clientRegistrationRepository,
-            DiscardingOAuth2AuthorizedClients discardingOAuth2AuthorizedClients) throws Exception {
+            DiscardingOAuth2AuthorizedClients discardingOAuth2AuthorizedClients
+    ) throws Exception {
         var authorizationStart = PathPatternRequestMatcher.withDefaults()
                 .matcher(HttpMethod.GET, "/auth/{registrationId}");
         AuthenticationEntryPoint unauthorized = (request, response, exception) -> {
