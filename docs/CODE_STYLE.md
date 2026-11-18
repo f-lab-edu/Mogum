@@ -56,6 +56,7 @@ public JobResult receive(long userId, JobRequest request) {
     - 매개변수 줄은 선언 줄 + 8칸이다. 의미가 묶이는 것끼리 한 줄에 여럿 둘 수 있다.
     - 마지막 매개변수 뒤에서 줄을 바꾸고, 닫는 `)` 를 **선언이 시작한 열**에 둔다. `{` · `throws …` · 본문 없는 선언(인터페이스 · 추상 메서드)의 `;` 는 그 `)` 와 같은 줄에 둔다.
     - 한 줄에 들어가면 지금처럼 한 줄이다. 매개변수의 애노테이션(`@Valid @RequestBody`)은 그 매개변수와 같은 줄에 둔다.
+    - 매개변수 하나가 애노테이션과 함께 120자를 넘으면, 그 매개변수만 애노테이션을 바로 위 줄에 따로 두고 들여쓰기는 매개변수와 같게 한다(IntelliJ 의 매개변수 애노테이션 줄바꿈과 같은 모양 — 예: `@Qualifier("…")` 줄 아래 `AbstractFilterRegistrationBean<?> securityFilterRegistrationBean`). 이 매개변수는 다른 매개변수와 한 줄에 두지 않는다.
     - 호출 인자(`new X(…)` · `method(…)`)는 이 규칙이 아니다 — 위의 「쉼표 뒤에서 끊는다」를 따른다.
 
 ```java

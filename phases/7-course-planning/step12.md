@@ -37,7 +37,7 @@ public record JobReceiveRequest(
 ```
 
 - 매개변수를 한 줄에 몇 개 둘지는 **지금 코드가 묶어 둔 그대로** 둔다 — 지금 첫 줄에 있던 매개변수들은 새 첫 매개변수 줄로 내려간다. 120자를 넘게 되면 의미가 묶이는 것끼리 다시 나눈다.
-- 매개변수의 애노테이션(`@Valid @RequestBody`)은 그 매개변수와 같은 줄에 둔다.
+- 매개변수의 애노테이션(`@Valid @RequestBody`)은 그 매개변수와 같은 줄에 둔다. 매개변수 하나가 애노테이션과 함께 120자를 넘으면 CODE_STYLE §2 대로 애노테이션을 바로 위 줄에 같은 들여쓰기로 둔다(첫 실행이 `IntegrationTestConfiguration.java:579` 의 `filterFailure` 에서 이 경우로 `blocked` 였고, 규칙을 더했다).
 - 매개변수 목록 뒤의 빈 줄 · 본문 첫 줄은 CODE_STYLE §1 을 그대로 따른다 — 이 step 은 본문의 빈 줄을 바꾸지 않는다.
 
 ### 3. 검증 — 공백만 바뀌었다
