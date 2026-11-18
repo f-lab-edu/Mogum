@@ -154,6 +154,11 @@
       "review_notes": [
         "phases/7-course-planning/index.json — 이번 step 의 summary 에 화면 테스트 수(전후)를 적으라고 했다. 지금은 408개다. 하네스 메타데이터라 리뷰 대상에서는 뺐으니, 수가 맞게 적혔는지 사람이 확인한다."
       ]
+    },
+    {
+      "step": 12,
+      "name": "parameter-wrapping",
+      "status": "pending"
     }
   ],
   "created_at": "2026-11-17T18:36:01+0900",
