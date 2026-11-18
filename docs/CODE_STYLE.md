@@ -51,6 +51,12 @@ public JobResult receive(long userId, JobRequest request) {
     - 테스트 체인도 같다 — 대상을 고르는 호출과 그 대상에 거는 기대 · 동작이 짝이면 짝마다 한 줄이다. `.expectStatus().isOk()` · Mockito 의 `.given(jobRunner).releaseCurrent()` · ArchUnit 의 `.should().beAnnotatedWith(X)` · `.orShould().beAssignableTo(X)`.
     - 인자 · 매개변수는 쉼표 뒤에서 끊는다. 한 줄에 다 들어가지 않으면 의미가 묶이는 것끼리 둔다.
 - 검색할 문구(오류 문구 · 로그 문구 · SQL 조각)를 나눠야만 120자를 지킬 수 있으면 나누지 않고 넘겨도 된다.
+- **선언의 매개변수 목록이 한 줄에 다 들어가지 않으면 괄호를 따로 연다**(README 2026-11-18 — Google Java · Kotlin 공식 스타일과 같은 모양). 메서드 · 생성자 · record 칸 · `@Bean` 메서드가 대상이다.
+    - 여는 `(` 바로 뒤에서 줄을 바꾼다 — 첫 매개변수도 다음 줄로 내린다.
+    - 매개변수 줄은 선언 줄 + 8칸이다. 의미가 묶이는 것끼리 한 줄에 여럿 둘 수 있다.
+    - 마지막 매개변수 뒤에서 줄을 바꾸고, 닫는 `)` 를 **선언이 시작한 열**에 둔다. `{` · `throws …` 는 그 `)` 와 같은 줄에 둔다.
+    - 한 줄에 들어가면 지금처럼 한 줄이다. 매개변수의 애노테이션(`@Valid @RequestBody`)은 그 매개변수와 같은 줄에 둔다.
+    - 호출 인자(`new X(…)` · `method(…)`)는 이 규칙이 아니다 — 위의 「쉼표 뒤에서 끊는다」를 따른다.
 
 ```java
 boolean includeSucceeded = request.type() == JobType.MATERIAL
@@ -64,6 +70,18 @@ return generationJobRepository.findById(jobId)
         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
         .requestMatchers(HttpMethod.GET, "/api/me").authenticated()
         .anyRequest().denyAll())
+
+public record JobReceiveRequest(
+        String type, Long courseId, Long roadmapId, Long lessonId,
+        String topic, String level, String levelOther, String purpose,
+        String purposeOther, String memo, String feedback
+) {
+
+    public JobRunner(
+            EntityManager entityManager, PlatformTransactionManager platformTransactionManager,
+            CreditLedger creditLedger, Clock clock, WorkerProperties workerProperties,
+            List<JobGenerator> generators, ScheduledExecutorService renewals
+    ) {
 ```
 
 ## 3. 이름 — 의존 필드는 타입 이름 그대로
