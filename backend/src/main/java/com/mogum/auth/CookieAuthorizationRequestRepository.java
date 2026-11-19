@@ -71,10 +71,8 @@ public final class CookieAuthorizationRequestRepository
     }
 
     @Override
-    public void saveAuthorizationRequest(
-            OAuth2AuthorizationRequest authorization, HttpServletRequest request,
-            HttpServletResponse response
-    ) {
+    public void saveAuthorizationRequest(OAuth2AuthorizationRequest authorization, HttpServletRequest request,
+            HttpServletResponse response) {
         if (authorization == null && Boolean.TRUE.equals(request.getAttribute(CLEARED))) return;
 
         String value = authorization == null ? ""
@@ -96,10 +94,8 @@ public final class CookieAuthorizationRequestRepository
     }
 
     @Override
-    public OAuth2AuthorizationRequest removeAuthorizationRequest(
-            HttpServletRequest request,
-            HttpServletResponse response
-    ) {
+    public OAuth2AuthorizationRequest removeAuthorizationRequest(HttpServletRequest request,
+            HttpServletResponse response) {
         var authorization = loadAuthorizationRequest(request);
         saveAuthorizationRequest(null, request, response);
         return authorization;

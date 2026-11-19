@@ -17,10 +17,8 @@ public final class CourseFixtures {
         return Course.single(userId, input, title);
     }
 
-    public static Course inRoadmap(
-            Roadmap roadmap, int position, String title, String planDescription,
-            List<PlannedConcept> planConcepts
-    ) {
+    public static Course inRoadmap(Roadmap roadmap, int position, String title, String planDescription,
+            List<PlannedConcept> planConcepts) {
         return Course.inRoadmap(roadmap, position, title, planDescription, planConcepts);
     }
 

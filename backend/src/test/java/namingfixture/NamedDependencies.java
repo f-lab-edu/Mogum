@@ -18,10 +18,8 @@ public class NamedDependencies {
     private final int count;
     private UserRepository shortMutable;
 
-    public NamedDependencies(
-            UserRepository userRepository, TransactionTemplate releaseTransactionTemplate,
-            Clock time, Map<String, UserRepository> users, int count
-    ) {
+    public NamedDependencies(UserRepository userRepository, TransactionTemplate releaseTransactionTemplate,
+            Clock time, Map<String, UserRepository> users, int count) {
         this.userRepository = userRepository;
         this.releaseTransactionTemplate = releaseTransactionTemplate;
         this.time = time;

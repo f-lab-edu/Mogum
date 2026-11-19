@@ -87,10 +87,8 @@ class GenerationJobTest {
         assertQueued(job, JobType.MATERIAL, null, null, null, null, 91L);
     }
 
-    private void assertQueued(
-            GenerationJob job, JobType type, LearningInput input, String feedback,
-            Long courseId, Long roadmapId, Long lessonId
-    ) {
+    private void assertQueued(GenerationJob job, JobType type, LearningInput input, String feedback,
+            Long courseId, Long roadmapId, Long lessonId) {
         assertThat(job.getId()).isNull();
         assertThat(job.getCreatedAt()).isNull();
         assertThat(job.getUpdatedAt()).isNull();

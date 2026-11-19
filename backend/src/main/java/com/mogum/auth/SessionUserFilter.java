@@ -25,10 +25,8 @@ public final class SessionUserFilter extends OncePerRequestFilter {
     private final AuthenticationEntryPoint authenticationEntryPoint;
 
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request, HttpServletResponse response,
-            FilterChain chain
-    ) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+            FilterChain chain) throws ServletException, IOException {
         var session = request.getSession(false);
         if (session != null) {
             Object owner = session.getAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME);

@@ -69,10 +69,8 @@ public class LlmCall extends AuditedEntity {
         return call;
     }
 
-    public void finish(
-            LlmCallOutcome outcome, Integer inputTokens, Integer outputTokens,
-            BigDecimal cost, int durationMs
-    ) {
+    public void finish(LlmCallOutcome outcome, Integer inputTokens, Integer outputTokens,
+            BigDecimal cost, int durationMs) {
         this.outcome = Objects.requireNonNull(outcome);
         this.inputTokens = inputTokens;
         this.outputTokens = outputTokens;

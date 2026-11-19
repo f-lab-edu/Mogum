@@ -11,24 +11,18 @@ import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepo
 public final class DiscardingOAuth2AuthorizedClients
         implements OAuth2AuthorizedClientRepository, OAuth2AuthorizedClientService {
     @Override
-    public <T extends OAuth2AuthorizedClient> T loadAuthorizedClient(
-            String registrationId, Authentication principal,
-            HttpServletRequest request
-    ) {
+    public <T extends OAuth2AuthorizedClient> T loadAuthorizedClient(String registrationId, Authentication principal,
+            HttpServletRequest request) {
         return null;
     }
 
     @Override
-    public void saveAuthorizedClient(
-            OAuth2AuthorizedClient client, Authentication principal,
-            HttpServletRequest request, HttpServletResponse response
-    ) {}
+    public void saveAuthorizedClient(OAuth2AuthorizedClient client, Authentication principal,
+            HttpServletRequest request, HttpServletResponse response) {}
 
     @Override
-    public void removeAuthorizedClient(
-            String registrationId, Authentication principal,
-            HttpServletRequest request, HttpServletResponse response
-    ) {}
+    public void removeAuthorizedClient(String registrationId, Authentication principal,
+            HttpServletRequest request, HttpServletResponse response) {}
 
     @Override
     public <T extends OAuth2AuthorizedClient> T loadAuthorizedClient(String registrationId, String principalName) {

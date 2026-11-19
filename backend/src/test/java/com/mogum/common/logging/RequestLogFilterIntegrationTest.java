@@ -72,10 +72,8 @@ class RequestLogFilterIntegrationTest {
             "POST,/api/auth/logout,true,403,false", "GET,/api/log-test-missing,true,404,false",
             "POST,/api/me,true,405,true"})
     @DisplayName("인증 CSRF MVC 오류는 최종 상태로 접근 줄 하나를 남긴다")
-    void logsFinalStatusOnce(
-            String method, String path, boolean authenticated, int status, boolean csrf,
-            CapturedOutput output
-    ) throws Exception {
+    void logsFinalStatusOnce(String method, String path, boolean authenticated, int status, boolean csrf,
+            CapturedOutput output) throws Exception {
         // given
         String token = csrf
                 ? send("GET", "/api/me", true, null).getResponseCookies().getFirst("XSRF-TOKEN").getValue()
@@ -256,10 +254,8 @@ class RequestLogFilterIntegrationTest {
         return builder.exchange().returnResult(String.class);
     }
 
-    private String assertAccess(
-            EntityExchangeResult<String> response, int status, String method, String path,
-            boolean authenticated, CapturedOutput output
-    ) throws InterruptedException {
+    private String assertAccess(EntityExchangeResult<String> response, int status, String method, String path,
+            boolean authenticated, CapturedOutput output) throws InterruptedException {
         assertThat(response.getStatus().value()).isEqualTo(status);
         var id = requestId(response);
         assertThat(UUID.fromString(id).toString()).isEqualTo(id);

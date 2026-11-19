@@ -29,26 +29,20 @@ public class CourseController {
     }
 
     @GetMapping("/api/courses/{id}")
-    public ApiResponse<CourseResponse> read(
-            @AuthenticationPrincipal AccountPrincipal.Member member,
-            @PathVariable long id
-    ) {
+    public ApiResponse<CourseResponse> read(@AuthenticationPrincipal AccountPrincipal.Member member,
+            @PathVariable long id) {
         return ApiResponse.of(courseReadService.read(member.userId(), id));
     }
 
     @PostMapping("/api/courses/{id}/start")
-    public ApiResponse<CourseResponse> start(
-            @AuthenticationPrincipal AccountPrincipal.Member member,
-            @PathVariable long id
-    ) {
+    public ApiResponse<CourseResponse> start(@AuthenticationPrincipal AccountPrincipal.Member member,
+            @PathVariable long id) {
         return ApiResponse.of(courseCommandService.start(member.userId(), id));
     }
 
     @PatchMapping("/api/courses/{id}")
-    public ApiResponse<CourseResponse> rename(
-            @AuthenticationPrincipal AccountPrincipal.Member member,
-            @PathVariable long id, @Valid @RequestBody CourseTitleRequest request
-    ) {
+    public ApiResponse<CourseResponse> rename(@AuthenticationPrincipal AccountPrincipal.Member member,
+            @PathVariable long id, @Valid @RequestBody CourseTitleRequest request) {
         return ApiResponse.of(courseCommandService.rename(member.userId(), id, request.title()));
     }
 }

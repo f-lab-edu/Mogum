@@ -73,10 +73,8 @@ public class RoadmapReadService {
                 course.getPlanDescription(), course.getPlanConcepts(), course.getStatus(), progress, jobId);
     }
 
-    private RoadmapResponse.NextCourse nextCourse(
-            List<Course> courses,
-            Map<Long, CourseJobRepository.PlanningJob> jobs
-    ) {
+    private RoadmapResponse.NextCourse nextCourse(List<Course> courses,
+            Map<Long, CourseJobRepository.PlanningJob> jobs) {
         return courses.stream()
                 .filter(course -> course.getStatus() == CourseStatus.NOT_PLANNED && !jobs.containsKey(course.getId()))
                 .findFirst()

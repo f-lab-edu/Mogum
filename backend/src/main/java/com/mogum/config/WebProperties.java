@@ -6,10 +6,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import java.net.URI;
 
 @ConfigurationProperties("app.web")
-public record WebProperties(
-        @DefaultValue("http://localhost:5173") String origin,
-        @DefaultValue("") String cookieDomain
-) {
+public record WebProperties(@DefaultValue("http://localhost:5173") String origin,
+        @DefaultValue("") String cookieDomain) {
     public WebProperties {
         var uri = URI.create(origin);
         if (!("http".equals(uri.getScheme()) || "https".equals(uri.getScheme()))

@@ -24,11 +24,9 @@ public final class ReplanRoadmapGenerator implements JobGenerator {
     private final EntityManager entityManager;
     private final TransactionTemplate transactionTemplate;
 
-    public ReplanRoadmapGenerator(
-            ChatCall chatCall, ChatSettings chatSettings, RoadmapPlanFormat roadmapPlanFormat,
+    public ReplanRoadmapGenerator(ChatCall chatCall, ChatSettings chatSettings, RoadmapPlanFormat roadmapPlanFormat,
             CourseRepository courseRepository, RoadmapRepository roadmapRepository, EntityManager entityManager,
-            PlatformTransactionManager platformTransactionManager
-    ) {
+            PlatformTransactionManager platformTransactionManager) {
         this.chatCall = chatCall;
         this.chatSettings = chatSettings;
         this.roadmapPlanFormat = roadmapPlanFormat;

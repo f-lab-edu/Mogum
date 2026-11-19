@@ -50,10 +50,8 @@ public class Lesson extends AuditedEntity {
     @Column(name = "completed_at")
     private Instant completedAt;
 
-    public static Lesson listed(
-            Course course, int position, String title, String description,
-            List<PlannedConcept> concepts
-    ) {
+    public static Lesson listed(Course course, int position, String title, String description,
+            List<PlannedConcept> concepts) {
         var lesson = new Lesson();
         lesson.course = course;
         lesson.position = position;

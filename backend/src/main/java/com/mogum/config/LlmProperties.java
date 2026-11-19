@@ -9,10 +9,8 @@ import java.time.Duration;
 import java.util.Map;
 
 @ConfigurationProperties("app.llm")
-public record LlmProperties(
-        Openai openai, Map<String, ChatSettings> chats, Map<String, TokenPrices> prices,
-        Duration databaseAllowance
-) {
+public record LlmProperties(Openai openai, Map<String, ChatSettings> chats, Map<String, TokenPrices> prices,
+        Duration databaseAllowance) {
     private static final String PLANNING_CHAT = "planning";
 
     public LlmProperties {

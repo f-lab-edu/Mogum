@@ -19,10 +19,8 @@ public final class RoadmapCoursePlanReader {
     private final LessonRepository lessonRepository;
     private final TransactionTemplate transactionTemplate;
 
-    public RoadmapCoursePlanReader(
-            CourseRepository courseRepository, LessonRepository lessonRepository,
-            PlatformTransactionManager platformTransactionManager
-    ) {
+    public RoadmapCoursePlanReader(CourseRepository courseRepository, LessonRepository lessonRepository,
+            PlatformTransactionManager platformTransactionManager) {
         this.courseRepository = courseRepository;
         this.lessonRepository = lessonRepository;
         this.transactionTemplate = new TransactionTemplate(platformTransactionManager);

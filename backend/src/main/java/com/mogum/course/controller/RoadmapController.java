@@ -22,10 +22,8 @@ public class RoadmapController {
     }
 
     @GetMapping("/api/roadmaps/{id}")
-    public ApiResponse<RoadmapResponse> read(
-            @AuthenticationPrincipal AccountPrincipal.Member member,
-            @PathVariable long id
-    ) {
+    public ApiResponse<RoadmapResponse> read(@AuthenticationPrincipal AccountPrincipal.Member member,
+            @PathVariable long id) {
         return ApiResponse.of(roadmapReadService.read(member.userId(), id));
     }
 }

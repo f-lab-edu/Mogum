@@ -388,10 +388,8 @@ public class IntegrationTestConfiguration {
     }
 
     @Bean
-    public TestRequests testRequests(
-            RestTestClient restTestClient,
-            JdbcIndexedSessionRepository jdbcIndexedSessionRepository
-    ) {
+    public TestRequests testRequests(RestTestClient restTestClient,
+            JdbcIndexedSessionRepository jdbcIndexedSessionRepository) {
         return new TestRequests(restTestClient, jdbcIndexedSessionRepository);
     }
 
@@ -538,13 +536,12 @@ public class IntegrationTestConfiguration {
         }
     }
 
-    record ValidationRequest(@NotBlank @Size(max = 5) String topic, @NotBlank @Size(max = 10) String purpose) { }
+    record ValidationRequest(@NotBlank @Size(max = 5) String topic,
+            @NotBlank @Size(max = 10) String purpose) { }
 
-    record OtherValidationRequest(
-            @Size(min = 2, max = 5) String topic,
+    record OtherValidationRequest(@Size(min = 2, max = 5) String topic,
             @Pattern(regexp = "학습") String purpose,
-            @NotNull String requestId
-    ) { }
+            @NotNull String requestId) { }
 
     @TestConfiguration(proxyBeanMethods = false)
     public static class ServletErrors {
@@ -581,8 +578,7 @@ public class IntegrationTestConfiguration {
         @Bean
         FilterRegistrationBean<Filter> filterFailure(
                 @Qualifier("securityFilterChainRegistration")
-                AbstractFilterRegistrationBean<?> securityFilterRegistrationBean
-        ) {
+                AbstractFilterRegistrationBean<?> securityFilterRegistrationBean) {
             Filter failure = (request, response, chain) -> {
                 if ("/api/test-request-log-filter-failure".equals(((HttpServletRequest) request).getRequestURI())) {
                     throw new RuntimeException("request log filter failure marker");

@@ -195,10 +195,8 @@ class JobRunnerIntegrationTest {
             "PROVIDER_UNAVAILABLE,3,FAILED,3", "INVALID_OUTPUT,1,SUCCEEDED,2", "INVALID_OUTPUT,3,FAILED,3",
             "PROVIDER_REJECTED,3,FAILED,1", "INPUT_TOO_LARGE,3,FAILED,1"})
     @DisplayName("일시적과 형식 실패만 같은 꺼내기 안에서 정한 횟수까지 다시 만든다")
-    void retriesOnlyRecoverableFailures(
-            GenerationOutcome.Failure failure, int failures, JobStatus status, int calls,
-            CapturedOutput output
-    ) {
+    void retriesOnlyRecoverableFailures(GenerationOutcome.Failure failure, int failures, JobStatus status, int calls,
+            CapturedOutput output) {
         // given
         long userId = user();
         long id = jobIntakeService.receive(userId, request(userId, JobType.NEW_COURSE)).id();

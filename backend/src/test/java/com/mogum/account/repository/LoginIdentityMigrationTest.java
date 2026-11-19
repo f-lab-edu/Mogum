@@ -170,10 +170,8 @@ class LoginIdentityMigrationTest {
         }
     }
 
-    private record LegacyData(
-            List<Map<String, Object>> users, List<Map<String, Object>> sessions,
-            String attributeBase64, String sessionId
-    ) {
+    private record LegacyData(List<Map<String, Object>> users, List<Map<String, Object>> sessions,
+            String attributeBase64, String sessionId) {
     }
 
     private static final class MigrationDatabase implements AutoCloseable {
