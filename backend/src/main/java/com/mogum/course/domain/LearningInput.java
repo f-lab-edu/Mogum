@@ -32,8 +32,10 @@ public class LearningInput {
     @Column(columnDefinition = "text")
     private String memo;
 
-    public LearningInput(String topic, Level level, String levelOther,
-            Purpose purpose, String purposeOther, String memo) {
+    public LearningInput(
+            String topic, Level level, String levelOther,
+            Purpose purpose, String purposeOther, String memo
+    ) {
         this.topic = topic;
         this.level = level;
         this.levelOther = levelOther;

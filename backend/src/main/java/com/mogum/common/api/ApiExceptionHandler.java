@@ -28,8 +28,10 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @Override
-    protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException exception,
-            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(
+            MethodArgumentNotValidException exception,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request
+    ) {
         var errors = exception.getBindingResult().getAllErrors();
         var violations = errors.stream().map(ApiExceptionHandler::fieldViolation).toList();
         var response = !violations.isEmpty() && violations.stream().allMatch(violation -> violation != null)
@@ -74,8 +76,10 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @Override
-    protected ResponseEntity<Object> createResponseEntity(Object body, HttpHeaders headers,
-            HttpStatusCode status, WebRequest request) {
+    protected ResponseEntity<Object> createResponseEntity(
+            Object body, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request
+    ) {
         var response = ApiErrorResponses.forStatus(status.value(), headers);
         return new ResponseEntity<>(response.getBody(), response.getHeaders(), response.getStatusCode());
     }

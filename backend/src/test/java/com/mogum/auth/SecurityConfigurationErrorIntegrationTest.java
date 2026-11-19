@@ -76,8 +76,7 @@ class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
     @ParameterizedTest(name = "등록되지 않은 로그인 경로 인증 {0}")
     @ValueSource(booleans = {false, true})
     @DisplayName("미등록 로그인 경로는 ERROR 디스패치로 JSON 404를 주고 오류 로그가 없다")
-    void dispatchesUnknownRegistrationWithoutErrorLog(boolean authenticated,
-            CapturedOutput output) throws Exception {
+    void dispatchesUnknownRegistrationWithoutErrorLog(boolean authenticated, CapturedOutput output) throws Exception {
         // given
         int logOffset = output.getAll().length();
         var client = authenticated ? client(approvedSession()) : testRequests.anonymous();

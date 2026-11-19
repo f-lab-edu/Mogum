@@ -33,8 +33,10 @@ class CourseRepositoryTest {
     @CsvSource({"BEGINNER,,WORK,,자바 예제", "BASICS,,INTERVIEW,,", "FAMILIAR,,GENERAL,,",
             "OTHER,실습 경험,OTHER,개인 프로젝트,"})
     @DisplayName("단일 코스는 입력과 검토 중 상태를 저장하고 계획과 학습 시각은 비운다")
-    void reloadsSingleCourseWithInput(Level level, String levelOther, Purpose purpose,
-            String purposeOther, String memo) {
+    void reloadsSingleCourseWithInput(
+            Level level, String levelOther, Purpose purpose,
+            String purposeOther, String memo
+    ) {
         // given
         var user = userRepository.save(UserFixtures.user("me@example.com"));
         var input = new LearningInput("자바", level, levelOther, purpose, purposeOther, memo);

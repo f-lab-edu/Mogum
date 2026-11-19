@@ -19,8 +19,10 @@ public class ApplyController {
     private final ApplyService applyService;
 
     @PostMapping("/api/account/apply")
-    public ApiResponse<MeResponse> apply(@AuthenticationPrincipal AccountPrincipal principal,
-            HttpServletRequest request) {
+    public ApiResponse<MeResponse> apply(
+            @AuthenticationPrincipal AccountPrincipal principal,
+            HttpServletRequest request
+    ) {
         var member = applyService.apply(principal);
 
         // 서비스의 트랜잭션이 커밋된 뒤에만 신원 세션을 회원 세션으로 바꾼다.

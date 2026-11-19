@@ -30,8 +30,10 @@ public final class OAuthLoginHandler implements AuthenticationSuccessHandler, Au
     private final CookieAuthorizationRequestRepository cookieAuthorizationRequestRepository;
 
     @Override
-    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
-            Authentication authentication) throws IOException {
+    public void onAuthenticationSuccess(
+            HttpServletRequest request, HttpServletResponse response,
+            Authentication authentication
+    ) throws IOException {
         try {
             ExternalAccount account;
             try {
@@ -82,8 +84,10 @@ public final class OAuthLoginHandler implements AuthenticationSuccessHandler, Au
     }
 
     @Override
-    public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
-            AuthenticationException exception) throws IOException {
+    public void onAuthenticationFailure(
+            HttpServletRequest request, HttpServletResponse response,
+            AuthenticationException exception
+    ) throws IOException {
         fail(request, response, "login_failed", failureReason(exception));
     }
 
@@ -103,8 +107,10 @@ public final class OAuthLoginHandler implements AuthenticationSuccessHandler, Au
         };
     }
 
-    private void fail(HttpServletRequest request, HttpServletResponse response,
-            String error, String reason) throws IOException {
+    private void fail(
+            HttpServletRequest request, HttpServletResponse response,
+            String error, String reason
+    ) throws IOException {
         cookieAuthorizationRequestRepository.saveAuthorizationRequest(null, request, response);
         SecurityContextHolder.clearContext();
         response.sendRedirect(origin + "/login?error=" + error);

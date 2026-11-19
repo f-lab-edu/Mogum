@@ -60,8 +60,10 @@ public final class GenerationJobFixtures {
                 """, errorType.name(), Timestamp.from(finishedAt), Timestamp.from(finishedAt), id);
     }
 
-    public static void succeeded(JdbcTemplate jdbc, long id, Long courseId, Long roadmapId, Long lessonId,
-            Instant finishedAt) {
+    public static void succeeded(
+            JdbcTemplate jdbc, long id, Long courseId, Long roadmapId, Long lessonId,
+            Instant finishedAt
+    ) {
         jdbc.update("""
                 UPDATE generation_jobs SET status = 'SUCCEEDED', course_id = ?, roadmap_id = ?, lesson_id = ?,
                 lease_until = NULL, error_type = NULL, finished_at = ?, updated_at = ? WHERE id = ?

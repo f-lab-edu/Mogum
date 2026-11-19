@@ -25,10 +25,12 @@ public final class ReplanCourseGenerator implements JobGenerator {
     private final EntityManager entityManager;
     private final TransactionTemplate transactionTemplate;
 
-    public ReplanCourseGenerator(ChatCall chatCall, ChatSettings chatSettings, CoursePlanFormat coursePlanFormat,
+    public ReplanCourseGenerator(
+            ChatCall chatCall, ChatSettings chatSettings, CoursePlanFormat coursePlanFormat,
             RoadmapCoursePlanReader roadmapCoursePlanReader, CourseRepository courseRepository,
             LessonRepository lessonRepository, EntityManager entityManager,
-            PlatformTransactionManager platformTransactionManager) {
+            PlatformTransactionManager platformTransactionManager
+    ) {
         this.chatCall = chatCall;
         this.chatSettings = chatSettings;
         this.coursePlanFormat = coursePlanFormat;

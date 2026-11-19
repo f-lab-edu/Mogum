@@ -37,13 +37,17 @@ public final class ApiErrorResponses {
         return create(status, headers, code, code.message(), null, null);
     }
 
-    public static void write(HttpServletResponse response, ObjectMapper mapper,
-            ErrorCode code, Integer retryAfterSeconds) throws IOException {
+    public static void write(
+            HttpServletResponse response, ObjectMapper mapper,
+            ErrorCode code, Integer retryAfterSeconds
+    ) throws IOException {
         write(response, mapper, code, retryAfterSeconds, null);
     }
 
-    public static void write(HttpServletResponse response, ObjectMapper mapper,
-            ErrorCode code, Integer retryAfterSeconds, List<FieldViolation> fields) throws IOException {
+    public static void write(
+            HttpServletResponse response, ObjectMapper mapper,
+            ErrorCode code, Integer retryAfterSeconds, List<FieldViolation> fields
+    ) throws IOException {
         var error = of(code, retryAfterSeconds, fields);
         response.setStatus(error.getStatusCode().value());
         error.getHeaders().forEach((name, values) -> {
@@ -53,8 +57,10 @@ public final class ApiErrorResponses {
         mapper.writeValue(response.getOutputStream(), error.getBody());
     }
 
-    private static ResponseEntity<ApiError> create(int status, HttpHeaders headers,
-            ErrorCode code, String message, Integer retryAfterSeconds, List<FieldViolation> fields) {
+    private static ResponseEntity<ApiError> create(
+            int status, HttpHeaders headers,
+            ErrorCode code, String message, Integer retryAfterSeconds, List<FieldViolation> fields
+    ) {
         if (retryAfterSeconds != null && retryAfterSeconds <= 0) {
             throw new IllegalArgumentException("retryAfterSeconds must be positive");
         }

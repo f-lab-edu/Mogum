@@ -26,8 +26,10 @@ public final class ChatCall {
         this.prices = Map.copyOf(prices);
     }
 
-    public <T> ChatResult<T> call(JobSnapshot job, ChatSettings settings, String system, String user,
-            Function<String, Optional<T>> parser) {
+    public <T> ChatResult<T> call(
+            JobSnapshot job, ChatSettings settings, String system, String user,
+            Function<String, Optional<T>> parser
+    ) {
         // 호출자가 연결을 쥔 채 들어오면 유료 호출을 보내지 않는다.
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             return new ChatResult.Failed<>(GenerationOutcome.Failure.PROVIDER_UNAVAILABLE);
