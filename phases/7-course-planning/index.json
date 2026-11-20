@@ -166,6 +166,11 @@
         "The step file estimated about 57 files and 102 declarations; Codex changed 56 files and 85 declarations. My searches found no unconverted multi-line declarations left, so the estimate was probably counted on a different basis. A person may want to confirm the gap so the harness backlog does not record it as a dropped item.",
         "phases/index.json — the 7-course-planning entry still reads \"status\": \"blocked\" (with a blocked_at) from the first run. This is harness metadata, so it is outside this review, but the harness or a person should check that it is restored to completed when the commit is made."
       ]
+    },
+    {
+      "step": 13,
+      "name": "sonar-fixes",
+      "status": "pending"
     }
   ],
   "created_at": "2026-11-17T18:36:01+0900",
