@@ -62,11 +62,11 @@ public final class ChatCall {
             }
             if (outcome == LlmCallOutcome.SUCCEEDED) {
                 try {
-                    parsed = parser.apply(text.toString());
+                    parsed = Optional.ofNullable(parser.apply(text.toString())).flatMap(Function.identity());
                 } catch (RuntimeException ignored) {
                     // 해석 예외에는 출력 원문이 섞일 수 있다. 작업 실패로만 바꾼다.
                 }
-                if (parsed == null || parsed.isEmpty()) outcome = LlmCallOutcome.INVALID_OUTPUT;
+                if (parsed.isEmpty()) outcome = LlmCallOutcome.INVALID_OUTPUT;
             }
 
             finish(callId, outcome, reply.usage(), settings.model(), duration);

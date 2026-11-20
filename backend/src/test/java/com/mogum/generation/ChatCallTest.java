@@ -131,6 +131,27 @@ class ChatCallTest {
     }
 
     @Test
+    @DisplayName("해석 함수가 null을 내면 사용량을 보존하고 마지막 호출을 형식 실패로 마친다")
+    void recordsNullParse() {
+        // given
+        given(llmCallWriter.start(1L, 2L, JobType.NEW_COURSE, LlmCallType.CHAT, "gpt-5.6-terra"))
+                .willReturn(10L);
+        given(chatProvider.send(any())).willReturn(new ChatProvider.Reply("완성", LlmCallOutcome.SUCCEEDED,
+                null, new ChatProvider.Usage(100, 40, 20)));
+        var chat = new ChatCall(chatProvider, llmCallWriter, prices);
+
+        // when
+        var result = chat.call(jobSnapshot, chatSettings, "system", "user", text -> null);
+
+        // then
+        assertThat(result).isEqualTo(new ChatResult.Failed<>(GenerationOutcome.Failure.INVALID_OUTPUT));
+        then(llmCallWriter).should().finish(eq(10L), eq(LlmCallOutcome.INVALID_OUTPUT), eq(100), eq(20),
+                argThat(cost -> cost.compareTo(new BigDecimal("0.000368")) == 0), anyInt());
+        then(chatProvider).should().send(any());
+        then(chatProvider).shouldHaveNoMoreInteractions();
+    }
+
+    @Test
     @DisplayName("해석 함수가 빈 값을 내면 마지막 호출을 형식 실패로 마친다")
     void recordsEmptyParse() {
         // given

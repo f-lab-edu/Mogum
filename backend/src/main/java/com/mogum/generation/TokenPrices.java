@@ -15,7 +15,7 @@ public record TokenPrices(BigDecimal input, BigDecimal cachedInput, BigDecimal o
         if (usage == null || usage.inputTokens() == null || usage.outputTokens() == null) return null;
 
         int cached = usage.cachedInputTokens() == null ? 0 : usage.cachedInputTokens();
-        return input.multiply(BigDecimal.valueOf(usage.inputTokens() - cached))
+        return input.multiply(BigDecimal.valueOf((long) usage.inputTokens() - cached))
                 .add(cachedInput.multiply(BigDecimal.valueOf(cached)))
                 .add(output.multiply(BigDecimal.valueOf(usage.outputTokens())))
                 .movePointLeft(6);
