@@ -1,0 +1,49 @@
+{
+  "project": "Mogum",
+  "phase": "7a-naver-style",
+  "steps": [
+    {
+      "step": 0,
+      "name": "spotless-format",
+      "status": "completed",
+      "started_at": "2026-11-21T11:04:06+0900",
+      "summary": "Spotless 8.12.0(Gradle 9.1.0·Java 21)으로 네이버 Eclipse 기본 버전 포매터·importOrder·trimTrailingWhitespace·endWithNewline만 설정; e12658edad4017e2c00ef560704129901770cc2b 원본 크기: naver-eclipse-formatter.xml 30852, naver.importorder 139, naver-checkstyle-rules.xml 17238, naver-checkstyle-suppressions.xml 182, naver-intellij-formatter.xml 2879, 루트 .editorconfig 229바이트(모두 원본 바이트 동일), 출처 README 작성; Java 332개 대상 중 323개 포맷, 전체 332개 import 제외 공백 제거 본문·import 집합 동일, 문자열/문자 리터럴 7813개(텍스트 블록 141개 포함) 값 동일; spotlessCheck·build 통과, 서버 테스트 전후 2050개 및 목록 동일(실패·오류·건너뜀 0).",
+      "completed_at": "2026-11-21T11:10:40+0900",
+      "review_notes": [
+        "검증 범위 — 리뷰어는 gradle·git 명령만 쓸 수 있어, 「import 를 뺀 공백 제거 비교」와 「import 집합 비교」를 직접 다시 돌리지 못했다. Codex summary 의 수치(332개 모두 같음 · 리터럴 7813개 · 텍스트 블록 141개 값 같음)와 표본 diff · 전체 테스트 통과(2050개, 실패 0)로 판단했다 → 필요하면 phase 리뷰(/review) 때 사람이 임시 스크립트로 한 번 더 확인한다.",
+        "backend/src/main/java/com/mogum/generation/plan/PlanPromptSupport.java 등 — 포매터가 한 줄 if 를 중괄호 없는 두 줄로 나눴다(예: `if (stream == null)` 다음 줄에 `throw`). 동작은 같지만 네이버 Checkstyle 의 NeedBraces 에 걸릴 것으로 보인다 → step 1 에서 처리할 범위다.",
+        ".editorconfig:9-10 — 원본 그대로 `[*.bat] end_of_line = crlf` 이 들어 있다. 편집기에만 영향을 주고 지금 동작은 바꾸지 않지만, `backend/gradlew.bat` 를 편집기로 열어 저장하면 줄바꿈이 CRLF 로 바뀔 수 있다 → step 2 문서화 때 한 줄 적어 두면 좋다."
+      ]
+    },
+    {
+      "step": 1,
+      "name": "checkstyle-fixes",
+      "status": "completed",
+      "started_at": "2026-11-21T11:10:41+0900",
+      "summary": "Checkstyle 14.4.0 플러그인·원본 네이버 규칙/suppressions·maxWarnings=0·ignoreFailures=false·기본 check 연결; 중괄호 243곳 추가, 보조 클래스 2개(SecurityScenario·OAuthScenario) 같은 패키지의 새 파일로 분리, 변수 이름 2개(postgreSQLContainer→postgreSqlContainer·openAIClient→openAiClient) 변경, 일반 문자열 17곳·텍스트 블록 7곳 값 보존 줄 나누기(각각 상수식 연결·줄 끝 역슬래시); 임시 javac 파싱 비교로 331개 최상위 타입의 정규화 AST·전체 리터럴 값 10742개 동일(줄 나눈 24곳 모두 포함), 타입·공개 API·로직·네이버 설정·docs·CI 변경 없음; @checkstyle:off/on 82범위(모두 임시 사본에서 주석 제거 시 해당 범위 위반 재현), 목록(backend/src/ 기준): 인접 텍스트 블록 공백 들여쓰기 1범위: test/java/com/mogum/job/controller/JobControllerIntegrationTest.java:383-390; 텍스트 블록 공백 들여쓰기 34범위: main/java/com/mogum/course/repository/JpaCourseJobRepository.java:18-26/36-42, main/java/com/mogum/worker/JobRunner.java:166-179/262-268, test/java/com/mogum/account/repository/AccountSchemaMigrationTest.java:52-58/60-65/70-77/78-83/85-91, test/java/com/mogum/account/repository/LoginIdentityMigrationTest.java:59-65/74-80/202-208, test/java/com/mogum/auth/SecurityConfigurationIntegrationTest.java:192-199, test/java/com/mogum/card/repository/CardSchemaRepositoryTest.java:310-317, test/java/com/mogum/common/api/ApiErrorResponsesTest.java:56-62, test/java/com/mogum/common/api/ApiExceptionHandlerTest.java:69-74/88-93/144-150/294-299, test/java/com/mogum/course/repository/CourseRepositoryTest.java:101-106, test/java/com/mogum/course/repository/LessonRepositoryTest.java:66-71, test/java/com/mogum/deploy/AwsFilesTest.java:64-78/88-94, test/java/com/mogum/deploy/BackupFilesScriptTest.java:121-174, test/java/com/mogum/deploy/DeployFilesScriptTest.java:122-172, test/java/com/mogum/deploy/WorkflowFilesScriptTest.java:194-207, test/java/com/mogum/generation/ReplanRoadmapGeneratorIntegrationTest.java:101-106, test/java/com/mogum/generation/llm/FakeOpenAiServer.java:81-89/93-98, test/java/com/mogum/job/controller/JobControllerIntegrationTest.java:129-135/203-209, test/java/com/mogum/job/controller/JobControllerTest.java:81-86/274-279, test/java/com/mogum/support/IntegrationTestConfiguration.java:205-212; 포매터가 한 줄로 유지하는 빈 선언·블록 44범위: main/java/com/mogum/auth/DiscardingOAuth2AuthorizedClients.java:22-24/28-30/38-40/43-45, main/java/com/mogum/common/api/ApiErrorResponses.java:16-18, main/java/com/mogum/generation/GeneratedResult.java:4-6, main/java/com/mogum/generation/GenerationFailures.java:8-10, main/java/com/mogum/generation/plan/PlanJson.java:16-18, main/java/com/mogum/generation/plan/PlanPromptSupport.java:13-15, main/java/com/mogum/job/NewCourseIntakeHandler.java:15-17, main/java/com/mogum/job/NewRoadmapIntakeHandler.java:15-17, test/java/com/mogum/ArchitectureTest.java:675-677/731-733, test/java/com/mogum/account/domain/UserFixtures.java:8-10, test/java/com/mogum/account/repository/FakeUserRepository.java:15-17, test/java/com/mogum/account/service/ApplyServiceTest.java:116-118, test/java/com/mogum/archfixture/generation/GenerationPort.java:3-5, test/java/com/mogum/archfixture/generation/TransactionalGeneration.java:7-9, test/java/com/mogum/archfixture/testrules/LegacyIT.java:4-6, test/java/com/mogum/archfixture/worker/JakartaTransactionalWorkerMethod.java:7-9, test/java/com/mogum/archfixture/worker/TransactionalWorkerMethod.java:7-9, test/java/com/mogum/archfixture/worker/WorkerPort.java:3-5, test/java/com/mogum/card/domain/CardConceptFixtures.java:4-6, test/java/com/mogum/card/domain/CardFixtures.java:6-8, test/java/com/mogum/card/domain/ConceptFixtures.java:6-8, test/java/com/mogum/card/domain/ReviewFixtures.java:4-6, test/java/com/mogum/common/api/ApiExceptionHandlerTest.java:357-359, test/java/com/mogum/config/CreditPropertiesTest.java:83-85, test/java/com/mogum/config/LlmPropertiesTest.java:84-86, test/java/com/mogum/config/WebPropertiesTest.java:90-92, test/java/com/mogum/config/WorkerPropertiesTest.java:76-78, test/java/com/mogum/course/domain/CourseFixtures.java:9-11, test/java/com/mogum/course/domain/LessonFixtures.java:9-11, test/java/com/mogum/course/domain/MaterialFixtures.java:4-6, test/java/com/mogum/course/domain/RoadmapFixtures.java:6-8, test/java/com/mogum/generation/call/domain/LlmCallFixtures.java:6-8, test/java/com/mogum/job/domain/GenerationJobFixtures.java:12-14, test/java/com/mogum/job/repository/GenerationJobSchemaRepositoryTest.java:506-508, test/java/com/mogum/job/service/JobReadServiceIntegrationTest.java:82-84, test/java/com/mogum/support/IntegrationTest.java:31-33, test/java/com/mogum/support/LocalCookieIntegrationTest.java:23-25, test/java/com/mogum/support/PostgresTestConfiguration.java:16-18, test/java/com/mogum/support/RepositoryTest.java:30-32, test/java/repositoryfixture/BroadUserRepository.java:7-9; 단항 연산자·switch 간격 충돌 1범위: test/java/com/mogum/job/service/JobIntakeServiceTest.java:215-217; 두 번째 switch 인자 들여쓰기 충돌 1범위: test/java/com/mogum/job/service/JobReadServiceIntegrationTest.java:91-95; 애노테이션 선언 중괄호 간격 충돌 1범위: main/java/com/mogum/job/dto/ValidJobRequest.java:14-16; spotlessApply 재적용 후 spotlessCheck·build·ArchUnit 통과, Checkstyle 위반 0, 서버 테스트 전후 2050개 및 전체 테스트 목록 동일(실패·오류·건너뜀 0).",
+      "completed_at": "2026-11-21T11:45:37+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/course/domain/Material.java:22-23 — 제약 이름을 단어 가운데서 `\"materials_l\" + \"esson_id_key\"` 로 나눴다. 값은 같지만 이름을 grep 으로 찾을 수 없다 → phase 리뷰 때 `\"materials_lesson_id_key\"` 를 통째로 다음 줄에 두는 등 단어 경계에서 나누는 모양을 검토한다.",
+        "backend/src/test/java/com/mogum/deploy/AwsFilesTest.java — 텍스트 블록이 `ACC\\` / `OUNT_ID` 와 `:sub\\` / `\":\"repo…` 처럼 토큰 가운데서 끊긴다. 값은 같지만 정책 JSON 을 읽기 어렵다 → 키 · 값 경계(`,` 뒤)에서 나누는 편이 낫다.",
+        "backend/src/test/java/com/mogum/auth/DiscardingOAuth2AuthorizedClientsTest.java:508-510 · backend/src/main/java/com/mogum/worker/JobRunner.java:323 — 식 가운데와 빈 catch 주석 뒤에 빈 줄이 새로 생겼다. 동작에는 영향이 없다 → 꼭 필요한 빈 줄인지 phase 리뷰 때 한 번 본다.",
+        "검증 범위 — 리뷰어는 gradle · git 명령만 쓸 수 있어, 리터럴 값 비교(10742개)와 82범위 각각의 「주석을 빼면 위반이 다시 나는지」를 직접 다시 돌리지 못했다. 줄을 나눈 24곳은 diff 에서 손으로 확인했다 → 필요하면 /review 때 사람이 임시 스크립트로 한 번 더 확인한다.",
+        "`@checkstyle:off` 가 82범위로 많다. 그중 텍스트 블록 34범위는 규칙 `[indentation-tab]`(`^\\t* `)이 블록 안 SQL · 셸의 스페이스 들여쓰기에 걸려서 생겼다 → step 2 문서화 때 CODE_STYLE 에 「텍스트 블록 안 스페이스 들여쓰기는 `@checkstyle:off` 로 감싼다」는 관례를 한 줄 적어 두면, 다음 작업자가 같은 판단을 다시 하지 않는다."
+      ]
+    },
+    {
+      "step": 2,
+      "name": "ci-style-check",
+      "status": "completed",
+      "started_at": "2026-11-21T11:45:37+0900",
+      "summary": "CI backend: ./backend/gradlew -p backend spotlessCheck checkstyleMain checkstyleTest test(다른 작업·단계·액션 SHA 유지); CiWorkflowFilesTest 명령 기대·설명 갱신, SonarAnalysisFilesTest 상수·설명에 커버리지 목적 명시—Sonar는 CI 명령 동일성이 아니라 test의 JaCoCo 리포트 생성이 목적이므로 기존 test 명령·워크플로 유지; .git-blame-ignore-revs에 step 0 feat 95863af51752c484e6d8cd209cc9436e8fd00f2f·step 1 feat e16d47db0a7df7ab569a0399c990bb29685b7dc6 등록; CODE_STYLE §1 도구 버전(Spotless 8.12.0·Checkstyle 14.4.0)·설정 경로·checkstyle 예외 구간·bat CRLF, deploy/README PR 검사·04 §2.1 config/naver 경로·AGENTS 로컬 blame 명령 반영(spotlessApply 명령 일치 확인·유지); 워크플로 시험 14개·build 통과, 서버 시험 2050개 실패·오류·건너뜀 0, Checkstyle 위반 0·spotlessCheck 통과; 커밋하지 않음.",
+      "completed_at": "2026-11-21T11:50:58+0900",
+      "review_notes": [
+        "docs/CODE_STYLE.md:19 — `.editorconfig` 의 `*.bat` 이 CRLF 라는 설명은 사실이다(`.editorconfig` 9–10행). 다만 이 step 이 확정한 사실(CI 명령 · 버전 · 경로)이 아니고 작업 목록에도 없다 → phase `/review` 때 남길지 정한다.",
+        "docs/CODE_STYLE.md:15 — 문장 앞의 「현재」는 시점에 기대는 말이라 문서가 오래되면 낡는다 → 「…구간은 사유 주석과 `@checkstyle:off` / `@checkstyle:on` 으로 감싼다」처럼 규칙으로 쓰는 편이 낫다.",
+        "backend/src/test/java/com/mogum/deploy/SonarAnalysisFilesTest.java:20 — Sonar 시험은 원래 고칠 필요가 없었다. 상수 이름과 설명을 바꿔 커버리지 목적을 드러낸 것은 동작에 영향이 없고 해롭지 않다."
+      ]
+    }
+  ],
+  "created_at": "2026-11-21T11:04:06+0900",
+  "completed_at": "2026-11-21T11:50:58+0900"
+}

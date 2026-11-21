@@ -6,9 +6,9 @@ import org.springframework.context.annotation.Primary;
 
 @TestConfiguration(proxyBeanMethods = false)
 public class TestClockConfiguration {
-    @Bean
-    @Primary
-    public TestClock testClock() {
-        return new TestClock();
-    }
+	@Bean
+	@Primary
+	public TestClock testClock() {
+		return new TestClock();
+	}
 }

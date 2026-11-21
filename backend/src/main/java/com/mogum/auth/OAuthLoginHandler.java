@@ -1,14 +1,8 @@
 package com.mogum.auth;
 
-import com.mogum.account.service.ExternalAccount;
-import com.mogum.account.service.LoginResult;
-import com.mogum.account.service.LoginService;
-import com.mogum.common.logging.RequestLogFilter;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.io.IOException;
+import java.util.Collections;
+
 import org.slf4j.MDC;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -18,102 +12,114 @@ import org.springframework.security.web.authentication.AuthenticationFailureHand
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.session.FindByIndexNameSessionRepository;
 
-import java.io.IOException;
-import java.util.Collections;
+import com.mogum.account.service.ExternalAccount;
+import com.mogum.account.service.LoginResult;
+import com.mogum.account.service.LoginService;
+import com.mogum.common.logging.RequestLogFilter;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RequiredArgsConstructor
 @Slf4j
 public final class OAuthLoginHandler implements AuthenticationSuccessHandler, AuthenticationFailureHandler {
-    private final LoginService loginService;
-    private final GoogleAccountMapper googleAccountMapper;
-    private final String origin;
-    private final CookieAuthorizationRequestRepository cookieAuthorizationRequestRepository;
+	private final LoginService loginService;
+	private final GoogleAccountMapper googleAccountMapper;
+	private final String origin;
+	private final CookieAuthorizationRequestRepository cookieAuthorizationRequestRepository;
 
-    @Override
-    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
-            Authentication authentication) throws IOException {
-        try {
-            ExternalAccount account;
-            try {
-                account = googleAccountMapper.map(authentication);
-            } catch (OAuth2AuthenticationException invalid) {
-                fail(request, response, "login_failed", failureReason(invalid));
-                return;
-            }
+	@Override
+	public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
+		Authentication authentication) throws IOException {
+		try {
+			ExternalAccount account;
+			try {
+				account = googleAccountMapper.map(authentication);
+			} catch (OAuth2AuthenticationException invalid) {
+				fail(request, response, "login_failed", failureReason(invalid));
+				return;
+			}
 
-            switch (loginService.login(account)) {
-                case LoginResult.Success success -> {
-                    var session = resetSession(request);
-                    session.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME,
-                            Long.toString(success.userId()));
-                    response.sendRedirect(origin + "/");
-                    log.info("login result=success userId={}", success.userId());
-                }
-                case LoginResult.NotApplied notApplied -> {
-                    var identity = notApplied.account();
-                    var session = resetSession(request);
-                    session.setAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE,
-                            new AccountPrincipal.NotApplied(identity.provider(), identity.subject(),
-                                    identity.email(), identity.name()));
+			switch (loginService.login(account)) {
+				case LoginResult.Success success -> {
+					var session = resetSession(request);
+					session.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME,
+						Long.toString(success.userId()));
+					response.sendRedirect(origin + "/");
+					log.info("login result=success userId={}", success.userId());
+				}
+				case LoginResult.NotApplied notApplied -> {
+					var identity = notApplied.account();
+					var session = resetSession(request);
+					session.setAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE,
+						new AccountPrincipal.NotApplied(identity.provider(), identity.subject(),
+							identity.email(), identity.name()));
 
-                    // 다른 회원의 세션으로 계정을 바꾼 콜백에도 앞 회원 ID가 남지 않는다.
-                    MDC.remove(RequestLogFilter.USER_ID);
-                    response.sendRedirect(origin + "/");
-                    log.info("login result=not_applied");
-                }
-                case LoginResult.Rejected rejected -> fail(request, response, "login_failed",
-                        switch (rejected.reason()) {
-                            case EMAIL_NOT_VERIFIED -> "email_not_verified";
-                        });
-            }
-        } finally {
-            SecurityContextHolder.clearContext();
-        }
-    }
+					// 다른 회원의 세션으로 계정을 바꾼 콜백에도 앞 회원 ID가 남지 않는다.
+					MDC.remove(RequestLogFilter.USER_ID);
+					response.sendRedirect(origin + "/");
+					log.info("login result=not_applied");
+				}
+				case LoginResult.Rejected rejected -> fail(request, response, "login_failed",
+					switch (rejected.reason()) {
+						case EMAIL_NOT_VERIFIED -> "email_not_verified";
+					});
+			}
+		} finally {
+			SecurityContextHolder.clearContext();
+		}
+	}
 
-    private static HttpSession resetSession(HttpServletRequest request) {
-        // 번호 변경은 JDBC 저장 시 반영된다. 변경 직후 invalidate하면 이전 DB 행을 다시 읽을 수 있다.
-        var session = request.getSession(false);
-        if (session == null) return request.getSession(true);
+	private static HttpSession resetSession(HttpServletRequest request) {
+		// 번호 변경은 JDBC 저장 시 반영된다. 변경 직후 invalidate하면 이전 DB 행을 다시 읽을 수 있다.
+		var session = request.getSession(false);
+		if (session == null) {
+			return request.getSession(true);
+		}
 
-        request.changeSessionId();
-        Collections.list(session.getAttributeNames()).forEach(session::removeAttribute);
-        return session;
-    }
+		request.changeSessionId();
+		Collections.list(session.getAttributeNames()).forEach(session::removeAttribute);
+		return session;
+	}
 
-    @Override
-    public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
-            AuthenticationException exception) throws IOException {
-        fail(request, response, "login_failed", failureReason(exception));
-    }
+	@Override
+	public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
+		AuthenticationException exception) throws IOException {
+		fail(request, response, "login_failed", failureReason(exception));
+	}
 
-    // error code도 콜백/프로바이더가 보낸 원문일 수 있으므로 알려진 코드만 고정 문자열로 바꾼다.
-    private static String failureReason(AuthenticationException exception) {
-        if (!(exception instanceof OAuth2AuthenticationException oauth)) return "unknown";
-        return switch (oauth.getError().getErrorCode()) {
-            case "authorization_request_not_found" -> "authorization_request_not_found";
-            case "invalid_state_parameter" -> "invalid_state_parameter";
-            case "access_denied" -> "access_denied";
-            case "invalid_request" -> "invalid_request";
-            case "invalid_user_info" -> "invalid_user_info";
-            case "invalid_grant" -> "invalid_grant";
-            case "invalid_token_response" -> "invalid_token_response";
-            case "invalid_user_info_response" -> "invalid_user_info_response";
-            default -> "unknown";
-        };
-    }
+	// error code도 콜백/프로바이더가 보낸 원문일 수 있으므로 알려진 코드만 고정 문자열로 바꾼다.
+	private static String failureReason(AuthenticationException exception) {
+		if (!(exception instanceof OAuth2AuthenticationException oauth)) {
+			return "unknown";
+		}
+		return switch (oauth.getError().getErrorCode()) {
+			case "authorization_request_not_found" -> "authorization_request_not_found";
+			case "invalid_state_parameter" -> "invalid_state_parameter";
+			case "access_denied" -> "access_denied";
+			case "invalid_request" -> "invalid_request";
+			case "invalid_user_info" -> "invalid_user_info";
+			case "invalid_grant" -> "invalid_grant";
+			case "invalid_token_response" -> "invalid_token_response";
+			case "invalid_user_info_response" -> "invalid_user_info_response";
+			default -> "unknown";
+		};
+	}
 
-    private void fail(HttpServletRequest request, HttpServletResponse response,
-            String error, String reason) throws IOException {
-        cookieAuthorizationRequestRepository.saveAuthorizationRequest(null, request, response);
-        SecurityContextHolder.clearContext();
-        response.sendRedirect(origin + "/login?error=" + error);
+	private void fail(HttpServletRequest request, HttpServletResponse response,
+		String error, String reason) throws IOException {
+		cookieAuthorizationRequestRepository.saveAuthorizationRequest(null, request, response);
+		SecurityContextHolder.clearContext();
+		response.sendRedirect(origin + "/login?error=" + error);
 
-        if (reason.equals("invalid_grant") || reason.equals("invalid_token_response")
-                || reason.equals("invalid_user_info_response")) {
-            log.warn("login result={} reason={}", error, reason);
-        } else {
-            log.info("login result={} reason={}", error, reason);
-        }
-    }
+		if (reason.equals("invalid_grant") || reason.equals("invalid_token_response")
+			|| reason.equals("invalid_user_info_response")) {
+			log.warn("login result={} reason={}", error, reason);
+		} else {
+			log.info("login result={} reason={}", error, reason);
+		}
+	}
 }

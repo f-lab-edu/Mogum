@@ -1,0 +1,4 @@
+# Step 0: 네이버 포매터로 백엔드 Java 일괄 포맷 (spotless-format)
+95863af51752c484e6d8cd209cc9436e8fd00f2f
+# Step 1: 네이버 Checkstyle에 맞춘 백엔드 Java 정리 (checkstyle-fixes)
+e16d47db0a7df7ab569a0399c990bb29685b7dc6

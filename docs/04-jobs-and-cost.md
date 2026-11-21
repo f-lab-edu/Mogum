@@ -23,6 +23,7 @@
 ```
 /
 ├── backend/                         # Spring Boot — 서버. 단일 Gradle 모듈
+│   ├── config/naver/                 # 네이버 Java 포매터 · Checkstyle · import 순서 · IntelliJ 설정 · 출처 README
 │   ├── src/main/java/…/mogum/
 │   │   ├── config/                  # 설정 값 · 시계 · Auditing · 요청 로그 필터 · API와 워커를 한 서버에 조립 — worker · generation 의 빈 등록
 │   │   ├── common/                  # api(성공 · 오류 응답) · time · logging · persistence — 그대로 쓴다

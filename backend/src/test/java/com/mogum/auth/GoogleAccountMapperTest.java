@@ -1,6 +1,13 @@
 package com.mogum.auth;
 
-import com.mogum.account.service.ExternalAccount;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -10,120 +17,123 @@ import org.springframework.security.oauth2.client.authentication.OAuth2Authentic
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Stream;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.mogum.account.service.ExternalAccount;
 
 class GoogleAccountMapperTest {
-    private final GoogleAccountMapper googleAccountMapper = new GoogleAccountMapper();
+	private final GoogleAccountMapper googleAccountMapper = new GoogleAccountMapper();
 
-    @Test
-    @DisplayName("서버 등록 ID와 구글 응답을 로그인 입력으로 변환하고 원문을 보존한다")
-    void mapsGoogleAccountWithoutChangingOriginalValues() {
-        // given
-        var authentication = authentication("google", attributes());
+	@Test
+	@DisplayName("서버 등록 ID와 구글 응답을 로그인 입력으로 변환하고 원문을 보존한다")
+	void mapsGoogleAccountWithoutChangingOriginalValues() {
+		// given
+		var authentication = authentication("google", attributes());
 
-        // when
-        var account = googleAccountMapper.map(authentication);
+		// when
+		var account = googleAccountMapper.map(authentication);
 
-        // then
-        assertThat(account)
-                .isEqualTo(new ExternalAccount("google", " Case-Sensitive-Sub ", "Admin@Example.com", "test", true));
-    }
+		// then
+		assertThat(account)
+			.isEqualTo(new ExternalAccount("google", " Case-Sensitive-Sub ", "Admin@Example.com", "test", true));
+	}
 
-    @Test
-    @DisplayName("구글 외 등록은 같은 응답 필드가 있어도 거절한다")
-    void rejectsOtherProviderRegistration() {
-        // given
-        var authentication = authentication("kakao", attributes());
+	@Test
+	@DisplayName("구글 외 등록은 같은 응답 필드가 있어도 거절한다")
+	void rejectsOtherProviderRegistration() {
+		// given
+		var authentication = authentication("kakao", attributes());
 
-        // when & then
-        assertThatThrownBy(() -> googleAccountMapper.map(authentication))
-                .isInstanceOf(OAuth2AuthenticationException.class);
-    }
+		// when & then
+		assertThatThrownBy(() -> googleAccountMapper.map(authentication))
+			.isInstanceOf(OAuth2AuthenticationException.class);
+	}
 
-    @ParameterizedTest(name = "필드 {0} 값 [{1}]")
-    @MethodSource("invalidIdentityAttributes")
-    @DisplayName("식별자와 이메일의 누락과 빈값 및 잘못된 타입을 거절한다")
-    void rejectsInvalidIdentityAttribute(String field, Object invalid) {
-        // given
-        var values = attributes();
+	@ParameterizedTest(name = "필드 {0} 값 [{1}]")
+	@MethodSource("invalidIdentityAttributes")
+	@DisplayName("식별자와 이메일의 누락과 빈값 및 잘못된 타입을 거절한다")
+	void rejectsInvalidIdentityAttribute(String field, Object invalid) {
+		// given
+		var values = attributes();
 
-        if (invalid == null) values.remove(field);
-        else values.put(field, invalid);
+		if (invalid == null) {
+			values.remove(field);
+		} else {
+			values.put(field, invalid);
+		}
 
-        var authentication = authentication("google", values);
+		var authentication = authentication("google", values);
 
-        // when & then
-        assertThatThrownBy(() -> googleAccountMapper.map(authentication))
-                .isInstanceOf(OAuth2AuthenticationException.class);
-    }
+		// when & then
+		assertThatThrownBy(() -> googleAccountMapper.map(authentication))
+			.isInstanceOf(OAuth2AuthenticationException.class);
+	}
 
-    @ParameterizedTest(name = "인증 표시 [{0}]")
-    @MethodSource("unverifiedAttributes")
-    @DisplayName("이메일 검증 표시가 없거나 boolean true가 아니면 미인증이다")
-    void treatsMissingOrNonBooleanVerificationAsUnverified(Object value) {
-        // given
-        var values = attributes();
+	@ParameterizedTest(name = "인증 표시 [{0}]")
+	@MethodSource("unverifiedAttributes")
+	@DisplayName("이메일 검증 표시가 없거나 boolean true가 아니면 미인증이다")
+	void treatsMissingOrNonBooleanVerificationAsUnverified(Object value) {
+		// given
+		var values = attributes();
 
-        if (value == null) values.remove("email_verified");
-        else values.put("email_verified", value);
+		if (value == null) {
+			values.remove("email_verified");
+		} else {
+			values.put("email_verified", value);
+		}
 
-        var authentication = authentication("google", values);
+		var authentication = authentication("google", values);
 
-        // when
-        var account = googleAccountMapper.map(authentication);
+		// when
+		var account = googleAccountMapper.map(authentication);
 
-        // then
-        assertThat(account.emailVerified()).isFalse();
-    }
+		// then
+		assertThat(account.emailVerified()).isFalse();
+	}
 
-    @ParameterizedTest(name = "구글 이름 [{0}]")
-    @MethodSource("missingNames")
-    @DisplayName("구글 이름이 없거나 공백이면 이메일 앞부분을 이름으로 쓴다")
-    void fallsBackToEmailLocalPart(Object name) {
-        // given
-        var values = attributes();
+	@ParameterizedTest(name = "구글 이름 [{0}]")
+	@MethodSource("missingNames")
+	@DisplayName("구글 이름이 없거나 공백이면 이메일 앞부분을 이름으로 쓴다")
+	void fallsBackToEmailLocalPart(Object name) {
+		// given
+		var values = attributes();
 
-        if (name == null) values.remove("name");
-        else values.put("name", name);
+		if (name == null) {
+			values.remove("name");
+		} else {
+			values.put("name", name);
+		}
 
-        var authentication = authentication("google", values);
+		var authentication = authentication("google", values);
 
-        // when
-        var account = googleAccountMapper.map(authentication);
+		// when
+		var account = googleAccountMapper.map(authentication);
 
-        // then
-        assertThat(account.name()).isEqualTo("Admin");
-    }
+		// then
+		assertThat(account.name()).isEqualTo("Admin");
+	}
 
-    private static Stream<Arguments> missingNames() {
-        return Stream.of(null, "", "  \t\n", 123).map(Arguments::of);
-    }
+	private static Stream<Arguments> missingNames() {
+		return Stream.of(null, "", "  \t\n", 123).map(Arguments::of);
+	}
 
-    private static Stream<Arguments> invalidIdentityAttributes() {
-        return Stream.of("sub", "email")
-                .flatMap(field -> Stream.of(null, "", "  ", 123)
-                        .map(value -> Arguments.of(field, value)));
-    }
+	private static Stream<Arguments> invalidIdentityAttributes() {
+		return Stream.of("sub", "email")
+			.flatMap(field -> Stream.of(null, "", "  ", 123)
+				.map(value -> Arguments.of(field, value)));
+	}
 
-    private static Stream<Arguments> unverifiedAttributes() {
-        return Stream.of(null, false, "true", 1).map(value -> Arguments.of(value));
-    }
+	private static Stream<Arguments> unverifiedAttributes() {
+		return Stream.of(null, false, "true", 1).map(value -> Arguments.of(value));
+	}
 
-    private static Map<String, Object> attributes() {
-        return new HashMap<>(Map.of("name", "test", "sub", " Case-Sensitive-Sub ",
-                "email", "Admin@Example.com", "email_verified", true));
-    }
+	private static Map<String, Object> attributes() {
+		return new HashMap<>(Map.of("name", "test", "sub", " Case-Sensitive-Sub ",
+			"email", "Admin@Example.com", "email_verified", true));
+	}
 
-    private static OAuth2AuthenticationToken authentication(String registration, Map<String, Object> attributes) {
-        var values = new HashMap<>(attributes);
-        values.put("fixture-id", "fixture-principal");
-        return new OAuth2AuthenticationToken(new DefaultOAuth2User(List.of(), values, "fixture-id"), List.of(),
-                registration);
-    }
+	private static OAuth2AuthenticationToken authentication(String registration, Map<String, Object> attributes) {
+		var values = new HashMap<>(attributes);
+		values.put("fixture-id", "fixture-principal");
+		return new OAuth2AuthenticationToken(new DefaultOAuth2User(List.of(), values, "fixture-id"), List.of(),
+			registration);
+	}
 }

@@ -1,5 +1,18 @@
 package com.mogum.card.repository;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.time.Instant;
+
+import org.hibernate.Hibernate;
+import org.hibernate.LazyInitializationException;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.beans.factory.annotation.Autowired;
+
 import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.card.domain.Card;
@@ -14,78 +27,72 @@ import com.mogum.course.repository.CourseRepository;
 import com.mogum.course.repository.LessonRepository;
 import com.mogum.support.RepositoryTest;
 import com.mogum.support.TestClock;
-import org.hibernate.Hibernate;
-import org.hibernate.LazyInitializationException;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
-import org.springframework.beans.factory.annotation.Autowired;
-
-import java.time.Instant;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @RepositoryTest
 class ReviewRepositoryTest {
-    @Autowired private UserRepository userRepository;
-    @Autowired private CourseRepository courseRepository;
-    @Autowired private LessonRepository lessonRepository;
-    @Autowired private CardRepository cardRepository;
-    @Autowired private ReviewRepository reviewRepository;
-    @Autowired private TestClock testClock;
+	@Autowired
+	private UserRepository userRepository;
+	@Autowired
+	private CourseRepository courseRepository;
+	@Autowired
+	private LessonRepository lessonRepository;
+	@Autowired
+	private CardRepository cardRepository;
+	@Autowired
+	private ReviewRepository reviewRepository;
+	@Autowired
+	private TestClock testClock;
 
-    @ParameterizedTest(name = "평가 {0}")
-    @EnumSource(Rating.class)
-    @DisplayName("복습은 모든 평가와 공용 시계의 평가 시각을 저장하고 카드는 바꾸지 않는다")
-    void reloadsRatingAndReviewTimeWithoutChangingCard(Rating rating) {
-        // given
-        var card = savedCard();
+	@ParameterizedTest(name = "평가 {0}")
+	@EnumSource(Rating.class)
+	@DisplayName("복습은 모든 평가와 공용 시계의 평가 시각을 저장하고 카드는 바꾸지 않는다")
+	void reloadsRatingAndReviewTimeWithoutChangingCard(Rating rating) {
+		// given
+		var card = savedCard();
 
-        var reviewedAt = Instant.parse("2026-11-10T03:04:05Z");
-        testClock.set(reviewedAt);
-        var saved = reviewRepository.save(ReviewFixtures.review(card, rating));
+		var reviewedAt = Instant.parse("2026-11-10T03:04:05Z");
+		testClock.set(reviewedAt);
+		var saved = reviewRepository.save(ReviewFixtures.review(card, rating));
 
-        // when
-        var actual = reviewRepository.findById(saved.getId()).orElseThrow();
+		// when
+		var actual = reviewRepository.findById(saved.getId()).orElseThrow();
 
-        // then
-        assertThat(actual).isNotSameAs(saved);
-        assertThat(actual.getId()).isPositive();
-        assertThat(actual.getCard().getId()).isEqualTo(card.getId());
-        assertThat(actual.getRating()).isEqualTo(rating);
-        assertThat(actual.getCreatedAt()).isEqualTo(reviewedAt);
-        assertThat(actual.getUpdatedAt()).isEqualTo(reviewedAt);
+		// then
+		assertThat(actual).isNotSameAs(saved);
+		assertThat(actual.getId()).isPositive();
+		assertThat(actual.getCard().getId()).isEqualTo(card.getId());
+		assertThat(actual.getRating()).isEqualTo(rating);
+		assertThat(actual.getCreatedAt()).isEqualTo(reviewedAt);
+		assertThat(actual.getUpdatedAt()).isEqualTo(reviewedAt);
 
-        var unchanged = cardRepository.findById(card.getId()).orElseThrow();
-        assertThat(unchanged.getFsrsState()).isEqualTo(FsrsState.LEARNING);
-        assertThat(unchanged.getFsrsStep()).isZero();
-        assertThat(unchanged.getStatus()).isEqualTo(CardStatus.ACTIVE);
-        assertThat(unchanged.getDueAt()).isNull();
-        assertThat(unchanged.getStability()).isNull();
-        assertThat(unchanged.getDifficulty()).isNull();
-        assertThat(unchanged.getLastReviewedAt()).isNull();
-        assertThat(unchanged.getUpdatedAt()).isEqualTo(card.getUpdatedAt());
-    }
+		var unchanged = cardRepository.findById(card.getId()).orElseThrow();
+		assertThat(unchanged.getFsrsState()).isEqualTo(FsrsState.LEARNING);
+		assertThat(unchanged.getFsrsStep()).isZero();
+		assertThat(unchanged.getStatus()).isEqualTo(CardStatus.ACTIVE);
+		assertThat(unchanged.getDueAt()).isNull();
+		assertThat(unchanged.getStability()).isNull();
+		assertThat(unchanged.getDifficulty()).isNull();
+		assertThat(unchanged.getLastReviewedAt()).isNull();
+		assertThat(unchanged.getUpdatedAt()).isEqualTo(card.getUpdatedAt());
+	}
 
-    @Test
-    @DisplayName("커밋 뒤 다시 읽은 복습의 카드 내용은 트랜잭션 밖에서 지연 로딩할 수 없다")
-    void rejectsLazyCardAccessOutsideTransaction() {
-        // given
-        var card = savedCard();
-        var saved = reviewRepository.save(ReviewFixtures.review(card, Rating.GOOD));
-        var reloaded = reviewRepository.findById(saved.getId()).orElseThrow();
-        assertThat(Hibernate.isInitialized(reloaded.getCard())).isFalse();
+	@Test
+	@DisplayName("커밋 뒤 다시 읽은 복습의 카드 내용은 트랜잭션 밖에서 지연 로딩할 수 없다")
+	void rejectsLazyCardAccessOutsideTransaction() {
+		// given
+		var card = savedCard();
+		var saved = reviewRepository.save(ReviewFixtures.review(card, Rating.GOOD));
+		var reloaded = reviewRepository.findById(saved.getId()).orElseThrow();
+		assertThat(Hibernate.isInitialized(reloaded.getCard())).isFalse();
 
-        // when & then
-        assertThatThrownBy(() -> reloaded.getCard().getQuestion()).isInstanceOf(LazyInitializationException.class);
-    }
+		// when & then
+		assertThatThrownBy(() -> reloaded.getCard().getQuestion()).isInstanceOf(LazyInitializationException.class);
+	}
 
-    private Card savedCard() {
-        var user = userRepository.save(UserFixtures.user("me@example.com"));
-        var course = courseRepository.save(CourseFixtures.single(user.getId()));
-        var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
-        return cardRepository.save(CardFixtures.card(user.getId(), lesson.getId(), 2, "질문", "답"));
-    }
+	private Card savedCard() {
+		var user = userRepository.save(UserFixtures.user("me@example.com"));
+		var course = courseRepository.save(CourseFixtures.single(user.getId()));
+		var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
+		return cardRepository.save(CardFixtures.card(user.getId(), lesson.getId(), 2, "질문", "답"));
+	}
 }

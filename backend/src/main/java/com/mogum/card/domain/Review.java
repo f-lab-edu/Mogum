@@ -1,6 +1,7 @@
 package com.mogum.card.domain;
 
 import com.mogum.common.persistence.AuditedEntity;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -21,22 +22,22 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "reviews")
 public class Review extends AuditedEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "card_id", nullable = false)
-    private Card card;
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "card_id", nullable = false)
+	private Card card;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, columnDefinition = "text")
-    private Rating rating;
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false, columnDefinition = "text")
+	private Rating rating;
 
-    public static Review record(Card card, Rating rating) {
-        var review = new Review();
-        review.card = card;
-        review.rating = rating;
-        return review;
-    }
+	public static Review record(Card card, Rating rating) {
+		var review = new Review();
+		review.card = card;
+		review.rating = rating;
+		return review;
+	}
 }

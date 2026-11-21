@@ -1,34 +1,35 @@
 package com.mogum.auth;
 
-import com.mogum.account.service.ExternalAccount;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 
+import com.mogum.account.service.ExternalAccount;
+
 public final class GoogleAccountMapper {
-    public ExternalAccount map(Authentication authentication) {
-        if (!(authentication instanceof OAuth2AuthenticationToken oauth) || !oauth.isAuthenticated()
-                || !"google".equals(oauth.getAuthorizedClientRegistrationId())) {
-            throw invalidAccount();
-        }
+	public ExternalAccount map(Authentication authentication) {
+		if (!(authentication instanceof OAuth2AuthenticationToken oauth) || !oauth.isAuthenticated()
+			|| !"google".equals(oauth.getAuthorizedClientRegistrationId())) {
+			throw invalidAccount();
+		}
 
-        var principal = oauth.getPrincipal();
-        Object sub = principal.getAttribute("sub");
-        Object email = principal.getAttribute("email");
-        if (!(sub instanceof String subject) || subject.isBlank()
-                || !(email instanceof String address) || address.isBlank()) {
-            throw invalidAccount();
-        }
+		var principal = oauth.getPrincipal();
+		Object sub = principal.getAttribute("sub");
+		Object email = principal.getAttribute("email");
+		if (!(sub instanceof String subject) || subject.isBlank()
+			|| !(email instanceof String address) || address.isBlank()) {
+			throw invalidAccount();
+		}
 
-        Object name = principal.getAttribute("name");
-        String accountName = name instanceof String value && !value.isBlank()
-                ? value : address.split("@", 2)[0];
-        return new ExternalAccount("google", subject, address, accountName,
-                Boolean.TRUE.equals(principal.getAttribute("email_verified")));
-    }
+		Object name = principal.getAttribute("name");
+		String accountName = name instanceof String value && !value.isBlank()
+			? value : address.split("@", 2)[0];
+		return new ExternalAccount("google", subject, address, accountName,
+			Boolean.TRUE.equals(principal.getAttribute("email_verified")));
+	}
 
-    private static OAuth2AuthenticationException invalidAccount() {
-        return new OAuth2AuthenticationException(new OAuth2Error("invalid_user_info"));
-    }
+	private static OAuth2AuthenticationException invalidAccount() {
+		return new OAuth2AuthenticationException(new OAuth2Error("invalid_user_info"));
+	}
 }

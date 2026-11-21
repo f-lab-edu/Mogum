@@ -1,9 +1,11 @@
 package com.mogum.generation.plan;
 
 public sealed interface RoadmapPlanInput {
-    PlanningInput input();
+	PlanningInput input();
 
-    record NewRoadmap(PlanningInput input) implements RoadmapPlanInput { }
+	record NewRoadmap(PlanningInput input) implements RoadmapPlanInput {
+	}
 
-    record ReplanRoadmap(PlanningInput input, RoadmapPlan previousPlan, String feedback) implements RoadmapPlanInput { }
+	record ReplanRoadmap(PlanningInput input, RoadmapPlan previousPlan, String feedback) implements RoadmapPlanInput {
+	}
 }
