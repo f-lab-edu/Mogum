@@ -13,7 +13,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /** MVC와 보안 필터가 공유하는 오류 본문 · 상태 · 헤더 변환. */
 public final class ApiErrorResponses {
+	// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 	private ApiErrorResponses() {}
+	// @checkstyle:on
 
 	public static ResponseEntity<ApiError> of(ErrorCode code, Integer retryAfterSeconds) {
 		return of(code, retryAfterSeconds, null);

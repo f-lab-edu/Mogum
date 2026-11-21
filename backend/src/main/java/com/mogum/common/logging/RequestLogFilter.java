@@ -39,8 +39,9 @@ public final class RequestLogFilter implements Filter, ServletRequestListener {
 
 		MDC.put(REQUEST_ID, state.id);
 		MDC.remove(USER_ID);
-		if (state.userId != null)
+		if (state.userId != null) {
 			MDC.put(USER_ID, state.userId);
+		}
 		response.setHeader(HEADER, state.id);
 
 		boolean dispatchFailed = false;
@@ -54,8 +55,9 @@ public final class RequestLogFilter implements Filter, ServletRequestListener {
 			state.userId = MDC.get(USER_ID);
 
 			// 체인 밖에서 컨테이너가 찍는 ERROR까지 ID를 유지하고 종료 리스너에서 지운다.
-			if (!dispatchFailed)
+			if (!dispatchFailed) {
 				clearRequestMdc();
+			}
 		}
 	}
 
@@ -63,14 +65,16 @@ public final class RequestLogFilter implements Filter, ServletRequestListener {
 	public void requestDestroyed(ServletRequestEvent event) {
 		var request = event.getServletRequest();
 		var state = (RequestState)request.getAttribute(STATE);
-		if (state == null)
+		if (state == null) {
 			return;
+		}
 
 		try {
 			MDC.put(REQUEST_ID, state.id);
 			MDC.remove(USER_ID);
-			if (state.userId != null)
+			if (state.userId != null) {
 				MDC.put(USER_ID, state.userId);
+			}
 			if (!("GET".equals(state.method) && "/actuator/health".equals(state.path))) {
 				log.info("access method={} path={} status={} durationMs={}", state.method, state.path,
 					state.failed ? 500 : state.response.getStatus(),

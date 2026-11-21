@@ -54,10 +54,11 @@ class GoogleAccountMapperTest {
 		// given
 		var values = attributes();
 
-		if (invalid == null)
+		if (invalid == null) {
 			values.remove(field);
-		else
+		} else {
 			values.put(field, invalid);
+		}
 
 		var authentication = authentication("google", values);
 
@@ -73,10 +74,11 @@ class GoogleAccountMapperTest {
 		// given
 		var values = attributes();
 
-		if (value == null)
+		if (value == null) {
 			values.remove("email_verified");
-		else
+		} else {
 			values.put("email_verified", value);
+		}
 
 		var authentication = authentication("google", values);
 
@@ -94,10 +96,11 @@ class GoogleAccountMapperTest {
 		// given
 		var values = attributes();
 
-		if (name == null)
+		if (name == null) {
 			values.remove("name");
-		else
+		} else {
 			values.put("name", name);
+		}
 
 		var authentication = authentication("google", values);
 

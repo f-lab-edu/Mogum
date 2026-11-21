@@ -23,8 +23,9 @@ public sealed interface CoursePlanInput {
 	record RoadmapContext(int position, CourseOutline coursePlan, List<LessonOutline> previousCourseLessons,
 		List<CourseOutline> followingCoursePlans) {
 		public RoadmapContext {
-			if (position < 1)
+			if (position < 1) {
 				throw new IllegalArgumentException("Course position must be positive");
+			}
 			previousCourseLessons = List.copyOf(previousCourseLessons);
 			followingCoursePlans = List.copyOf(followingCoursePlans);
 		}

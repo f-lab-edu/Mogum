@@ -113,5 +113,7 @@ class ApplyServiceTest {
 
 	@Configuration(proxyBeanMethods = false)
 	@EnableConfigurationProperties(CreditProperties.class)
+	// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 	static class PropertiesConfiguration {}
+	// @checkstyle:on
 }

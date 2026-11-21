@@ -125,8 +125,9 @@ class CourseControllerIntegrationTest {
 			lessonRepository.save(LessonFixtures.withCompletedAt(
 				LessonFixtures.lesson(course, 1), testClock.instant()));
 			var lesson = LessonFixtures.lesson(course, 2);
-			if (status == CourseStatus.COMPLETED)
+			if (status == CourseStatus.COMPLETED) {
 				LessonFixtures.withCompletedAt(lesson, testClock.instant());
+			}
 			nextLessonId = lessonRepository.save(lesson).getId();
 		}
 		var client = testRequests.asUser(userId);
@@ -145,14 +146,16 @@ class CourseControllerIntegrationTest {
 			.jsonPath("$.data.userId").doesNotExist().jsonPath("$.data.input").doesNotExist()
 			.jsonPath("$.data.topic").doesNotExist().jsonPath("$.data.masteryReport").doesNotExist()
 			.jsonPath("$.data.startedAt").doesNotExist().jsonPath("$.data.createdAt").doesNotExist();
-		if (status == CourseStatus.LEARNING)
+		if (status == CourseStatus.LEARNING) {
 			body.jsonPath("$.data.nextLessonId").isEqualTo(nextLessonId);
-		else
+		} else {
 			body.jsonPath("$.data.nextLessonId").doesNotExist();
-		if (status == CourseStatus.COMPLETED)
+		}
+		if (status == CourseStatus.COMPLETED) {
 			body.jsonPath("$.data.completedAt").isEqualTo("2026-11-02T00:00:00Z");
-		else
+		} else {
 			body.jsonPath("$.data.completedAt").doesNotExist();
+		}
 		assertThat(state()).isEqualTo(before);
 	}
 

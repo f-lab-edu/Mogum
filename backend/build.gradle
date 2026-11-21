@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'jacoco'
+    id 'checkstyle'
     id 'com.diffplug.spotless' version '8.12.0'
     id 'org.springframework.boot' version '4.1.1'
 }
@@ -15,6 +16,14 @@ java {
 
 repositories {
     mavenCentral()
+}
+
+checkstyle {
+    toolVersion = '14.4.0'
+    configFile = file('config/naver/naver-checkstyle-rules.xml')
+    configProperties = [suppressionFile: file('config/naver/naver-checkstyle-suppressions.xml').absolutePath]
+    maxWarnings = 0
+    ignoreFailures = false
 }
 
 spotless {

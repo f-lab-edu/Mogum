@@ -135,10 +135,12 @@ class CiWorkflowFilesTest {
 
 		for (var value : map(definition.get("jobs")).values()) {
 			for (var step : steps(map(value))) {
-				if (step.containsKey("uses"))
+				if (step.containsKey("uses")) {
 					actions.add(step.get("uses").toString());
-				if (step.containsKey("run"))
+				}
+				if (step.containsKey("run")) {
 					assertThat(step.get("run").toString()).doesNotContain("${{");
+				}
 			}
 		}
 
@@ -179,8 +181,9 @@ class CiWorkflowFilesTest {
 			.containsEntry("retention-days", 7);
 
 		assertThat(steps.toString()).doesNotContain("imageTest", "docker");
-		for (var step : steps.subList(0, 4))
+		for (var step : steps.subList(0, 4)) {
 			assertThat(step).doesNotContainKey("if");
+		}
 	}
 
 	@Test
@@ -204,8 +207,9 @@ class CiWorkflowFilesTest {
 		assertThat(steps.subList(2, 6).stream().map(step -> step.get("run")).toList())
 			.containsExactly("npm ci --ignore-scripts", "npm run lint", "npm run test", "npm run build");
 
-		for (var step : steps)
+		for (var step : steps) {
 			assertThat(step).doesNotContainKey("if");
+		}
 	}
 
 	@Test

@@ -98,10 +98,12 @@ class ReplanRoadmapGeneratorIntegrationTest {
 		var roadmap = roadmap(previousCount);
 		var oldIds = jdbcTemplate.queryForList("SELECT id FROM courses ORDER BY position", Long.class);
 		long id = jobIntakeService.receive(roadmap.getUserId(), request(roadmap)).id();
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		String outline = """
 			{"title":"새 코스", "description":"새 코스 설명",
 			 "concepts":[{"name":"새 개념", "definition":"새 정의"}]}
 			""";
+		// @checkstyle:on
 		testChatProvider.reply(id, TestChatProvider.success("{\"title\":\"새 로드맵\","
 			+ "\"description\":\"새 로드맵 설명\",\"courses\":[" + String.join(",", outline, outline, outline) + "]}"));
 		testClock.advance(Duration.ofSeconds(1));

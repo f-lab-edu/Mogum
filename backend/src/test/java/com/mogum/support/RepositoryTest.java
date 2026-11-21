@@ -27,4 +27,6 @@ import com.mogum.config.JpaAuditingConfiguration;
 @Import({TestClockConfiguration.class, JpaAuditingConfiguration.class})
 @ContextConfiguration(initializers = PostgresTestConfiguration.ConnectionInitializer.class)
 @ExtendWith(DatabaseCleaner.class)
+// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 public @interface RepositoryTest{}
+// @checkstyle:on

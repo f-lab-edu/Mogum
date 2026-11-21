@@ -66,10 +66,12 @@ class ApiExceptionHandlerTest {
 		var response = new ApiExceptionHandler().handleException(exception, request);
 
 		// then
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		assertValidationResponse(response, """
 			{"code":"FIELD_INVALID","message":"입력을 확인해 주십시오",
 			 "fields":[{"field":"topic","reason":"TOO_LONG"}]}
 			""");
+		// @checkstyle:on
 	}
 
 	@Test
@@ -83,10 +85,12 @@ class ApiExceptionHandlerTest {
 		var response = new ApiExceptionHandler().handleException(exception, request);
 
 		// then
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		assertValidationResponse(response, """
 			{"code":"FIELD_INVALID","message":"입력을 확인해 주십시오",
 			 "fields":[{"field":"purpose","reason":"REQUIRED"},{"field":"topic","reason":"TOO_LONG"}]}
 			""");
+		// @checkstyle:on
 	}
 
 	@Test
@@ -137,11 +141,13 @@ class ApiExceptionHandlerTest {
 		var response = new ApiExceptionHandler().handleException(exception, request);
 
 		// then
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		assertValidationResponse(response, """
 			{"code":"FIELD_INVALID","message":"입력을 확인해 주십시오","fields":[
 			 {"field":"array","reason":"TOO_LONG"},{"field":"list","reason":"TOO_LONG"},
 			 {"field":"map","reason":"TOO_LONG"}]}
 			""");
+		// @checkstyle:on
 	}
 
 	@Test
@@ -285,10 +291,12 @@ class ApiExceptionHandlerTest {
 		var response = new ApiExceptionHandler().handleException(exception, webRequest());
 
 		// then
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		assertValidationResponse(response, """
 			{"code":"FIELD_INVALID","message":"입력을 확인해 주십시오",
 			 "fields":[{"field":"levelOther","reason":"NOT_ALLOWED"}]}
 			""");
+		// @checkstyle:on
 	}
 
 	private MockMvcTester mvc(RuntimeException failure) {
@@ -346,7 +354,9 @@ class ApiExceptionHandlerTest {
 		assertThat(json).doesNotContain("private");
 	}
 
+	// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 	private void validationTarget(Object request) {}
+	// @checkstyle:on
 
 	record ValidationRequest(@NotBlank @Size(max = 5) String topic, @NotNull String purpose) {
 	}

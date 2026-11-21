@@ -83,10 +83,12 @@ class UserIdentityLockImplIntegrationTest {
 
 			do {
 				waiting = jdbcTemplate.queryForObject(
-					"SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event = 'advisory'",
+					"SELECT count(*) FROM pg_stat_activity WHERE datname "
+						+ "= current_database() AND wait_event = 'advisory'",
 					Integer.class);
-				if (waiting < 2)
+				if (waiting < 2) {
 					Thread.sleep(10);
+				}
 			} while (waiting < 2 && System.nanoTime() < deadline);
 
 			// 두 트랜잭션이 실제로 함께 DB에서 기다렸는지 확인한다.
@@ -111,7 +113,8 @@ class UserIdentityLockImplIntegrationTest {
 			assertThat(jdbcTemplate.queryForObject("SELECT credit_balance FROM users", Integer.class))
 				.isEqualTo(creditProperties.monthlyAmount());
 			assertThat(jdbcTemplate.queryForObject(
-				"SELECT u.credit_balance = sum(e.amount) FROM users u JOIN credit_entries e ON e.user_id = u.id GROUP BY u.id",
+				"SELECT u.credit_balance = sum(e.amount) FROM users u "
+					+ "JOIN credit_entries e ON e.user_id = u.id GROUP BY u.id",
 				Boolean.class)).isTrue();
 		} finally {
 			protocol.setMaxThreads(originalMax);
@@ -119,8 +122,9 @@ class UserIdentityLockImplIntegrationTest {
 			var executor = (ThreadPoolExecutor)protocol.getExecutor();
 			long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
 
-			while (executor.getPoolSize() > originalMax && System.nanoTime() < deadline)
+			while (executor.getPoolSize() > originalMax && System.nanoTime() < deadline) {
 				Thread.sleep(10);
+			}
 
 			assertThat(executor.getPoolSize()).isLessThanOrEqualTo(originalMax);
 		}

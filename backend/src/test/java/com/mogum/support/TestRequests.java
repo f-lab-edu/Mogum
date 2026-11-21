@@ -22,8 +22,9 @@ public final class TestRequests {
 		var authenticated = restTestClient.mutate().defaultCookie(session.getName(), session.getValue()).build();
 		var response = authenticated.get().uri("/api/me").exchange().returnResult();
 		var token = response.getResponseCookies().getFirst("XSRF-TOKEN");
-		if (token == null)
+		if (token == null) {
 			throw new IllegalStateException("GET /api/me did not issue XSRF-TOKEN");
+		}
 
 		return authenticated.mutate()
 			.defaultCookie("XSRF-TOKEN", token.getValue())

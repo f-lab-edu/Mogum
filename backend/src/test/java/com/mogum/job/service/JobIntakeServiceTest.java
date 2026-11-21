@@ -59,8 +59,9 @@ class JobIntakeServiceTest {
 			}
 
 			public void check(long userId, JobRequest request) {
-				if ("reject".equals(request.feedback()))
+				if ("reject".equals(request.feedback())) {
 					throw new ApiException(ErrorCode.INVALID_REQUEST);
+				}
 			}
 		}).toList());
 
@@ -143,8 +144,9 @@ class JobIntakeServiceTest {
 		GenerationJobFixtures.failed(
 			generationJobRepository.findById(first.id()).orElseThrow(), JobErrorType.INVALID_OUTPUT);
 
-		for (int i = 0; i < 3; i++)
+		for (int i = 0; i < 3; i++) {
 			generationJobRepository.save(GenerationJobFixtures.newCourse(userId, input()));
+		}
 		userRepository.findById(userId)
 			.orElseThrow()
 			.consumeCredits(userRepository.findById(userId)
@@ -210,7 +212,9 @@ class JobIntakeServiceTest {
 
 		assertThat(creditEntryRepository.entries()).last().satisfies(entry -> {
 			assertThat(entry.getJobId()).isEqualTo(result.id());
+			// @checkstyle:off — 포매터의 단항 연산자와 switch 간격을 따른다.
 			assertThat(entry.getAmount()).isEqualTo(-switch (type) {
+				// @checkstyle:on
 				case NEW_COURSE -> 2;
 				case NEW_ROADMAP -> 3;
 				case PLAN_ROADMAP_COURSE -> 4;
@@ -258,8 +262,9 @@ class JobIntakeServiceTest {
 		long userId = user(100);
 		var job = failed(userId, JobErrorType.INVALID_OUTPUT);
 
-		for (int i = 0; i < 3; i++)
+		for (int i = 0; i < 3; i++) {
 			generationJobRepository.save(GenerationJobFixtures.newCourse(userId, input()));
+		}
 
 		// when & then
 		assertError(() -> jobIntakeService.retry(userId, job.getId()), ErrorCode.TOO_MANY_IN_PROGRESS);

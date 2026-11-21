@@ -256,8 +256,9 @@ class GenerationJobSchemaRepositoryTest {
 		var context = context();
 		long id = job(column.equals("type") ? JobType.MATERIAL : JobType.NEW_COURSE, context);
 
-		if (column.equals("error_type"))
+		if (column.equals("error_type")) {
 			setState(id, JobStatus.FAILED, context);
+		}
 
 		// when & then
 		assertConstraint("23514",
@@ -426,8 +427,9 @@ class GenerationJobSchemaRepositoryTest {
 		var context = context();
 		job(type, context);
 
-		if (table.equals("courses"))
+		if (table.equals("courses")) {
 			jdbcTemplate.update("DELETE FROM lessons WHERE id = ?", context.lesson());
+		}
 
 		long target = switch (type) {
 			case REPLAN_COURSE -> context.course();
@@ -501,7 +503,9 @@ class GenerationJobSchemaRepositoryTest {
 		var instant = Instant.parse("2026-11-15T00:00:00Z");
 
 		switch (status) {
+			// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 			case QUEUED -> {}
+			// @checkstyle:on
 			case RUNNING -> GenerationJobFixtures.running(jdbcTemplate, id, 1, instant, instant.plusSeconds(300));
 			case FAILED -> GenerationJobFixtures.failed(jdbcTemplate, id, JobErrorType.INVALID_OUTPUT, instant);
 			case SUCCEEDED -> {

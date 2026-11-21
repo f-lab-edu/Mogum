@@ -19,8 +19,9 @@ public final class JobReceiveRequestValidator implements ConstraintValidator<Val
 
 	@Override
 	public boolean isValid(JobReceiveRequest request, ConstraintValidatorContext context) {
-		if (request == null)
+		if (request == null) {
 			return true;
+		}
 
 		var errors = new LinkedHashMap<String, Reason>();
 		choice(errors, "type", request.type(), JobType.values());
@@ -57,8 +58,9 @@ public final class JobReceiveRequestValidator implements ConstraintValidator<Val
 			}
 		}
 
-		if (errors.isEmpty())
+		if (errors.isEmpty()) {
 			return true;
+		}
 
 		context.disableDefaultConstraintViolation();
 		errors.forEach((field, reason) -> context.buildConstraintViolationWithTemplate("field." + reason.name())
@@ -68,32 +70,38 @@ public final class JobReceiveRequestValidator implements ConstraintValidator<Val
 	}
 
 	private static void target(Map<String, Reason> errors, String field, Long value, boolean required) {
-		if (required && value == null)
+		if (required && value == null) {
 			errors.put(field, Reason.REQUIRED);
-		if (!required)
+		}
+		if (!required) {
 			absent(errors, field, value);
+		}
 	}
 
 	private static void other(Map<String, Reason> errors, String field, String value, boolean required) {
-		if (required)
+		if (required) {
 			text(errors, field, value, 50, true);
-		else
+		} else {
 			absent(errors, field, value);
+		}
 	}
 
 	private static void absent(Map<String, Reason> errors, String field, Object value) {
-		if (value != null)
+		if (value != null) {
 			errors.put(field, Reason.NOT_ALLOWED);
+		}
 	}
 
 	private static void text(Map<String, Reason> errors, String field, String value, int max, boolean required) {
 		if (value == null) {
-			if (required)
+			if (required) {
 				errors.put(field, Reason.REQUIRED);
-		} else if (BLANK.matcher(value).matches())
+			}
+		} else if (BLANK.matcher(value).matches()) {
 			errors.put(field, Reason.REQUIRED);
-		else if (value.codePointCount(0, value.length()) > max)
+		} else if (value.codePointCount(0, value.length()) > max) {
 			errors.put(field, Reason.TOO_LONG);
+		}
 	}
 
 	private static void choice(Map<String, Reason> errors, String field, String value, Enum<?>[] choices) {

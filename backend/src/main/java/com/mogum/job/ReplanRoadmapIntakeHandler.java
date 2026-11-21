@@ -25,7 +25,8 @@ public final class ReplanRoadmapIntakeHandler implements JobIntakeHandler {
 	public void check(long userId, JobRequest request) {
 		var target = roadmapRepository.findById(request.targetId())
 			.orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
-		if (target.getStatus() != RoadmapStatus.REVIEWING)
+		if (target.getStatus() != RoadmapStatus.REVIEWING) {
 			throw new ApiException(ErrorCode.REPLAN_NOT_ALLOWED);
+		}
 	}
 }

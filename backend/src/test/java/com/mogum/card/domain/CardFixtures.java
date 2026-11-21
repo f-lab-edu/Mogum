@@ -3,7 +3,9 @@ package com.mogum.card.domain;
 import org.springframework.test.util.ReflectionTestUtils;
 
 public final class CardFixtures {
+	// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 	private CardFixtures() {}
+	// @checkstyle:on
 
 	public static Card card(long userId, long lessonId, int position, String question, String answer) {
 		return Card.write(userId, lessonId, position, question, answer);

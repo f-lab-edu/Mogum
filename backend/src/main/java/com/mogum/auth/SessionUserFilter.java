@@ -72,8 +72,9 @@ public final class SessionUserFilter extends OncePerRequestFilter {
 	}
 
 	private static Long userId(Object attribute) {
-		if (!(attribute instanceof String value))
+		if (!(attribute instanceof String value)) {
 			return null;
+		}
 
 		try {
 			long id = Long.parseLong(value);

@@ -76,8 +76,9 @@ public final class OAuthLoginHandler implements AuthenticationSuccessHandler, Au
 	private static HttpSession resetSession(HttpServletRequest request) {
 		// 번호 변경은 JDBC 저장 시 반영된다. 변경 직후 invalidate하면 이전 DB 행을 다시 읽을 수 있다.
 		var session = request.getSession(false);
-		if (session == null)
+		if (session == null) {
 			return request.getSession(true);
+		}
 
 		request.changeSessionId();
 		Collections.list(session.getAttributeNames()).forEach(session::removeAttribute);
@@ -92,8 +93,9 @@ public final class OAuthLoginHandler implements AuthenticationSuccessHandler, Au
 
 	// error code도 콜백/프로바이더가 보낸 원문일 수 있으므로 알려진 코드만 고정 문자열로 바꾼다.
 	private static String failureReason(AuthenticationException exception) {
-		if (!(exception instanceof OAuth2AuthenticationException oauth))
+		if (!(exception instanceof OAuth2AuthenticationException oauth)) {
 			return "unknown";
+		}
 		return switch (oauth.getError().getErrorCode()) {
 			case "authorization_request_not_found" -> "authorization_request_not_found";
 			case "invalid_state_parameter" -> "invalid_state_parameter";

@@ -15,8 +15,9 @@ public final class FakeCourseRepository implements CourseRepository {
 	private final Map<Long, Course> entities = new LinkedHashMap<>();
 
 	public <S extends Course> S save(S entity) {
-		if (entity.getId() == null)
+		if (entity.getId() == null) {
 			ReflectionTestUtils.setField(entity, "id", (long)entities.size() + 1);
+		}
 		entities.put(entity.getId(), entity);
 		return entity;
 	}

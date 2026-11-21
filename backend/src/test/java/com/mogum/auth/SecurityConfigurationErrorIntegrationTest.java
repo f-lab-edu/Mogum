@@ -97,8 +97,9 @@ class SecurityConfigurationErrorIntegrationTest extends SecurityScenario {
 		while (output.getOut()
 			.lines()
 			.noneMatch(line -> line.contains("requestId=" + id) && line.contains("access method="))
-			&& System.nanoTime() < deadline)
+			&& System.nanoTime() < deadline) {
 			Thread.sleep(10);
+		}
 
 		assertThat(output.getAll().substring(logOffset).lines()).noneMatch(line -> line.contains(" ERROR "));
 	}

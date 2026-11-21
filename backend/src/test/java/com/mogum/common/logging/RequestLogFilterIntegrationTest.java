@@ -62,8 +62,9 @@ class RequestLogFilterIntegrationTest {
 		// 별도 앱을 닫는 마이그레이션 테스트는 JVM 공용 JUL 연결도 닫는다.
 		// 컨테이너 로그를 보는 이 테스트에 필요한 연결을 준비하고 끝나면 원래 상태로 돌린다.
 		installedJulBridge = !SLF4JBridgeHandler.isInstalled();
-		if (installedJulBridge)
+		if (installedJulBridge) {
 			SLF4JBridgeHandler.install();
+		}
 
 		user = userRepository.save(UserFixtures.approved("request-log@example.com"));
 		cookie = new TestSessions(jdbcIndexedSessionRepository).create(user.getId());
@@ -71,8 +72,9 @@ class RequestLogFilterIntegrationTest {
 
 	@AfterEach
 	void restoreJulBridge() {
-		if (installedJulBridge)
+		if (installedJulBridge) {
 			SLF4JBridgeHandler.uninstall();
+		}
 	}
 
 	@ParameterizedTest(name = "{0} {1} 인증 {2} 상태 {3}")
@@ -257,10 +259,12 @@ class RequestLogFilterIntegrationTest {
 
 	private EntityExchangeResult<String> send(String method, String path, boolean authenticated, String token) {
 		var builder = testRequests.anonymous().method(HttpMethod.valueOf(method)).uri(path);
-		if (authenticated)
+		if (authenticated) {
 			builder.cookie("SESSION", cookie.getValue());
-		if (token != null)
+		}
+		if (token != null) {
 			builder.cookie("XSRF-TOKEN", token).header("X-XSRF-TOKEN", token);
+		}
 
 		return builder.exchange().returnResult(String.class);
 	}
@@ -272,8 +276,9 @@ class RequestLogFilterIntegrationTest {
 		assertThat(UUID.fromString(id).toString()).isEqualTo(id);
 
 		var deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
-		while (accessLines(output, id).isEmpty() && System.nanoTime() < deadline)
+		while (accessLines(output, id).isEmpty() && System.nanoTime() < deadline) {
 			Thread.sleep(10);
+		}
 
 		var lines = accessLines(output, id);
 		assertThat(lines).hasSize(1);
@@ -285,10 +290,11 @@ class RequestLogFilterIntegrationTest {
 		assertThat(TimeZone.getDefault().getID()).isEqualTo("UTC");
 		assertThat(line.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\+09:00 .*")).isTrue();
 
-		if (authenticated)
+		if (authenticated) {
 			assertThat(line).contains("userId=" + user.getId());
-		else
+		} else {
 			assertThat(line).doesNotContain("userId=");
+		}
 
 		assertThat(Optional.ofNullable(response.getResponseBody()).orElse("")).doesNotContain("requestId");
 		assertThat(Optional.ofNullable(response.getResponseHeaders().getFirst("Access-Control-Expose-Headers"))

@@ -14,8 +14,9 @@ public final class FakeRoadmapRepository implements RoadmapRepository {
 	private final Map<Long, Roadmap> entities = new LinkedHashMap<>();
 
 	public <S extends Roadmap> S save(S entity) {
-		if (entity.getId() == null)
+		if (entity.getId() == null) {
 			ReflectionTestUtils.setField(entity, "id", (long)entities.size() + 1);
+		}
 		entities.put(entity.getId(), entity);
 		return entity;
 	}

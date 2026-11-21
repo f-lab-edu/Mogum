@@ -175,8 +175,9 @@ class CookieAuthorizationRequestRepositoryTest {
 
 	private Cookie savedCookie(String verifier) {
 		var saved = new ObjectMapper().createObjectNode().put("state", STATE).put("issuedAt", NOW.getEpochSecond());
-		if (verifier != null)
+		if (verifier != null) {
 			saved.put("code_verifier", verifier);
+		}
 
 		return new Cookie("MOGUM_OAUTH_REQUEST", Base64.getUrlEncoder()
 			.withoutPadding()

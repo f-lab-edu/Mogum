@@ -170,10 +170,12 @@ class SessionUserFilterTest {
 		// given
 		var request = new MockHttpServletRequest("GET", "/api/me");
 		var session = request.getSession();
-		if (userId != null)
+		if (userId != null) {
 			session.setAttribute(FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME, userId);
-		if (identity != null)
+		}
+		if (identity != null) {
 			session.setAttribute(AccountPrincipal.NOT_APPLIED_SESSION_ATTRIBUTE, identity);
+		}
 
 		var response = new MockHttpServletResponse();
 		var chainCalled = new AtomicBoolean();

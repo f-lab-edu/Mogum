@@ -86,8 +86,9 @@ class WorkflowFilesTest {
 			.isEqualTo(SECRETS);
 
 		var environment = map(job().get("env"));
-		for (var secret : SECRETS)
+		for (var secret : SECRETS) {
 			assertThat(environment.get(secret)).isEqualTo("${{ secrets." + secret + " }}");
+		}
 
 		for (var variable : List.of("AWS_REGION", "API_ORIGIN")) {
 			assertThat(environment.get(variable)).isEqualTo("${{ vars." + variable + " }}");
@@ -98,8 +99,9 @@ class WorkflowFilesTest {
 
 		var actions = new ArrayList<String>();
 		for (var step : steps()) {
-			if (step.containsKey("uses"))
+			if (step.containsKey("uses")) {
 				actions.add(step.get("uses").toString());
+			}
 			if (step.containsKey("run")) {
 				var script = step.get("run").toString();
 				assertThat(script).as("식은 run 본문 대신 env에 전달한다").doesNotContain("${{");

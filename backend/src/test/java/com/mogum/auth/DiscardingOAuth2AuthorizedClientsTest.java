@@ -19,7 +19,9 @@ class DiscardingOAuth2AuthorizedClientsTest {
 	private OAuth2AuthorizedClient oAuth2AuthorizedClient;
 	@Mock
 	private Authentication authentication;
-	private final DiscardingOAuth2AuthorizedClients discardingOAuth2AuthorizedClients = new DiscardingOAuth2AuthorizedClients();
+	private final DiscardingOAuth2AuthorizedClients discardingOAuth2AuthorizedClients =
+
+		new DiscardingOAuth2AuthorizedClients();
 
 	@Test
 	@DisplayName("서비스의 저장은 토큰과 인증 정보를 읽지 않는다")

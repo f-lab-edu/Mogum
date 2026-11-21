@@ -13,8 +13,9 @@ public final class CoursePlanFormat {
 		var data = PlanPromptSupport.materials(input.input(), context == null || context.position() == 1);
 		if (context != null) {
 			data.put("coursePlan", context.coursePlan());
-			if (context.position() > 1)
+			if (context.position() > 1) {
 				data.put("previousCourseLessons", context.previousCourseLessons());
+			}
 			data.put("followingCoursePlans", context.followingCoursePlans());
 		}
 		if (input instanceof CoursePlanInput.ReplanCourse replan) {
@@ -37,16 +38,19 @@ public final class CoursePlanFormat {
 
 	private Optional<CoursePlan> parse(String text, boolean newCourse) {
 		return PlanJson.read(text).flatMap(root -> {
-			if (newCourse && !PlanJson.title(root.path("title")))
+			if (newCourse && !PlanJson.title(root.path("title"))) {
 				return Optional.empty();
+			}
 			var lessons = root.path("lessons");
-			if (!lessons.isArray() || lessons.isEmpty() || lessons.size() > 10)
+			if (!lessons.isArray() || lessons.isEmpty() || lessons.size() > 10) {
 				return Optional.empty();
+			}
 
 			var result = new ArrayList<LessonOutline>();
 			for (var lesson : lessons) {
-				if (!PlanJson.outline(lesson, false))
+				if (!PlanJson.outline(lesson, false)) {
 					return Optional.empty();
+				}
 				result.add(new LessonOutline(lesson.path("title").asString(), lesson.path("description").asString(),
 					PlanJson.concepts(lesson)));
 			}

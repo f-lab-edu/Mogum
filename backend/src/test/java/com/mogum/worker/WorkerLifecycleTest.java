@@ -40,8 +40,9 @@ class WorkerLifecycleTest {
 
 		given(jobRunner.runOnce()).willAnswer(invocation -> {
 			int attempt = attempts.incrementAndGet();
-			if (attempt <= 3 || attempt == 5)
+			if (attempt <= 3 || attempt == 5) {
 				throw failure;
+			}
 			return attempt == 4;
 		});
 

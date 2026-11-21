@@ -49,36 +49,46 @@ class AccountSchemaMigrationTest {
 				.containsExactly("active", "pending", "waitlisted");
 			assertThat(jdbc.queryForList("SELECT credit_balance FROM users ORDER BY id", Integer.class))
 				.containsExactly(100, 100, 100);
+			// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 			assertThat(jdbc.queryForObject("""
 				SELECT count(*) FROM users u JOIN credit_entries c ON c.user_id = u.id
 				WHERE c.type = 'REFILL' AND c.amount = 100 AND c.created_at = c.updated_at
 				    AND c.created_at IS NOT NULL
 				""", Integer.class)).isEqualTo(3);
+			// @checkstyle:on
 			assertThat(jdbc.queryForObject("SELECT count(*) FROM credit_entries", Integer.class)).isEqualTo(3);
+			// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 			assertThat(jdbc.queryForObject("""
 				SELECT count(*) FROM users u WHERE credit_balance <>
 				    (SELECT sum(amount) FROM credit_entries WHERE user_id = u.id)
 				""", Integer.class)).isZero();
+			// @checkstyle:on
 
 			var approved = jdbc.queryForObject("SELECT approved_at FROM users WHERE status = 'APPROVED'",
 				Timestamp.class);
 			assertThat(approved.toInstant()).isBetween(earliest, latest);
+			// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 			assertThat(jdbc.queryForObject("""
 				SELECT credit_refill_at =
 				    (((approved_at AT TIME ZONE 'Asia/Seoul' - interval '4 hours')::date + 30
 				        + time '04:00') AT TIME ZONE 'Asia/Seoul')
 				FROM users WHERE status = 'APPROVED'
 				""", Boolean.class)).isTrue();
+			// @checkstyle:on
+			// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 			assertThat(jdbc.queryForObject("""
 				SELECT count(*) FROM users WHERE status = 'APPLIED'
 				    AND approved_at IS NULL AND credit_refill_at IS NULL
 				""", Integer.class)).isEqualTo(2);
+			// @checkstyle:on
 
+			// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 			assertThat(jdbc.queryForObject("""
 				SELECT count(*) FROM information_schema.columns WHERE table_schema = ? AND
 				    ((table_name = 'users' AND column_name IN ('role', 'terms_agreed_at', 'terms_version'))
 				    OR (table_name = 'credit_entries' AND column_name = 'job_id'))
 				""", Integer.class, database.schema)).isZero();
+			// @checkstyle:on
 		}
 	}
 
@@ -155,8 +165,9 @@ class AccountSchemaMigrationTest {
 				.dataSource(url, POSTGRES.getUsername(), POSTGRES.getPassword())
 				.defaultSchema(schema)
 				.schemas(schema);
-			if (target != null)
+			if (target != null) {
 				configuration.target(target);
+			}
 
 			return configuration.load();
 		}

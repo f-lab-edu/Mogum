@@ -13,27 +13,33 @@ import tools.jackson.databind.json.JsonMapper;
 final class PlanJson {
 	private static final JsonMapper JSON_MAPPER = new JsonMapper();
 
+	// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 	private PlanJson() {}
+	// @checkstyle:on
 
 	/** 앞뒤 설명 속 객체는 건너뛰고 계획 JSON 하나만 꺼낸다. */
 	static Optional<JsonNode> read(String text) {
-		if (blank(text))
+		if (blank(text)) {
 			return Optional.empty();
+		}
 
 		JsonNode result = null;
 		for (int start = 0; start < text.length(); start++) {
 			char first = text.charAt(start);
-			if (first != '{' && first != '[')
+			if (first != '{' && first != '[') {
 				continue;
+			}
 
 			int end = endOfValue(text, start);
-			if (end < 0)
+			if (end < 0) {
 				continue;
+			}
 			try {
 				var node = JSON_MAPPER.readTree(text.substring(start, end + 1));
 				if (node.isObject() && (node.has("lessons") || node.has("courses"))) {
-					if (result != null)
+					if (result != null) {
 						return Optional.empty();
+					}
 					result = node;
 				}
 			} catch (JacksonException ignored) {
@@ -65,8 +71,9 @@ final class PlanJson {
 		}
 
 		var concepts = node.path("concepts");
-		if (!concepts.isArray() || concepts.isEmpty())
+		if (!concepts.isArray() || concepts.isEmpty()) {
 			return false;
+		}
 		for (var concept : concepts) {
 			if (!concept.isObject() || !text(concept.path("name")) || !text(concept.path("definition"))) {
 				return false;
@@ -90,19 +97,21 @@ final class PlanJson {
 		for (int index = start; index < text.length(); index++) {
 			char current = text.charAt(index);
 			if (quoted) {
-				if (escaped)
+				if (escaped) {
 					escaped = false;
-				else if (current == '\\')
+				} else if (current == '\\') {
 					escaped = true;
-				else if (current == '"')
+				} else if (current == '"') {
 					quoted = false;
+				}
 			} else if (current == '"') {
 				quoted = true;
 			} else if (current == '{' || current == '[') {
 				depth++;
 			} else if (current == '}' || current == ']') {
-				if (--depth == 0)
+				if (--depth == 0) {
 					return index;
+				}
 			}
 		}
 		return -1;

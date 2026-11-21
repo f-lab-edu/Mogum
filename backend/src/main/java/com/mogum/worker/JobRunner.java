@@ -68,12 +68,14 @@ public final class JobRunner {
 
 		final Lease lease;
 		synchronized (admission) {
-			if (stopping)
+			if (stopping) {
 				return false;
+			}
 
 			var claimed = transactionTemplate.execute(status -> claim());
-			if (claimed == null)
+			if (claimed == null) {
 				return false;
+			}
 
 			lease = new Lease(claimed);
 			current = lease;
@@ -83,19 +85,22 @@ public final class JobRunner {
 		putMdc(job);
 		try (lease) {
 			var generator = generators.get(job.type());
-			if (generator == null)
+			if (generator == null) {
 				throw new IllegalStateException("No generator for claimed job type");
+			}
 
 			lease.start();
 			GenerationOutcome outcome;
 			int retries = 0;
 			while (true) {
-				if (lease.lost())
+				if (lease.lost()) {
 					return true;
+				}
 
 				outcome = generator.generate(job);
-				if (lease.lost())
+				if (lease.lost()) {
 					return true;
+				}
 				if (!(outcome instanceof GenerationOutcome.Failure failure)
 					|| !retryable(failure) || retries >= workerProperties.maxRetries()) {
 					break;
@@ -115,8 +120,9 @@ public final class JobRunner {
 
 			// 이미 시작된 갱신이 끝날 때까지 기다려 완료 뒤 0 rows를 시한 상실로 오인하지 않는다.
 			lease.close();
-			if (lease.lost())
+			if (lease.lost()) {
 				return true;
+			}
 
 			if (outcome instanceof GenerationOutcome.Success success) {
 				save(job, generator, success.result(), lease);
@@ -143,8 +149,9 @@ public final class JobRunner {
 		synchronized (admission) {
 			lease = current;
 		}
-		if (lease == null)
+		if (lease == null) {
 			return;
+		}
 
 		putMdc(lease.job);
 		try {
@@ -156,6 +163,7 @@ public final class JobRunner {
 
 	private JobSnapshot claim() {
 		var now = clock.instant();
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		var ids = entityManager.createNativeQuery("""
 			WITH candidate AS (
 			    SELECT id FROM generation_jobs
@@ -168,11 +176,13 @@ public final class JobRunner {
 			    started_at = :now, finished_at = NULL, error_type = NULL, updated_at = :now
 			FROM candidate WHERE j.id = candidate.id RETURNING j.id
 			""")
+			// @checkstyle:on
 			.setParameter("now", now)
 			.setParameter("until", now.plus(workerProperties.leaseDuration()))
 			.getResultList();
-		if (ids.isEmpty())
+		if (ids.isEmpty()) {
 			return null;
+		}
 
 		var job = entityManager.find(GenerationJob.class, ((Number)ids.getFirst()).longValue());
 		Long target = switch (job.getType()) {
@@ -205,8 +215,9 @@ public final class JobRunner {
 		boolean saved;
 		try {
 			saved = Boolean.TRUE.equals(transactionTemplate.execute(status -> {
-				if (!guard(job))
+				if (!guard(job)) {
 					return false;
+				}
 
 				var ref = generator.save(job, result);
 				if (job.targetId() != null && ref.id() != job.targetId()) {
@@ -238,36 +249,41 @@ public final class JobRunner {
 			return; // 롤백된 RUNNING은 시한 뒤 처음부터 되찾는다. 실패·복구로 바꾸지 않는다.
 		}
 
-		if (saved)
+		if (saved) {
 			log.info("job finished status=SUCCEEDED");
-		else
+		} else {
 			lease.lose();
+		}
 	}
 
 	private void fail(JobSnapshot job, GenerationOutcome.Failure failure, Lease lease) {
 		boolean failed = Boolean.TRUE.equals(transactionTemplate.execute(status -> {
 			// 첫 쓰기에서 확인·실패 전환. 지워졌으면 복구는 지우는 쪽이 한다.
+			// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 			int rows = entityManager.createNativeQuery("""
 				UPDATE generation_jobs SET status = 'FAILED', error_type = :error,
 				    finished_at = :now, lease_until = NULL, updated_at = :now
 				WHERE id = :id AND claim_count = :claim AND status = 'RUNNING'
 				""")
+				// @checkstyle:on
 				.setParameter("error", JobErrorType.valueOf(failure.name()).name())
 				.setParameter("now", clock.instant())
 				.setParameter("id", job.id())
 				.setParameter("claim", job.claimCount())
 				.executeUpdate();
-			if (rows == 0)
+			if (rows == 0) {
 				return false;
+			}
 
 			creditLedger.restoreIfOwed(job.userId(), job.id());
 			return true;
 		}));
 
-		if (failed)
+		if (failed) {
 			log.info("job finished status=FAILED");
-		else
+		} else {
 			lease.lose();
+		}
 	}
 
 	private static boolean retryable(GenerationOutcome.Failure failure) {
@@ -304,6 +320,7 @@ public final class JobRunner {
 					refresh();
 				} catch (RuntimeException ignored) {
 					// DB에 닿지 못하면 다음 간격에 다시 확인한다. 0 rows만 소유권 상실의 증거다.
+
 				} finally {
 					clearMdc();
 				}
@@ -311,8 +328,9 @@ public final class JobRunner {
 		}
 
 		private synchronized void refresh() {
-			if (!active || lost)
+			if (!active || lost) {
 				return;
+			}
 
 			var now = clock.instant();
 			int rows = transactionTemplate.execute(status -> entityManager.createNativeQuery("""
@@ -324,8 +342,9 @@ public final class JobRunner {
 				.setParameter("id", job.id())
 				.setParameter("claim", job.claimCount())
 				.executeUpdate());
-			if (rows == 0)
+			if (rows == 0) {
 				lose();
+			}
 		}
 
 		private synchronized boolean lost() {
@@ -333,8 +352,9 @@ public final class JobRunner {
 		}
 
 		private synchronized void lose() {
-			if (lost)
+			if (lost) {
 				return;
+			}
 			lost = true;
 			log.warn("job lease lost");
 		}
@@ -351,15 +371,17 @@ public final class JobRunner {
 					.setParameter("claim", job.claimCount())
 					.executeUpdate() == 1));
 			lost = true; // 의도한 반환이다. 늦은 시도는 DB/유료 호출을 더 하지 않는다.
-			if (released)
+			if (released) {
 				log.info("job released");
+			}
 		}
 
 		@Override
 		public synchronized void close() {
 			active = false;
-			if (renewal != null)
+			if (renewal != null) {
 				renewal.cancel(false);
+			}
 		}
 	}
 }

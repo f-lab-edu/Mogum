@@ -345,8 +345,9 @@ class UserRepositoryTest {
 		assertThat(failure).hasRootCauseInstanceOf(SQLException.class);
 
 		Throwable root = failure;
-		while (root.getCause() != null)
+		while (root.getCause() != null) {
 			root = root.getCause();
+		}
 
 		assertThat(root).isInstanceOfSatisfying(SQLException.class,
 			sql -> assertThat(sql.getSQLState()).isEqualTo(expected));

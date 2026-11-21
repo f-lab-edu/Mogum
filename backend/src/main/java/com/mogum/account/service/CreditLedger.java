@@ -29,8 +29,9 @@ public class CreditLedger {
 
 	/** amount는 양수다. users 행을 잠그고 잔액과 음수 CONSUME 기록을 함께 바꾼다. */
 	public void consume(long userId, long jobId, int amount) {
-		if (amount <= 0)
+		if (amount <= 0) {
 			throw new IllegalArgumentException("amount must be positive");
+		}
 
 		var user = lockedUser(userId);
 		if (user.getCreditBalance() < amount) {
@@ -51,11 +52,13 @@ public class CreditLedger {
 	public void restoreIfOwed(long userId, long jobId) {
 		var user = lockedUser(userId);
 		var last = creditEntryRepository.findFirstByUserIdAndJobIdOrderByIdDesc(userId, jobId);
-		if (last.isEmpty() || last.get().getType() != CreditEntryType.CONSUME)
+		if (last.isEmpty() || last.get().getType() != CreditEntryType.CONSUME) {
 			return;
+		}
 		var refill = creditEntryRepository.findFirstByUserIdAndTypeOrderByIdDesc(userId, CreditEntryType.REFILL);
-		if (refill.isEmpty() || last.get().getId() <= refill.get().getId())
+		if (refill.isEmpty() || last.get().getId() <= refill.get().getId()) {
 			return;
+		}
 
 		int amount = Math.negateExact(last.get().getAmount());
 		user.restoreCredits(amount);

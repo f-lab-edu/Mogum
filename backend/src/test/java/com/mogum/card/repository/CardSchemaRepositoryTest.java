@@ -108,7 +108,8 @@ class CardSchemaRepositoryTest {
 		// given
 		var graph = graph();
 		var cardBefore = jdbcTemplate.queryForMap(
-			"SELECT question, answer, fsrs_state, fsrs_step, due_at, stability, difficulty, last_reviewed_at, created_at FROM cards WHERE id = ?",
+			"SELECT question, answer, fsrs_state, fsrs_step, due_at, stability,"
+				+ " difficulty, last_reviewed_at, created_at FROM cards WHERE id = ?",
 			graph.card());
 		var linksBefore = jdbcTemplate.queryForList("SELECT * FROM card_concepts");
 		var reviewsBefore = jdbcTemplate.queryForList("SELECT * FROM reviews");
@@ -127,7 +128,8 @@ class CardSchemaRepositoryTest {
 			.containsEntry("status", "COURSE_DELETED")
 			.containsEntry("lesson_id", null);
 		assertThat(jdbcTemplate.queryForMap(
-			"SELECT question, answer, fsrs_state, fsrs_step, due_at, stability, difficulty, last_reviewed_at, created_at FROM cards WHERE id = ?",
+			"SELECT question, answer, fsrs_state, fsrs_step, due_at, stability,"
+				+ " difficulty, last_reviewed_at, created_at FROM cards WHERE id = ?",
 			graph.card()))
 			.isEqualTo(cardBefore);
 		assertThat(jdbcTemplate.queryForList("SELECT * FROM card_concepts")).isEqualTo(linksBefore);
@@ -153,8 +155,9 @@ class CardSchemaRepositoryTest {
 			case "concepts" -> graph.concept();
 			default -> throw new IllegalArgumentException(table);
 		};
-		if (table.equals("cards"))
+		if (table.equals("cards")) {
 			jdbcTemplate.update("DELETE FROM card_concepts WHERE card_id = ?", id);
+		}
 
 		// when & then
 		assertConstraint("23503", constraint, () -> jdbcTemplate.update("DELETE FROM " + table + " WHERE id = ?", id));
@@ -304,12 +307,14 @@ class CardSchemaRepositoryTest {
 	@DisplayName("강의를 가리키는 카드만 SET NULL이고 나머지 학습 모델 FK는 NO ACTION이다")
 	void preservesForeignKeyDeleteActions() {
 		// when
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		var actions = jdbcTemplate.queryForList("""
 			SELECT conname, confdeltype::text AS action FROM pg_constraint
 			WHERE connamespace = 'public'::regnamespace AND contype = 'f'
 			AND conrelid IN ('roadmaps'::regclass, 'courses'::regclass, 'lessons'::regclass, 'materials'::regclass,
 			    'cards'::regclass, 'card_concepts'::regclass, 'reviews'::regclass, 'concepts'::regclass)
 			""");
+		// @checkstyle:on
 
 		// then
 		assertThat(actions)
@@ -349,7 +354,8 @@ class CardSchemaRepositoryTest {
 	private long card(long user, long lesson, int position) {
 		return jdbcTemplate.queryForObject(
 			"""
-				INSERT INTO cards (user_id, lesson_id, position, question, answer, status, fsrs_state, fsrs_step, created_at, updated_at)
+				INSERT INTO cards (user_id, lesson_id, position, \
+				question, answer, status, fsrs_state, fsrs_step, created_at, updated_at)
 				VALUES (?, ?, ?, '질문', '답', 'ACTIVE', 'LEARNING', 0, now(), now()) RETURNING id
 				""",
 			Long.class, user, lesson, position);

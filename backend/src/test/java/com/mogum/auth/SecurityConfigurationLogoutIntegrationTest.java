@@ -71,8 +71,9 @@ class SecurityConfigurationLogoutIntegrationTest extends SecurityScenario {
 			.getResponseCookies()
 			.getFirst("XSRF-TOKEN");
 		var request = client(cookie).post().uri("/api/auth/logout").cookie("XSRF-TOKEN", token.getValue());
-		if (header.equals("different"))
+		if (header.equals("different")) {
 			request.header("X-XSRF-TOKEN", "different");
+		}
 
 		// when
 		var response = request.exchange().returnResult(String.class);

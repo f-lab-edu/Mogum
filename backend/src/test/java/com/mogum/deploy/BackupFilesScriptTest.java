@@ -48,8 +48,9 @@ class BackupFilesScriptTest {
 			assertThat(result.commands().lines().filter(line -> line.equals("sleep 5")).count()).isEqualTo(24);
 		}
 
-		if (scenario.equals("delayed"))
+		if (scenario.equals("delayed")) {
 			assertThat(result.commands()).contains("sleep 5");
+		}
 
 		if (success) {
 			assertThat(result.output()).contains(KEY);
@@ -117,6 +118,7 @@ class BackupFilesScriptTest {
 	private Result runScript(String name, String scenario, Path root) throws Exception {
 		var bin = Files.createDirectory(root.resolve("bin"));
 		var tmp = Files.createDirectory(root.resolve("tmp"));
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		String fake = """
 			#!/usr/bin/env bash
 			set -euo pipefail
@@ -138,7 +140,8 @@ class BackupFilesScriptTest {
 			    fi
 			    if [[ $* == *'s3 cp'* ]]; then
 			      if [[ $3 == s3://* ]]; then path=$4; else path=$3; fi
-			      ls -l "$path" | awk '{print "mode=" (substr($1, 1, 10) == "-rw-------" ? "600" : "bad")}' >> "$TEST_ROOT/commands"
+			      ls -l "$path" | awk '{print "mode=" (substr($1,\
+			 1, 10) == "-rw-------" ? "600" : "bad")}' >> "$TEST_ROOT/commands"
 			    fi
 			    [[ $SCENARIO != upload-failure ]] || exit 1 ;;
 			  docker)
@@ -168,6 +171,7 @@ class BackupFilesScriptTest {
 			    else exit 1; fi ;;
 			esac
 			""";
+		// @checkstyle:on
 
 		for (var nameOfCommand : List.of("id", "date", "sleep", "aws", "docker")) {
 			var path = Files.writeString(bin.resolve(nameOfCommand), fake);

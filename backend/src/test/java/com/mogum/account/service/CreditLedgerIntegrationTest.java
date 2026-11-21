@@ -154,17 +154,19 @@ class CreditLedgerIntegrationTest {
 	void participatesInCallerRollback(boolean restore) {
 		// given
 		var data = prepare();
-		if (restore)
+		if (restore) {
 			creditLedger.consume(data.userId(), data.firstJobId(), 7);
+		}
 
 		int previousCount = jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries", Integer.class);
 
 		// when
 		new TransactionTemplate(platformTransactionManager).executeWithoutResult(status -> {
-			if (restore)
+			if (restore) {
 				creditLedger.restoreIfOwed(data.userId(), data.firstJobId());
-			else
+			} else {
 				creditLedger.consume(data.userId(), data.firstJobId(), 7);
+			}
 
 			status.setRollbackOnly();
 		});
@@ -258,8 +260,9 @@ class CreditLedgerIntegrationTest {
 				SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()
 				AND wait_event_type = 'Lock' AND query LIKE '%users%'
 				""", Integer.class);
-			if (waiting >= expected)
+			if (waiting >= expected) {
 				return waiting;
+			}
 
 			try {
 				Thread.sleep(10);

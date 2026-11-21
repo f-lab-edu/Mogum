@@ -80,8 +80,9 @@ class CourseCommandServiceIntegrationTest {
 				1, "첫", "계획", List.of())
 			: CourseFixtures.withStatus(CourseFixtures.single(userId), status);
 		courseRepository.save(course);
-		if (status != CourseStatus.NOT_PLANNED)
+		if (status != CourseStatus.NOT_PLANNED) {
 			lessonRepository.save(LessonFixtures.lesson(course, 1));
+		}
 		var client = testRequests.asUser(userId);
 		var before = state();
 		testClock.advance(Duration.ofSeconds(5));
@@ -124,8 +125,9 @@ class CourseCommandServiceIntegrationTest {
 				testClock.instant(), testClock.instant().plusSeconds(360));
 		} else if (status.equals("FAILED") || status.equals("DISCARDED")) {
 			GenerationJobFixtures.failed(jdbcTemplate, jobId, JobErrorType.INVALID_OUTPUT, testClock.instant());
-			if (status.equals("DISCARDED"))
+			if (status.equals("DISCARDED")) {
 				jobIntakeService.discard(userId, jobId);
+			}
 		} else if (status.equals("SUCCEEDED")) {
 			GenerationJobFixtures.succeeded(jdbcTemplate, jobId, course.getId(), null, null, testClock.instant());
 		}
@@ -163,10 +165,11 @@ class CourseCommandServiceIntegrationTest {
 				Callable<ErrorCode> loser = () -> {
 					entered.countDown();
 					try {
-						if (startFirst)
+						if (startFirst) {
 							jobIntakeService.receive(userId, replan(course.getId()));
-						else
+						} else {
 							courseCommandService.start(userId, course.getId());
+						}
 						return null;
 					} catch (ApiException e) {
 						return e.errorCode();
@@ -186,10 +189,11 @@ class CourseCommandServiceIntegrationTest {
 						""", Integer.class)).isPositive();
 					assertThat(pending.isDone()).isFalse();
 				});
-				if (startFirst)
+				if (startFirst) {
 					courseCommandService.start(userId, course.getId());
-				else
+				} else {
 					jobIntakeService.receive(userId, replan(course.getId()));
+				}
 				return pending;
 			});
 			var rejection = future.get(10, TimeUnit.SECONDS);

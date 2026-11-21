@@ -77,8 +77,9 @@ class DeployFilesScriptTest {
 		var oldest = fixtureRelease(releases, "d".repeat(40), previousImage);
 
 		var current = root.resolve("current");
-		if (!scenario.equals("first-failure"))
+		if (!scenario.equals("first-failure")) {
 			Files.createSymbolicLink(current, previous);
+		}
 		if (scenario.equals("invalid-reference")) {
 			Files.writeString(release.resolve("app-image.ref"), image + "\nextra\n");
 		}
@@ -91,8 +92,9 @@ class DeployFilesScriptTest {
 			for (var unit : List.of("mogum-backup.service", "mogum-backup.timer")) {
 				Files.copy(DEPLOY.resolve("systemd/" + unit), systemd.resolve(unit));
 			}
-			if (scenario.equals("changed-unit"))
+			if (scenario.equals("changed-unit")) {
 				Files.writeString(systemd.resolve("mogum-backup.timer"), "# old\n");
+			}
 		}
 
 		var journalDirectory = root.resolve("journald.conf.d");
@@ -100,8 +102,9 @@ class DeployFilesScriptTest {
 		if (List.of("unchanged-units", "changed-unit", "unchanged-journal", "changed-journal").contains(scenario)) {
 			Files.createDirectory(journalDirectory);
 			Files.copy(DEPLOY.resolve("journald/mogum.conf"), journalConfig);
-			if (scenario.equals("changed-journal"))
+			if (scenario.equals("changed-journal")) {
 				Files.writeString(journalConfig, "# old\n");
+			}
 		}
 
 		// 실제 서버 경로와 GNU 전용 명령을 임시 경로/명령으로 대체한다. Docker/AWS에는 접속하지 않는다.
@@ -116,6 +119,7 @@ class DeployFilesScriptTest {
 		var scriptPath = root.resolve("deploy.sh");
 		Files.writeString(scriptPath, script);
 		var bin = Files.createDirectory(root.resolve("bin"));
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		String fakeCommand = """
 			#!/usr/bin/env bash
 			set -euo pipefail
@@ -165,6 +169,7 @@ class DeployFilesScriptTest {
 			    esac ;;
 			esac
 			""";
+		// @checkstyle:on
 
 		for (var command : List.of("stat", "aws", "curl", "sleep", "mv", "find", "docker",
 			"systemctl", "timedatectl", "install")) {

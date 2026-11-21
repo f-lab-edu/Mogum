@@ -31,20 +31,23 @@ public final class FakeOpenAiServer implements AutoCloseable {
 				exchange.getRequestHeaders().getFirst("Authorization"), new JsonMapper().readTree(body)));
 			var response = responses.poll();
 			try (exchange) {
-				if (response == null)
+				if (response == null) {
 					return;
+				}
 				byte[] bytes = response.body().getBytes(StandardCharsets.UTF_8);
 				exchange.getResponseHeaders().set("Content-Type", "application/json");
-				if (response.headersFirst())
+				if (response.headersFirst()) {
 					exchange.sendResponseHeaders(response.status(), bytes.length);
+				}
 				try {
 					Thread.sleep(response.delay().toMillis());
 				} catch (InterruptedException exception) {
 					Thread.currentThread().interrupt();
 					return;
 				}
-				if (!response.headersFirst())
+				if (!response.headersFirst()) {
 					exchange.sendResponseHeaders(response.status(), bytes.length);
+				}
 				exchange.getResponseBody().write(bytes);
 			} catch (IOException ignored) {
 				// 시간 초과 시험에서 클라이언트가 먼저 닫는다.
@@ -75,6 +78,7 @@ public final class FakeOpenAiServer implements AutoCloseable {
 
 	public static String completion(String reason, String content, boolean usage) {
 		var json = new JsonMapper();
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		return """
 			{"id":"chat-test","object":"chat.completion","created":1,"model":"gpt-5.6-terra",
 			 "choices":[{"index":0,"finish_reason":%s,"message":{"role":"assistant","content":%s}}]%s}
@@ -82,13 +86,16 @@ public final class FakeOpenAiServer implements AutoCloseable {
 			,"usage":{"prompt_tokens":100,"completion_tokens":20,"total_tokens":120,
 			          "prompt_tokens_details":{"cached_tokens":40}}
 			""" : "");
+		// @checkstyle:on
 	}
 
 	public static String error(String code) {
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		return """
 			{"error":{"message":"RESPONSE_PRIVATE_MARKER","type":"invalid_request_error",
 			          "code":"%s","param":null}}
 			""".formatted(code);
+		// @checkstyle:on
 	}
 
 	@Override

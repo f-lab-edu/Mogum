@@ -86,8 +86,9 @@ public class SecurityConfiguration {
 			cookie.secure(true)
 				.sameSite("Lax")
 				.path("/");
-			if (!webProperties.cookieDomain().isEmpty())
+			if (!webProperties.cookieDomain().isEmpty()) {
 				cookie.domain(webProperties.cookieDomain());
+			}
 		});
 		var tokenHandler = new CsrfTokenRequestAttributeHandler();
 
@@ -113,8 +114,9 @@ public class SecurityConfiguration {
 		var getOnlyResolver = new OAuth2AuthorizationRequestResolver() {
 			@Override
 			public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
-				if (!"GET".equals(request.getMethod()))
+				if (!"GET".equals(request.getMethod())) {
 					return null;
+				}
 
 				var match = authorizationStart.matcher(request);
 

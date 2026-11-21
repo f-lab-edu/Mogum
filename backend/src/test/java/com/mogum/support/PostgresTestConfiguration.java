@@ -13,7 +13,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * Boot 4.1.1의 @ImportTestcontainers는 컨테이너 빈을 등록하고 종료 때 close하므로 쓰지 않는다.
  */
 public final class PostgresTestConfiguration {
+	// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 	private PostgresTestConfiguration() {}
+	// @checkstyle:on
 
 	public static final PostgreSQLContainer POSTGRES =
 		// 공용 통합 컨텍스트 · 레포지토리 슬라이스 · 마이그레이션 검사의 풀이 함께 쓰는 테스트 DB다.

@@ -25,7 +25,8 @@ public final class ReplanCourseIntakeHandler implements JobIntakeHandler {
 	public void check(long userId, JobRequest request) {
 		var target = courseRepository.findById(request.targetId())
 			.orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
-		if (target.getStatus() != CourseStatus.REVIEWING)
+		if (target.getStatus() != CourseStatus.REVIEWING) {
 			throw new ApiException(ErrorCode.REPLAN_NOT_ALLOWED);
+		}
 	}
 }

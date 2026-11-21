@@ -53,11 +53,13 @@ class ApiErrorResponsesTest {
 
 		// then
 		assertThat(response.getStatusCode().value()).isEqualTo(400);
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		assertJson("""
 			{"code":"FIELD_INVALID","message":"입력을 확인해 주십시오","fields":[
 			  {"field":"purpose","reason":"TOO_LONG"},
 			  {"field":"topic","reason":"REQUIRED"},{"field":"topic","reason":"TOO_LONG"}]}
 			""", response.getBody());
+		// @checkstyle:on
 	}
 
 	@ParameterizedTest(name = "오류 code={0}")

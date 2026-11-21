@@ -12,13 +12,16 @@ public final class FakeUserRepository implements UserRepository {
 	private long nextId = 1;
 
 	@Override
+	// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 	public void lockIdentity(String provider, String subject) {}
+	// @checkstyle:on
 
 	@Override
 	public <S extends User> S save(S entity) {
 		if (entity.getId() == null) {
-			while (users.containsKey(nextId))
+			while (users.containsKey(nextId)) {
 				nextId++;
+			}
 			UserFixtures.withId(entity, nextId++);
 		}
 

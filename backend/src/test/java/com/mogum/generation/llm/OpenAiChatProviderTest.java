@@ -29,10 +29,11 @@ class OpenAiChatProviderTest {
 		try (var server = new FakeOpenAiServer();
 			var provider = new OpenAiChatProvider("fake-key", server.baseUrl(), Duration.ofSeconds(5))) {
 			var response = FakeOpenAiServer.completion("stop", "RESPONSE_PRIVATE_MARKER", true);
-			if (headersFirst)
+			if (headersFirst) {
 				server.respondWithDelayedBody(200, response, Duration.ofSeconds(2));
-			else
+			} else {
 				server.respond(200, response, Duration.ofSeconds(2));
+			}
 			var settings = new ChatSettings("gpt-5.6-terra", 4000, Duration.ofMillis(300), 1);
 			var request = new ChatProvider.Request(1L, JobType.NEW_COURSE, settings,
 				List.of(new ChatProvider.Message(ChatProvider.Role.USER, "PROMPT_PRIVATE_MARKER")));

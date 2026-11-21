@@ -269,8 +269,9 @@ class ReplanCourseGeneratorIntegrationTest {
 		for (int index = 1; index <= 4; index++) {
 			var course = CourseFixtures.inRoadmap(roadmap, index, "계획-" + index, "계획설명-" + index,
 				List.of(new PlannedConcept("계획개념-" + index, "계획정의-" + index)));
-			if (index < position)
+			if (index < position) {
 				CourseFixtures.withStatus(course, CourseStatus.COMPLETED);
+			}
 			courseRepository.save(course);
 			if (index < position) {
 				lessonRepository.save(LessonFixtures.lesson(course, 1, "실제-" + index, "실제설명-" + index,

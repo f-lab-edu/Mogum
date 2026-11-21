@@ -94,8 +94,9 @@ class WorkerLifecycleIntegrationTest {
 
 	@AfterEach
 	void finishWorkers() {
-		if (workerLifecycle != null)
+		if (workerLifecycle != null) {
 			workerLifecycle.stop();
+		}
 
 		generators.forEach(generator -> {
 			if (generator.type() == JobType.NEW_COURSE) {
@@ -165,8 +166,9 @@ class WorkerLifecycleIntegrationTest {
 		long userId = user();
 		long id = job(userId);
 		var plan = stub().plan(id).holdFirst();
-		if (failure)
+		if (failure) {
 			plan.fail(GenerationOutcome.Failure.PROVIDER_UNAVAILABLE, 10);
+		}
 
 		workerLifecycle = lifecycle(1, Duration.ofMillis(80), Duration.ofMillis(10));
 		workerLifecycle.start();

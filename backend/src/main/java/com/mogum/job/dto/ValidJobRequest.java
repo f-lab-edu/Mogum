@@ -11,7 +11,9 @@ import jakarta.validation.Payload;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy = JobReceiveRequestValidator.class)
+// @checkstyle:off — 포매터의 애노테이션 선언 중괄호 간격을 따른다.
 public @interface ValidJobRequest{
+	// @checkstyle:on
 	String message() default "field.INVALID_VALUE";
 
 	Class<?>[] groups() default {};

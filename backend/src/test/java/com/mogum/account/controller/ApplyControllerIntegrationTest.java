@@ -179,8 +179,9 @@ class ApplyControllerIntegrationTest {
 		long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
 
 		while (!output.getAll().substring(offset).contains("path=/api/account/apply status=200")
-			&& System.nanoTime() < deadline)
+			&& System.nanoTime() < deadline) {
 			Thread.sleep(10);
+		}
 
 		var logs = output.getAll().substring(offset);
 		assertThat(logs).doesNotContain(notApplied.email(), notApplied.name(), notApplied.subject());
@@ -250,7 +251,8 @@ class ApplyControllerIntegrationTest {
 		assertThat(jdbcTemplate.queryForObject("SELECT credit_balance FROM users", Integer.class))
 			.isEqualTo(creditProperties.monthlyAmount());
 		assertThat(jdbcTemplate.queryForObject(
-			"SELECT u.credit_balance = sum(e.amount) FROM users u JOIN credit_entries e ON e.user_id = u.id GROUP BY u.id",
+			"SELECT u.credit_balance = sum(e.amount) FROM users u "
+				+ "JOIN credit_entries e ON e.user_id = u.id GROUP BY u.id",
 			Boolean.class)).isTrue();
 	}
 }

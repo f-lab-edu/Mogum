@@ -126,11 +126,13 @@ class JobControllerIntegrationTest {
 		fail(id, JobErrorType.PROVIDER_UNAVAILABLE);
 		creditLedger.restoreIfOwed(user.getId(), id);
 
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		client.get().uri("/api/jobs/" + id).exchange().expectStatus().isOk().expectBody().json("""
 			{"data":{"id":%d,"type":"NEW_COURSE","status":"FAILED",
 			 "subject":{"topic":"자바","level":"BEGINNER","purpose":"WORK"},
 			 "error":{"code":"JOB_TEMPORARY_FAILURE","message":"만들지 못했습니다. 다시 시도하거나 버려 주세요"}}}
 			""".formatted(id), JsonCompareMode.STRICT);
+		// @checkstyle:on
 
 		// when — 다시 시도
 		var retried = client.post().uri("/api/jobs/" + id + "/retry").exchange();
@@ -198,11 +200,13 @@ class JobControllerIntegrationTest {
 		var response = client.get().uri("/api/jobs/" + job.getId()).exchange();
 
 		// then
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		response.expectStatus().isOk().expectBody().json("""
 			{"data":{"id":%d,"type":"NEW_ROADMAP","status":"FAILED",
 			 "subject":{"topic":"물리","level":"OTHER","levelOther":"수학은 알아요","purpose":"OTHER","purposeOther":"연구"},
 			 "error":{"code":"%s","message":"%s"}}}
 			""".formatted(job.getId(), input ? "JOB_INPUT_FAILURE" : "JOB_TEMPORARY_FAILURE",
+			// @checkstyle:on
 			input ? "주제를 좁혀 새로 만들어 주세요" : "만들지 못했습니다. 다시 시도하거나 버려 주세요"), JsonCompareMode.STRICT);
 	}
 
@@ -286,8 +290,9 @@ class JobControllerIntegrationTest {
 		var failed = generationJobRepository.save(GenerationJobFixtures.newCourse(user.getId(), input()));
 		fail(failed.getId(), JobErrorType.INVALID_OUTPUT);
 
-		for (int i = 0; i < jobProperties.maxInProgressPerUser(); i++)
+		for (int i = 0; i < jobProperties.maxInProgressPerUser(); i++) {
 			generationJobRepository.save(GenerationJobFixtures.newCourse(user.getId(), input()));
+		}
 
 		var client = testRequests.asUser(user.getId());
 
@@ -375,12 +380,14 @@ class JobControllerIntegrationTest {
 		var result = client.post().uri("/api/jobs").contentType(MediaType.APPLICATION_JSON).body(body).exchange();
 
 		// then
+		// @checkstyle:off — 인접한 텍스트 블록의 공백 들여쓰기를 보존한다.
 		result.expectStatus().isBadRequest().expectBody().json(malformed ? """
 			{"code":"INVALID_REQUEST","message":"요청을 확인할 수 없습니다"}
 			""" : """
 			{"code":"FIELD_INVALID","message":"입력을 확인해 주십시오",
 			 "fields":[{"field":"type","reason":"INVALID_VALUE"}]}
 			""", JsonCompareMode.STRICT);
+		// @checkstyle:on
 		assertThat(output.getAll())
 			.contains("method=POST", "path=/api/jobs", "status=400")
 			.doesNotContain(marker, "Unhandled API exception");
@@ -415,7 +422,8 @@ class JobControllerIntegrationTest {
 
 	private String queued(long id) {
 		return """
-			{"data":{"id":%d,"type":"NEW_COURSE","status":"QUEUED", "subject":{"topic":"자바","level":"BEGINNER","purpose":"WORK"}}}
+			{"data":{"id":%d,"type":"NEW_COURSE","status":"QUEUED", \
+			"subject":{"topic":"자바","level":"BEGINNER","purpose":"WORK"}}}
 			"""
 			.formatted(id);
 	}

@@ -158,8 +158,9 @@ class DeployFilesTest {
 		var matcher = VARIABLE.matcher(Files.readString(DEPLOY.resolve("compose.yaml")));
 
 		while (matcher.find()) {
-			if (!matcher.group(1).equals("APP_IMAGE"))
+			if (!matcher.group(1).equals("APP_IMAGE")) {
 				expected.add(matcher.group(1));
+			}
 		}
 
 		expected.add("API_DOMAIN");
@@ -171,8 +172,9 @@ class DeployFilesTest {
 
 		// then
 		for (var line : lines) {
-			if (line.isBlank() || line.startsWith("#"))
+			if (line.isBlank() || line.startsWith("#")) {
 				continue;
+			}
 
 			var parts = line.split("=", 2);
 			assertThat(parts.length).isEqualTo(2);

@@ -78,10 +78,12 @@ class JobControllerTest {
 			.exchange();
 
 		// then
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		assertThat(result).hasStatus(400).bodyJson().isStrictlyEqualTo("""
 			{"code":"FIELD_INVALID","message":"입력을 확인해 주십시오",
 			 "fields":[{"field":"%s","reason":"%s"}]}
 			""".formatted(field, reason));
+		// @checkstyle:on
 		then(jobIntakeService).shouldHaveNoInteractions();
 		then(jobReadService).shouldHaveNoInteractions();
 	}
@@ -94,37 +96,45 @@ class JobControllerTest {
 			cases.add(new Object[] {field + " 빈 글", changed(field, " \t\n"), field, "REQUIRED"});
 		}
 
-		for (var field : List.of("type", "level", "purpose"))
+		for (var field : List.of("type", "level", "purpose")) {
 			cases.add(new Object[] {field + " 모르는 값", changed(field, "FUTURE"), field, "INVALID_VALUE"});
+		}
 
 		for (var field : List.of("topic", "memo", "levelOther", "purposeOther", "feedback")) {
 			var body = changed(field, "가".repeat(field.equals("topic") ? 101 : field.endsWith("Other") ? 51 : 501));
-			if (field.equals("levelOther"))
+			if (field.equals("levelOther")) {
 				body.put("level", "OTHER");
-			if (field.equals("purposeOther"))
+			}
+			if (field.equals("purposeOther")) {
 				body.put("purpose", "OTHER");
-			if (field.equals("feedback"))
+			}
+			if (field.equals("feedback")) {
 				body = target("REPLAN_COURSE", "courseId", 1L, field, body.get(field));
+			}
 			cases.add(new Object[] {field + " 상한 초과", body, field, "TOO_LONG"});
 		}
 
 		for (var field : List.of("memo", "levelOther", "purposeOther", "feedback")) {
 			var body = changed(field, "\t\n ");
-			if (field.equals("levelOther"))
+			if (field.equals("levelOther")) {
 				body.put("level", "OTHER");
-			if (field.equals("purposeOther"))
+			}
+			if (field.equals("purposeOther")) {
 				body.put("purpose", "OTHER");
-			if (field.equals("feedback"))
+			}
+			if (field.equals("feedback")) {
 				body = target("REPLAN_COURSE", "courseId", 1L, field, "\t\n ");
+			}
 			cases.add(new Object[] {field + " 빈 글", body, field, "REQUIRED"});
 		}
 
 		cases.add(new Object[] {"기타 수준 글 누락", changed("level", "OTHER"), "levelOther", "REQUIRED"});
 		cases.add(new Object[] {"기타 목적 글 누락", changed("purpose", "OTHER"), "purposeOther", "REQUIRED"});
 
-		for (var field : List.of("levelOther", "purposeOther", "feedback", "courseId", "roadmapId", "lessonId"))
+		for (var field : List.of("levelOther", "purposeOther", "feedback", "courseId", "roadmapId", "lessonId")) {
 			cases.add(new Object[] {field + " 허용 안 됨", changed(field, field.endsWith("Id") ? 1L : "글"),
 				field, "NOT_ALLOWED"});
+		}
 
 		for (var entry : Map.of("MATERIAL", "lessonId", "PLAN_ROADMAP_COURSE", "courseId",
 			"REPLAN_COURSE", "courseId", "REPLAN_ROADMAP", "roadmapId").entrySet()) {
@@ -133,8 +143,9 @@ class JobControllerTest {
 
 			for (var field : List.of("topic", "level", "purpose", "levelOther", "purposeOther", "memo",
 				"courseId", "roadmapId", "lessonId")) {
-				if (field.equals(entry.getValue()))
+				if (field.equals(entry.getValue())) {
 					continue;
+				}
 				cases.add(new Object[] {entry.getKey() + " " + field + " 허용 안 됨",
 					target(entry.getKey(), entry.getValue(), 1L, field, field.endsWith("Id") ? 2L : "글"),
 					field, "NOT_ALLOWED"});
@@ -193,8 +204,9 @@ class JobControllerTest {
 			case REPLAN_ROADMAP -> target(type.name(), "roadmapId", 23L, "feedback", null);
 			case MATERIAL -> target(type.name(), "lessonId", 23L, "feedback", null);
 		};
-		if (type.name().startsWith("REPLAN"))
+		if (type.name().startsWith("REPLAN")) {
 			body.put("feedback", "바꿔 주세요");
+		}
 
 		// when
 		var result = mockMvcTester.post()
@@ -259,10 +271,12 @@ class JobControllerTest {
 	}
 
 	private void assertReadShape(MvcTestResult result) {
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		assertThat(result).hasStatusOk().bodyJson().isStrictlyEqualTo("""
 			{"data":{"id":11,"type":"NEW_COURSE","status":"QUEUED",
 			 "subject":{"topic":"자바","level":"BEGINNER","purpose":"WORK"}}}
 			""");
+		// @checkstyle:on
 	}
 
 	private static Map<String, Object> changed(String field, Object value) {

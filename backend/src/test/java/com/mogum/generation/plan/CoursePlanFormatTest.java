@@ -233,10 +233,11 @@ class CoursePlanFormatTest {
 			default -> (ObjectNode)root.path("lessons").get(0).path("concepts").get(0);
 		};
 		String key = path.equals("lessonTitle") ? "title" : path;
-		if (invalid.equals("missing"))
+		if (invalid.equals("missing")) {
 			target.remove(key);
-		else
+		} else {
 			target.set(key, jsonMapper.readTree(invalid));
+		}
 
 		// when
 		var result = coursePlanFormat.parseNewCourse(jsonMapper.writeValueAsString(root));

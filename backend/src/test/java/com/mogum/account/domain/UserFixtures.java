@@ -5,7 +5,9 @@ import java.time.Instant;
 import org.springframework.test.util.ReflectionTestUtils;
 
 public final class UserFixtures {
+	// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 	private UserFixtures() {}
+	// @checkstyle:on
 
 	public static User user(String email) {
 		return user("google", email, email);

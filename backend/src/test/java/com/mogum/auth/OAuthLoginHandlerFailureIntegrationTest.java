@@ -48,8 +48,9 @@ class OAuthLoginHandlerFailureIntegrationTest extends OAuthScenario {
 					case "expired-cookie" -> expiredCookie(start);
 					default -> start.cookie();
 				};
-				if (condition.equals("state"))
+				if (condition.equals("state")) {
 					path = "/auth/google/callback?code=" + marker + "&state=" + marker;
+				}
 				reason = "authorization_request_not_found";
 			}
 			case "cancel", "unknown" -> {

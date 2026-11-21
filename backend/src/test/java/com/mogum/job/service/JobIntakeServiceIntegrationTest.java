@@ -100,8 +100,9 @@ class JobIntakeServiceIntegrationTest {
 	void serializesIntakeAtLimit() throws Exception {
 		// given
 		long userId = user(100);
-		for (int i = 0; i < jobProperties.maxInProgressPerUser() - 1; i++)
+		for (int i = 0; i < jobProperties.maxInProgressPerUser() - 1; i++) {
 			jobIntakeService.receive(userId, request(JobType.NEW_COURSE, userId));
+		}
 
 		var first = request(JobType.NEW_ROADMAP, userId);
 		var second = request(JobType.MATERIAL, userId);
@@ -254,8 +255,9 @@ class JobIntakeServiceIntegrationTest {
 		long userId = user(100);
 		var result = jobIntakeService.receive(userId, request(JobType.NEW_COURSE, userId));
 		fail(result.id(), JobErrorType.INPUT_TOO_LARGE);
-		if (alreadyRestored)
+		if (alreadyRestored) {
 			creditLedger.restoreIfOwed(userId, result.id());
+		}
 
 		// when
 		jobIntakeService.discard(userId, result.id());
@@ -524,8 +526,9 @@ class JobIntakeServiceIntegrationTest {
 				AND wait_event_type = 'Lock' AND query LIKE '%users%'
 				""", Integer.class);
 
-			if (waiting >= 2)
+			if (waiting >= 2) {
 				return waiting;
+			}
 			Thread.sleep(10);
 		} while (System.nanoTime() < deadline);
 

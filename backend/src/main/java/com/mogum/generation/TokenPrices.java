@@ -12,8 +12,9 @@ public record TokenPrices(BigDecimal input, BigDecimal cachedInput, BigDecimal o
 	}
 
 	public BigDecimal cost(ChatProvider.Usage usage) {
-		if (usage == null || usage.inputTokens() == null || usage.outputTokens() == null)
+		if (usage == null || usage.inputTokens() == null || usage.outputTokens() == null) {
 			return null;
+		}
 
 		int cached = usage.cachedInputTokens() == null ? 0 : usage.cachedInputTokens();
 		return input.multiply(BigDecimal.valueOf((long)usage.inputTokens() - cached))

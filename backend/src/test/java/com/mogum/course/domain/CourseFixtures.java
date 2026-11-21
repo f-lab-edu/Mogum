@@ -6,7 +6,9 @@ import java.util.List;
 import org.springframework.test.util.ReflectionTestUtils;
 
 public final class CourseFixtures {
+	// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 	private CourseFixtures() {}
+	// @checkstyle:on
 
 	public static Course single(long userId) {
 		return Course.single(userId, new LearningInput("자바", Level.BEGINNER, null, Purpose.GENERAL, null, null),
@@ -30,8 +32,9 @@ public final class CourseFixtures {
 			&& course.getStatus() == CourseStatus.REVIEWING) {
 			course.start(Instant.parse("2026-11-01T00:00:00Z"));
 		}
-		if (course.getStatus() != status)
+		if (course.getStatus() != status) {
 			ReflectionTestUtils.setField(course, "status", status);
+		}
 		if (status == CourseStatus.COMPLETED) {
 			ReflectionTestUtils.setField(course, "completedAt", Instant.parse("2026-11-02T00:00:00Z"));
 		}

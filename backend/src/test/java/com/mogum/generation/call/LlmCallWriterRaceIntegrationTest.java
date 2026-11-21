@@ -76,7 +76,8 @@ class LlmCallWriterRaceIntegrationTest {
 				var started = executor.submit(() -> llmCallWriter.start(
 					job, user, JobType.NEW_COURSE, LlmCallType.CHAT, marker));
 				await().atMost(Duration.ofSeconds(10)).until(() -> Boolean.TRUE.equals(jdbcTemplate.queryForObject(
-					"SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND objid = 748129 AND NOT granted)",
+					"SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype "
+						+ "= 'advisory' AND objid = 748129 AND NOT granted)",
 					Boolean.class)));
 
 				// when

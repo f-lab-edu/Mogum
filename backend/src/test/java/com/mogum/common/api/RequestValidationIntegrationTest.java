@@ -88,7 +88,8 @@ class RequestValidationIntegrationTest {
 
 		// then
 		assertError(response, "FIELD_INVALID",
-			",\"fields\":[{\"field\":\"purpose\",\"reason\":\"TOO_LONG\"},{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]",
+			",\"fields\":[{\"field\":\"purpose\",\"reason\":\"TOO_LONG\"},"
+				+ "{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]",
 			"private-topic", "private-purpose");
 	}
 
@@ -138,7 +139,8 @@ class RequestValidationIntegrationTest {
 
 		// then
 		assertError(response, "FIELD_INVALID",
-			",\"fields\":[{\"field\":\"purpose\",\"reason\":\"REQUIRED\"},{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]",
+			",\"fields\":[{\"field\":\"purpose\",\"reason\":\"REQUIRED\"},"
+				+ "{\"field\":\"topic\",\"reason\":\"TOO_LONG\"}]",
 			"private-topic");
 	}
 
@@ -261,8 +263,9 @@ class RequestValidationIntegrationTest {
 		long deadline = System.nanoTime() + Duration.ofSeconds(3).toNanos();
 		while (output.getOut().lines().noneMatch(line -> line.contains("requestId=" + id)
 			&& line.contains("access method="))
-			&& System.nanoTime() < deadline)
+			&& System.nanoTime() < deadline) {
 			Thread.sleep(10);
+		}
 
 		var requestLines = output.getOut().lines().filter(line -> line.contains("requestId=" + id)).toList();
 		assertThat(requestLines).hasSize(1);
@@ -306,7 +309,8 @@ class RequestValidationIntegrationTest {
 			"{\"code\":\"" + code + "\",\"message\":\"" + message + "\"" + fields + "}",
 			response.getResponseBody());
 
-		for (var input : inputs)
+		for (var input : inputs) {
 			assertThat(response.getResponseBody().contains(input)).isFalse();
+		}
 	}
 }

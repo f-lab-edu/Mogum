@@ -9,7 +9,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.mogum.course.domain.LearningInput;
 
 public final class GenerationJobFixtures {
+	// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 	private GenerationJobFixtures() {}
+	// @checkstyle:on
 
 	public static GenerationJob newCourse(long userId, LearningInput input) {
 		return GenerationJob.newCourse(userId, input);

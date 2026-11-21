@@ -67,14 +67,18 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 	}
 
 	private static int sizeOf(Object value) {
-		if (value instanceof CharSequence text)
+		if (value instanceof CharSequence text) {
 			return text.length();
-		if (value instanceof Collection<?> collection)
+		}
+		if (value instanceof Collection<?> collection) {
 			return collection.size();
-		if (value instanceof Map<?, ?> map)
+		}
+		if (value instanceof Map<?, ?> map) {
 			return map.size();
-		if (value != null && value.getClass().isArray())
+		}
+		if (value != null && value.getClass().isArray()) {
 			return Array.getLength(value);
+		}
 		return -1;
 	}
 

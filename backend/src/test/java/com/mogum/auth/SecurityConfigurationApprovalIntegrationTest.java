@@ -39,8 +39,9 @@ class SecurityConfigurationApprovalIntegrationTest extends SecurityScenario {
 			.contains("\"status\":\"" + (status.equals("NOT_APPLIED") ? "APPLIED" : status) + "\"");
 
 		var next = apply.getResponseCookies().getFirst("SESSION");
-		if (next != null)
+		if (next != null) {
 			client = client.mutate().defaultCookie("SESSION", next.getValue()).build();
+		}
 
 		// when
 		var response = client.post().uri("/api/auth/logout").exchange();
@@ -124,7 +125,8 @@ class SecurityConfigurationApprovalIntegrationTest extends SecurityScenario {
 		var client = client(cookie);
 		client.get().uri("/api/test-domain-error").exchange().expectStatus().isForbidden();
 		jdbcTemplate.update(
-			"UPDATE users SET status = 'APPROVED', approved_at = now(), credit_refill_at = now() + interval '30 days', updated_at = now()");
+			"UPDATE users SET status = 'APPROVED', approved_at = now(), "
+				+ "credit_refill_at = now() + interval '30 days', updated_at = now()");
 
 		// when
 		var response = client.get().uri("/api/test-domain-error").exchange().returnResult(String.class);

@@ -63,8 +63,9 @@ public class JobIntakeService {
 		checkOwner(userId, request);
 
 		var handler = handlers.get(request.type());
-		if (handler == null)
+		if (handler == null) {
 			throw new ApiException(ErrorCode.INVALID_REQUEST);
+		}
 		handler.check(userId, request);
 
 		if (request.type() != JobType.NEW_COURSE && request.type() != JobType.NEW_ROADMAP) {
@@ -72,8 +73,9 @@ public class JobIntakeService {
 				|| request.type() == JobType.PLAN_ROADMAP_COURSE;
 			var existing = generationJobRepository.findSameTarget(
 				userId, request.type(), request.targetId(), includeSucceeded);
-			if (existing.isPresent())
+			if (existing.isPresent()) {
 				return result(existing.get());
+			}
 		}
 
 		checkLimit(userId);
@@ -86,10 +88,12 @@ public class JobIntakeService {
 	public JobResult retry(long userId, long jobId) {
 		creditLedger.lock(userId);
 		var job = ownedJob(userId, jobId);
-		if (job.getStatus() != JobStatus.FAILED)
+		if (job.getStatus() != JobStatus.FAILED) {
 			return result(job);
-		if (job.getErrorType() == JobErrorType.INPUT_TOO_LARGE)
+		}
+		if (job.getErrorType() == JobErrorType.INPUT_TOO_LARGE) {
 			throw new ApiException(ErrorCode.JOB_RETRY_NOT_ALLOWED);
+		}
 
 		checkLimit(userId);
 		job.retry();
@@ -101,8 +105,9 @@ public class JobIntakeService {
 	public void discard(long userId, long jobId) {
 		creditLedger.lock(userId);
 		var job = ownedJob(userId, jobId);
-		if (job.getStatus() != JobStatus.FAILED)
+		if (job.getStatus() != JobStatus.FAILED) {
 			throw new ApiException(ErrorCode.JOB_DISCARD_NOT_ALLOWED);
+		}
 
 		creditLedger.restoreIfOwed(userId, jobId);
 		generationJobRepository.delete(job);
@@ -122,8 +127,9 @@ public class JobIntakeService {
 				.getCourse()
 				.getUserId();
 		};
-		if (owner != userId)
+		if (owner != userId) {
 			throw new ApiException(ErrorCode.NOT_FOUND);
+		}
 	}
 
 	private GenerationJob ownedJob(long userId, long jobId) {
@@ -135,8 +141,9 @@ public class JobIntakeService {
 	private void checkLimit(long userId) {
 		long count = generationJobRepository.countByUserIdAndStatusIn(
 			userId, List.of(JobStatus.QUEUED, JobStatus.RUNNING));
-		if (count >= jobProperties.maxInProgressPerUser())
+		if (count >= jobProperties.maxInProgressPerUser()) {
 			throw new ApiException(ErrorCode.TOO_MANY_IN_PROGRESS);
+		}
 	}
 
 	private GenerationJob create(long userId, JobRequest request) {
@@ -170,10 +177,11 @@ public class JobIntakeService {
 		Runnable write = () -> {
 			MDC.put(RequestLogFilter.JOB_ID, Long.toString(jobId));
 			try {
-				if (retried)
+				if (retried) {
 					log.info("job retried");
-				else
+				} else {
 					log.info("job received type={}", type);
+				}
 			} finally {
 				MDC.remove(RequestLogFilter.JOB_ID);
 			}

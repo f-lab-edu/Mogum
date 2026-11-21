@@ -34,8 +34,9 @@ public final class LlmCallWriter {
 		try {
 			return insert(jobId, userId, jobType, callType, model);
 		} catch (RuntimeException exception) {
-			if (!isForeignKeyViolation(exception))
+			if (!isForeignKeyViolation(exception)) {
 				throw exception;
+			}
 		}
 
 		// 확인 직후 삭제된 연결은 새 트랜잭션에서 다시 확인해 비우고 한 번만 재시도한다.
@@ -61,8 +62,9 @@ public final class LlmCallWriter {
 	}
 
 	private Long existingId(String table, Long id) {
-		if (id == null)
+		if (id == null) {
 			return null;
+		}
 
 		var ids = entityManager.createNativeQuery("SELECT id FROM " + table + " WHERE id = :id")
 			.setParameter("id", id)
@@ -72,8 +74,9 @@ public final class LlmCallWriter {
 
 	private static boolean isForeignKeyViolation(Throwable exception) {
 		for (var cause = exception; cause != null; cause = cause.getCause()) {
-			if (cause instanceof SQLException sql && "23503".equals(sql.getSQLState()))
+			if (cause instanceof SQLException sql && "23503".equals(sql.getSQLState())) {
 				return true;
+			}
 		}
 		return false;
 	}

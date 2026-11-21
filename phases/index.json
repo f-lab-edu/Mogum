@@ -68,7 +68,8 @@
     },
     {
       "dir": "7a-naver-style",
-      "status": "pending"
+      "status": "blocked",
+      "blocked_at": "2026-11-21T11:12:36+0900"
     }
   ]
 }

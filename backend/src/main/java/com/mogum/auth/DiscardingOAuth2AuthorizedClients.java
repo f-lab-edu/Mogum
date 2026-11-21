@@ -19,11 +19,15 @@ public final class DiscardingOAuth2AuthorizedClients
 
 	@Override
 	public void saveAuthorizedClient(OAuth2AuthorizedClient client, Authentication principal,
+		// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 		HttpServletRequest request, HttpServletResponse response) {}
+	// @checkstyle:on
 
 	@Override
 	public void removeAuthorizedClient(String registrationId, Authentication principal,
+		// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 		HttpServletRequest request, HttpServletResponse response) {}
+	// @checkstyle:on
 
 	@Override
 	public <T extends OAuth2AuthorizedClient> T loadAuthorizedClient(String registrationId, String principalName) {
@@ -31,8 +35,12 @@ public final class DiscardingOAuth2AuthorizedClients
 	}
 
 	@Override
+	// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 	public void saveAuthorizedClient(OAuth2AuthorizedClient client, Authentication principal) {}
+	// @checkstyle:on
 
 	@Override
+	// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 	public void removeAuthorizedClient(String registrationId, String principalName) {}
+	// @checkstyle:on
 }

@@ -17,8 +17,9 @@ public final class FakeGenerationJobRepository implements GenerationJobRepositor
 	private long nextId = 1;
 
 	public <S extends GenerationJob> S save(S entity) {
-		if (entity.getId() == null)
+		if (entity.getId() == null) {
 			ReflectionTestUtils.setField(entity, "id", nextId++);
+		}
 		jobs.put(entity.getId(), entity);
 		return entity;
 	}

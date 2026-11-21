@@ -155,12 +155,14 @@ class ArchitectureTest {
 			@Override
 			public void check(JavaField field, ConditionEvents events) {
 				var rawType = field.getRawType();
-				if (rawType.isPrimitive() || rawType.getPackageName().startsWith("java."))
+				if (rawType.isPrimitive() || rawType.getPackageName().startsWith("java.")) {
 					return;
+				}
 
 				String typeName = rawType.getSimpleName();
-				if (typeName.startsWith("Fake"))
+				if (typeName.startsWith("Fake")) {
 					typeName = typeName.substring(4);
+				}
 
 				String camelCaseName = Character.toLowerCase(typeName.charAt(0)) + typeName.substring(1);
 				boolean matches = field.getName().equals(camelCaseName) || field.getName().endsWith(typeName);
@@ -670,7 +672,9 @@ class ArchitectureTest {
 
 		public void helper(
 			@RequestBody
+			// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 			MeResponse body) {}
+		// @checkstyle:on
 	}
 
 	@RestController
@@ -724,7 +728,9 @@ class ArchitectureTest {
 
 		@PatchMapping("/architecture/empty")
 		@ResponseStatus(HttpStatus.NO_CONTENT)
+		// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 		public void empty() {}
+		// @checkstyle:on
 
 		public MeResponse helper() {
 			return null;

@@ -33,19 +33,22 @@ public final class CookieAuthorizationRequestRepository
 
 	@Override
 	public OAuth2AuthorizationRequest loadAuthorizationRequest(HttpServletRequest request) {
-		if (request.getCookies() == null)
+		if (request.getCookies() == null) {
 			return null;
+		}
 
 		String value = null;
 		for (Cookie cookie : request.getCookies()) {
 			if (COOKIE_NAME.equals(cookie.getName())) {
-				if (value != null)
+				if (value != null) {
 					return null;
+				}
 				value = cookie.getValue();
 			}
 		}
-		if (value == null || value.length() > 2048)
+		if (value == null || value.length() > 2048) {
 			return null;
+		}
 
 		try {
 			var saved = objectMapper.readValue(Base64.getUrlDecoder().decode(value), SavedRequest.class);
@@ -55,8 +58,9 @@ public final class CookieAuthorizationRequestRepository
 				|| age < 0 || age >= MAX_AGE_SECONDS) {
 				return null;
 			}
-			if (saved.codeVerifier() == null || !saved.codeVerifier().matches("[A-Za-z0-9._~-]{43,128}"))
+			if (saved.codeVerifier() == null || !saved.codeVerifier().matches("[A-Za-z0-9._~-]{43,128}")) {
 				return null;
+			}
 
 			var registration = clientRegistrationRepository.findByRegistrationId("google");
 			return OAuth2AuthorizationRequest.authorizationCode()
@@ -79,8 +83,9 @@ public final class CookieAuthorizationRequestRepository
 	@Override
 	public void saveAuthorizationRequest(OAuth2AuthorizationRequest authorization, HttpServletRequest request,
 		HttpServletResponse response) {
-		if (authorization == null && Boolean.TRUE.equals(request.getAttribute(CLEARED)))
+		if (authorization == null && Boolean.TRUE.equals(request.getAttribute(CLEARED))) {
 			return;
+		}
 
 		String value = authorization == null ? ""
 			: Base64.getUrlEncoder()
@@ -97,8 +102,9 @@ public final class CookieAuthorizationRequestRepository
 			.maxAge(authorization == null ? 0 : MAX_AGE_SECONDS)
 			.build()
 			.toString());
-		if (authorization == null)
+		if (authorization == null) {
 			request.setAttribute(CLEARED, true);
+		}
 	}
 
 	@Override

@@ -28,13 +28,15 @@ public final class WorkerLifecycle implements SmartLifecycle {
 
 	@Override
 	public synchronized void start() {
-		if (running || workerProperties.count() == 0)
+		if (running || workerProperties.count() == 0) {
 			return;
+		}
 
 		shutdown.join();
 		slots.clear();
-		for (int index = 0; index < workerProperties.count(); index++)
+		for (int index = 0; index < workerProperties.count(); index++) {
 			slots.add(new Slot(index));
+		}
 
 		running = true;
 		slots.forEach(slot -> slot.thread.start());
@@ -134,8 +136,9 @@ public final class WorkerLifecycle implements SmartLifecycle {
 				.start(() -> {
 					try {
 						long remaining = deadline - System.nanoTime();
-						if (remaining > 0)
+						if (remaining > 0) {
 							TimeUnit.NANOSECONDS.timedJoin(thread, remaining);
+						}
 						runner.releaseCurrent();
 					} catch (InterruptedException exception) {
 						Thread.currentThread().interrupt();

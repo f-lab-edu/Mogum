@@ -63,10 +63,12 @@ class LessonRepositoryTest {
 			.getJsonFormatMapper())
 			.isInstanceOf(Jackson3JsonFormatMapper.class);
 
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		assertThat(jdbcTemplate.queryForObject("""
 			SELECT concepts = '[{"name":"변수","definition":"값을 담는 이름"},
 			  {"name":"타입","definition":"값의 종류"}]'::jsonb FROM lessons WHERE id = ?
 			""", Boolean.class, actual.getId())).isTrue();
+		// @checkstyle:on
 	}
 
 	@Test

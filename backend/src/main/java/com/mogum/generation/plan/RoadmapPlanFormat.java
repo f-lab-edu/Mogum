@@ -20,13 +20,15 @@ public final class RoadmapPlanFormat {
 				return Optional.empty();
 			}
 			var courses = root.path("courses");
-			if (!courses.isArray() || courses.size() < 2)
+			if (!courses.isArray() || courses.size() < 2) {
 				return Optional.empty();
+			}
 
 			var result = new ArrayList<CourseOutline>();
 			for (var course : courses) {
-				if (!PlanJson.outline(course, true))
+				if (!PlanJson.outline(course, true)) {
 					return Optional.empty();
+				}
 				result.add(new CourseOutline(course.path("title").asString(), course.path("description").asString(),
 					PlanJson.concepts(course)));
 			}

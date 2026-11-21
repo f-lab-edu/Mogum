@@ -92,7 +92,7 @@ class AppImageTest {
 
 	private static final class RunningApp implements AutoCloseable {
 		private final Network network;
-		private final PostgreSQLContainer postgreSQLContainer;
+		private final PostgreSQLContainer postgreSqlContainer;
 		private final GenericContainer<?> genericContainer;
 
 		private RunningApp() {
@@ -100,16 +100,16 @@ class AppImageTest {
 			assertThat(appImage).as("appImage 시스템 속성으로 검사할 이미지를 지정해야 한다").isNotBlank();
 
 			network = Network.newNetwork();
-			postgreSQLContainer = new PostgreSQLContainer("pgvector/pgvector:pg17")
+			postgreSqlContainer = new PostgreSQLContainer("pgvector/pgvector:pg17")
 				.withNetwork(network)
 				.withNetworkAliases("postgres")
 				.withStartupTimeout(Duration.ofMinutes(2));
 			genericContainer = new GenericContainer<>(DockerImageName.parse(appImage))
 				.withNetwork(network)
 				.withExposedPorts(8080)
-				.withEnv("DB_URL", "jdbc:postgresql://postgres:5432/" + postgreSQLContainer.getDatabaseName())
-				.withEnv("DB_USERNAME", postgreSQLContainer.getUsername())
-				.withEnv("DB_PASSWORD", postgreSQLContainer.getPassword())
+				.withEnv("DB_URL", "jdbc:postgresql://postgres:5432/" + postgreSqlContainer.getDatabaseName())
+				.withEnv("DB_USERNAME", postgreSqlContainer.getUsername())
+				.withEnv("DB_PASSWORD", postgreSqlContainer.getPassword())
 				.withEnv("OPENAI_API_KEY", "test-only-openai-key")
 				.withEnv("GOOGLE_CLIENT_ID", System.getProperty("GOOGLE_CLIENT_ID"))
 				.withEnv("GOOGLE_CLIENT_SECRET", System.getProperty("GOOGLE_CLIENT_SECRET"))
@@ -117,7 +117,7 @@ class AppImageTest {
 				.withStartupTimeout(Duration.ofMinutes(2));
 
 			try {
-				postgreSQLContainer.start();
+				postgreSqlContainer.start();
 				genericContainer.start();
 			} catch (RuntimeException | Error failure) {
 				close();
@@ -127,7 +127,7 @@ class AppImageTest {
 
 		@Override
 		public void close() {
-			try (network; postgreSQLContainer; genericContainer) {
+			try (network; postgreSqlContainer; genericContainer) {
 				// 선언의 역순으로 앱 · DB · 네트워크를 닫는다.
 			}
 		}

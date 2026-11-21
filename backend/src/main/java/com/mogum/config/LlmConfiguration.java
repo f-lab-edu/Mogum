@@ -17,8 +17,9 @@ public class LlmConfiguration {
 		var longest = Duration.ZERO;
 		for (var settings : llmProperties.chats().values()) {
 			var attempt = settings.timeout().multipliedBy((long)settings.maxContinuations() + 1);
-			if (attempt.compareTo(longest) > 0)
+			if (attempt.compareTo(longest) > 0) {
 				longest = attempt;
+			}
 
 			Assert.isTrue(workerProperties.shutdownWait().compareTo(settings.timeout()) > 0,
 				"Worker shutdown wait must exceed every chat timeout");

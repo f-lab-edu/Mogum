@@ -152,7 +152,8 @@ class OperatorSqlIntegrationTest {
 		var other = saveUser(initial, "other@example.com");
 		var otherBefore = jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", other.getId());
 		var before = jdbcTemplate.queryForMap(
-			"SELECT provider, subject, email, name, created_at, approved_at, credit_balance, credit_refill_at FROM users WHERE id = ?",
+			"SELECT provider, subject, email, name, created_at, approved_at,"
+				+ " credit_balance, credit_refill_at FROM users WHERE id = ?",
 			user.getId());
 		var credits = jdbcTemplate.queryForList("SELECT * FROM credit_entries");
 		var earliest = databaseNow();
@@ -167,7 +168,8 @@ class OperatorSqlIntegrationTest {
 		assertThat(changed.getUpdatedAt()).isBetween(earliest, databaseNow()).isAfter(user.getUpdatedAt());
 		assertThat(jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", other.getId())).isEqualTo(otherBefore);
 		assertThat(jdbcTemplate.queryForMap(
-			"SELECT provider, subject, email, name, created_at, approved_at, credit_balance, credit_refill_at FROM users WHERE id = ?",
+			"SELECT provider, subject, email, name, created_at, approved_at,"
+				+ " credit_balance, credit_refill_at FROM users WHERE id = ?",
 			user.getId()))
 			.isEqualTo(before);
 		assertThat(jdbcTemplate.queryForList("SELECT * FROM credit_entries")).isEqualTo(credits);
@@ -322,8 +324,9 @@ class OperatorSqlIntegrationTest {
 		var sql = Files.readString(SQL.resolve(file));
 
 		// 사람과 같은 파일과 psql -v 치환을 쓴다. 경계 시험에서만 now()를 고정 시각으로 바꾼다.
-		if (fixedNow != null)
+		if (fixedNow != null) {
 			sql = sql.replace("now()", "TIMESTAMPTZ '" + fixedNow + "'");
+		}
 
 		String remote = "/tmp/mogum-operator.sql";
 		POSTGRES.copyFileToContainer(Transferable.of(sql.getBytes(StandardCharsets.UTF_8)), remote);

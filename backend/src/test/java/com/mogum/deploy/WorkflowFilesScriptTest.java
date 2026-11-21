@@ -42,8 +42,9 @@ class WorkflowFilesScriptTest {
 			default -> "";
 		});
 
-		if (scenario.equals("other-branch"))
+		if (scenario.equals("other-branch")) {
 			environment.put("SOURCE_REF", "refs/heads/other");
+		}
 
 		switch (scenario) {
 			case "invalid-region" -> environment.put("AWS_REGION", "invalid-region");
@@ -136,10 +137,12 @@ class WorkflowFilesScriptTest {
 			assertThat(result.outputs()).contains("exists=true");
 			assertThat(result.environment()).contains("APP_IMAGE_REF=" + REGISTRY + "/mogum-app@" + DIGEST);
 		}
-		if (scenario.equals("missing"))
+		if (scenario.equals("missing")) {
 			assertThat(result.outputs()).contains("exists=false");
-		if (scenario.equals("rollback-missing"))
+		}
+		if (scenario.equals("rollback-missing")) {
 			assertThat(result.output()).contains("image");
+		}
 	}
 
 	@ParameterizedTest(name = "시나리오 {0}")
@@ -170,8 +173,9 @@ class WorkflowFilesScriptTest {
 
 		// then
 		assertThat(result.status()).as(result.output()).isEqualTo(scenario.equals("matching") ? 0 : 1);
-		if (scenario.equals("missing"))
+		if (scenario.equals("missing")) {
 			assertThat(result.output()).contains("bundle");
+		}
 	}
 
 	@ParameterizedTest(name = "시나리오 {0}")
@@ -187,6 +191,7 @@ class WorkflowFilesScriptTest {
 
 		// when
 		var result = run("ssm", root, environment,
+			// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 			"""
 				if [[ $2 == send-command ]]; then
 				    printf 'test-command-id'
@@ -195,9 +200,11 @@ class WorkflowFilesScriptTest {
 				    echo InvocationDoesNotExist >&2
 				    exit 1
 				else
-				    printf '{"Status":"%s","ResponseCode":0,"StandardOutputContent":"deploy-output","StandardErrorContent":"deploy-error"}' "$SCENARIO"
+				    printf '{"Status":"%s","ResponseCode":0,\
+				"StandardOutputContent":"deploy-output","StandardErrorContent":"deploy-error"}' "$SCENARIO"
 				fi
 				""");
+		// @checkstyle:on
 
 		// then
 		assertThat(result.status()).as(result.output()).isEqualTo(scenario.equals("Success") ? 0 : 1);
@@ -243,15 +250,17 @@ class WorkflowFilesScriptTest {
 		Files.writeString(bin.resolve("sleep"), "#!/usr/bin/env bash\nexit 0\n");
 		Files.writeString(bin.resolve("curl"), "#!/usr/bin/env bash\n"
 			+ "printf '%s\\n' \"$*\" >> \"$TEST_ROOT/commands\"\nprintf '%s' \"$SCENARIO\"\n");
-		for (var name : List.of("aws", "sleep", "curl"))
+		for (var name : List.of("aws", "sleep", "curl")) {
 			assertThat(bin.resolve(name).toFile().setExecutable(true)).isTrue();
+		}
 
 		var source = script(id);
 		if (environment.getOrDefault("SCENARIO", "").equals("poll-timeout")) {
 			source = source.replace("SECONDS + 1200", "SECONDS + 0");
 		}
-		if (id.equals("health"))
+		if (id.equals("health")) {
 			source = source.replace("SECONDS + 60", "SECONDS + 1");
+		}
 
 		var script = Files.writeString(root.resolve("run.sh"), source);
 		var builder = new ProcessBuilder("bash", "-e", "-o", "pipefail", script.toString())

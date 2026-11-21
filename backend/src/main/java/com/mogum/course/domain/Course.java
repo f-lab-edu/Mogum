@@ -95,8 +95,9 @@ public class Course extends AuditedEntity {
 	}
 
 	public void start(Instant startedAt) {
-		if (status != CourseStatus.REVIEWING)
+		if (status != CourseStatus.REVIEWING) {
 			throw new IllegalStateException("Course must be reviewing");
+		}
 		this.startedAt = Objects.requireNonNull(startedAt);
 		status = CourseStatus.LEARNING;
 	}
@@ -106,8 +107,9 @@ public class Course extends AuditedEntity {
 	}
 
 	public void planLessons() {
-		if (status != CourseStatus.NOT_PLANNED)
+		if (status != CourseStatus.NOT_PLANNED) {
 			throw new IllegalStateException("Course must be unplanned");
+		}
 		status = CourseStatus.REVIEWING;
 	}
 }

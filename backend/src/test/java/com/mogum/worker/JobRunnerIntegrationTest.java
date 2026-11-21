@@ -175,8 +175,9 @@ class JobRunnerIntegrationTest {
 		if (request.input() != null) {
 			assertThat(snapshot.input()).isEqualTo(new JobSnapshot.Input("LEAKCHECK-topic", Level.OTHER,
 				"LEAKCHECK-level", Purpose.OTHER, "LEAKCHECK-purpose", "LEAKCHECK-memo"));
-		} else
+		} else {
 			assertThat(snapshot.input()).isNull();
+		}
 
 		if (type == JobType.NEW_COURSE) {
 			assertThat(job.getCourseId()).isNotNull();
@@ -192,8 +193,9 @@ class JobRunnerIntegrationTest {
 			assertThat(count("roadmaps")).isEqualTo(1);
 		}
 
-		if (type == JobType.MATERIAL)
+		if (type == JobType.MATERIAL) {
 			assertThat(count("materials")).isEqualTo(1);
+		}
 
 		assertCredit(userId, 99, 1, 0);
 		assertThat(stub.plan(id).outsideTransaction()).isTrue();
@@ -283,8 +285,9 @@ class JobRunnerIntegrationTest {
 			start.countDown();
 
 			// then
-			for (var future : futures)
+			for (var future : futures) {
 				assertThat(future.get(10, TimeUnit.SECONDS)).isTrue();
+			}
 		}
 
 		for (long id : ids) {
@@ -528,8 +531,9 @@ class JobRunnerIntegrationTest {
 		long userId = user();
 		long id = jobIntakeService.receive(userId, request(userId, JobType.NEW_COURSE)).id();
 		var plan = stub(JobType.NEW_COURSE).plan(id).holdFirst();
-		if (fail)
+		if (fail) {
 			plan.fail(GenerationOutcome.Failure.PROVIDER_REJECTED, 1);
+		}
 
 		try (var worker = Executors.newSingleThreadExecutor()) {
 			var result = worker.submit(() -> runner(renew ? Duration.ofMillis(5) : Duration.ofMinutes(4)).runOnce());

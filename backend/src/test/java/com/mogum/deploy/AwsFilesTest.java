@@ -61,17 +61,21 @@ class AwsFilesTest {
 		// then
 		assertThat(sample)
 			.isEqualTo(JSON.readTree(
+				// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 				"""
 					{"Version":"2012-10-17","Statement":[{
 					  "Effect":"Allow",
-					  "Principal":{"Federated":"arn:aws:iam::ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"},
+					  "Principal":{"Federated":"arn:aws:iam::ACC\
+					OUNT_ID:oidc-provider/token.actions.githubusercontent.com"},
 					  "Action":"sts:AssumeRoleWithWebIdentity",
 					  "Condition":{"StringEquals":{
 					    "token.actions.githubusercontent.com:aud":"sts.amazonaws.com",
-					    "token.actions.githubusercontent.com:sub":"repo:f-lab-edu@54677968/Mogum@1378404194:ref:refs/heads/main"
+					    "token.actions.githubusercontent.com:sub\
+					":"repo:f-lab-edu@54677968/Mogum@1378404194:ref:refs/heads/main"
 					  }}
 					}]}
 					"""));
+		// @checkstyle:on
 	}
 
 	@Test
@@ -81,11 +85,13 @@ class AwsFilesTest {
 		var sample = read("ec2-trust.json");
 
 		// then
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		assertThat(sample).isEqualTo(JSON.readTree("""
 			{"Version":"2012-10-17","Statement":[{
 			  "Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"
 			}]}
 			"""));
+		// @checkstyle:on
 	}
 
 	@ParameterizedTest(name = "파일 {0}")
@@ -240,8 +246,9 @@ class AwsFilesTest {
 			int previousDays = rule.path("NoncurrentVersionExpiration").path("NoncurrentDays").asInt();
 			assertThat(currentDays).isEqualTo(prefix.equals("backups/") ? 6 : 30);
 			assertThat(previousDays).isEqualTo(1);
-			if (prefix.equals("backups/"))
+			if (prefix.equals("backups/")) {
 				assertThat(currentDays + previousDays <= 7).isTrue();
+			}
 
 			// Days 만료는 이전 버전이 사라진 뒤 삭제 표시도 정리한다. 두 필드의 병기는 S3가 거부한다.
 			assertThat(fields(rule.path("Expiration"))).isEqualTo(Set.of("Days"));
@@ -283,9 +290,9 @@ class AwsFilesTest {
 	private static Set<String> strings(JsonNode node) {
 		var values = new HashSet<String>();
 
-		if (node.isString())
+		if (node.isString()) {
 			values.add(node.asText());
-		else {
+		} else {
 			assertThat(node.isArray()).isTrue();
 			for (var value : node) {
 				assertThat(value.isString()).isTrue();

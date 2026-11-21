@@ -227,8 +227,9 @@ class ReplanCourseIntakeHandlerIntegrationTest {
 			: CourseFixtures.single(userId);
 		CourseFixtures.withStatus(course, courseStatus);
 		courseRepository.save(course);
-		if (courseStatus != CourseStatus.NOT_PLANNED)
+		if (courseStatus != CourseStatus.NOT_PLANNED) {
 			lessonRepository.save(LessonFixtures.lesson(course, 1));
+		}
 		return course.getId();
 	}
 

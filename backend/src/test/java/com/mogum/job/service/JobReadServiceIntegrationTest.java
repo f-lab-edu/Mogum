@@ -79,16 +79,20 @@ class JobReadServiceIntegrationTest {
 
 		var now = Instant.parse("2026-11-15T00:00:00Z");
 		switch (status) {
+			// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 			case QUEUED -> {}
+			// @checkstyle:on
 			case RUNNING -> GenerationJobFixtures.running(jdbcTemplate, job.getId(), 3, now, now.plusSeconds(100));
 			case FAILED -> GenerationJobFixtures.failed(jdbcTemplate, job.getId(), JobErrorType.PROVIDER_REJECTED, now);
 			case SUCCEEDED -> GenerationJobFixtures.succeeded(jdbcTemplate, job.getId(), switch (type) {
 				case NEW_COURSE, PLAN_ROADMAP_COURSE, REPLAN_COURSE -> course.getId();
 				default -> null;
 			}, switch (type) {
+				// @checkstyle:off — 포매터의 두 번째 switch 인자 들여쓰기를 따른다.
 				case NEW_ROADMAP, REPLAN_ROADMAP -> roadmap.getId();
 				default -> null;
 			},
+				// @checkstyle:on
 				type == JobType.MATERIAL ? lesson.getId() : null, now);
 		}
 
@@ -130,14 +134,16 @@ class JobReadServiceIntegrationTest {
 				default -> course.getId();
 			});
 			assertThat(result.result().courseId()).isEqualTo(type == JobType.MATERIAL ? course.getId() : null);
-		} else
+		} else {
 			assertThat(result.result()).isNull();
+		}
 
 		if (status == JobStatus.FAILED) {
 			assertThat(result.error().code()).isEqualTo("JOB_TEMPORARY_FAILURE");
 			assertThat(result.error().message()).isEqualTo("만들지 못했습니다. 다시 시도하거나 버려 주세요");
-		} else
+		} else {
 			assertThat(result.error()).isNull();
+		}
 
 		assertThat(jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", job.getId()))
 			.isEqualTo(before);

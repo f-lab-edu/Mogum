@@ -135,10 +135,11 @@ class DatabaseSetupIntegrationTest {
 
 		// when
 		var contexts = new ArrayList<ApplicationContext>();
-		for (String name : names)
+		for (String name : names) {
 			contexts.add(new TestContextManager(Class.forName("com.mogum." + name))
 				.getTestContext()
 				.getApplicationContext());
+		}
 
 		// then
 		assertThat(contexts).allSatisfy(actual -> assertThat(actual).isSameAs(applicationContext));

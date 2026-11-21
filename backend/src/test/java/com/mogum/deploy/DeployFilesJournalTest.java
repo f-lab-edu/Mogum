@@ -27,8 +27,9 @@ class DeployFilesJournalTest {
 		// then
 		for (var raw : lines) {
 			var line = raw.strip();
-			if (line.isEmpty() || line.startsWith("#") || line.startsWith(";"))
+			if (line.isEmpty() || line.startsWith("#") || line.startsWith(";")) {
 				continue;
+			}
 
 			if (line.startsWith("[")) {
 				assertThat(line).isEqualTo("[Journal]");

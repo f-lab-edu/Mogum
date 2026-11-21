@@ -3,7 +3,9 @@ package com.mogum.card.domain;
 import org.springframework.test.util.ReflectionTestUtils;
 
 public final class ConceptFixtures {
+	// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 	private ConceptFixtures() {}
+	// @checkstyle:on
 
 	public static Concept concept(long userId, String name, String definition, float[] embedding) {
 		return Concept.add(userId, name, definition, embedding);

@@ -18,8 +18,9 @@ public final class FakeCreditEntryRepository implements CreditEntryRepository {
 
 	@Override
 	public <S extends CreditEntry> S save(S entry) {
-		if (entry.getId() == null)
+		if (entry.getId() == null) {
 			ReflectionTestUtils.setField(entry, "id", nextId++);
+		}
 		entries.put(entry.getId(), entry);
 		return entry;
 	}

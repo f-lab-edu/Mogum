@@ -16,13 +16,14 @@ import com.openai.models.chat.completions.ChatCompletionCreateParams;
 
 /** SDK 예외와 프로바이더 응답은 이 경계 밖으로 내보내지 않는다. 자동 재시도는 없다. */
 public final class OpenAiChatProvider implements ChatProvider, AutoCloseable {
-	private final OpenAIClient openAIClient;
+	private final OpenAIClient openAiClient;
 
 	public OpenAiChatProvider(String apiKey, String baseUrl, Duration timeout) {
 		var builder = OpenAIOkHttpClient.builder().apiKey(apiKey).maxRetries(0).timeout(timeout);
-		if (baseUrl != null && !baseUrl.isBlank())
+		if (baseUrl != null && !baseUrl.isBlank()) {
 			builder.baseUrl(baseUrl);
-		openAIClient = builder.build();
+		}
+		openAiClient = builder.build();
 	}
 
 	@Override
@@ -41,7 +42,7 @@ public final class OpenAiChatProvider implements ChatProvider, AutoCloseable {
 				}
 			}
 
-			var response = openAIClient.chat().completions().create(params.build(),
+			var response = openAiClient.chat().completions().create(params.build(),
 				RequestOptions.builder().timeout(request.settings().timeout()).build());
 			if (response.usage().isPresent()) {
 				var tokens = response.usage().get();
@@ -50,13 +51,15 @@ public final class OpenAiChatProvider implements ChatProvider, AutoCloseable {
 						.map(Math::toIntExact).orElse(null),
 					Math.toIntExact(tokens.completionTokens()));
 			}
-			if (response.choices().isEmpty())
+			if (response.choices().isEmpty()) {
 				return invalid(usage);
+			}
 
 			var choice = response.choices().getFirst();
 			String text = choice.message().content().orElse("");
-			if (text.isBlank())
+			if (text.isBlank()) {
 				return invalid(usage);
+			}
 			if (choice.finishReason().asString().equals("stop")) {
 				return new Reply(text, LlmCallOutcome.SUCCEEDED, null, usage);
 			}
@@ -81,8 +84,9 @@ public final class OpenAiChatProvider implements ChatProvider, AutoCloseable {
 
 	private static boolean timedOut(Throwable exception) {
 		for (var cause = exception; cause != null; cause = cause.getCause()) {
-			if (cause instanceof InterruptedIOException)
+			if (cause instanceof InterruptedIOException) {
 				return true;
+			}
 		}
 		return false;
 	}
@@ -114,6 +118,6 @@ public final class OpenAiChatProvider implements ChatProvider, AutoCloseable {
 
 	@Override
 	public void close() {
-		openAIClient.close();
+		openAiClient.close();
 	}
 }

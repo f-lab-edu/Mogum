@@ -67,19 +67,22 @@ public final class ChatCall {
 				} catch (RuntimeException ignored) {
 					// 해석 예외에는 출력 원문이 섞일 수 있다. 작업 실패로만 바꾼다.
 				}
-				if (parsed.isEmpty())
+				if (parsed.isEmpty()) {
 					outcome = LlmCallOutcome.INVALID_OUTPUT;
+				}
 			}
 
 			finish(callId, outcome, reply.usage(), settings.model(), duration);
-			if (outcome == LlmCallOutcome.SUCCEEDED)
+			if (outcome == LlmCallOutcome.SUCCEEDED) {
 				return new ChatResult.Success<>(parsed.orElseThrow());
+			}
 			if (outcome != LlmCallOutcome.TRUNCATED) {
 				return new ChatResult.Failed<>(reply.failure() == null
 					? GenerationOutcome.Failure.INVALID_OUTPUT : reply.failure());
 			}
-			if (continuation == settings.maxContinuations())
+			if (continuation == settings.maxContinuations()) {
 				break;
+			}
 
 			messages.add(new ChatProvider.Message(ChatProvider.Role.ASSISTANT, reply.text()));
 			messages.add(new ChatProvider.Message(ChatProvider.Role.USER, CONTINUE));

@@ -56,11 +56,13 @@ class LoginIdentityMigrationTest {
 				WHERE table_schema = ? AND table_name = 'user_identities'
 				""", Integer.class, database.schema)).isZero();
 			assertThat(database.users()).isEqualTo(legacy.users());
+			// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 			assertThat(jdbc.queryForObject("""
 				SELECT count(*) FROM information_schema.columns
 				WHERE table_schema = ? AND table_name = 'users' AND column_name = 'updated_at'
 				    AND (is_nullable <> 'NO' OR column_default IS NOT NULL)
 				""", Integer.class, database.schema)).isZero();
+			// @checkstyle:on
 			assertThat(jdbc.queryForList("SELECT subject FROM users ORDER BY id", String.class))
 				.containsExactly("Original-Sub", "other-sub");
 			assertThat(jdbc.queryForList("SELECT provider FROM users ORDER BY id", String.class))
@@ -69,11 +71,13 @@ class LoginIdentityMigrationTest {
 				SELECT count(*) FROM information_schema.columns
 				WHERE table_schema = ? AND table_name = 'users' AND column_name = 'google_sub'
 				""", Integer.class, database.schema)).isZero();
+			// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 			assertThat(jdbc.queryForObject("""
 				SELECT count(*) FROM information_schema.columns
 				WHERE table_schema = ? AND table_name = 'users' AND column_name = 'provider'
 				    AND column_default IS NOT NULL
 				""", Integer.class, database.schema)).isZero();
+			// @checkstyle:on
 			assertThat(jdbc.queryForList("SELECT * FROM spring_session")).isEqualTo(legacy.sessions());
 			assertThat(jdbc.queryForObject("SELECT attribute_bytes FROM spring_session_attributes", byte[].class))
 				.containsExactly(Base64.getDecoder().decode(legacy.attributeBase64()));
@@ -150,12 +154,14 @@ class LoginIdentityMigrationTest {
 
 			if (!scenario.equals("missing")) {
 				jdbc.update(
-					"INSERT INTO user_identities (user_id, provider, subject, created_at) VALUES (?, ?, 'original', now())",
+					"INSERT INTO user_identities (user_id, provider, "
+						+ "subject, created_at) VALUES (?, ?, 'original', now())",
 					id, scenario.equals("other") ? "other-provider" : "google");
 			}
 			if (scenario.equals("multiple")) {
 				jdbc.update(
-					"INSERT INTO user_identities (user_id, provider, subject, created_at) VALUES (?, 'google', 'second', now())",
+					"INSERT INTO user_identities (user_id, provider, subject,"
+						+ " created_at) VALUES (?, 'google', 'second', now())",
 					id);
 			}
 
@@ -193,11 +199,13 @@ class LoginIdentityMigrationTest {
 		private LegacyData prepareUsersAndSession(String version) throws Exception {
 			migrateTo("3");
 			var created = Instant.parse("2026-10-12T03:00:00Z");
+			// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 			jdbcTemplate.update("""
 				INSERT INTO users (google_sub, email, status, role, terms_agreed_at, terms_version, created_at)
 				VALUES ('Original-Sub', 'old@example.com', 'WAITLISTED', 'USER', ?, 'v1', ?),
 				       ('other-sub', 'old@example.com', 'ACTIVE', 'ADMIN', NULL, NULL, ?)
 				""", Timestamp.from(created.plusSeconds(10)), Timestamp.from(created),
+				// @checkstyle:on
 				Timestamp.from(created));
 
 			var users = jdbcTemplate.queryForList("SELECT id, email, created_at FROM users ORDER BY id");

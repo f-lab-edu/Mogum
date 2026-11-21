@@ -379,7 +379,8 @@ class CourseSchemaRepositoryTest {
 	private long planned(long user, long roadmap, int position) {
 		return jdbcTemplate.queryForObject(
 			"""
-				INSERT INTO courses (user_id, roadmap_id, position, title, status, plan_description, plan_concepts, created_at, updated_at)
+				INSERT INTO courses (user_id, roadmap_id, \
+				position, title, status, plan_description, plan_concepts, created_at, updated_at)
 				VALUES (?, ?, ?, '계획 코스', 'NOT_PLANNED', '계획 설명', '[]', now(), now()) RETURNING id
 				""",
 			Long.class, user, roadmap, position);
@@ -408,7 +409,8 @@ class CourseSchemaRepositoryTest {
 		long id = inputRow(table);
 		jdbcTemplate.update(
 			"UPDATE " + table
-				+ " SET level = 'OTHER', level_other = '수준', purpose = 'OTHER', purpose_other = '목적', updated_at = now() WHERE id = ?",
+				+ " SET level = 'OTHER', level_other = '수준', purpose = 'OTHER',"
+				+ " purpose_other = '목적', updated_at = now() WHERE id = ?",
 			id);
 		return id;
 	}
@@ -419,8 +421,9 @@ class CourseSchemaRepositoryTest {
 		}
 
 		long user = owner();
-		if (table.equals("courses"))
+		if (table.equals("courses")) {
 			return planned(user, roadmap(user), 1);
+		}
 
 		long lesson = lesson(single(user), 1);
 		return table.equals("lessons") ? lesson : material(lesson);

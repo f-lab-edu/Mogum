@@ -68,8 +68,9 @@ public class RoadmapReadService {
 		if (course.getStatus() == CourseStatus.NOT_PLANNED) {
 			progress = job == null ? CourseProgress.NOT_PLANNED
 				: job.failed() ? CourseProgress.FAILED : CourseProgress.GENERATING;
-			if (job != null)
+			if (job != null) {
 				jobId = job.jobId();
+			}
 		}
 
 		return new RoadmapResponse.CourseItem(course.getId(), course.getPosition(), course.getTitle(),

@@ -181,8 +181,9 @@ public class IntegrationTestConfiguration {
 			var sequence = replies.get(request.jobId());
 			if (sequence != null) {
 				synchronized (sequence) {
-					if (!sequence.isEmpty())
+					if (!sequence.isEmpty()) {
 						return sequence.removeFirst();
+					}
 				}
 			}
 			return success(defaultText(request.jobType()));
@@ -193,19 +194,22 @@ public class IntegrationTestConfiguration {
 		}
 
 		public static Reply failure(GenerationOutcome.Failure failure) {
-			if (failure == GenerationOutcome.Failure.INVALID_OUTPUT)
+			if (failure == GenerationOutcome.Failure.INVALID_OUTPUT) {
 				return success("invalid output");
+			}
 			return new Reply(null, failure == GenerationOutcome.Failure.PROVIDER_UNAVAILABLE
 				? LlmCallOutcome.PROVIDER_ERROR : LlmCallOutcome.REJECTED, failure, null);
 		}
 
 		public static String defaultText(JobType type) {
+			// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 			String outlines = """
 				[{"title":"기초", "description":"기초 설명",
 				  "concepts":[{"name":"변수", "definition":"값을 담는 이름"}]},
 				 {"title":"응용", "description":"응용 설명",
 				  "concepts":[{"name":"함수", "definition":"동작의 묶음"}]}]
 				""";
+			// @checkstyle:on
 			if (type == JobType.PLAN_ROADMAP_COURSE || type == JobType.REPLAN_COURSE) {
 				return "{\"lessons\":" + outlines + "}";
 			}
@@ -384,8 +388,9 @@ public class IntegrationTestConfiguration {
 			}
 
 			public void awaitEntered() throws InterruptedException {
-				if (!entered.await(5, TimeUnit.SECONDS))
+				if (!entered.await(5, TimeUnit.SECONDS)) {
 					throw new IllegalStateException("Stub not entered");
+				}
 			}
 
 			public void release() {
@@ -476,8 +481,9 @@ public class IntegrationTestConfiguration {
 
 		private void beforeConnection() throws SQLException {
 			attempts.incrementAndGet();
-			if (failing)
+			if (failing) {
 				throw new SQLException("test database unavailable");
+			}
 		}
 	}
 
@@ -519,14 +525,16 @@ public class IntegrationTestConfiguration {
 					var form = UriComponentsBuilder.fromUriString("http://localhost/?" + body).build().getQueryParams();
 
 					String verifier = form.getFirst("code_verifier");
-					if (verifier != null)
+					if (verifier != null) {
 						verifier = URLDecoder.decode(verifier, StandardCharsets.UTF_8);
+					}
 
 					boolean bad = tokenFailure || "bad-token".equals(form.getFirst("code")) || verifier == null
 						|| CODE_CHALLENGE.get() == null || !CODE_CHALLENGE.get().equals(challenge(verifier));
 					String response = bad
 						? "{\"error\":\"invalid_grant\",\"error_description\":\"" + form.getFirst("code") + "\"}"
-						: "{\"access_token\":\"fake-access-token\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"id_token\":\"fake-id-token\"}";
+						: "{\"access_token\":\"fake-access-token\",\"token_type\":\"Bearer\","
+							+ "\"expires_in\":3600,\"id_token\":\"fake-id-token\"}";
 
 					byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
 					exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -540,8 +548,9 @@ public class IntegrationTestConfiguration {
 					identity.put("sub", sub);
 					identity.put("email", email);
 					identity.put("email_verified", verified);
-					if (name != null)
+					if (name != null) {
 						identity.put("name", name);
+					}
 					String response = userInfoFailure
 						? "{\"error\":\"invalid_token\",\"error_description\":\"" + sub + "\"}"
 						: new ObjectMapper().writeValueAsString(identity);

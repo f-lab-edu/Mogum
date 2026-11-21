@@ -82,8 +82,9 @@ public final class ReplanCourseGenerator implements JobGenerator {
 	@Override
 	public ResultRef save(JobSnapshot job, GeneratedResult result) {
 		var course = courseRepository.findById(job.targetId()).orElseThrow();
-		if (course.getStatus() != CourseStatus.REVIEWING)
+		if (course.getStatus() != CourseStatus.REVIEWING) {
 			throw new IllegalStateException("Course must be reviewing");
+		}
 
 		lessonRepository.findByCourseIdOrderByPositionAsc(course.getId()).forEach(entityManager::remove);
 		entityManager.flush(); // 순서 unique와 부딪히지 않도록 DELETE를 INSERT보다 먼저 보낸다.

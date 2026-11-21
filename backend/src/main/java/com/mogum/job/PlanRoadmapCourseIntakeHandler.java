@@ -29,8 +29,9 @@ public final class PlanRoadmapCourseIntakeHandler implements JobIntakeHandler {
 		var course = courseRepository.findById(request.targetId())
 			.orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
 		var roadmap = course.getRoadmap();
-		if (roadmap == null)
+		if (roadmap == null) {
 			throw new ApiException(ErrorCode.NOT_FOUND);
+		}
 		if (course.getStatus() != CourseStatus.NOT_PLANNED) {
 			throw new ApiException(ErrorCode.COURSE_PLAN_NOT_ALLOWED);
 		}
@@ -52,8 +53,9 @@ public final class PlanRoadmapCourseIntakeHandler implements JobIntakeHandler {
 				.isPresent()) {
 				throw new ApiException(ErrorCode.REPLAN_IN_PROGRESS);
 			}
-			if (roadmap.getStatus() == RoadmapStatus.REVIEWING)
+			if (roadmap.getStatus() == RoadmapStatus.REVIEWING) {
 				roadmap.start();
+			}
 		} else {
 			var previous = courses.stream()
 				.filter(candidate -> candidate.getPosition() == position - 1)

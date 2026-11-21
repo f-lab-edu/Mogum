@@ -19,7 +19,8 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "materials", uniqueConstraints = @UniqueConstraint(name = "materials_lesson_id_key", columnNames = "lesson_id"))
+@Table(name = "materials", uniqueConstraints = @UniqueConstraint(name = "materials_l"
+	+ "esson_id_key", columnNames = "lesson_id"))
 public class Material extends AuditedEntity {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)

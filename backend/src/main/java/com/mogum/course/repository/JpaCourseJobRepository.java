@@ -15,6 +15,7 @@ public class JpaCourseJobRepository implements CourseJobRepository {
 	@Override
 	@SuppressWarnings("unchecked")
 	public List<PlanningJob> findUnfinishedPlanningJobs(long userId, long roadmapId) {
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		List<Object[]> rows = entityManager.createNativeQuery("""
 			SELECT j.course_id, j.id, j.status = 'FAILED'
 			FROM generation_jobs j JOIN courses c ON c.id = j.course_id
@@ -22,6 +23,7 @@ public class JpaCourseJobRepository implements CourseJobRepository {
 			  AND j.type = 'PLAN_ROADMAP_COURSE' AND j.status IN ('QUEUED', 'RUNNING', 'FAILED')
 			ORDER BY j.id DESC
 			""", Object[].class)
+			// @checkstyle:on
 			.setParameter("userId", userId)
 			.setParameter("roadmapId", roadmapId)
 			.getResultList();
@@ -31,11 +33,13 @@ public class JpaCourseJobRepository implements CourseJobRepository {
 
 	@Override
 	public boolean hasUnfinishedReplan(long userId, long courseId) {
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		return (Boolean)entityManager.createNativeQuery("""
 			SELECT EXISTS (SELECT 1 FROM generation_jobs
 			WHERE user_id = :userId AND course_id = :courseId AND type = 'REPLAN_COURSE'
 			  AND status IN ('QUEUED', 'RUNNING', 'FAILED'))
 			""", Boolean.class)
+			// @checkstyle:on
 			.setParameter("userId", userId)
 			.setParameter("courseId", courseId)
 			.getSingleResult();
