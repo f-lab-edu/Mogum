@@ -1,0 +1,21 @@
+{
+  "project": "Mogum",
+  "phase": "7a-naver-style",
+  "steps": [
+    {
+      "step": 0,
+      "name": "spotless-format",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "checkstyle-fixes",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "ci-style-check",
+      "status": "pending"
+    }
+  ]
+}

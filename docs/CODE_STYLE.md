@@ -1,91 +1,22 @@
 # 코드 스타일 — 백엔드 Java
 
-> 백엔드 Java 코드(`backend/src/main` · `backend/src/test`)를 쓸 때 본다. **이 규칙의 단일 출처다.** 결정의 이유는 [ADR-180](./ADR.md).
-> 화면(`frontend/`) · 하네스(`scripts/`)는 아직 정하지 않았다 — 이 문서를 적용하지 않는다.
-> 빌드가 지키는 것은 §3 의 필드 이름뿐이다(`ArchitectureTest`). 나머지는 리뷰가 지킨다. 포매터는 두지 않는다.
+> 백엔드 Java 코드(`backend/src/main` · `backend/src/test`)를 쓸 때 본다. **이 규칙의 단일 출처다.** 결정의 이유는 [ADR-184](./ADR.md)(줄 배치 — 네이버 컨벤션) · [ADR-180](./ADR.md)(이름 · Lombok).
+> 화면(`frontend/`) · 하네스(`scripts/`)는 이 문서를 적용하지 않는다 — 화면은 ESLint 다.
 > 테스트 본문 · 이름 · 데이터 규칙은 [TEST_GUIDE](./TEST_GUIDE.md)에 있다. 둘이 겹치면 테스트 쪽은 TEST_GUIDE 가 맞다.
 
-## 1. 빈 줄 — 사람이 읽는 문맥 단위로 나눈다
+## 1. 줄 배치 — 네이버 핵데이 Java 컨벤션을 그대로 따른다
 
-**클래스**
+**줄 배치 · 공백 · 중괄호 · import 순서는 [네이버 캠퍼스 핵데이 Java 코딩 컨벤션](https://naver.github.io/hackday-conventions-java/)(`naver/hackday-conventions-java`)을 설정 파일 그대로 따른다**(ADR-184). 손으로 정한 줄 배치 규칙은 두지 않는다 — **포매터가 만든 모양이 기준이다.**
 
-- 클래스 선언 줄 바로 다음에는 빈 줄을 두지 않는다.
-- 묶음 사이에 빈 줄 하나 — static 상수 묶음 · 인스턴스 필드 묶음 · 생성자 · 메서드 하나하나 · 중첩 타입.
-- 같은 묶음 안의 필드 사이에는 빈 줄을 두지 않는다. 단, 애노테이션을 필드 위 따로 된 줄에 쓴 필드(엔티티의 `@Id` · `@Column` …)는 필드마다 빈 줄로 나눈다 — 붙여 두면 애노테이션 줄이 어느 필드에 붙는지 보이지 않는다. `@Autowired UserRepository userRepository;` 처럼 한 줄인 필드는 붙여 둔다.
+- **도구가 고치고 검사한다** — 손으로 맞추지 않는다. Java 를 고친 뒤 커밋 전에 포매터를 돌린다.
+    - 고치기: `./backend/gradlew -p backend spotlessApply` — 네이버 Eclipse 포매터 설정 · import 순서 · 줄 끝 공백 · 파일 끝 줄바꿈
+    - 검사: `spotlessCheck`(포맷) · `checkstyleMain` · `checkstyleTest`(네이버 Checkstyle 규칙) — CI 가 PR 마다 돌린다
+    - 도구 이름 · 버전 · 설정 파일 위치는 `backend/build.gradle` 과 `backend/config/naver/`(출처 README 포함)가 출처다. 이 절은 7a-naver-style 이 구현하면서 확정 사실로 고친다.
+- **설정 파일을 고치지 않는다** — 네이버 저장소의 커밋 `e12658e` 에서 가져온 그대로 쓴다. 규칙과 코드가 부딪히면 코드를 고친다.
+- 큰 줄기(자세한 것은 네이버 가이드): 하드 탭 들여쓰기(탭 1개 = 4칸) · 이어지는 줄은 한 단계(탭 1개) 더 · 한 줄 120자 · K&R 중괄호 · `if` · 반복문은 언제나 중괄호 · 연산자 앞과 `.` 앞에서 끊기 · import 는 static → `java.` → `javax.` → `org.` → `net.` → `com.*` → 그 밖 순서로 묶음 사이 빈 줄 · 와일드카드 import 금지(static 은 허용) · 한 줄에 문장 하나.
+- **IDE** — IntelliJ 는 `backend/config/naver/naver-intellij-formatter.xml` 을 Settings → Editor → Code Style → Java → Import Scheme 으로 가져온다. 저장소 루트의 `.editorconfig`(네이버 것 그대로)는 인코딩(UTF-8) · 줄바꿈(LF) · 파일 끝 줄바꿈만 정한다 — 탭 들여쓰기는 IntelliJ 설정과 포매터가 맞춘다.
 
-**메서드 본문**
-
-- 하는 일이 바뀌는 곳에 빈 줄 하나를 둔다 — 준비(값 읽기 · 잠그기) → 검사(가드) → 처리 → 기록 · 결과.
-- 이어진 가드(`if (…) return …;` · `if (…) throw …;`) 묶음 뒤에는 빈 줄을 둔다.
-- 여러 줄 블록(`if` · `for` · `try` · `switch`)이 앞뒤 문장과 다른 일이면 블록 앞뒤에 빈 줄을 둔다.
-- 짧은 메서드(문장 세 줄 이하)는 나누지 않는다.
-- 빈 줄을 두 줄 이상 잇지 않는다. 블록을 여는 줄 바로 다음 · 닫는 줄 바로 앞에는 빈 줄을 두지 않는다.
-- 주석은 설명하는 코드 바로 위에 두고, 그 주석 앞에 빈 줄을 둔다(블록의 첫 줄이면 두지 않는다).
-
-```java
-public JobResult receive(long userId, JobRequest request) {
-    creditLedger.lock(userId);
-    checkOwner(userId, request);
-
-    var handler = handlers.get(request.type());
-    if (handler == null) throw new ApiException(ErrorCode.INVALID_REQUEST);
-    handler.check(userId, request);
-
-    checkLimit(userId);
-    var job = generationJobRepository.save(create(userId, request));
-    creditLedger.consume(userId, job.getId(), cost(job.getType()));
-    return result(job);
-}
-```
-
-**테스트 본문**은 `// given` · `// when` · `// then` 주석으로 나누고 주석 앞에 빈 줄을 둔다([TEST_GUIDE §3](./TEST_GUIDE.md#3-본문)). 한 단계가 길면 그 안에서도 위 규칙대로 나눈다.
-
-## 2. 줄 길이 · 줄 나누기
-
-- **한 줄은 120자를 넘기지 않는다**(들여쓰기 포함). `package` · `import` 줄은 세지 않는다.
-- **이어지는 줄은 앞줄 들여쓰기 + 8칸**이다. 여는 괄호 · 앞 인자 위치에 맞추지 않는다 — 이름이 바뀌면 맞춤이 깨진다.
-- 의미 단위에서 끊는다.
-    - 연산자(`&&` · `||` · `+` · `?` · `:`)는 **앞에서** 끊고 다음 줄 맨 앞에 둔다.
-    - 메서드 체인은 `.` 앞에서 끊고, 끊으면 한 줄에 호출 하나씩 둔다.
-    - 예외 — 호출 둘이 뜻 하나를 이루는 설정 체인은 그 둘을 한 줄에 둔다. Spring Security 의 `.requestMatchers(…).permitAll()` 처럼 대상과 규칙이 짝이면 짝마다 한 줄이다 — 나누면 어느 규칙이 어느 경로에 걸리는지 읽기 어렵다.
-    - 테스트 체인도 같다 — 대상을 고르는 호출과 그 대상에 거는 기대 · 동작이 짝이면 짝마다 한 줄이다. `.expectStatus().isOk()` · Mockito 의 `.given(jobRunner).releaseCurrent()` · ArchUnit 의 `.should().beAnnotatedWith(X)` · `.orShould().beAssignableTo(X)`.
-    - 인자 · 매개변수는 쉼표 뒤에서 끊는다. 한 줄에 다 들어가지 않으면 의미가 묶이는 것끼리 둔다.
-- 검색할 문구(오류 문구 · 로그 문구 · SQL 조각)를 나눠야만 120자를 지킬 수 있으면 나누지 않고 넘겨도 된다.
-- **선언의 매개변수 목록이 한 줄에 다 들어가지 않으면 괄호를 따로 연다**(README 2026-11-18 — Google Java · Kotlin 공식 스타일과 같은 모양). 메서드 · 생성자 · record 칸 · `@Bean` 메서드가 대상이다.
-    - 여는 `(` 바로 뒤에서 줄을 바꾼다 — 첫 매개변수도 다음 줄로 내린다.
-    - 매개변수 줄은 선언 줄 + 8칸이다. 의미가 묶이는 것끼리 한 줄에 여럿 둘 수 있다.
-    - 마지막 매개변수 뒤에서 줄을 바꾸고, 닫는 `)` 를 **선언이 시작한 열**에 둔다. `{` · `throws …` · 본문 없는 선언(인터페이스 · 추상 메서드)의 `;` 는 그 `)` 와 같은 줄에 둔다.
-    - 한 줄에 들어가면 지금처럼 한 줄이다. 매개변수의 애노테이션(`@Valid @RequestBody`)은 그 매개변수와 같은 줄에 둔다.
-    - 매개변수 하나가 애노테이션과 함께 120자를 넘으면, 그 매개변수만 애노테이션을 바로 위 줄에 따로 두고 들여쓰기는 매개변수와 같게 한다(IntelliJ 의 매개변수 애노테이션 줄바꿈과 같은 모양 — 예: `@Qualifier("…")` 줄 아래 `AbstractFilterRegistrationBean<?> securityFilterRegistrationBean`). 이 매개변수는 다른 매개변수와 한 줄에 두지 않는다.
-    - 호출 인자(`new X(…)` · `method(…)`)는 이 규칙이 아니다 — 위의 「쉼표 뒤에서 끊는다」를 따른다.
-
-```java
-boolean includeSucceeded = request.type() == JobType.MATERIAL
-        || request.type() == JobType.PLAN_ROADMAP_COURSE;
-
-return generationJobRepository.findById(jobId)
-        .filter(job -> job.getUserId() == userId)
-        .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
-
-.authorizeHttpRequests(requests -> requests
-        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
-        .requestMatchers(HttpMethod.GET, "/api/me").authenticated()
-        .anyRequest().denyAll())
-
-public record JobReceiveRequest(
-        String type, Long courseId, Long roadmapId, Long lessonId,
-        String topic, String level, String levelOther, String purpose,
-        String purposeOther, String memo, String feedback
-) {
-
-    public JobRunner(
-            EntityManager entityManager, PlatformTransactionManager platformTransactionManager,
-            CreditLedger creditLedger, Clock clock, WorkerProperties workerProperties,
-            List<JobGenerator> generators, ScheduledExecutorService renewals
-    ) {
-```
-
-## 3. 이름 — 의존 필드는 타입 이름 그대로
+## 2. 이름 — 의존 필드는 타입 이름 그대로
 
 - **주입받는 의존 필드는 타입 단순 이름을 camelCase 로 쓴다** — `RoadmapRepository roadmapRepository` · `LoginService loginService` · `TransactionTemplate transactionTemplate` · `ObjectMapper objectMapper` · `EntityManager entityManager`. 줄임말(`tx` · `em` · `repo`) · 역할 이름(`roadmaps` · `login` · `reads`)을 쓰지 않는다.
 - **같은 타입이 둘 이상이면 역할을 앞에 붙이고 타입 이름으로 끝낸다** — `transactionTemplate` · `releaseTransactionTemplate`.
@@ -104,29 +35,13 @@ public record JobReceiveRequest(
 
 타입이 `java.*` 인 필드는 검사하지 않는다.
 
-## 4. Lombok · 생성자 · 로거
+## 3. Lombok · 생성자 · 로거
 
 - **생성자가 final 필드에 대입만 하면 `@RequiredArgsConstructor` 를 쓴다** — 빈이 아닌 클래스(`OAuthLoginHandler` 처럼 설정이 `new` 로 만드는 것)도 같다 — 생성자를 직접 쓰지 않는다. 생성자에서 변환 · 계산을 하면(목록을 `Map` 으로 바꾸기 · `TransactionTemplate` 만들기) 직접 쓴다.
 - **로거는 `@Slf4j` 로 둔다**(필드 이름 `log`). `LoggerFactory.getLogger` 를 직접 쓰지 않는다.
 - 엔티티는 `@Getter` · `@NoArgsConstructor(access = PROTECTED)` 만 쓴다([AGENTS.md](../AGENTS.md) 「스택」 · 금지 24).
 - 그 밖의 Lombok(`@Data` · `@Setter` · `@Builder` · `@Value` · `@AllArgsConstructor` · `@EqualsAndHashCode` · `@ToString` …)은 쓰지 않는다.
 
-## 5. import
+## 4. 두 규칙이 부딪히면
 
-- **완전 경로 타입을 코드 안에 쓰지 않는다** — `java.util.Collections.list(…)` 가 아니라 `import java.util.Collections;`. 같은 단순 이름의 두 타입이 한 파일에 필요할 때만 하나를 완전 경로로 쓴다.
-- **와일드카드 import(`.*`)를 쓰지 않는다** — static import 도 같다. import 만 보고 무엇을 쓰는지 알 수 있어야 한다.
-- 순서는 세 묶음, 묶음 사이에 빈 줄 하나 — ① `java.*` 가 아닌 것(알파벳 순) ② `java.*` ③ static import.
-
-## 6. 정했지만 제한하지 않는 것
-
-- **중괄호 없는 `if` 는 조건과 본문이 한 줄에 들어가는 간단한 경우에만 쓴다** — 가드가 아니어도 된다. 조건이나 본문이 두 줄 이상이면 중괄호를 쓴다(`else` 도 같다).
-
-```java
-if (handler == null) throw new ApiException(ErrorCode.INVALID_REQUEST);
-
-if (match.isMatch()
-        && registrations.findByRegistrationId(match.getVariables().get("registrationId")) == null) {
-    return null;
-}
-```
-- **`var`** — 객체는 `var`, 원시값 · `boolean` 은 타입을 쓴다(`long count = …` · `boolean includeSucceeded = …`).
+- **네이버 규칙이 이긴다** — 예: 의존 필드 이름(§2 — 타입 이름 그대로)과 네이버의 연속 대문자 제한(`AbbreviationAsWordInName` — 연속 대문자 2자까지)이 부딪히면 타입 이름을 쓰되 연속 대문자를 줄인다(`OpenAIClient` → `openAiClient` · `PostgreSQLContainer` → `postgreSqlContainer`).
