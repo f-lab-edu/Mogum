@@ -5,7 +5,15 @@
     {
       "step": 0,
       "name": "spotless-format",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-21T11:04:06+0900",
+      "summary": "Spotless 8.12.0(Gradle 9.1.0·Java 21)으로 네이버 Eclipse 기본 버전 포매터·importOrder·trimTrailingWhitespace·endWithNewline만 설정; e12658edad4017e2c00ef560704129901770cc2b 원본 크기: naver-eclipse-formatter.xml 30852, naver.importorder 139, naver-checkstyle-rules.xml 17238, naver-checkstyle-suppressions.xml 182, naver-intellij-formatter.xml 2879, 루트 .editorconfig 229바이트(모두 원본 바이트 동일), 출처 README 작성; Java 332개 대상 중 323개 포맷, 전체 332개 import 제외 공백 제거 본문·import 집합 동일, 문자열/문자 리터럴 7813개(텍스트 블록 141개 포함) 값 동일; spotlessCheck·build 통과, 서버 테스트 전후 2050개 및 목록 동일(실패·오류·건너뜀 0).",
+      "completed_at": "2026-11-21T11:10:40+0900",
+      "review_notes": [
+        "검증 범위 — 리뷰어는 gradle·git 명령만 쓸 수 있어, 「import 를 뺀 공백 제거 비교」와 「import 집합 비교」를 직접 다시 돌리지 못했다. Codex summary 의 수치(332개 모두 같음 · 리터럴 7813개 · 텍스트 블록 141개 값 같음)와 표본 diff · 전체 테스트 통과(2050개, 실패 0)로 판단했다 → 필요하면 phase 리뷰(/review) 때 사람이 임시 스크립트로 한 번 더 확인한다.",
+        "backend/src/main/java/com/mogum/generation/plan/PlanPromptSupport.java 등 — 포매터가 한 줄 if 를 중괄호 없는 두 줄로 나눴다(예: `if (stream == null)` 다음 줄에 `throw`). 동작은 같지만 네이버 Checkstyle 의 NeedBraces 에 걸릴 것으로 보인다 → step 1 에서 처리할 범위다.",
+        ".editorconfig:9-10 — 원본 그대로 `[*.bat] end_of_line = crlf` 이 들어 있다. 편집기에만 영향을 주고 지금 동작은 바꾸지 않지만, `backend/gradlew.bat` 를 편집기로 열어 저장하면 줄바꿈이 CRLF 로 바뀔 수 있다 → step 2 문서화 때 한 줄 적어 두면 좋다."
+      ]
     },
     {
       "step": 1,
@@ -17,5 +25,6 @@
       "name": "ci-style-check",
       "status": "pending"
     }
-  ]
+  ],
+  "created_at": "2026-11-21T11:04:06+0900"
 }
