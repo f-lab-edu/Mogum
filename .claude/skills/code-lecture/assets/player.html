@@ -180,6 +180,10 @@ button.b svg { width: 14px; height: 14px; fill: currentColor; }
 button.b.self-ok[aria-pressed="true"] { background: var(--ok-soft); border-color: var(--ok); }
 button.b.self-err[aria-pressed="true"] { background: var(--err-soft); border-color: var(--err); }
 button.link { font: 500 13.5px var(--sans); color: var(--db); background: none; border: 0; padding: 2px 0; cursor: pointer; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+button.back {
+  position: fixed; z-index: 5; right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  border-color: var(--accent); font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
+}
 button.back[hidden] { display: none; }
 
 /* 도식 */
