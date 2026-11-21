@@ -33,7 +33,15 @@
     {
       "step": 2,
       "name": "ci-style-check",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-21T11:45:37+0900",
+      "summary": "CI backend: ./backend/gradlew -p backend spotlessCheck checkstyleMain checkstyleTest test(다른 작업·단계·액션 SHA 유지); CiWorkflowFilesTest 명령 기대·설명 갱신, SonarAnalysisFilesTest 상수·설명에 커버리지 목적 명시—Sonar는 CI 명령 동일성이 아니라 test의 JaCoCo 리포트 생성이 목적이므로 기존 test 명령·워크플로 유지; .git-blame-ignore-revs에 step 0 feat 95863af51752c484e6d8cd209cc9436e8fd00f2f·step 1 feat e16d47db0a7df7ab569a0399c990bb29685b7dc6 등록; CODE_STYLE §1 도구 버전(Spotless 8.12.0·Checkstyle 14.4.0)·설정 경로·checkstyle 예외 구간·bat CRLF, deploy/README PR 검사·04 §2.1 config/naver 경로·AGENTS 로컬 blame 명령 반영(spotlessApply 명령 일치 확인·유지); 워크플로 시험 14개·build 통과, 서버 시험 2050개 실패·오류·건너뜀 0, Checkstyle 위반 0·spotlessCheck 통과; 커밋하지 않음.",
+      "completed_at": "2026-11-21T11:50:58+0900",
+      "review_notes": [
+        "docs/CODE_STYLE.md:19 — `.editorconfig` 의 `*.bat` 이 CRLF 라는 설명은 사실이다(`.editorconfig` 9–10행). 다만 이 step 이 확정한 사실(CI 명령 · 버전 · 경로)이 아니고 작업 목록에도 없다 → phase `/review` 때 남길지 정한다.",
+        "docs/CODE_STYLE.md:15 — 문장 앞의 「현재」는 시점에 기대는 말이라 문서가 오래되면 낡는다 → 「…구간은 사유 주석과 `@checkstyle:off` / `@checkstyle:on` 으로 감싼다」처럼 규칙으로 쓰는 편이 낫다.",
+        "backend/src/test/java/com/mogum/deploy/SonarAnalysisFilesTest.java:20 — Sonar 시험은 원래 고칠 필요가 없었다. 상수 이름과 설명을 바꿔 커버리지 목적을 드러낸 것은 동작에 영향이 없고 해롭지 않다."
+      ]
     }
   ],
   "created_at": "2026-11-21T11:04:06+0900"
