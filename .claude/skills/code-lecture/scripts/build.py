@@ -19,6 +19,7 @@ LANG = {
 }
 NODE_KINDS = {"svc", "db", "ext", "err", "ok", "note", "later", "box", "held", "free", "slack", "cap"}
 EDGE_KINDS = {None, "dash", "err", "mark"}
+CHAPTER_KINDS = {None, "background"}
 
 
 def read_file(repo, rev, path):
@@ -49,6 +50,52 @@ def cut(lines, spec, key):
             end -= 1
     start = max(0, start + spec.get("from_offset", 0))
     return start + 1, lines[start:end + 1]
+
+
+def text_len(paragraphs):
+    return sum(sum(len(x) for x in p) if isinstance(p, list) else len(p) for p in paragraphs)
+
+
+def check_quiz(quiz, chapters, errors, warnings):
+    """퀴즈 문항 검사. 돌려주는 값은 (객관식 수, 서술형 수)."""
+    if not quiz:
+        errors.append("quiz 가 비었다 — 강의 끝에 이해도를 확인하는 퀴즈를 둔다")
+        return 0, 0
+    answers, essays = [], 0
+    for qi, item in enumerate(quiz, 1):
+        at = f"퀴즈 {qi}"
+        if not item.get("q"):
+            errors.append(f"{at}: q 가 없다")
+        choices, model = item.get("choices"), item.get("model")
+        if choices and model:
+            errors.append(f"{at}: choices 와 model 을 함께 쓰지 않는다 — 객관식이나 서술형 하나다")
+        elif choices:
+            if not 3 <= len(choices) <= 5:
+                errors.append(f"{at}: choices 는 3~5개다")
+            answer = item.get("answer")
+            if not isinstance(answer, int) or not 1 <= answer <= len(choices):
+                errors.append(f"{at}: answer {answer} 는 choices 1~{len(choices)} 밖이다(1부터 센다)")
+            else:
+                answers.append(answer)
+            if not item.get("why"):
+                errors.append(f"{at}: why 가 없다 — 정답의 이유와 헷갈리는 보기가 왜 틀렸는지 쓴다")
+        elif model:
+            essays += 1
+        else:
+            errors.append(f"{at}: choices(객관식) 나 model(서술형) 중 하나가 있어야 한다")
+        see = item.get("see")
+        if see is None:
+            errors.append(f"{at}: see 가 없다 — 다시 볼 [장, 단계] 를 1부터 센 번호로 준다")
+        elif not (isinstance(see, list) and len(see) == 2 and all(isinstance(v, int) for v in see)
+                  and 1 <= see[0] <= len(chapters) and 1 <= see[1] <= len(chapters[see[0] - 1].get("beats") or [])):
+            errors.append(f"{at}: see {see} 은 없는 단계다 — [장, 단계] 를 1부터 센다")
+    if answers and not essays:
+        warnings.append("퀴즈에 서술형이 없다 — 「왜」 「빼면 무엇이 깨지나」를 묻는 서술형 2~3개를 섞는다")
+    if essays and not answers:
+        warnings.append("퀴즈에 객관식이 없다")
+    if len(answers) >= 3 and len(set(answers)) == 1:
+        warnings.append(f"객관식 정답이 모두 {answers[0]}번이다 — 정답 위치를 섞는다")
+    return len(answers), essays
 
 
 def overlap(a, b):
@@ -94,6 +141,8 @@ def main():
     beats_total, detail_chars = 0, 0
     for ci, ch in enumerate(chapters, 1):
         where = f"{ci}장 '{ch.get('title', '?')}'"
+        if ch.get("kind") not in CHAPTER_KINDS:
+            errors.append(f"{where}: kind '{ch.get('kind')}' 는 없는 종류다 — 배경 지식 장만 'background'")
         nodes = ch.get("nodes", [])
         ids = [n.get("id") for n in nodes]
         for dup in {i for i in ids if ids.count(i) > 1}:
@@ -139,8 +188,13 @@ def main():
             if not detail:
                 errors.append(f"{at}: detail 이 없다 — 이 페이지의 핵심이 자세한 설명이다")
             else:
-                for p in detail:
-                    detail_chars += sum(len(x) for x in p) if isinstance(p, list) else len(p)
+                detail_chars += text_len(detail)
+            know = beat.get("know")
+            if know is not None:
+                if not (isinstance(know, dict) and know.get("title") and know.get("body")):
+                    errors.append(f"{at}: know 에 title 과 body 가 있어야 한다")
+                else:
+                    detail_chars += text_len(know["body"])
             for nid in beat.get("on", []):
                 if nid not in node_ids:
                     errors.append(f"{at}: on '{nid}' 는 이 장의 노드가 아니다")
@@ -170,6 +224,8 @@ def main():
                 if not any(h in line for line in snippets[code]["lines"]):
                     errors.append(f"{at}: hl '{h}' 가 snippet '{code}' 의 어느 줄에도 없다")
 
+    mc, essays = check_quiz(lecture.get("quiz"), chapters, errors, warnings)
+
     for key in snippets.keys() - used:
         warnings.append(f"snippet '{key}': 어느 단계도 쓰지 않는다")
 
@@ -189,7 +245,8 @@ def main():
     out.write_text(html, encoding="utf-8")
     minutes = round(detail_chars / 450)
     print(f"완료: {out} — {len(chapters)}장 · {beats_total}단계 · 발췌 {len(snippets)}개 · "
-          f"설명 {detail_chars:,}자(읽는 데 약 {minutes}분) · {len(html) / 1024:.0f}KB")
+          f"설명 {detail_chars:,}자(읽는 데 약 {minutes}분) · 퀴즈 {mc + essays}문항(객관식 {mc} · 서술형 {essays}) · "
+          f"{len(html) / 1024:.0f}KB")
 
 
 if __name__ == "__main__":

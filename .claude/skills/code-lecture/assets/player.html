@@ -4,7 +4,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* 코드 설명 페이지: 왼쪽 도식 + 설명, 오른쪽 실제 코드 발췌. 단계를 넘기면 도식 강조 · 설명 · 코드 강조 줄이 함께 바뀐다. */
+/* 코드 설명 페이지: 왼쪽 도식 + 설명, 오른쪽 실제 코드 발췌. 단계를 넘기면 도식 강조 · 설명 · 코드 강조 줄이 함께 바뀐다.
+   마지막은 퀴즈 화면 — 객관식은 바로 채점, 서술형은 모범 답을 펴 보고 스스로 채점한다. */
 :root {
   --bg: #E9EDF1; --panel: #FBFCFD; --stage: #FFFFFF; --ink: #18212E; --muted: #5A6676;
   --line: #D3DAE2; --line-strong: #9AA6B4;
@@ -72,6 +73,14 @@ h1 { margin: 2px 0 0; font-size: 24px; line-height: 1.25; font-weight: 700; text
 .explain .detail ul { margin: 0; padding-left: 1.3em; display: grid; gap: 4px; font-size: 15.5px; line-height: 1.7; }
 .explain code { font: 13px var(--mono); background: var(--inline-code); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
 .explain strong { font-weight: 700; }
+.know { margin-top: 14px; padding: 12px 16px 14px; border-radius: 10px; background: var(--db-soft); border-left: 3px solid var(--db); display: grid; gap: 8px; max-width: 72ch; }
+.know[hidden] { display: none; }
+.know .kb { display: grid; gap: 8px; }
+.know .kt { font: 600 12px/1.4 var(--mono); color: var(--db); letter-spacing: .04em; }
+.know .kt b { font-family: var(--sans); font-size: 14px; color: var(--ink); letter-spacing: 0; margin-left: 4px; }
+.know p { margin: 0; font-size: 15px; line-height: 1.75; text-wrap: pretty; }
+.know ul { margin: 0; padding-left: 1.3em; display: grid; gap: 4px; font-size: 15px; line-height: 1.7; }
+.know code { background: var(--stage); }
 .refs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
 .refs span { font: 12px var(--mono); color: var(--db); background: var(--db-soft); border-radius: 999px; padding: 3px 10px; }
 
@@ -120,9 +129,62 @@ button.b svg { width: 14px; height: 14px; fill: currentColor; }
   border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; cursor: pointer; display: grid; gap: 1px;
 }
 .chapters button span { font: 11.5px var(--mono); color: var(--muted); }
+.chapters button.bg span::after { content: " · 배경 지식"; color: var(--db); }
+.chapters button.qz span { color: var(--accent); }
 .chapters button.cur { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 .foot { font-size: 12.5px; color: var(--muted); }
 .foot code { font-family: var(--mono); }
+
+/* 퀴즈 */
+.quiz { display: grid; gap: 14px; }
+.quiz[hidden], .stage[hidden] { display: none; }
+.qhead .grow { flex: 1 1 auto; }
+.qhead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; }
+.qhead h2 { margin: 0; font-size: 18px; }
+.qhead .score { margin: 0; font: 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.qhead .score b { color: var(--accent); }
+.qs { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; }
+.q { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px 18px; display: grid; gap: 12px; min-width: 0; }
+.q .qmeta { font: 600 11px/1.4 var(--mono); letter-spacing: .06em; color: var(--accent); }
+.q .qq { margin: 0; font-size: 16.5px; line-height: 1.65; font-weight: 600; text-wrap: pretty; max-width: 72ch; }
+.q code, .qhead code { font: 13px var(--mono); background: var(--inline-code); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.opts { display: grid; gap: 8px; max-width: 80ch; }
+.opt {
+  display: flex; gap: 10px; align-items: baseline; text-align: left; width: 100%;
+  font: 15px/1.6 var(--sans); color: var(--ink); background: var(--stage);
+  border: 1px solid var(--line-strong); border-radius: 9px; padding: 9px 14px; cursor: pointer;
+}
+.opt .oi { font: 600 12.5px var(--mono); color: var(--muted); flex: none; }
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt.right { background: var(--ok-soft); border-color: var(--ok); }
+.opt.right .oi { color: var(--ok); }
+.opt.wrong { background: var(--err-soft); border-color: var(--err); }
+.opt.wrong .oi { color: var(--err); }
+.opt.rest { opacity: .6; }
+.opt:focus-visible, .q button:focus-visible, .q textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.q textarea {
+  width: 100%; box-sizing: border-box; min-height: 96px; resize: vertical; font: 15px/1.6 var(--sans); color: var(--ink);
+  background: var(--stage); border: 1px solid var(--line-strong); border-radius: 9px; padding: 10px 12px;
+}
+.fb { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); max-width: 72ch; }
+.fb[hidden] { display: none; }
+.fb p { margin: 0; font-size: 15px; line-height: 1.75; text-wrap: pretty; }
+.fb ul { margin: 0; padding-left: 1.3em; display: grid; gap: 4px; font-size: 15px; line-height: 1.7; }
+.fb .verdict { font-weight: 700; }
+.fb .verdict.ok { color: var(--ok); } .fb .verdict.err { color: var(--err); }
+.fb .lbl { font: 600 12px/1.4 var(--mono); color: var(--muted); letter-spacing: .04em; margin-top: 4px; }
+.qbtns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.qbtns .mine { font: 600 13px var(--sans); }
+.qbtns .mine.ok { color: var(--ok); } .qbtns .mine.err { color: var(--err); }
+button.b.self-ok[aria-pressed="true"] { background: var(--ok-soft); border-color: var(--ok); }
+button.b.self-err[aria-pressed="true"] { background: var(--err-soft); border-color: var(--err); }
+button.link { font: 500 13.5px var(--sans); color: var(--db); background: none; border: 0; padding: 2px 0; cursor: pointer; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+button.back {
+  position: fixed; z-index: 5; right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  border-color: var(--accent); font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
+}
+button.back[hidden] { display: none; }
 
 /* 도식 */
 .node rect { fill: var(--stage); stroke: var(--line-strong); stroke-width: 1.2; transition: fill .35s, stroke .35s, stroke-width .35s; }
@@ -189,7 +251,7 @@ button.b svg { width: 14px; height: 14px; fill: currentColor; }
     <div class="where"><span class="num" id="chapNum"></span><b id="chapTitle"></b></div>
   </header>
 
-  <section class="stage">
+  <section class="stage" id="stage">
     <div class="left">
       <div class="dia" id="dia"></div>
       <article class="explain" aria-live="polite">
@@ -197,6 +259,7 @@ button.b svg { width: 14px; height: 14px; fill: currentColor; }
         <p class="say" id="say"></p>
         <div class="detail" id="detail"></div>
         <div class="refs" id="refs"></div>
+        <aside class="know" id="know" hidden><div class="kt">더 알아두기<b id="knowTitle"></b></div><div class="kb" id="knowBody"></div></aside>
       </article>
     </div>
     <div class="code">
@@ -207,12 +270,23 @@ button.b svg { width: 14px; height: 14px; fill: currentColor; }
     </div>
   </section>
 
+  <section class="quiz" id="quiz" hidden aria-label="이해도 확인 퀴즈">
+    <div class="qhead">
+      <h2>이해도 확인</h2>
+      <p class="score" id="score"></p>
+      <span class="grow"></span>
+      <button class="b" id="quizReset" type="button">다시 풀기</button>
+    </div>
+    <ol class="qs" id="qs"></ol>
+  </section>
+
   <section class="bar" aria-label="단계 이동">
     <div class="segs" id="segs"></div>
     <div class="ctrls">
       <button class="b" id="prev" type="button"><svg viewBox="0 0 16 16"><path d="M10 2v12L2 8z"/></svg>이전</button>
       <button class="b next" id="next" type="button">다음<svg viewBox="0 0 16 16"><path d="M6 2v12l8-6z"/></svg></button>
       <span class="count" id="count"></span>
+      <button class="b back" id="backToQuiz" type="button" hidden>퀴즈로 돌아가기</button>
       <span class="grow"></span>
       <span class="keys">← → 로 넘기기</span>
     </div>
@@ -244,6 +318,9 @@ const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 const pad2 = v => String(v).padStart(2, '0');
 // 설명 글의 작은 표기: `코드` · **강조**. HTML 은 먼저 이스케이프한다.
 const inline = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+// 문단 목록: 문자열은 문단, 문자열 배열은 글머리 목록.
+const paras = list => (list || []).map(p =>
+  Array.isArray(p) ? `<ul>${p.map(it => `<li>${inline(it)}</li>`).join('')}</ul>` : `<p>${inline(p)}</p>`).join('');
 
 /* ---------- 도식 ---------- */
 function anchor(node, tx, ty) {
@@ -380,20 +457,120 @@ function renderCode(beat) {
 
 /* ---------- 설명 ---------- */
 function renderExplain(beat) {
-  $('beatChap').textContent = `${pad2(si + 1)} · ${SCENES[si].title} · ${bi + 1}/${SCENES[si].beats.length}`;
+  const scene = SCENES[si];
+  $('beatChap').textContent = `${pad2(si + 1)} · ${scene.kind === 'background' ? '배경 지식 · ' : ''}${scene.title} · ${bi + 1}/${scene.beats.length}`;
   $('say').innerHTML = inline(beat.say);
-  $('detail').innerHTML = (beat.detail || []).map(p => {
-    if (Array.isArray(p)) return `<ul>${p.map(it => `<li>${inline(it)}</li>`).join('')}</ul>`;
-    return `<p>${inline(p)}</p>`;
-  }).join('');
+  $('detail').innerHTML = paras(beat.detail);
   $('detail').hidden = !(beat.detail && beat.detail.length);
+  $('know').hidden = !beat.know;
+  if (beat.know) {
+    $('knowTitle').textContent = beat.know.title;
+    $('knowBody').innerHTML = paras(beat.know.body);
+  }
   $('refs').innerHTML = (beat.refs || []).map(r => `<span>${esc(r)}</span>`).join('');
   $('refs').hidden = !(beat.refs && beat.refs.length);
+}
+
+/* ---------- 퀴즈 ---------- */
+// 퀴즈는 마지막 장 뒤의 화면 하나다(si === QI). 고른 답 · 쓴 답은 이 브라우저에만 남는다.
+const QUIZ = L.quiz || [];
+const QI = QUIZ.length ? SCENES.length : -1;
+const QUIZ_KEY = 'lecture-quiz:' + L.title;
+const emptyAnswers = () => ({ pick: {}, open: {}, self: {}, draft: {} });
+let answers = emptyAnswers();
+let backTo = null; // 「다시 보기」로 떠난 문항 — 돌아갈 자리
+
+function saveAnswers() { try { localStorage.setItem(QUIZ_KEY, JSON.stringify(answers)); } catch (_) {} }
+function loadAnswers() {
+  try { answers = Object.assign(emptyAnswers(), JSON.parse(localStorage.getItem(QUIZ_KEY) || '{}')); } catch (_) {}
+}
+
+function quizItem(i) {
+  const it = QUIZ[i], mc = !!it.choices;
+  const [sc, sb] = it.see;
+  const see = `<button class="link" type="button" data-see="${i}">${pad2(sc)}장 「${esc(SCENES[sc - 1].title)}」 ${sb}단계 다시 보기</button>`;
+  let h = `<div class="qmeta">${pad2(i + 1)} · ${mc ? '객관식' : '서술형'}</div><p class="qq">${inline(it.q)}</p>`;
+  if (mc) {
+    const pick = answers.pick[i];
+    const done = pick !== undefined;
+    h += '<div class="opts">' + it.choices.map((c, j) => {
+      const no = j + 1;
+      const cls = !done ? '' : no === it.answer ? ' right' : no === pick ? ' wrong' : ' rest';
+      return `<button class="opt${cls}" type="button" data-q="${i}" data-o="${no}"${done ? ' disabled' : ''}><span class="oi">${no}</span><span>${inline(c)}</span></button>`;
+    }).join('') + '</div>';
+    if (done) {
+      const ok = pick === it.answer;
+      h += `<div class="fb" tabindex="-1"><p class="verdict ${ok ? 'ok' : 'err'}">${ok ? '맞았습니다.' : `틀렸습니다 — 정답은 ${it.answer}번입니다.`}</p>${paras(it.why)}<div>${see}</div></div>`;
+    }
+    return h;
+  }
+  h += `<textarea data-draft="${i}" aria-label="${i + 1}번 내 답" placeholder="모범 답을 보기 전에 내 말로 먼저 써 보세요.">${esc(answers.draft[i] || '')}</textarea>`;
+  if (!answers.open[i]) return h + `<div class="qbtns"><button class="b" type="button" data-open="${i}">모범 답 보기</button></div>`;
+  const self = answers.self[i];
+  h += `<div class="fb" tabindex="-1"><div class="lbl">모범 답</div>${paras(it.model)}`;
+  if (it.points && it.points.length) h += `<div class="lbl">이게 들어 있으면 맞은 것</div>${paras([it.points])}`;
+  return h + `<div class="qbtns"><button class="b self-ok" type="button" data-self="${i}" data-v="1" aria-pressed="${self === true}">맞았다</button>`
+    + `<button class="b self-err" type="button" data-self="${i}" data-v="0" aria-pressed="${self === false}">부족했다</button>${see}</div></div>`;
+}
+function refreshQuiz(i, focus) {
+  const li = document.querySelector(`.q[data-i="${i}"]`);
+  li.innerHTML = quizItem(i);
+  const el = focus && li.querySelector(focus);
+  if (el) el.focus({ preventScroll: true });
+  renderScore();
+}
+function renderScore() {
+  const idx = QUIZ.map((_, i) => i);
+  const mc = idx.filter(i => QUIZ[i].choices), es = idx.filter(i => !QUIZ[i].choices);
+  const mcDone = mc.filter(i => answers.pick[i] !== undefined), esDone = es.filter(i => answers.self[i] !== undefined);
+  const parts = [];
+  if (mc.length) parts.push(`객관식 <b>${mcDone.filter(i => answers.pick[i] === QUIZ[i].answer).length}</b> / ${mc.length}`);
+  if (es.length) parts.push(`서술형(스스로 채점) <b>${esDone.filter(i => answers.self[i] === true).length}</b> / ${es.length}`);
+  const left = QUIZ.length - mcDone.length - esDone.length;
+  parts.push(left ? `남은 문항 ${left}` : '다 풀었습니다');
+  $('score').innerHTML = parts.join(' · ');
+}
+function buildQuiz() {
+  $('qs').innerHTML = QUIZ.map((_, i) => `<li class="q" data-i="${i}">${quizItem(i)}</li>`).join('');
+  renderScore();
+}
+function bindQuiz() {
+  $('qs').addEventListener('click', ev => {
+    const t = ev.target.closest('button');
+    if (!t) return;
+    const d = t.dataset; // data-* 는 문자열이다 — 문항 번호는 숫자로 바꿔 쓴다.
+    if (d.o) {
+      answers.pick[d.q] = +d.o; saveAnswers(); refreshQuiz(+d.q, '.fb');
+    } else if (d.open) {
+      answers.open[d.open] = true; saveAnswers(); refreshQuiz(+d.open, '.fb');
+    } else if (d.self) {
+      answers.self[d.self] = d.v === '1'; saveAnswers();
+      refreshQuiz(+d.self, `[data-self][data-v="${d.v}"]`);
+    } else if (d.see) {
+      const [sc, sb] = QUIZ[d.see].see;
+      backTo = +d.see;
+      go(sc - 1, sb - 1);
+      window.scrollTo(0, 0);
+    }
+  });
+  $('qs').addEventListener('input', ev => {
+    const t = ev.target;
+    if (t.dataset && t.dataset.draft !== undefined) { answers.draft[t.dataset.draft] = t.value; saveAnswers(); }
+  });
+  $('quizReset').addEventListener('click', () => { answers = emptyAnswers(); saveAnswers(); buildQuiz(); });
+  $('backToQuiz').addEventListener('click', () => {
+    const i = backTo;
+    go(QI, 0);
+    const li = document.querySelector(`.q[data-i="${i}"]`);
+    if (li) li.scrollIntoView({ block: 'start' });
+  });
 }
 
 /* ---------- 상태 · 그리기 ---------- */
 const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TOTAL = SCENES.reduce((a, s) => a + s.beats.length, 0);
+const LAST = QUIZ.length ? QI : SCENES.length - 1;
+const beatsOf = s => s === QI ? 1 : SCENES[s].beats.length;
 const POS_KEY = 'lecture-pos:' + L.title;
 let si = 0, bi = 0, shownScene = -1;
 
@@ -401,28 +578,39 @@ function store() { try { localStorage.setItem(POS_KEY, JSON.stringify({ si, bi }
 function restore() {
   try {
     const v = JSON.parse(localStorage.getItem(POS_KEY) || 'null');
-    if (v && SCENES[v.si] && SCENES[v.si].beats[v.bi]) { si = v.si; bi = v.bi; }
+    if (v && ((v.si === QI && v.bi === 0) || (SCENES[v.si] && SCENES[v.si].beats[v.bi]))) { si = v.si; bi = v.bi; }
   } catch (_) {}
 }
 
 function render() {
-  const scene = SCENES[si], beat = scene.beats[bi];
-  if (shownScene !== si) {
-    $('dia').innerHTML = renderDiagram(scene);
-    if (shownScene === -1) $('dia').firstChild.classList.remove('enter');
-    shownScene = si;
+  const inQuiz = si === QI;
+  $('stage').hidden = inQuiz;
+  $('quiz').hidden = !inQuiz;
+  if (inQuiz) {
+    backTo = null;
+    $('chapNum').textContent = '퀴즈';
+    $('chapTitle').textContent = '이해도 확인';
+    $('count').textContent = `${QUIZ.length}문항`;
+  } else {
+    const scene = SCENES[si], beat = scene.beats[bi];
+    if (shownScene !== si) {
+      $('dia').innerHTML = renderDiagram(scene);
+      if (shownScene === -1) $('dia').firstChild.classList.remove('enter');
+      shownScene = si;
+    }
+    applyFocus(beat);
+    renderCode(beat);
+    renderExplain(beat);
+    $('chapNum').textContent = `${pad2(si + 1)} / ${SCENES.length}`;
+    $('chapTitle').textContent = scene.title;
+    let idx = 0; for (let k = 0; k < si; k++) idx += SCENES[k].beats.length;
+    $('count').textContent = `${idx + bi + 1} / ${TOTAL}`;
   }
-  applyFocus(beat);
-  renderCode(beat);
-  renderExplain(beat);
-  $('chapNum').textContent = `${pad2(si + 1)} / ${SCENES.length}`;
-  $('chapTitle').textContent = scene.title;
-  let idx = 0; for (let k = 0; k < si; k++) idx += SCENES[k].beats.length;
-  $('count').textContent = `${idx + bi + 1} / ${TOTAL}`;
+  $('backToQuiz').hidden = inQuiz || backTo === null;
   $('prev').disabled = si === 0 && bi === 0;
-  $('next').disabled = si === SCENES.length - 1 && bi === scene.beats.length - 1;
+  $('next').disabled = si === LAST && bi === beatsOf(si) - 1;
   document.querySelectorAll('.seg').forEach((sg, k) => {
-    const w = k < si ? 100 : k > si ? 0 : ((bi + 1) / scene.beats.length) * 100;
+    const w = k < si ? 100 : k > si ? 0 : ((bi + 1) / beatsOf(si)) * 100;
     sg.firstChild.style.width = w + '%';
   });
   document.querySelectorAll('.chapters button').forEach((b, k) => b.classList.toggle('cur', k === si));
@@ -432,8 +620,8 @@ function render() {
 function go(s, b) { si = s; bi = b; render(); }
 function step(delta) {
   let s = si, b = bi + delta;
-  if (b < 0) { if (s === 0) b = 0; else { s--; b = SCENES[s].beats.length - 1; } }
-  else if (b >= SCENES[s].beats.length) { if (s < SCENES.length - 1) { s++; b = 0; } else b = SCENES[s].beats.length - 1; }
+  if (b < 0) { if (s === 0) b = 0; else { s--; b = beatsOf(s) - 1; } }
+  else if (b >= beatsOf(s)) { if (s < LAST) { s++; b = 0; } else b = beatsOf(s) - 1; }
   go(s, b);
 }
 
@@ -443,9 +631,11 @@ function buildChrome() {
   $('eyebrow').textContent = L.eyebrow || '';
   $('foot').innerHTML = inline(L.foot || '');
   $('segs').innerHTML = SCENES.map((s, k) =>
-    `<button class="seg" type="button" style="flex-grow:${s.beats.length}" data-k="${k}" title="${pad2(k + 1)} ${esc(s.title)}" aria-label="${pad2(k + 1)} ${esc(s.title)}로 이동"><i></i></button>`).join('');
+    `<button class="seg" type="button" style="flex-grow:${s.beats.length}" data-k="${k}" title="${pad2(k + 1)} ${esc(s.title)}" aria-label="${pad2(k + 1)} ${esc(s.title)}로 이동"><i></i></button>`).join('')
+    + (QUIZ.length ? `<button class="seg" type="button" style="flex-grow:2" data-k="${QI}" title="퀴즈" aria-label="퀴즈로 이동"><i></i></button>` : '');
   $('chapters').innerHTML = SCENES.map((s, k) =>
-    `<li><button type="button" data-k="${k}"><span>${pad2(k + 1)} · ${s.beats.length}단계</span>${esc(s.title)}</button></li>`).join('');
+    `<li><button type="button" data-k="${k}"${s.kind === 'background' ? ' class="bg"' : ''}><span>${pad2(k + 1)} · ${s.beats.length}단계</span>${esc(s.title)}</button></li>`).join('')
+    + (QUIZ.length ? `<li><button type="button" data-k="${QI}" class="qz"><span>퀴즈 · ${QUIZ.length}문항</span>이해도 확인</button></li>` : '');
   const jump = ev => { const b = ev.target.closest('[data-k]'); if (b) go(+b.dataset.k, 0); };
   $('segs').addEventListener('click', jump);
   $('chapters').addEventListener('click', jump);
@@ -459,6 +649,8 @@ function buildChrome() {
 }
 
 buildChrome();
+loadAnswers();
+if (QUIZ.length) { buildQuiz(); bindQuiz(); }
 restore();
 render();
 </script>
