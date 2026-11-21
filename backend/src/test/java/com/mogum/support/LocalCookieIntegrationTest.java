@@ -1,13 +1,13 @@
 package com.mogum.support;
 
-import org.springframework.test.context.TestPropertySource;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+
+import org.springframework.test.context.TestPropertySource;
 
 /**
  * 로컬 XSRF 쿠키의 발급/로그아웃 만료에 Domain이 없는지는 실제 보안 필터의 응답으로 확인한다.
@@ -20,5 +20,4 @@ import java.lang.annotation.Target;
 @Inherited
 @IntegrationTest
 @TestPropertySource(properties = "app.web.cookie-domain=")
-public @interface LocalCookieIntegrationTest {
-}
+public @interface LocalCookieIntegrationTest{}

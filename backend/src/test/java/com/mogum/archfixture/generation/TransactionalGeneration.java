@@ -4,6 +4,5 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
 public class TransactionalGeneration {
-    public void generate() {
-    }
+	public void generate() {}
 }

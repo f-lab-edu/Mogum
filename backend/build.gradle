@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'jacoco'
+    id 'com.diffplug.spotless' version '8.12.0'
     id 'org.springframework.boot' version '4.1.1'
 }
 
@@ -14,6 +15,16 @@ java {
 
 repositories {
     mavenCentral()
+}
+
+spotless {
+    java {
+        target 'src/main/java/**/*.java', 'src/test/java/**/*.java'
+        eclipse().configFile('config/naver/naver-eclipse-formatter.xml')
+        importOrderFile('config/naver/naver.importorder')
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
 }
 
 dependencies {
@@ -30,7 +41,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-flyway'
     implementation 'org.flywaydb:flyway-database-postgresql'
     runtimeOnly 'org.postgresql:postgresql'
-    // Lombok — 엔티티의 @Getter · @NoArgsConstructor(access = PROTECTED), 대입만 하는 빈 생성자의 @RequiredArgsConstructor, 로거의 @Slf4j(docs/CODE_STYLE.md §4). 애노테이션 프로세서에도 BOM 을 걸어야 버전이 정해진다
+    // Lombok — 엔티티의 @Getter · @NoArgsConstructor(access = PROTECTED), 대입만 하는 빈 생성자의 @RequiredArgsConstructor, 로거의 @Slf4j(docs/CODE_STYLE.md §3). 애노테이션 프로세서에도 BOM 을 걸어야 버전이 정해진다
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor platform(org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES)
     annotationProcessor 'org.projectlombok:lombok'
