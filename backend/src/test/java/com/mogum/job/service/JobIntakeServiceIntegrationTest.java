@@ -26,9 +26,11 @@ import com.mogum.job.domain.JobStatus;
 import com.mogum.job.domain.JobType;
 import com.mogum.job.repository.GenerationJobRepository;
 import com.mogum.support.IntegrationTest;
+import com.mogum.support.IntegrationTestConfiguration.FrameworkJobs;
 import com.mogum.support.IntegrationTestConfiguration.TestJobIntakeHandler;
 import com.mogum.support.TestClock;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +41,7 @@ import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -55,7 +58,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @IntegrationTest
 @ExtendWith(OutputCaptureExtension.class)
 class JobIntakeServiceIntegrationTest {
-    @Autowired JobIntakeService jobIntakeService;
+    @Autowired ApplicationContext applicationContext;
+    JobIntakeService jobIntakeService;
     @Autowired GenerationJobRepository generationJobRepository;
     @Autowired CourseRepository courseRepository;
     @Autowired RoadmapRepository roadmapRepository;
@@ -69,6 +73,11 @@ class JobIntakeServiceIntegrationTest {
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired DataSource dataSource;
     @Autowired PlatformTransactionManager platformTransactionManager;
+
+    @BeforeEach
+    void configureIntake() {
+        jobIntakeService = new FrameworkJobs(applicationContext).jobIntakeService;
+    }
 
     @Test
     @DisplayName("상한 바로 아래 두 받기가 users 행에서 기다려 하나만 받는다")

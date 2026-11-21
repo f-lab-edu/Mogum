@@ -26,6 +26,7 @@ import com.mogum.job.domain.JobType;
 import com.mogum.job.repository.GenerationJobRepository;
 import com.mogum.job.service.JobIntakeService;
 import com.mogum.support.IntegrationTest;
+import com.mogum.support.IntegrationTestConfiguration.FrameworkJobs;
 import com.mogum.support.IntegrationTestConfiguration.TestJobGenerator;
 import com.mogum.support.TestClock;
 import jakarta.persistence.EntityManager;
@@ -41,6 +42,7 @@ import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -65,7 +67,8 @@ class JobRunnerIntegrationTest {
     @Autowired PlatformTransactionManager platformTransactionManager;
     @Autowired TestClock testClock;
     @Autowired CreditLedger creditLedger;
-    @Autowired JobIntakeService jobIntakeService;
+    @Autowired ApplicationContext applicationContext;
+    JobIntakeService jobIntakeService;
     @Autowired GenerationJobRepository generationJobRepository;
     @Autowired UserRepository userRepository;
     @Autowired CreditEntryRepository creditEntryRepository;
@@ -73,7 +76,7 @@ class JobRunnerIntegrationTest {
     @Autowired RoadmapRepository roadmapRepository;
     @Autowired LessonRepository lessonRepository;
     @Autowired JdbcTemplate jdbcTemplate;
-    @Autowired List<JobGenerator> generators;
+    List<JobGenerator> generators;
     @Autowired WorkerProperties configuredWorkerProperties;
     ScheduledExecutorService renewals;
 
@@ -82,7 +85,9 @@ class JobRunnerIntegrationTest {
     @BeforeEach
     void prepareSchedulerAndStubs() {
         renewals = Executors.newSingleThreadScheduledExecutor();
-        generators.forEach(generator -> ((TestJobGenerator) generator).reset());
+        var framework = new FrameworkJobs(applicationContext);
+        jobIntakeService = framework.jobIntakeService;
+        generators = framework.generators;
     }
 
     @AfterEach
@@ -111,7 +116,8 @@ class JobRunnerIntegrationTest {
         var values = configuredWorkerProperties;
 
         // then
-        assertThat(values).isEqualTo(new WorkerProperties(LEASE, Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
+        assertThat(values).isEqualTo(new WorkerProperties(
+                Duration.ofMinutes(6), Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
                 0, Duration.ofSeconds(1), Duration.ofSeconds(100)));
     }
 

@@ -59,11 +59,27 @@ management:
         enabled: false
 
 app:
+  llm:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      base-url: ""
+    chats:
+      planning:
+        model: gpt-5.6-terra
+        max-completion-tokens: 4000
+        timeout: 50s
+        max-continuations: 1
+    prices:
+      "[gpt-5.6-terra]":
+        input: 2.00
+        cached-input: 0.20
+        output: 12.00
+    database-allowance: 10s
   worker:
     count: 2
     poll-interval: 1s
     shutdown-wait: 100s
-    lease-duration: 5m
+    lease-duration: 6m
     renewal-interval: 30s
     max-retries: 2
     retry-delay: 1s

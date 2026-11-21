@@ -7,7 +7,7 @@
 
 > `3a` step 5에서 인증 · 로그/시계 · 설정 · 배포 파일 · FSRS 학습 · `ArchitectureTest`의 단위 테스트 형식을 이관했다. 배포 파일 검사는 `DeployFilesTest` · `DeployFilesJournalTest` · `DeployFilesScriptTest`, 백업은 `BackupFilesTest` · `BackupFilesScriptTest`, 워크플로는 `WorkflowFilesTest` · `WorkflowFilesScriptTest`로 나눴다. 설정 바인딩의 레포지토리 대역은 기존 `FakeUserRepository`를 쓴다. 기존 검증 사실과 아키텍처 규칙 · 위반 픽스처 · 제품 클래스 검사 범위는 유지했다.
 
-> `6-job-worker` step 3에서 `NoJobHandlersIntegrationTest` 묶음을 더해 통합 컨텍스트는 총 3개다(레포지토리 슬라이스 제외). 운영과 같이 처리기가 없는 HTTP 받기의 거절과 DB 보존을 확인해야 하므로 이 묶음만 `test.job-intake-handlers=false`로 테스트 전용 처리기를 뺀다. 기본 묶음은 `IntegrationTestConfiguration.JobIntakeHandlers`의 여섯 처리기를 그대로 쓰며, Google 가짜 서버 · 시계 · 정리기 · HTTP 요청 도구는 모두 공유한다.
+> `7-course-planning` step 3에서 테스트 처리기 빈과 `NoJobHandlersIntegrationTest` · `test.job-intake-handlers` 속성을 제거해 통합 컨텍스트는 총 2개다(레포지토리 슬라이스 제외). 공용 컨텍스트는 운영 처리기 구성을 쓰고 LLM 어댑터만 스텁으로 바꾼다. 틀 시험은 `IntegrationTestConfiguration.FrameworkJobs`로 테스트 처리기와 트랜잭션 프록시를 직접 구성한다. 처리기 · LLM 스텁의 사용법은 [07 §2](./07-testing.md#2-llm-스텁)에 있다. Google 가짜 서버 · 시계 · 정리기 · HTTP 요청 도구는 모두 공유한다.
 
 ## 1. 종류 — 무엇으로 무엇을 보나
 

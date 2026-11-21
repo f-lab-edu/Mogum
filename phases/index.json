@@ -60,6 +60,11 @@
       "dir": "6a-code-style",
       "status": "completed",
       "completed_at": "2026-11-17T15:45:14+0900"
+    },
+    {
+      "dir": "7-course-planning",
+      "status": "completed",
+      "completed_at": "2026-11-21T07:00:37+0900"
     }
   ]
 }

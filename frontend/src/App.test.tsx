@@ -14,12 +14,10 @@ test('작업 주소를 직접 열면 승인 뒤 작업을 읽고 기다리는 �
 })
 
 test.each([
-  ['/courses/31', '코스'],
-  ['/roadmaps/41', '로드맵'],
   ['/courses/31/lessons/51', '강의'],
 ])('결과 주소 %s는 승인 뒤 제목 %s와 뒤로 가기만 있는 자리를 표시한다', async (path, title) => {
   window.history.replaceState(null, '', path)
-  vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/courses' ? { courses: [] } : path === '/api/roadmaps' ? { roadmaps: [] } : { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
   render(<App />)
   expect(await screen.findByRole('heading', { name: title })).toBeVisible()
   expect(screen.getByRole('main')).toHaveTextContent(/^$/)
@@ -27,7 +25,7 @@ test.each([
   await waitFor(() => expect(screen.getByRole('heading', { name: title })).toHaveFocus())
 })
 
-test.each(['/jobs/12', '/courses/31', '/roadmaps/41', '/courses/31/lessons/51'])('승인 전에는 %s에서 작업이나 결과를 읽지 않는다', async (path) => {
+test.each(['/new', '/jobs/12', '/courses/31', '/roadmaps/41', '/courses/31/lessons/51'])('승인 전에는 %s에서 작업이나 결과를 읽지 않는다', async (path) => {
   window.history.replaceState(null, '', path)
   vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: { status: 'APPLIED', name: '민서', email: 'minseo@example.com' } })))))
   render(<App />)
@@ -109,13 +107,15 @@ const tabPages = [
   { entry: '/profile', title: '내 정보', label: '내 정보' },
 ]
 
-test.each(tabPages)('승인된 사람은 $entry 주소에서 틀 안의 $label 자리만 본다', async ({ entry, title, label }) => {
+test.each(tabPages)('승인된 사람은 $entry 주소에서 틀 안의 $label 화면을 본다', async ({ entry, title, label }) => {
   window.history.replaceState(null, '', entry)
-  vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/courses' ? { courses: [] } : path === '/api/roadmaps' ? { roadmaps: [] } : { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
   render(<App />)
   const heading = await screen.findByRole('heading', { level: 1, name: title })
   expect(screen.getByRole('main')).toContainElement(heading)
-  expect(screen.getByRole('main').textContent).toBe(title)
+  if (entry === '/courses' || entry === '/roadmaps') {
+    expect(await screen.findByText(entry === '/courses' ? '아직 만든 코스가 없어요' : '아직 만든 로드맵이 없어요')).toBeVisible()
+  } else expect(screen.getByRole('main').textContent).toBe(entry === '/' ? `${title}새로 배우기` : title)
   expect(screen.getByRole('banner')).toBeVisible()
   for (const navigation of screen.getAllByRole('navigation')) {
     expect(within(navigation).getByRole('link', { name: label })).toHaveAttribute('aria-current', 'page')
@@ -141,7 +141,7 @@ test.each(states.filter((state) => state.status !== 'APPROVED').flatMap((state) 
 
 test('홈에서 탭 링크로 다른 자리 화면을 열어도 계정 화면으로 되돌리지 않는다', async () => {
   window.history.replaceState(null, '', '/')
-  vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/courses' ? { courses: [] } : path === '/api/roadmaps' ? { roadmaps: [] } : { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
   render(<App />)
   await screen.findByRole('heading', { name: '머금' })
   for (const tab of tabPages.slice(1)) {
@@ -149,4 +149,50 @@ test('홈에서 탭 링크로 다른 자리 화면을 열어도 계정 화면으
     expect(await screen.findByRole('heading', { name: tab.title })).toBeVisible()
     await waitFor(() => expect(window.location.pathname).toBe(tab.entry))
   }
+})
+
+test('임시 홈의 입구에서 새로 배우기로 가고 받기 뒤 실제 기다리는 화면을 연다', async () => {
+  window.history.replaceState(null, '', '/')
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+    ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
+    : { id: 42, type: 'NEW_COURSE', status: 'QUEUED', subject: { topic: '자바', level: 'BEGINNER', purpose: 'WORK' } } })))))
+  render(<App />)
+  fireEvent.click(await screen.findByRole('link', { name: '새로 배우기' }))
+  await waitFor(() => {
+    expect(window.location.pathname).toBe('/new')
+    expect(screen.getByRole('heading', { name: '새로 배우기' })).toHaveFocus()
+  })
+  fireEvent.change(screen.getByRole('textbox', { name: '주제' }), { target: { value: '자바' } })
+  fireEvent.click(screen.getByRole('radio', { name: '처음 배워요' }))
+  fireEvent.click(screen.getByRole('radio', { name: '업무에 쓰려고요' }))
+  fireEvent.click(screen.getByRole('button', { name: '만들기' }))
+  expect(await screen.findByRole('heading', { name: '자바' })).toBeVisible()
+  await waitFor(() => expect(window.location.pathname).toBe('/jobs/42'))
+  expect(screen.getByRole('status')).toHaveTextContent('차례를 기다리고 있어요')
+  expect(fetch).toHaveBeenCalledWith('/api/jobs', expect.objectContaining({ method: 'POST' }))
+})
+
+test('코스 주소를 직접 열면 승인 뒤 실제 코스를 읽고 같은 주소에 표시한다', async () => {
+  window.history.replaceState(null, '', '/courses/31')
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+    ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
+    : { id: 31, status: 'REVIEWING', title: '자바 기초', lessons: [], progress: { completedLessons: 0, totalLessons: 0 } } })))))
+  render(<App />)
+  expect(await screen.findByRole('heading', { name: '자바 기초' })).toBeVisible()
+  expect(screen.getByText('검토 중')).toBeVisible()
+  expect(fetch).toHaveBeenCalledWith('/api/courses/31', expect.objectContaining({ method: 'GET' }))
+  await waitFor(() => expect(screen.getByRole('heading', { name: '코스' })).toHaveFocus())
+  expect(window.location.pathname).toBe('/courses/31')
+})
+
+
+test('로드맵 주소를 직접 열면 승인 뒤 실제 계획을 읽는다', async () => {
+  window.history.replaceState(null, '', '/roadmaps/41')
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+    ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
+    : { id: 41, status: 'REVIEWING', title: '자바 로드맵', description: '기초부터 실무까지', courses: [] } })))))
+  render(<App />)
+  expect(await screen.findByRole('heading', { name: '자바 로드맵' })).toBeVisible()
+  expect(fetch).toHaveBeenCalledWith('/api/roadmaps/41', expect.objectContaining({ method: 'GET' }))
+  await waitFor(() => expect(screen.getByRole('heading', { name: '로드맵' })).toHaveFocus())
 })

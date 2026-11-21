@@ -26,6 +26,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-session-jdbc'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.hibernate.orm:hibernate-vector'
+    implementation 'com.openai:openai-java:4.75.1'
     implementation 'org.springframework.boot:spring-boot-starter-flyway'
     implementation 'org.flywaydb:flyway-database-postgresql'
     runtimeOnly 'org.postgresql:postgresql'
@@ -57,12 +58,14 @@ tasks.withType(Test).configureEach {
     useJUnitPlatform()
     // 운영 컨테이너와 같은 UTC로 두어 한국 시간 머신에서도 기본 시간대에 기대는 코드 · 설정을 드러낸다.
     systemProperty 'user.timezone', 'UTC'
-    // 모든 SpringBootTest는 실제 Google 비밀 없이 main 설정을 그대로 읽는다.
+    // 모든 SpringBootTest는 실제 Google/OpenAI 비밀 없이 main 설정을 그대로 읽는다.
     systemProperties fakeGoogleCredentials
+    systemProperty 'OPENAI_API_KEY', 'test-only-openai-key'
 }
 
 tasks.named('test') {
     exclude 'com/mogum/AppImageTest.class'
+    exclude 'com/mogum/generation/llm/OpenAiLiveIntegrationTest.class'
     finalizedBy tasks.named('jacocoTestReport')
     inputs.dir('../deploy')
     inputs.dir('../.github/workflows')
@@ -97,5 +100,15 @@ tasks.register('imageTest', Test) {
     include 'com/mogum/AppImageTest.class'
     systemProperty 'appImage', suppliedAppImage.getOrElse(localAppImage)
     // 같은 태그의 이미지 내용이 바뀔 수 있으므로 매번 실제 컨테이너를 검사한다.
+    outputs.upToDateWhen { false }
+}
+
+// 실제 유료 호출과 키 읽기는 사람이 이 시험을 명시적으로 실행할 때만 한다.
+tasks.register('llmTest', Test) {
+    group = 'verification'
+    description = 'Calls OpenAI once with OPENAI_API_KEY; skips without a key (paid, excluded from test).'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    include 'com/mogum/generation/llm/OpenAiLiveIntegrationTest.class'
     outputs.upToDateWhen { false }
 }

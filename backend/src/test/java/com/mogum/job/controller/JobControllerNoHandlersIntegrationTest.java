@@ -12,7 +12,7 @@ import com.mogum.course.repository.LessonRepository;
 import com.mogum.course.repository.RoadmapRepository;
 import com.mogum.job.JobIntakeHandler;
 import com.mogum.job.domain.JobType;
-import com.mogum.support.NoJobHandlersIntegrationTest;
+import com.mogum.support.IntegrationTest;
 import com.mogum.support.TestRequests;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -26,7 +26,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@NoJobHandlersIntegrationTest
+@IntegrationTest
 class JobControllerNoHandlersIntegrationTest {
     @Autowired TestRequests testRequests;
     @Autowired UserRepository userRepository;
@@ -38,7 +38,7 @@ class JobControllerNoHandlersIntegrationTest {
     @Autowired ApplicationContext applicationContext;
 
     @ParameterizedTest(name = "종류={0}")
-    @EnumSource(JobType.class)
+    @EnumSource(value = JobType.class, names = "MATERIAL")
     @DisplayName("처리기가 없는 종류는 HTTP 받기를 거절하고 작업과 크레딧을 보존한다")
     void rejectsTypesWithoutHandlers(JobType type) {
         // given
@@ -64,7 +64,8 @@ class JobControllerNoHandlersIntegrationTest {
         var result = client.post().uri("/api/jobs").body(body).exchange();
 
         // then
-        assertThat(applicationContext.getBeansOfType(JobIntakeHandler.class)).isEmpty();
+        assertThat(applicationContext.getBeansOfType(JobIntakeHandler.class).values())
+                .noneMatch(handler -> handler.type() == type);
         result.expectStatus().isBadRequest().expectBody().json("""
                 {"code":"INVALID_REQUEST","message":"요청을 확인할 수 없습니다"}
                 """, JsonCompareMode.STRICT);

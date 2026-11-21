@@ -19,7 +19,7 @@ class DeployFilesTest {
     private static final Pattern VARIABLE = Pattern.compile("(?<!\\$)\\$\\{([A-Z][A-Z0-9_]*)(?::[^}]*)?}");
 
     private static final Set<String> OPERATING_VARIABLES = Set.of("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
-            "GOOGLE_REDIRECT_URI", "APP_WEB_ORIGIN", "APP_WEB_COOKIE_DOMAIN");
+            "GOOGLE_REDIRECT_URI", "APP_WEB_ORIGIN", "APP_WEB_COOKIE_DOMAIN", "OPENAI_API_KEY");
 
     @Test
     @DisplayName("운영은 mogum 프로젝트의 세 서비스이고 이미지는 필수 지문 변수다")

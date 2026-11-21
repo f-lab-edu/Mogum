@@ -21,7 +21,7 @@ services:
   backend:
     build: ./backend
     env_file:
-      - path: .env                  # GOOGLE_CLIENT_ID · GOOGLE_CLIENT_SECRET 등 — .env.example 참고. 없으면 서버가 기동을 거부한다
+      - path: .env                  # GOOGLE_CLIENT_ID · GOOGLE_CLIENT_SECRET · OPENAI_API_KEY 등 — .env.example 참고. 없으면 서버가 기동을 거부한다
         required: false
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/mogum   # 컨테이너 안의 localhost 는 자기 자신이다

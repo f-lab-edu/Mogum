@@ -36,14 +36,21 @@
 
 ## 2. LLM 스텁
 
+- `7-course-planning` step 1의 `generation.llm.FakeOpenAiServer`는 테스트 안의 JDK `HttpServer`다. 실제 SDK 4.75.1이 보내는 경로 · 인증 · 모델 · 출력 상한 · reasoning effort · 메시지 역할과 이어 쓰기를 검사한다. 500 · 429 · 시간 초과에서도 요청 수가 한 번인지 확인한다. `ChatCallIntegrationTest`는 호출 전 기록의 커밋 · 트랜잭션과 연결 반환 · 호출별 결과/토큰/비용 · 해석 실패의 마지막 기록 · 원문 로그 부재를 확인한다.
+- 실제 OpenAI 시험 `OpenAiLiveIntegrationTest`는 기본 `test`에서 제외한다. `./backend/gradlew -p backend llmTest`만 실행하며 `OPENAI_API_KEY` 환경 변수가 없거나 공백이면 건너뛴다. 짧은 요청 한 번의 끝남 · 사용량 · 호출 기록을 본다. 유료 호출이며 step 1에서는 실행하지 않았다.
+
 - 생성은 서버가 정한 순서대로 부르므로(ADR-118) 스텁으로 흐름 전체를 시험한다 — 실제 LLM 은 부르지 않는다.
 - 흉내 낼 것 — 정상 응답 · 일시적 실패 · 형식 불합격 · 잘린 출력(이어 쓰기) · 다시 해도 같은 실패(ADR-127).
     - 만드는 작업 TASK 는 테스트 전용 처리기로 정상 · 일시적 실패 · 형식 불합격 · 다시 해도 같은 실패(거절 · 입력이 너무 큼) · 오래 걸림(시한 · 정상 종료 시험)을 흉내 낸다. 잘린 출력(이어 쓰기)은 LLM 호출 안의 일이라, 그 호출을 만드는 강의 목록 TASK 가 LLM 스텁으로 흉내 낸다(README 2026-11-15).
-- `6-job-worker` step 4의 주입: 공용 `support.IntegrationTestConfiguration.JobGenerators`가 여섯 종류의 중첩 static `TestJobGenerator` 빈을 올린다. `@IntegrationTest`에서 `List<JobGenerator>`를 주입받아 종류별로 고르고 `plan(jobId)`로 작업마다 설정한다. 클래스별 `@Import`는 더하지 않는다. `reset()`으로 계획과 호출 기록을 비운다.
-    - 기본은 즉시 성공이다. `plan(id).fail(GenerationOutcome.Failure, N)`은 앞 N번을 그 실패로 돌려준 뒤 성공한다. 거절 · 입력이 너무 큼도 이 방식으로 정하며 워커가 한 번만 부르는지 본다.
-    - `plan(id).holdFirst()`는 첫 호출을 `awaitEntered()`로 관찰하고 `release()`할 때까지 붙잡는다(미해제 시험은 15초에 끝낸다). 같은 작업의 두 번째 호출은 기다리지 않아 되찾은 새 워커와 늦은 옛 워커를 따로 끝낼 수 있다. 시한 지남은 `TestClock.advance`로 만들고, 갱신 예약의 실행만 짧은 간격과 Awaitility로 기다린다. 응답 시간 확률 분포는 두지 않는다.
-    - `calls()` · `saves()` · `snapshots()`로 호출을 확인한다. `outsideTransaction()`은 만들기 중 트랜잭션과 바인딩된 EntityManager가 없는지, `mdc()`는 실행 중 키를 확인한다. `failSave(marker)`는 실제 결과 행을 만든 뒤 cause · suppressed에도 표식을 넣어 예외를 내며, `failSave(null)`로 해제한다. 결과 트랜잭션의 롤백과 안전한 스택 출력을 시험한다.
-    - 스텁 `save`는 실제 코스 · 로드맵 · 강의 · 강의 자료를 만들거나 대상 상태를 바꾼다. `JobRunnerIntegrationTest`는 `JobRunner`를 직접 구성해 `runOnce()`를 부른다. `6-job-worker` step 5부터 공용 컨텍스트에 수명 관리 빈을 조립하되 워커 수는 0으로 적용해 자동 실행을 끈다. `WorkerLifecycleIntegrationTest`는 직접 만든 수명 객체로 긴 시도 · 정상 종료 · 동시 실행을 제어한다. 운영용 생성 처리기는 없다.
+- `7-course-planning` step 3부터 공용 `support.IntegrationTestConfiguration`은 테스트 받기 · 생성 처리기를 빈으로 올리지 않는다. 공용 컨텍스트는 운영 처리기를 그대로 쓴다. 별도 「처리기 없는 구성」 묶음과 `test.job-intake-handlers` 속성은 제거했다. `JobControllerNoHandlersIntegrationTest`는 같은 컨텍스트에서 아직 운영 처리기가 없는 종류의 거절과 DB 보존을 본다.
+- 운영 생성 흐름에서는 공용 설정의 중첩 static `TestChatProvider`를 `@Primary` 빈으로 등록해 `ChatProvider` 경계만 바꾼다. 실제 `ChatCall` · 이어 쓰기 · 형식 검사 · 호출 기록 · 생성 처리기 · 저장 · `JobRunner.runOnce()`가 돈다.
+    - `TestChatProvider`를 주입받아 `reset()`으로 설정과 관찰을 비운 뒤 쓴다. `reply(jobId, Reply...)`는 `Request.jobId`별 응답을 순서대로 소모하며, 끝나면 종류(`Request.jobType`)에 맞는 정상 기본 응답을 준다. `defaultText(type)`는 새 코스의 두 강의 또는 새 로드맵의 두 코스 JSON이다. step 4의 `PLAN_ROADMAP_COURSE`와 step 5의 `REPLAN_COURSE`는 제목 없이 두 강의 JSON을 주며, `REPLAN_ROADMAP`은 새 로드맵과 같은 형식의 두 코스 JSON을 준다.
+    - `success(text)` · `failure(GenerationOutcome.Failure)`로 정상 · 형식 불합격 원문 · 일시적 실패 · 거절 · 입력 초과를 정한다. 잘림은 `Reply(앞부분, TRUNCATED, null, usage)` 다음에 `success(뒷부분)`을 넣는다. `requests(jobId)`로 시도 · 이어 쓰기의 작업 문맥과 메시지를, `outsideTransaction(jobId)`로 트랜잭션과 바인딩된 EntityManager 부재를 본다. 응답 시간 확률 분포는 두지 않는다.
+- 틀 시험은 빈 대신 `new IntegrationTestConfiguration.FrameworkJobs(applicationContext)`를 직접 구성한다. `jobIntakeService`는 여섯 `TestJobIntakeHandler`를 받은 실제 서비스에 애노테이션 기반 트랜잭션 프록시를 직접 씌운 객체다. `generators`는 여섯 `TestJobGenerator` 객체 목록이며, 직접 만드는 `JobRunner` · `WorkerLifecycle`에 넘긴다. 클래스별 `@Import`는 더하지 않는다. 받기 · 워커 · 수명 시험은 운영 처리기가 늘어도 이 목록을 쓴다. 읽기 · HTTP 시험은 직접 저장한 작업 픽스처 또는 새로 배우기 운영 받기를 사용한다.
+    - `TestJobGenerator.plan(jobId)`의 기본은 즉시 성공이다. `fail(GenerationOutcome.Failure, N)`은 앞 N번을 그 실패로 돌려준 뒤 성공한다. `reset()`으로 계획과 관찰을 비울 수 있고, 틀 시험은 테스트마다 새 객체를 만든다.
+    - `holdFirst()`는 첫 호출을 `awaitEntered()`로 관찰하고 `release()`할 때까지 붙잡는다(미해제 시험은 15초에 끝낸다). 같은 작업의 두 번째 호출은 기다리지 않아 되찾은 새 워커와 늦은 옛 워커를 따로 끝낼 수 있다. 시한 지남은 `TestClock.advance`로 만들고, 갱신 예약의 실행만 짧은 간격과 Awaitility로 기다린다.
+    - `calls()` · `saves()` · `snapshots()`로 호출을 확인한다. `outsideTransaction()`은 만들기 중 트랜잭션과 바인딩된 EntityManager 부재를, `mdc()`는 실행 중 키를 확인한다. `failSave(marker)`는 실제 결과 행을 만든 뒤 cause · suppressed에도 표식을 넣어 예외를 내며, `failSave(null)`로 해제한다. 결과 트랜잭션의 롤백과 안전한 스택 출력을 시험한다.
+    - 스텁 `save`는 실제 코스 · 로드맵 · 강의 · 강의 자료를 만들거나 대상 상태를 바꾼다. 공용 수명 관리 빈은 워커 수 0으로 자동 실행을 끈다. `WorkerLifecycleIntegrationTest`는 직접 만든 수명 객체로 긴 시도 · 정상 종료 · 동시 실행을 제어한다.
 
 ## 3. 공개 전 품질 점검
 
@@ -62,6 +69,6 @@
 
 | 것 | 근거 |
 |---|---|
-| 만드는 작업의 스텁 주입과 수동 대기는 §2에 구현했다. 실제 LLM 스텁의 응답 시간 분포 · 이어 쓰기 응답 모양은 강의 목록 TASK에서 정한다 | ADR-118 |
+| 만드는 작업의 스텁 직접 구성 · 수동 대기와 LLM 어댑터 스텁의 작업별 응답 · 이어 쓰기는 §2에 구현했다. 응답 시간 확률 분포는 두지 않는다 | ADR-118 |
 | 품질 점검의 방식 · 기준 · 표본 수 · 통과선 | ADR-067 |
 | 서버마다 워커 수는 `6-job-worker` step 5에서 임시 값으로 정했다(설정 · 값은 [04 §10](./04-jobs-and-cost.md#10-아직-정하지-않은-값)). 실제 운영 수는 용량을 재 보고 정한다 | ADR-105 |

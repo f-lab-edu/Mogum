@@ -75,6 +75,12 @@
 | `Button` · [components/Button.tsx](../frontend/src/components/Button.tsx) | 기본 `variant="primary"`는 보라·흰색 굵은 글자·4px 아래 두께. hover는 진한 보라, 누르면 3px 내려가 두께가 1px. `variant="secondary"`는 보조 동작용으로 안내 바탕·보조 글자·옅은 테두리이며 hover는 `surface-muted`, 아래 두께는 없다. 둘 다 최소 높이 52px·가로 여백 24px·세로 여백 12px·16px 모서리. `disabled`는 옅은 바탕·보조 글자·그림자 없음·클릭 차단·눌림 없음. `focus-visible`은 보라 2px outline과 2px offset. 기본 `type="button"`, 네이티브 버튼 속성을 전달한다. 신청·다시 시도는 기본형, 계정 전환·로그아웃은 보조형을 쓴다. |
 | `AccountIdentity` · [components/AccountIdentity.tsx](../frontend/src/components/AccountIdentity.tsx) | 신청·승인 대기·거절됨에서 공유하는 「신청 계정」 영역. 안내 바탕·옅은 테두리·16px 모서리·안쪽 여백 16px. 이름과 구글 이메일을 `dl`로 세로 표시한다. 긴 값은 자르지 않고 줄바꿈하며 사진·입력 칸은 없다. |
 | `FailureNotice` · [components/FailureNotice.tsx](../frontend/src/components/FailureNotice.tsx) | 무엇이 안 됐는지·안내·전달받은 동작을 함께 담는 `role="alert"` 영역. 안내 바탕·옅은 테두리·16px 모서리·안쪽 여백 16px·요소 사이 12px. 제목은 굵은 오류색, 안내는 작은 본문이며 동작은 공통 `Button`·링크를 쓴다. |
+| `TextField` · [components/TextField.tsx](../frontend/src/components/TextField.tsx) | 한 줄 글 입력·`multiline`이면 4줄 높이의 여러 줄 입력. 굵은 이름과 필수/선택 표시 → 입력 → 선택적인 길이 안내 → 칸 오류 순서. 흰 면·옅은 테두리·16px 모서리·최소 높이 52px·가로 여백 16px·세로 여백 12px. `value`·`onChange`·`required`·`disabled`·`maxCodePoints`·`error`를 받는다. `maxCodePoints`가 있으면 유니코드 코드 포인트 수를 `현재 / 상한자`로 표시하고 초과 시 오류를 알린다. UTF-16 단위인 HTML `maxlength`로 자르지 않는다. 오류는 붉은 테두리·`aria-invalid`·`aria-describedby`로 연결하고, 잠금은 옅은 바탕·보조 글자·네이티브 disabled. 키보드 포커스는 공통 2px 보라 outline·2px offset. |
+| `ChoiceGroup` · [components/ChoiceGroup.tsx](../frontend/src/components/ChoiceGroup.tsx) | 이름·필수/선택 표시와 나란한 선택 버튼 묶음. 모바일 2열·640px부터 4열, 간격 12px. 흰 면·옅은 테두리·16px 모서리·최소 높이 52px·안쪽 여백 가로 16px/세로 12px. 선택은 안내 바탕·보라 글자/테두리/2px ring·채운 원 표시로 구분한다. 미선택은 빈 원, hover는 안내 바탕. `options`·`value`·`onChange`·`required`·`disabled`·`error`를 받으며 기본 선택을 만들지 않는다. 네이티브 radio와 같은 name, 이름 있는 `fieldset role="radiogroup"`으로 단일 선택·키보드 이동을 지원한다. 포커스는 버튼 모양 영역에 공통 outline, 잠금은 네이티브 disabled·옅은 바탕·보조 글자, 오류는 묶음에 `aria-invalid`·`aria-describedby`로 연결한다. |
+| `CheckboxField` · [components/CheckboxField.tsx](../frontend/src/components/CheckboxField.tsx) | 안내 바탕·옅은 테두리·16px 모서리·안쪽 여백 16px. 24px 네이티브 checkbox와 굵은 이름은 최소 높이 44px의 클릭 영역, 선택적 `description`은 그 아래 작은 보조 글자·12px 간격이며 `aria-describedby`로 연결한다. `checked`·`onChange`·`disabled`를 받는다. 선택은 기존 `primary` accent, 키보드 포커스는 공통 outline, 잠금은 네이티브 disabled. |
+| `FieldError` · [components/FieldError.tsx](../frontend/src/components/FieldError.tsx) | 작은 오류색 글자·`role="alert"`. 서버 `fields`의 칸별 `reason`에는 별도 문구가 없으므로 `REQUIRED`는 「필수 입력이에요.」, `TOO_LONG`은 「글자 수 상한을 넘었어요.」, `INVALID_VALUE`는 「보기에서 골라 주세요.」, `NOT_ALLOWED`는 「이 칸은 비워 주세요.」로 설명한다. 모르는 reason은 「입력을 확인해 주세요.」이며 원래 code/reason은 노출하지 않는다. 오류 응답의 `message`는 `FailureNotice`에서 원문 그대로 함께 보인다. |
+| `StatusBadge` · [components/StatusBadge.tsx](../frontend/src/components/StatusBadge.tsx) | 상태 글을 `children`으로 받는 공통 표시. 안내 바탕·보라색 작은 굵은 글자·16px 모서리·가로 여백 12px/세로 4px. 색과 함께 상태 이름을 항상 보인다. 코스 화면·코스 탭은 검토 중·학습 중·다 마침, 로드맵 화면은 로드맵 상태와 코스별 짜기 전·만드는 중·실패·만들어짐을 같은 모양으로 표시한다. |
+| `ProgressBar` · [components/ProgressBar.tsx](../frontend/src/components/ProgressBar.tsx) | `label`·`completed`·`total`을 받는다. 굵은 이름과 보라색 `완료 수 / 전체` 글 아래 12px 높이·16px 모서리의 옅은 바탕에 실제 비율만큼 보라색을 채운다. 이름·최솟값 0·현재값·전체를 `role="progressbar"`의 ARIA 속성으로 연결한다. 전체가 0이면 채우지 않는다. 코스 화면·로드맵 화면에서 실제 학습 진도에만 쓴다. |
 
 각 컴포넌트는 같은 폴더의 `{이름}.test.tsx`에 짝 테스트가 있다. `Mogumi`의 공통 크기는 §7을 따른다.
 
@@ -94,18 +100,21 @@ Google 링크는 기존 Roboto 500·44px 높이·흰 바탕·1px 테두리·4px 
 | `/apply` | 신청 · `NOT_APPLIED` |
 | `/waiting-approval` | 승인 대기 · `APPLIED` |
 | `/rejected` | 거절됨 · `REJECTED` |
-| `/` | `APPROVED`의 홈 자리(`PlaceholderPage`, 제목 「머금」). 처음 열리는 탭 |
-| `/courses` | `APPROVED`의 코스 탭 자리 |
-| `/roadmaps` | `APPROVED`의 로드맵 탭 자리 |
+| `/` | `APPROVED`의 홈 자리(`PlaceholderPage`, 제목 「머금」). 처음 열리는 탭. 「새로 배우기」 링크 하나로 `/new`에 진입 |
+| `/new` | `APPROVED`의 새로 배우기(`NewLearningPage`). 위 바 제목 「새로 배우기」·뒤로 가기. 받기 성공 시 `/jobs/{id}`로 이동 |
+| `/courses` | `APPROVED`의 코스 탭(`CoursesPage`). 제목·상태의 목록 행에서 코스 화면으로 이동(§11) |
+| `/roadmaps` | `APPROVED`의 로드맵 탭(`RoadmapsPage`). 제목·설명·진행 한 줄의 목록 행에서 로드맵 화면으로 이동(§11) |
 | `/review` | `APPROVED`의 복습 탭 자리 |
 | `/profile` | `APPROVED`의 내 정보 탭 자리 |
 | `/jobs/:jobId` | `APPROVED`의 기다리는 화면. 위 바 제목 「기다리는 화면」·뒤로 가기 |
-| `/courses/:courseId` | 성공 결과의 코스 자리. 위 바 제목 「코스」·뒤로 가기만 표시 |
-| `/roadmaps/:roadmapId` | 성공 결과의 로드맵 자리. 위 바 제목 「로드맵」·뒤로 가기만 표시 |
+| `/courses/:courseId` | `APPROVED`의 코스 화면(`CoursePage`). 위 바 제목 「코스」·뒤로 가기. 검토 중·학습 중·다 마침을 같은 주소에서 표시(§9) |
+| `/roadmaps/:roadmapId` | `APPROVED`의 로드맵 화면(`RoadmapPage`). 위 바 제목 「로드맵」·뒤로 가기. 검토 중·진행 중·다 마침을 같은 주소에서 표시(§10) |
 | `/courses/:courseId/lessons/:lessonId` | 성공 결과의 강의 자리. 위 바 제목 「강의」·뒤로 가기만 표시 |
 | `/privacy` | 개인정보처리방침 자리. 로그인·상태 읽기 없이 제목·준비 중·돌아가기만 표시 |
 
 계정 화면 세 개는 [AccountPage.tsx](../frontend/src/pages/AccountPage.tsx)에서 상태별로 구성한다. `/`와 계정 주소를 열 때 「나」를 읽어 현재 상태의 주소로 보낸다. 모르는 상태는 기존 불러오기 실패·다시 시도로 처리하며 값을 노출하지 않는다. 승인 대기에 폴링·새로고침 버튼을 두지 않는다. `ACCOUNT_NOT_APPROVED`를 받으면 「나」를 다시 읽어 현재 상태를 반영한다.
+
+새로 배우기는 [NewLearningPage.tsx](../frontend/src/pages/NewLearningPage.tsx)에서 안내·모구미 묶음 → 흰 입력 면 순서로 구성한다. 입력 면은 24px 모서리·옅은 테두리·안쪽 여백 24px(640px부터 32px), 입력 묶음 간격 32px이며 §3의 공통 컴포넌트를 쓴다. 내용과 보기는 [06 §5](./06-screens.md#5-새로-배우기) · [03 §1.2](./03-generation.md#12-입력--새로-배우기), 길이와 보내는 칸은 [05 §2](./05-api.md#2-만드는-작업--받기-하나--다시-읽기)를 따른다. 필수 입력과 길이 상한을 만족해야 만들기를 누를 수 있다. 요청 중 입력·선택·만들기를 잠그고, 같은 순간의 중복 제출도 한 번만 보낸다. [useJob.ts](../frontend/src/api/useJob.ts)의 `receiveJob(NewLearningRequest)`가 공통 `apiFetch`로 받기를 보내며 자동 재시도하지 않는다. 실패하면 `FailureNotice`에 서버 문구 원문과 재제출 안내를 보이고, 입력·선택을 보존하며 만들기를 다시 누를 수 있다. 새 토큰은 추가하지 않았다.
 
 시안의 핵심 순서를 맞춰 모구미·제목 → 계정 → 저장 정보 안내 → 신청·계정 전환으로 구성한다. 승인 대기는 제목 뒤에 알림 없음 안내를 먼저 두고, 계정 → 삭제 요청 안내 → 처리방침·로그아웃으로 이어진다. 거절됨은 제목 → 계정 → 남은 정보·삭제 요청 안내 → 처리방침·로그아웃 순서다. 처리방침 링크는 안내 영역에 두며 보라 글자·밑줄·최소 높이 44px·공통 포커스 outline을 쓴다. 처리방침의 돌아가기는 `/`에서 현재 상태를 다시 읽는 방식이다.
 
@@ -124,11 +133,11 @@ sips -Z 384 docs/design/assets/mogumi-reading.png --out frontend/src/assets/mogu
 
 ## 6. 아직 정하지 않은 것 — 처음 쓰는 TASK가 정한다
 
-홈 배치·공통 카드·배지·진도 막대·확인 펼침·추가 버튼 모양·애니메이션은 처음 필요한 TASK에서 정한다. 지금의 중앙 면과 안내 문단을 미리 카드 컴포넌트로 만들지 않는다. 다크 모드는 미정 항목이 아니라 MVP에서 제외한 기능이다(ADR-064).
+홈 배치·공통 카드·확인 펼침·추가 버튼 모양·애니메이션은 처음 필요한 TASK에서 정한다. 상태 표시·진도 막대는 `7-course-planning` step 8에서 §3의 공통 컴포넌트로 정했다. 글 입력·여러 줄 입력·선택 버튼 묶음·체크·칸 오류는 `7-course-planning` step 7에서 §3의 공통 컴포넌트로 정했다. 지금의 중앙 면과 안내 문단을 미리 카드 컴포넌트로 만들지 않는다. 다크 모드는 미정 항목이 아니라 MVP에서 제외한 기능이다(ADR-064).
 
 ## 7. 승인 뒤 화면의 틀
 
-`6-job-worker` step 6에서 정한다. 주소는 §4.1, 화면 구분과 탭 순서는 [06 §2.1~2.3](./06-screens.md#21-형태와-모양의-원칙)을 따른다. 다섯 탭은 모두 제목 한 줄의 자리이며 내용은 해당 TASK에서 채운다.
+`6-job-worker` step 6에서 정한다. 주소는 §4.1, 화면 구분과 탭 순서는 [06 §2.1~2.3](./06-screens.md#21-형태와-모양의-원칙)을 따른다. 홈·복습·내 정보는 제목 한 줄의 자리이며, 홈에는 `7-course-planning` step 7에서 새로 배우기 입구 하나를 더했다. 코스·로드맵 탭은 같은 TASK의 step 9에서 §11의 목록으로 채웠다. 나머지 내용은 해당 TASK에서 채운다.
 
 | 이름 · 경로 | 모양 · 동작 · 상태 |
 |---|---|
@@ -139,7 +148,7 @@ sips -Z 384 docs/design/assets/mogumi-reading.png --out frontend/src/assets/mogu
 | 위 바 · `AppLayout` 안 | 높이 56px·흰 면·아래 테두리·스크롤 위에 붙는 바. 기본(탭 첫 화면)은 40px 모구미와 「머금」 로고. 1024px 부터 로고는 사이드바에만 둔다. 화면이 `title`을 넘기면 뒤로 가기 버튼과 해당 제목(`h1`)을 보인다. 뒤로 가기는 `navigate(-1)`로 브라우저의 이전 화면으로 간다. 버튼은 최소 44×44px·공통 포커스 outline. 제목은 진입 시 포커스를 받고 문서 제목을 `제목 · 머금`으로 바꾼다. |
 | 탭 아이콘 · `AppLayout` 안 | [guide §3](./design/guide.md#3-표준-내비게이션-5대-탭-아이콘-navigation-icons)의 홈·학사모·경로 노드·카드 덱·프로필 인라인 SVG를 그대로 사용한다. 24×24px·`currentColor`·선 두께 2, `aria-hidden`·`focusable="false"`로 장식 처리하며 접근 가능한 이름은 링크의 글자다. 아이콘 라이브러리는 없다. |
 | `Mogumi` · [components/Mogumi.tsx](../frontend/src/components/Mogumi.tsx) | 기본 `size="page"`는 기존 128px·가운데 정렬. `size="logo"`는 위 바·사이드바의 40px 표시다. 같은 로컬 사본·대체 글·원래 비율을 유지한다. |
-| `PlaceholderPage` · [pages/PlaceholderPage.tsx](../frontend/src/pages/PlaceholderPage.tsx) | 제목만 제공하며 `main`을 중복하지 않는다. 기본 홈 제목은 「머금」·문서 제목은 「홈 · 머금」, 다른 탭은 `title`을 받는다. 제목 진입·변경 시 포커스와 문서 제목을 갱신한다. |
+| `PlaceholderPage` · [pages/PlaceholderPage.tsx](../frontend/src/pages/PlaceholderPage.tsx) | `main`을 중복하지 않는다. 기본 홈 제목은 「머금」·문서 제목은 「홈 · 머금」, 제목 아래 24px 간격으로 「새로 배우기」 링크 하나를 둔다. 링크는 기본 Button과 같은 토큰·모양·포커스·눌림 효과를 쓴다. 다른 탭은 `title`을 받고 제목만 보인다. 제목 진입·변경 시 포커스와 문서 제목을 갱신한다. |
 
 뒤 TASK의 탭에서 들어간 화면은 `RequireAuth` 아래에서 `<AppLayout title="기다리는 화면">…본문…</AppLayout>`처럼 사용한다. 탭 첫 화면은 `title` 없이 감싸고 본문에서 제목을 제공한다. 승인 전 화면과 처리방침은 기존 `AccountLayout`을 유지한다.
 
@@ -162,3 +171,50 @@ sips -Z 384 docs/design/assets/mogumi-reading.png --out frontend/src/assets/mogu
 다시 시도·버리기 요청 중에는 두 버튼을 잠근다. 동작 실패는 별도 `FailureNotice`에서 무엇이 안 됐는지와 서버 문구(연결 실패는 공통 안내)를 보이고 원래 동작을 다시 할 수 있다. 버리기 성공은 현재 홈으로 이동하며, 종류별 돌아갈 화면은 뒤 TASK에서 연결한다. 같은 작업 주소의 ID가 바뀌면 동작 상태도 새로 시작한다. API 훅 [useJob.ts](../frontend/src/api/useJob.ts)는 공통 `apiFetch`를 쓰고, 동작 성공 시 진행 중인 읽기를 취소한 뒤 해당 작업 캐시를 교체하거나 지운다. 읽기 오류 뒤에는 수동으로 다시 읽을 수 있으며, 창 포커스·재연결로 따로 읽지 않는다.
 
 진행 단계·퍼센트·남은 시간·대기 순서·오래 걸릴 때 안내·기다리는 동안 복습·결과 자리·취소·크레딧·운영 정보는 두지 않는다. 모르는 응답 칸과 값은 화면에 그대로 내보내지 않는다. 위 바 제목의 포커스·문서 제목은 `AppLayout`이 관리하며, 성공 이동·뒤로 가기·폴링 중단/재개·버튼 잠금·확장 응답·실패 안내는 API 대역과 가짜 타이머로 시험한다.
+
+## 9. 코스 화면
+
+`7-course-planning` step 8의 [CoursePage.tsx](../frontend/src/pages/CoursePage.tsx)는 §7의 `AppLayout` 안에서 [06 §7](./06-screens.md#7-코스-화면)의 상태별 내용을 표시한다. 시안의 제목 영역 → 상태별 주요 안내·동작 → 강의 목록 순서다. 영역 사이 간격은 24px, 흰 면은 24px 모서리·옅은 테두리·안쪽 여백 24px(640px부터 32px)이며 새 토큰은 추가하지 않았다. 제목은 24px·800 굵기이고, 제목 영역에는 §3의 상태 표시와 책 읽기 모구미 사본을 쓴다. 모바일에서는 세로로, 640px부터 제목과 모구미를 나란히 둔다. 다 마침은 모구미를 앞에 두며 모바일에서는 가운데 정렬한다.
+
+| 상태 | 구성 |
+|---|---|
+| 검토 중 | 제목 영역 → 강의를 아직 열 수 없다는 안내와 다시 짜기(보조형)·이대로 시작(기본형) → 강의 목록. 다시 짜기 입력은 같은 안내 영역 안에 펼친다. |
+| 학습 중 | 제목 영역 안의 진도 막대 → 보라색 면·흰 글자·굵은 제목으로 강조한 다음에 열 강의 → 강의 목록. 다음 강의의 목록 행도 보라 테두리로 구분한다. |
+| 다 마침 | 제목 영역에 완료 안내·`Asia/Seoul`의 한국 날짜·로드맵 코스일 때만 로드맵 화면 링크 → 강의 목록. |
+| 짜기 전 | 코스 내용 대신 소속 로드맵 화면으로 가는 링크만 제공한다. |
+| 읽는 중·읽기 실패 | 읽는 중 한 줄은 `role="status"`. 404·연결 실패·모르는 상태는 `FailureNotice`에 읽지 못한 것·서버 문구(연결 실패는 공통 안내)·다시 시도·홈으로를 표시한다. |
+
+강의 목록은 이름 있는 `ol`이며 각 행은 순서·제목 → 한 줄 설명 → 다룰 개념의 이름·정의 순서다. 행은 흰 면·24px 모서리·옅은 테두리·24px 여백(640px부터 32px), 행 사이 16px 간격이다. 개념은 안내 바탕·16px 모서리·작은 글자이며 완료한 강의는 「학습 완료」로 표시한다. 강의 줄과 다음 강의 영역에는 이동 동작을 연결하지 않았다. 강의 열기는 강의 자료 TASK에서 연결한다.
+
+코스 제목 고치기는 §3의 `TextField`와 저장·취소 버튼을 제목 영역에 펼친다. 편집 중에는 「코스 제목 고치기」 버튼을 비활성화해 입력을 보존하고, 취소·저장 성공으로 닫으면 다시 활성화한다. 보이는 이름만 바뀐다고 안내하며 공백·100 코드 포인트 초과는 저장을 막고 서버의 `title` 칸 오류는 해당 입력과 연결한다. 다시 짜기는 선택적인 「고칠 점」 여러 줄 입력·500 코드 포인트 길이 안내·요청·취소 버튼을 펼친다. 펼침 버튼의 `aria-expanded`는 펼침 상태와 맞추고, `aria-controls`는 입력이 펼쳐져 DOM에 있을 때만 붙인다. 두 펼침은 입력으로 포커스를 옮기며, 제목 저장·취소와 다시 짜기 취소는 원래 버튼으로 돌아간다. 요청 중에는 화면의 입력·동작 버튼을 잠그고 같은 순간의 중복 제출도 막는다. 실패하면 서버 문구 원문과 다시 누를 동작을 알리고 입력을 보존한다.
+
+[api/useCourse.ts](../frontend/src/api/useCourse.ts)의 `readCourse`·`startCourse`·`updateCourseTitle`은 공통 `apiFetch`를 쓰며, `useCourse`는 코스 하나를 `['courses', courseId]`에 캐시한다. 시작·제목 고치기의 `useCourseAction`은 성공 뒤 진행 중인 읽기를 취소하고 응답 전체로 같은 코스 캐시를 바꾼다. 시작해도 주소를 유지하고 1강을 열지 않는다. 다시 짜기는 [api/useJob.ts](../frontend/src/api/useJob.ts)의 `receiveJob(ReplanCourseRequest)`로 `REPLAN_COURSE`·`courseId`·선택 `feedback`만 보내며, 빈 피드백은 생략하고 서버가 반환한 작업의 `/jobs/{id}`로 이동한다. 이미 있는 작업을 반환해도 같은 경로다. 읽기·쓰기는 자동 재시도하지 않으며, 읽기 실패는 다시 시도 버튼으로 다시 읽는다.
+
+상태별 내용·시작 후 같은 화면 유지·다시 짜기 본문과 이동·버튼 잠금·제목 저장/칸 오류·한국 날짜·조건부 로드맵 링크·강의 줄 이동 부재·금지 정보 부재를 API 대역으로 시험한다. 포커스와 효과 결과는 `waitFor` 안에서 확인한다. 브라우저에서 실제 너비별 렌더링을 검증한 것으로 보지는 않는다.
+
+## 10. 로드맵 화면
+
+`7-course-planning` step 9의 [RoadmapPage.tsx](../frontend/src/pages/RoadmapPage.tsx)는 §7의 `AppLayout` 안에서 [06 §8](./06-screens.md#8-로드맵-화면)의 상태별 내용을 표시한다. 제목·설명·모구미 영역 → 검토 동작(검토 중만) → 로드맵 계획 순서다. 제목 영역·코스 행은 흰 면·24px 모서리·옅은 테두리·안쪽 여백 24px(640px부터 32px)이며 영역 사이 24px, 코스 행 사이 16px 간격이다. 제목은 24px·800 굵기다. 새 공통 컴포넌트·토큰 없이 §3의 `StatusBadge`·`ProgressBar`·`TextField`·`Button`·`FailureNotice`와 모구미 사본을 재사용한다.
+
+| 상태 | 구성·동작 |
+|---|---|
+| 검토 중 | 로드맵 상태·제목·설명 다음에 보조형 다시 짜기·기본형 이대로 시작. 시작은 순서 1의 코스를 받으며, 다시 짜기는 선택적인 고칠 점 여러 줄 입력·500 코드 포인트 안내·요청·취소를 펼친다. 두 받기 모두 성공하면 반환된 작업의 `/jobs/{id}`로 이동한다. |
+| 진행 중 | 제목 영역 아래 `ProgressBar`로 마친 코스 수 / 전체 코스 수를 표시한다. 계획의 각 행에는 서버 진행 값에 대응하는 §3의 상태 표시를 쓰고, 만들어진 코스는 검토 중·학습 중·다 마침도 글로 보인다. 만들어짐은 코스 화면, 만드는 중·실패는 서버가 준 작업 ID의 기다리는 화면으로 가는 링크를 둔다. |
+| 다 마침 | 진행 중과 같은 계획·진행 표시와 모든 코스를 마쳤다는 안내. 다음 코스 만들기는 없다. |
+| 읽는 중·읽기 실패 | 읽는 중 한 줄은 `role="status"`. 404·연결 실패·모르는 상태는 `FailureNotice`에 서버 문구(연결 실패는 공통 안내)·다시 시도·홈으로를 표시한다. |
+
+계획은 이름 있는 `ol`에 왼쪽 2px 연결선·16px 안쪽 여백(640px부터 24px)을 두어 순서를 보인다. 행은 진행 상태 → 순서·코스 제목 → 설명 → 개념의 이름·정의 → 동작 순서다. 짜기 전은 다른 진행과 같은 `StatusBadge`의 「짜기 전」으로 표시하고 이동 링크를 두지 않는다. 학습 중 코스와 서버가 지정한 다음 코스의 행은 보라 테두리로 강조한다. `nextCourse`가 있으면 해당 행에 기본형 「다음 코스 만들기」를 두고, `enabled: false`이면 잠금 안내를 `aria-describedby`로 연결한다. 활성화되면 서버가 준 코스를 받아 기다리는 화면으로 이동한다. 다음 코스의 자격을 화면에서 다시 계산하지 않는다. 완료 비율의 숫자·진도율 문구는 추가하지 않는다.
+
+검토 중에만 코스 제목 고치기를 각 행에 펼친다. 공백·100 코드 포인트 초과는 저장을 막고 보이는 이름만 바뀐다고 안내한다. 서버 칸 오류는 입력과 연결하며 실패 문구와 입력을 보존한다. 제목·피드백 펼침은 입력으로 포커스를 옮기고, 제목 저장·취소와 다시 짜기 취소는 원래 버튼으로 돌아간다. 요청 중에는 입력·동작 버튼을 잠그고 같은 순간의 중복 제출도 한 번만 보낸다. 서버가 거절하면 문구 원문과 다시 누를 동작을 알린다.
+
+[api/useRoadmap.ts](../frontend/src/api/useRoadmap.ts)의 `useRoadmap`은 공통 `apiFetch`로 로드맵 하나를 읽어 `['roadmaps', roadmapId]`에 캐시한다. §9의 `useCourseAction`은 제목 저장·시작 성공 시 진행 중인 코스 목록·소속 로드맵 읽기도 취소한 뒤, 기존 목록 행과 로드맵 계획 행의 제목·코스 상태를 응답으로 맞춘다. 계획 설명·개념·다른 행은 보존한다. 로드맵의 받기는 `receiveJob(PlanRoadmapCourseRequest | ReplanRoadmapRequest)`로 대상과 선택 피드백만 보내며 빈 피드백은 생략한다. 읽기·쓰기는 자동 재시도하지 않는다.
+
+상태별 표시·첫 코스/다음 코스 받기·작업 이동·서버 거절·다시 짜기·제목 저장/칸 오류·요청 잠금·캐시 갱신·늦은 읽기의 덮어쓰기 차단·금지 정보 부재를 API 대역으로 시험한다. 포커스와 효과 결과는 `waitFor` 안에서 확인하며, 실제 브라우저의 너비별 렌더링을 검증한 것으로 보지는 않는다.
+
+## 11. 코스 탭·로드맵 탭
+
+`7-course-planning` step 9의 [CoursesPage.tsx](../frontend/src/pages/CoursesPage.tsx)·[RoadmapsPage.tsx](../frontend/src/pages/RoadmapsPage.tsx)는 제목 없는 §7의 `AppLayout` 안에 본문 제목 → 목록 순서로 배치한다. 제목은 24px·800 굵기·아래 간격 24px이며 진입 시 포커스와 문서 제목을 갱신한다. 목록은 서버 순서를 유지하는 이름 있는 `ul`, 행 사이는 16px이다. 행 전체가 같은 브라우저 탭에서 상세 주소로 이동하는 링크이며 흰 면·24px 모서리·옅은 테두리·24px 여백·보라색 hover 테두리·공통 포커스 outline을 쓴다.
+
+코스 행은 굵은 제목과 §3의 상태 표시를 나란히 두며 좁은 화면·긴 제목은 줄바꿈한다. 로드맵 행은 굵은 제목 → 설명 → 작은 보라 글자의 진행 한 줄로 세로 배치한다. 완료 상태의 진행 문구는 「다 마침」이다. 비었을 때는 각 탭에 「아직 만든 코스가 없어요」·「아직 만든 로드맵이 없어요」 한 줄을 보인다. 읽는 중은 상태 안내, 실패는 `FailureNotice`와 다시 시도로 표시하며 실패를 빈 목록으로 보이지 않는다. 새로 배우기 입구·거르기·정렬·진도 막대·다음 강의·로드맵의 코스 목록은 두지 않는다.
+
+`useCourses`·`useRoadmaps`가 공통 `apiFetch`로 목록을 읽어 각각 `['courses']`·`['roadmaps']`에 캐시한다. 자동 재시도·창 포커스·재연결에 따른 별도 읽기는 없으며 실패 뒤 버튼으로 다시 읽는다. 행 구성·이동·빈 목록·오류 후 재시도·금지 동작 부재·제목 포커스와 문서 제목을 API 대역으로 시험한다.

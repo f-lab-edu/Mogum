@@ -79,8 +79,8 @@ erDiagram
 |---|---|
 | 처음 — 단일 코스 · 로드맵은 검토 중, 로드맵의 코스는 짜기 전 | 만들기가 성공해 생길 때(ADR-130 · ADR-132) |
 | 코스 짜기 전 → 검토 중(로드맵의 코스만) | 그 코스의 강의 목록 만들기가 성공할 때 |
-| 코스 검토 중 → 학습 중 | 「이대로 시작」(ADR-007) |
-| 로드맵 검토 중 → 진행 중 | 「이대로 시작」 — 첫 코스의 작업을 받을 때(ADR-009 · ADR-143) |
+| 코스 검토 중 → 학습 중 | 「이대로 시작」(ADR-007) — 성공하지 않은 코스 다시 짜기가 있으면 받지 않는다(ADR-182) |
+| 로드맵 검토 중 → 진행 중 | 「이대로 시작」 — 첫 코스의 작업을 받을 때(ADR-009 · ADR-143). 성공하지 않은 로드맵 다시 짜기가 있으면 받지 않는다(ADR-182) |
 | 코스 학습 중 → 다 마침 | 마지막 강의를 학습 완료할 때(ADR-101) — 다 마친 때(`completed_at`)도 함께 적는다(ADR-169) |
 | 로드맵 진행 중 → 다 마침 | 마지막 순서의 코스가 다 마침이 될 때 — 같은 트랜잭션에서(ADR-176). 마지막인지는 더 뒤 순서의 코스가 있는지로 본다 |
 
@@ -186,7 +186,7 @@ erDiagram
 
 ## 8. 테이블
 
-PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md) — 이 절을 고치면 ERD 도 같은 변경에서 고친다. `users` 를 고치고 `credit_entries` 를 만드는 것은 계정 TASK 의 마이그레이션이다(ADR-147 · ADR-173) — 신청할 때 채움 기록이 생기기 때문이다. 그때는 가리킬 `generation_jobs` 가 없어 `credit_entries.job_id` 를 빼고 만들고, `generation_jobs` 를 만드는 마이그레이션이 그 칸과 연결을 더한다(사용자 확인 2026-11-08). 배우는 것 · 기억 · 개념의 테이블(§8.3 · §8.4 — 여덟 개)은 배우는 단위 모델 TASK(`5-learning-model`)가 새 마이그레이션 하나로 옛 커리큘럼 테이블(`curriculum_groups` · `curriculum_steps` · `curriculums` · `lessons`)을 지우고 만든다(ADR-148). `generation_jobs` 와 `credit_entries.job_id` 는 만드는 작업 TASK 가, `llm_calls` 는 강의 목록 TASK 가 그 테이블을 쓰는 코드와 함께 만든다(사용자 확인 2026-11-10). 로그인 세션 테이블(`SPRING_SESSION` · `SPRING_SESSION_ATTRIBUTES`)은 그대로다.
+PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md) — 이 절을 고치면 ERD 도 같은 변경에서 고친다. `users` 를 고치고 `credit_entries` 를 만드는 것은 계정 TASK 의 마이그레이션이다(ADR-147 · ADR-173) — 신청할 때 채움 기록이 생기기 때문이다. 그때는 가리킬 `generation_jobs` 가 없어 `credit_entries.job_id` 를 빼고 만들고, `generation_jobs` 를 만드는 마이그레이션이 그 칸과 연결을 더한다(사용자 확인 2026-11-08). 배우는 것 · 기억 · 개념의 테이블(§8.3 · §8.4 — 여덟 개)은 배우는 단위 모델 TASK(`5-learning-model`)가 새 마이그레이션 하나로 옛 커리큘럼 테이블(`curriculum_groups` · `curriculum_steps` · `curriculums` · `lessons`)을 지우고 만든다(ADR-148). `generation_jobs` 와 `credit_entries.job_id` 는 만드는 작업 TASK 가, `llm_calls` 는 강의 목록 TASK 가 `V12__create_llm_calls.sql`로 그 테이블을 쓰는 코드와 함께 만든다(사용자 확인 2026-11-10). 로그인 세션 테이블(`SPRING_SESSION` · `SPRING_SESSION_ATTRIBUTES`)은 그대로다.
 
 ### 8.1 공통 규칙
 

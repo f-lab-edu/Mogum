@@ -1,13 +1,16 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { expect, test } from 'vitest'
 import PlaceholderPage from './PlaceholderPage'
+import { MemoryRouter } from 'react-router-dom'
 
-test('홈 자리는 머금 제목만 표시하고 본문 틀을 중복하지 않는다', async () => {
-  render(<PlaceholderPage />)
+test('홈 자리는 머금 제목과 새로 배우기 입구 하나를 표시하고 본문 틀을 중복하지 않는다', async () => {
+  render(<MemoryRouter><PlaceholderPage /></MemoryRouter>)
 
   const title = screen.getByRole('heading', { level: 1, name: '머금' })
   expect(title).toBeVisible()
   expect(screen.queryByRole('main')).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: '새로 배우기' })).toHaveAttribute('href', '/new')
+  expect(screen.getAllByRole('link')).toHaveLength(1)
   await waitFor(() => {
     expect(title).toHaveFocus()
     expect(document.title).toBe('홈 · 머금')

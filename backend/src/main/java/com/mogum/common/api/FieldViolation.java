@@ -3,7 +3,7 @@ package com.mogum.common.api;
 public record FieldViolation(String field, Reason reason) {
     /** 요청 칸의 검증 실패를 공통 오류 응답에 싣는 까닭. */
     public enum Reason {
-        /** @Size의 최댓값이나 작업 요청 글자 수 상한을 넘었을 때 쓴다. */
+        /** @Size · @CodePointLength의 최댓값이나 작업 요청 글자 수 상한을 넘었을 때 쓴다. */
         TOO_LONG,
 
         /** @NotBlank · @NotNull 또는 작업 요청의 필수 값 · 빈 글 제약을 위반한 칸에 쓴다. */
