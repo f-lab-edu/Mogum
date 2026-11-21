@@ -11,10 +11,12 @@
 - **도구가 고치고 검사한다** — 손으로 맞추지 않는다. Java 를 고친 뒤 커밋 전에 포매터를 돌린다.
     - 고치기: `./backend/gradlew -p backend spotlessApply` — 네이버 Eclipse 포매터 설정 · import 순서 · 줄 끝 공백 · 파일 끝 줄바꿈
     - 검사: `spotlessCheck`(포맷) · `checkstyleMain` · `checkstyleTest`(네이버 Checkstyle 규칙) — CI 가 PR 마다 돌린다
-    - 도구 이름 · 버전 · 설정 파일 위치는 `backend/build.gradle` 과 `backend/config/naver/`(출처 README 포함)가 출처다. 이 절은 7a-naver-style 이 구현하면서 확정 사실로 고친다.
+    - Spotless 8.12.0 · Checkstyle 14.4.0은 `backend/build.gradle` 에 설정되어 있다. 네이버 설정 파일과 출처 README는 `backend/config/naver/` 에 있다.
+    - 현재 텍스트 블록 안 공백 들여쓰기 보존 · 포매터와 Checkstyle이 충돌하는 구간(빈 선언·블록, 단항 연산자·switch 간격, switch 인자 들여쓰기, 애노테이션 선언 중괄호 간격)은 사유 주석과 `@checkstyle:off` / `@checkstyle:on` 으로 감쌌다.
 - **설정 파일을 고치지 않는다** — 네이버 저장소의 커밋 `e12658e` 에서 가져온 그대로 쓴다. 규칙과 코드가 부딪히면 코드를 고친다.
 - 큰 줄기(자세한 것은 네이버 가이드): 하드 탭 들여쓰기(탭 1개 = 4칸) · 이어지는 줄은 한 단계(탭 1개) 더 · 한 줄 120자 · K&R 중괄호 · `if` · 반복문은 언제나 중괄호 · 연산자 앞과 `.` 앞에서 끊기 · import 는 static → `java.` → `javax.` → `org.` → `net.` → `com.*` → 그 밖 순서로 묶음 사이 빈 줄 · 와일드카드 import 금지(static 은 허용) · 한 줄에 문장 하나.
 - **IDE** — IntelliJ 는 `backend/config/naver/naver-intellij-formatter.xml` 을 Settings → Editor → Code Style → Java → Import Scheme 으로 가져온다. 저장소 루트의 `.editorconfig`(네이버 것 그대로)는 인코딩(UTF-8) · 줄바꿈(LF) · 파일 끝 줄바꿈만 정한다 — 탭 들여쓰기는 IntelliJ 설정과 포매터가 맞춘다.
+    - 원본 `.editorconfig` 의 `*.bat` 설정은 CRLF이므로 편집기에서 `backend/gradlew.bat` 를 저장하면 줄바꿈이 CRLF로 바뀔 수 있다.
 
 ## 2. 이름 — 의존 필드는 타입 이름 그대로
 

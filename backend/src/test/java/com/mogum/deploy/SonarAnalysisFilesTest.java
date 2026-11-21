@@ -17,10 +17,10 @@ class SonarAnalysisFilesTest {
 	private static final Path WORKFLOW = Path.of("../.github/workflows/sonarcloud-analyze.yml");
 	private static final String SETUP_JAVA = "actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961";
 	private static final String SETUP_GRADLE = "gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6";
-	private static final String BACKEND_TEST = "./backend/gradlew -p backend test";
+	private static final String BACKEND_COVERAGE_TEST = "./backend/gradlew -p backend test";
 
 	@Test
-	@DisplayName("체크아웃 뒤 Java 21과 Gradle을 준비하고 프로젝트 키 설정과 스캔 전에 테스트한다")
+	@DisplayName("체크아웃 뒤 Java 21과 Gradle을 준비하고 스캔 전 커버리지 생성을 위해 test만 실행한다")
 	void preparesJavaAndGradleAndTestsBeforeProjectKeyAndScan() throws Exception {
 		// when
 		var steps = steps();
@@ -31,7 +31,7 @@ class SonarAnalysisFilesTest {
 		assertThat(steps.get(1).get("uses")).isEqualTo(SETUP_JAVA);
 		assertThat(steps.get(1).get("with")).isEqualTo(Map.of("distribution", "temurin", "java-version", "21"));
 		assertThat(steps.get(2).get("uses")).isEqualTo(SETUP_GRADLE);
-		assertThat(steps.get(3).get("run")).isEqualTo(BACKEND_TEST);
+		assertThat(steps.get(3).get("run")).isEqualTo(BACKEND_COVERAGE_TEST);
 		assertThat(steps.get(4).get("name")).isEqualTo("Set SonarCloud Project Key");
 		assertThat(steps.get(5).get("uses")).isEqualTo("SonarSource/sonarcloud-github-action@master");
 	}
@@ -60,7 +60,8 @@ class SonarAnalysisFilesTest {
 	@DisplayName("백엔드 테스트가 실패해도 Sonar 스캔을 계속한다")
 	void continuesScanningAfterBackendTestFailure() throws Exception {
 		// when
-		var test = steps().stream().filter(step -> BACKEND_TEST.equals(step.get("run"))).findFirst().orElseThrow();
+		var test = steps().stream().filter(step -> BACKEND_COVERAGE_TEST.equals(step.get("run"))).findFirst()
+			.orElseThrow();
 
 		// then
 		assertThat(test).containsEntry("continue-on-error", true).doesNotContainKey("if");

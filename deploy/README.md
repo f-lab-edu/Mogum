@@ -508,7 +508,7 @@ docker logs --tail 50 mogum-postgres-1
 
 | job | 명령과 결과 | 제한 시간 |
 |---|---|---|
-| `backend` | Temurin Java 21 · Gradle 설정 후 `./backend/gradlew -p backend test`. 실패할 때만 `backend/build/reports/tests/test`를 아티팩트로 7일 보관한다 | 30분 |
+| `backend` | Temurin Java 21 · Gradle 설정 후 `./backend/gradlew -p backend spotlessCheck checkstyleMain checkstyleTest test`로 포맷 · 네이버 Checkstyle · 테스트를 검사한다. 실패할 때만 `backend/build/reports/tests/test`를 아티팩트로 7일 보관한다 | 30분 |
 | `frontend` | [frontend/.nvmrc](../frontend/.nvmrc)의 Node 22와 npm 캐시를 사용한다. `frontend/`에서 `npm ci --ignore-scripts` → `npm run lint` → `npm run test` → `npm run build`를 각각 별도 단계로 실행한다 | 15분 |
 | `ci-ok` | 두 job의 결과를 환경 변수로 받아 둘 다 `success`일 때만 통과하고, 그 외에는 `exit 1`로 실패한다 | 5분 |
 

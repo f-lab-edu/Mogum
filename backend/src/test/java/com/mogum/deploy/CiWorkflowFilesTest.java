@@ -161,7 +161,7 @@ class CiWorkflowFilesTest {
 	}
 
 	@Test
-	@DisplayName("백엔드는 Java 21로 테스트만 실행하고 실패할 때만 보고서를 7일 보관한다")
+	@DisplayName("백엔드는 Java 21로 스타일 검사와 테스트를 실행하고 실패할 때만 보고서를 7일 보관한다")
 	void testsBackendWithoutBuildingImagesAndUploadsReportsOnFailure() throws Exception {
 		// when
 		var steps = steps(job("backend"));
@@ -173,7 +173,8 @@ class CiWorkflowFilesTest {
 		assertThat(steps.get(1).get("uses").toString()).startsWith("actions/setup-java@");
 		assertThat(steps.get(1).get("with")).isEqualTo(Map.of("distribution", "temurin", "java-version", "21"));
 		assertThat(steps.get(2).get("uses").toString()).startsWith("gradle/actions/setup-gradle@");
-		assertThat(steps.get(3).get("run")).isEqualTo("./backend/gradlew -p backend test");
+		assertThat(steps.get(3).get("run"))
+			.isEqualTo("./backend/gradlew -p backend spotlessCheck checkstyleMain checkstyleTest test");
 		assertThat(steps.get(4).get("uses").toString()).startsWith("actions/upload-artifact@");
 		assertThat(steps.get(4).get("if")).isEqualTo("failure()");
 		assertThat(map(steps.get(4).get("with")))

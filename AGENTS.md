@@ -119,4 +119,5 @@ cd frontend && npm run build # 화면 빌드 (배포는 Vercel)
 cd frontend && npm run test  # 화면 테스트 (Vitest)
 cd frontend && npm run lint  # ESLint
 git config core.hooksPath .githooks  # 클론마다 처음 한 번 — main 직접 커밋 · push 를 막는 훅
+git config blame.ignoreRevsFile .git-blame-ignore-revs # 로컬 blame에서 일괄 스타일 변경 커밋을 건너뛴다
 ```
