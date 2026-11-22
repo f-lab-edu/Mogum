@@ -89,6 +89,11 @@ public final class FakeOpenAiServer implements AutoCloseable {
 		// @checkstyle:on
 	}
 
+	public static String embeddings(String data, boolean usage) {
+		return "{\"object\":\"list\",\"model\":\"text-embedding-3-large\",\"data\":[" + data + "]"
+			+ (usage ? ",\"usage\":{\"prompt_tokens\":100,\"total_tokens\":100}" : "") + "}";
+	}
+
 	public static String error(String code) {
 		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
 		return """

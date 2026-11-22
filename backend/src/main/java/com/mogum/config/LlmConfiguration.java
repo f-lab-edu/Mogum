@@ -8,8 +8,11 @@ import org.springframework.util.Assert;
 
 import com.mogum.generation.ChatCall;
 import com.mogum.generation.ChatProvider;
+import com.mogum.generation.EmbeddingCall;
+import com.mogum.generation.EmbeddingProvider;
 import com.mogum.generation.call.LlmCallWriter;
 import com.mogum.generation.llm.OpenAiChatProvider;
+import com.mogum.generation.llm.OpenAiEmbeddingProvider;
 
 @Configuration(proxyBeanMethods = false)
 public class LlmConfiguration {
@@ -41,6 +44,17 @@ public class LlmConfiguration {
 			.max(Duration::compareTo)
 			.orElseThrow();
 		return new OpenAiChatProvider(llmProperties.openai().apiKey(), llmProperties.openai().baseUrl(), timeout);
+	}
+
+	@Bean
+	public OpenAiEmbeddingProvider embeddingProvider(OpenAiChatProvider openAiChatProvider) {
+		return new OpenAiEmbeddingProvider(openAiChatProvider);
+	}
+
+	@Bean
+	public EmbeddingCall embeddingCall(EmbeddingProvider embeddingProvider, LlmCallWriter llmCallWriter,
+		LlmProperties llmProperties) {
+		return new EmbeddingCall(embeddingProvider, llmCallWriter, llmProperties.prices());
 	}
 
 	@Bean

@@ -14,6 +14,8 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import com.mogum.generation.ChatCall;
 import com.mogum.generation.ChatProvider;
+import com.mogum.generation.EmbeddingCall;
+import com.mogum.generation.EmbeddingProvider;
 import com.mogum.generation.call.LlmCallWriter;
 
 class LlmConfigurationTest {
@@ -29,7 +31,8 @@ class LlmConfigurationTest {
 		// when
 		applicationContextRunner.run(context -> {
 			// then
-			assertThat(context).hasNotFailed().hasSingleBean(ChatProvider.class).hasSingleBean(ChatCall.class);
+			assertThat(context).hasNotFailed().hasSingleBean(ChatProvider.class).hasSingleBean(ChatCall.class)
+				.hasSingleBean(EmbeddingProvider.class).hasSingleBean(EmbeddingCall.class);
 			assertThat(context.getBean(WorkerProperties.class).leaseDuration())
 				.isEqualTo(Duration.ofSeconds(960)).isGreaterThan(Duration.ofSeconds(912));
 			var llm = context.getBean(LlmProperties.class);

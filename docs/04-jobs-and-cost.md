@@ -316,7 +316,7 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 
 `8-material-cards` step 0에서 강의 자료 채팅 `T호출=140초`, `C=1`과 임베딩 `T임베딩=20초`의 임시 값을 더했다(ADR-186 · ADR-187). 강의 목록 채팅은 50초 · 이어 쓰기 1번이며, 임베딩을 하지 않는 강의 목록에도 임베딩 시간을 더해 식 하나로 보수적으로 검사한다. `T_DB=10초`는 재료 읽기 · 호출 기록 · 시한 처리 · 결과/실패 쓰기에 남기는 예산이며 실측 상한은 아니다. 운영 프롬프트와 DB 부하로 다시 잰다. `config.LlmConfiguration`의 생성자는 모든 채팅 묶음 중 `(C + 1) × T호출`이 가장 큰 값에 임베딩 시간을 더해 엄격한 부등식을 검사하며, 각 채팅 호출 시간 제한보다 정상 종료 대기(150초)가 길어야 한다. 깨지면 빈 생성 실패로 기동을 거부한다.
 
-채팅 · 임베딩 설정은 `application.yml`의 `app.llm` 한 곳이고 `config.LlmProperties` record로 읽는다. 생성자는 `planning` · `material` · `embedding`의 누락, 채팅 설정의 유효성, 임베딩 모델이 빈 값인지와 시간 제한이 양수인지를 검사해 설정 바인딩 실패로 기동을 거부한다. `GenerationConfiguration`은 `LlmProperties.planning()`으로 계획 묶음을 받아 다섯 생성 처리기에 넘긴다. `material()`과 `embedding()`은 후속 강의 자료 · 임베딩 step이 쓸 설정으로, 아직 생성 처리기에 연결하지 않았다. 임베딩은 별도 `LlmProperties.Embedding(model, timeout)` record이며 채팅의 출력 상한 · 이어 쓰기 설정은 쓰지 않는다.
+채팅 · 임베딩 설정은 `application.yml`의 `app.llm` 한 곳이고 `config.LlmProperties` record로 읽는다. 생성자는 `planning` · `material` · `embedding`의 누락, 채팅 설정의 유효성, 임베딩 모델이 빈 값인지와 시간 제한이 양수인지를 검사해 설정 바인딩 실패로 기동을 거부한다. `GenerationConfiguration`은 `LlmProperties.planning()`으로 계획 묶음을 받아 다섯 생성 처리기에 넘긴다. `material()`과 `embedding()`은 아직 생성 처리기에 연결하지 않았다. step 1의 임베딩 호출 경계에는 SDK 없는 `generation.EmbeddingSettings(model, timeout)`을 넘긴다. 임베딩 설정 바인딩은 별도 `LlmProperties.Embedding(model, timeout)` record이며 채팅의 출력 상한 · 이어 쓰기 설정은 쓰지 않는다.
 
 | 설정 키 | 값 |
 |---|---|
@@ -353,6 +353,12 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 | 5xx · 연결 오류 | `PROVIDER_ERROR` | `PROVIDER_UNAVAILABLE` |
 | 401 · 403 · 그 밖의 4xx | `REJECTED` | `PROVIDER_REJECTED` |
 | 400 `context_length_exceeded` | `REJECTED` | `INPUT_TOO_LARGE` |
+
+`8-material-cards` step 1의 `generation.EmbeddingProvider.send(Request)`는 작업 ID · 종류 · `EmbeddingSettings` · 정의 글 목록을 받아 입력 순서의 `List<List<Float>>` · 호출 결과 · 작업 실패 · 입력 토큰을 돌려준다. `EmbeddingCall.call(JobSnapshot, EmbeddingSettings, List<String>)`은 `EmbeddingResult.Success(value)` 또는 `Failed(failure)`를 돌려준다. 호출 전 `EMBEDDING` 기록을 커밋하고, 트랜잭션 밖에서 한 번 호출한 뒤 결과 · 입력 토큰 · 입력 단가 비용 · 시간을 기록한다. 출력 토큰은 비워 둔다. 벡터 수가 입력 수와 다르거나 차원이 0 · 불일치이면 `INVALID_OUTPUT`이며, 확인한 사용량은 그대로 기록한다. 한 시도에서 카드 개념 정의를 한 번에 보내는 임베딩은 한 번이고, 임베딩 안의 다시 시도 · 이어 쓰기는 없다. 호출자가 트랜잭션을 쥐면 전송과 기록을 시작하지 않는다. 예상 밖 예외는 호출 기록을 마칠 수 있으면 `PROVIDER_ERROR`로 마친 뒤 다시 던져 기존 생성 처리기의 `GenerationFailures`가 원문 없는 `job generate failed`로 기록하게 한다. 기록 저장의 예상 밖 예외도 던진다.
+
+`generation.llm.OpenAiEmbeddingProvider`는 채팅 어댑터가 소유한 같은 `OpenAIClient`(키 · 기준 주소 · HTTP 풀 · `maxRetries(0)`)를 쓰고, 빈 조립은 `config.LlmConfiguration`에 둔다. `RequestOptions`의 시간 제한은 요청의 임베딩 설정이다. HTTP · 시간 초과 · 연결 실패 분류는 위 채팅 표와 같고 `OpenAiFailures`로 공유한다. SDK 데이터/JSON 형식 오류는 `INVALID_OUTPUT`으로 돌리며, 그 밖의 예외는 숨기지 않는다. 응답 `index`로 순서를 복원하고 중복 · 범위 밖 · 누락 index는 형식 실패다. 정의 글 · 벡터 · 프로바이더 원문은 DB와 로그에 넣지 않는다.
+
+SDK **4.75.1 소스 JAR**의 `EmbeddingCreateParams.Body.Builder`는 `encodingFormat`을 `BASE64`로 초기화한다. 따라서 이 어댑터가 실제 보내는 `encoding_format`은 `base64`다. [공식 API 문서](https://developers.openai.com/api/reference/resources/embeddings/methods/create)의 HTTP 기본값 `float`와 SDK가 넣는 기본값은 구별한다. 같은 JAR의 `Embedding.embedding()` → `EmbeddingValue.asFloats()`는 base64 바이트를 little-endian IEEE 754 32비트 float로 풀어 `List<Float>`를 반환하며, float 배열 응답도 그대로 받는다. 가짜 서버가 실제 SDK 요청의 기본값과 두 응답 형식을 확인한다.
 
 실제 유료 호출은 실행하지 않았다. 가짜 서버가 요청 형식 · 요청 수 · 이어 쓰기와 오류 분류를 확인한다([07 §2](./07-testing.md#2-llm-스텁)).
 

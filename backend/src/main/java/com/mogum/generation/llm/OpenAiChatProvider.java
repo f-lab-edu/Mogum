@@ -1,6 +1,5 @@
 package com.mogum.generation.llm;
 
-import java.io.InterruptedIOException;
 import java.time.Duration;
 
 import com.mogum.generation.ChatProvider;
@@ -70,11 +69,12 @@ public final class OpenAiChatProvider implements ChatProvider, AutoCloseable {
 		} catch (OpenAIServiceException exception) {
 			return rejected(exception);
 		} catch (OpenAIIoException exception) {
-			return new Reply(null, timedOut(exception) ? LlmCallOutcome.TIMEOUT : LlmCallOutcome.PROVIDER_ERROR,
+			return new Reply(null,
+				OpenAiFailures.timedOut(exception) ? LlmCallOutcome.TIMEOUT : LlmCallOutcome.PROVIDER_ERROR,
 				GenerationOutcome.Failure.PROVIDER_UNAVAILABLE, usage);
 		} catch (RuntimeException exception) {
 			// SDK JsonHandler는 본문 읽기 중의 시간 초과도 데이터 예외로 감싼다.
-			if (timedOut(exception)) {
+			if (OpenAiFailures.timedOut(exception)) {
 				return new Reply(null, LlmCallOutcome.TIMEOUT, GenerationOutcome.Failure.PROVIDER_UNAVAILABLE, usage);
 			}
 			// JSON 해석·스키마 오류에는 원문이 들어 있을 수 있다. 메시지는 사용하지 않는다.
@@ -82,34 +82,14 @@ public final class OpenAiChatProvider implements ChatProvider, AutoCloseable {
 		}
 	}
 
-	private static boolean timedOut(Throwable exception) {
-		for (var cause = exception; cause != null; cause = cause.getCause()) {
-			if (cause instanceof InterruptedIOException) {
-				return true;
-			}
-		}
-		return false;
+	/** 임베딩 어댑터와 같은 키 · 기준 주소 · HTTP 풀을 쓴다. 소유자는 이 어댑터다. */
+	OpenAIClient client() {
+		return openAiClient;
 	}
 
 	private static Reply rejected(OpenAIServiceException exception) {
-		int status = exception.statusCode();
-		String code;
-		try {
-			code = exception.code().orElse("");
-		} catch (RuntimeException ignored) {
-			// 프로바이더의 오류 본문이 잘못되어도 확인한 HTTP 상태로 분류한다.
-			code = "";
-		}
-		if (status == 400 && code.equals("context_length_exceeded")) {
-			return new Reply(null, LlmCallOutcome.REJECTED, GenerationOutcome.Failure.INPUT_TOO_LARGE, null);
-		}
-		if (status == 429 && !code.equals("insufficient_quota")) {
-			return new Reply(null, LlmCallOutcome.RATE_LIMITED, GenerationOutcome.Failure.PROVIDER_UNAVAILABLE, null);
-		}
-		if (status >= 500) {
-			return new Reply(null, LlmCallOutcome.PROVIDER_ERROR, GenerationOutcome.Failure.PROVIDER_UNAVAILABLE, null);
-		}
-		return new Reply(null, LlmCallOutcome.REJECTED, GenerationOutcome.Failure.PROVIDER_REJECTED, null);
+		var failure = OpenAiFailures.rejected(exception);
+		return new Reply(null, failure.outcome(), failure.failure(), null);
 	}
 
 	private static Reply invalid(Usage usage) {

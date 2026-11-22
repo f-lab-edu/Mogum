@@ -37,6 +37,9 @@
 ## 2. LLM 스텁
 
 - `7-course-planning` step 1의 `generation.llm.FakeOpenAiServer`는 테스트 안의 JDK `HttpServer`다. 실제 SDK 4.75.1이 보내는 경로 · 인증 · 모델 · 출력 상한 · reasoning effort · 메시지 역할과 이어 쓰기를 검사한다. 500 · 429 · 시간 초과에서도 요청 수가 한 번인지 확인한다. `ChatCallIntegrationTest`는 호출 전 기록의 커밋 · 트랜잭션과 연결 반환 · 호출별 결과/토큰/비용 · 해석 실패의 마지막 기록 · 원문 로그 부재를 확인한다.
+- `8-material-cards` step 1에서 같은 가짜 서버에 임베딩 응답을 더했다. `OpenAiEmbeddingProviderTest`는 `/embeddings` · 인증 · 모델 · 정의 문자열 배열과 입력 순서 · SDK 기본 `encoding_format=base64` · base64/float 응답 · 섞인 `index` 복원 · 잘못된 index/JSON/벡터 · 실패 분류를 확인한다. 500 · 429 · 헤더 전/본문 읽기 시간 초과와 연결 오류에서도 요청은 한 번이다. `EmbeddingCallIntegrationTest`는 호출 전 기록 커밋 · 트랜잭션과 연결 반환 · `EMBEDDING` 한 줄 · 입력 단가 비용 · 출력 토큰 없음 · 벡터 수/차원 검사 뒤에도 사용량 보존 · 예상 밖 예외 전달 · 원문 로그 부재를 확인한다.
+- 공용 설정의 중첩 static `TestEmbeddingProvider`를 `@Primary`로 등록한다. 클래스별 `@Import` 없이 주입받고 `reset()`으로 설정과 관찰을 비운 뒤 쓴다. 기본은 정의 글의 해시로 만든 결정적 3,072차원 벡터이며, 실제 의미 유사도를 흉내 내지 않는다. `vector(definition, List<Float>)`로 정의별 벡터를 정하고, `reply(jobId, Reply...)`와 `failure(Failure)`로 작업별 실패 응답을 순서대로 정한다. 소진 뒤 기본 응답으로 돌아간다. 같은/다른 개념 시험은 명시적인 벡터를 설정한다. `requests(jobId)`와 `outsideTransaction(jobId)`로 받은 요청과 트랜잭션/EntityManager 부재를 본다. `IntegrationTestConfigurationEmbeddingIntegrationTest`가 결정성 · 설정 · reset · 관찰을 검증한다. 공용 컨텍스트 수는 늘리지 않는다.
+- `ConceptSimilarityMeasurementTest`도 기본 `test`에서 제외하고 `llmTest`에만 포함한다(ADR-187). 환경 변수 키가 없거나 공백이면 건너뛴다. 한국어 개발 개념의 같은 쌍 15개 · 다른 쌍 15개(이름/뜻이 엇갈리는 쌍 · 가까운/먼 개념)를 이름과 정의로 코드에 두며 **정의만** 한 요청에 임베딩한다. DB 없이 실제 어댑터를 직접 쓰고 코사인 유사도를 계산한다. `backend/build/reports/concept-similarity.txt`에 쌍마다 같음/다름 · 이름 둘 · 유사도, 같은 쌍 최솟값 · 다른 쌍 최댓값 · 그 사이에 걸치는 쌍을 쓴다. 기준값은 단언하지 않고 사람이 보고 정한다. 이 step에서는 유료 호출 없이 컴파일과 키 없는/공백 키 건너뛰기만 확인했다.
 - 실제 OpenAI 시험 `OpenAiLiveIntegrationTest`는 기본 `test`에서 제외한다. `./backend/gradlew -p backend llmTest`만 실행하며 `OPENAI_API_KEY` 환경 변수가 없거나 공백이면 건너뛴다. 짧은 요청 한 번의 끝남 · 사용량 · 호출 기록을 본다. 유료 호출이며 step 1에서는 실행하지 않았다.
 
 - 생성은 서버가 정한 순서대로 부르므로(ADR-118) 스텁으로 흐름 전체를 시험한다 — 실제 LLM 은 부르지 않는다.

@@ -112,7 +112,7 @@ cd backend && ./gradlew test        # 백엔드 테스트 (Testcontainers — Do
 cd backend && ./gradlew build       # 백엔드 jar 생성 — 화면은 넣지 않는다
 ./backend/gradlew -p backend test   # 저장소 루트에서 같은 일 — step 의 AC · 리뷰어는 이 형태로 쓴다(cd 불가)
 ./backend/gradlew -p backend spotlessApply # 백엔드 Java 포맷(네이버 컨벤션) — 커밋 전에. 검사는 spotlessCheck · checkstyleMain · checkstyleTest
-./backend/gradlew -p backend llmTest # 실제 OpenAI 짧은 호출 시험(유료 · 기본 test 제외 · OPENAI_API_KEY 없으면 건너뜀)
+./backend/gradlew -p backend llmTest # 실제 OpenAI 짧은 호출 + 개념 유사도 실측(유료 · 기본 test 제외 · OPENAI_API_KEY 없거나 공백이면 건너뜀), 보고서 backend/build/reports/concept-similarity.txt
 ./backend/gradlew -p backend imageTest # 서버 이미지 빌드 후 기동 · 헬스 · 비루트 · SIGTERM 정상 종료 확인(Docker 필요 · 기본 test 제외). -PappImage=<이미지 이름>으로 이미 만든 이미지 검사
 cd frontend && npm run dev   # 화면 개발 서버 (Vite — API 는 proxy 로 같은 출처처럼)
 cd frontend && npm run build # 화면 빌드 (배포는 Vercel)
