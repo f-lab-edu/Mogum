@@ -2,12 +2,49 @@
   "project": "Mogum",
   "phase": "8-material-cards",
   "steps": [
-    { "step": 0, "name": "llm-timing", "status": "pending" },
-    { "step": 1, "name": "embedding-call", "status": "pending" },
-    { "step": 2, "name": "concept-dictionary", "status": "pending" },
-    { "step": 3, "name": "material-generator", "status": "pending" },
-    { "step": 4, "name": "lesson-api", "status": "pending" },
-    { "step": 5, "name": "markdown-renderer", "status": "pending" },
-    { "step": 6, "name": "lesson-screen", "status": "pending" }
-  ]
+    {
+      "step": 0,
+      "name": "llm-timing",
+      "status": "completed",
+      "summary": "LlmProperties.material()(gpt-5.6-terra·출력 10000·140s·이어 쓰기 1)과 app.llm.embedding.model/timeout의 embedding()(text-embedding-3-large·20s), 필수 묶음·전체 모델 단가 검사 추가; 임베딩은 TokenPrices(0.13, 0, 0)과 출력 토큰 0으로 입력 비용 계산; 종료 대기 150s·상한 170s·Spring 180s·두 컨테이너 220s·시한 16m·갱신 30s, 시한 > (R+1)×(max_묶음((C+1)×T호출)+T임베딩)+R×D다시시도+T_DB(960초 > 912초) 검증; Boot 4.1.1·Context 7.0.9 소스에서 워커 대기 중 Tomcat 수신 유지 확인(실제 HTTP 응답 실험 미수행), 지정 테스트와 전체 build 통과",
+      "started_at": "2026-11-23T08:16:45+0900",
+      "completed_at": "2026-11-23T08:26:11+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/deploy/DeployFilesTest.java:98-102 — 관계식 검사에 `isEqualTo(150/180/220/65)` 같은 상수 단언이 함께 붙어 있다. 임시 값을 다시 잴 때마다 이 시험도 고쳐야 한다. 관계(`gracePeriod > springWait > 170 > workerWait`)만 남기거나, 상수는 설정 바인딩 시험 한 곳에만 두는 것을 고려할 수 있다.",
+        "docs/04-jobs-and-cost.md:359 — 「단계별 제한 180초 전부를 Tomcat이 쓰는 경우까지 보장하는 값은 아니다」는 사실대로 적었다. 다만 ADR-186 의 「API 가 계속 응답하는지」는 소스로만 확인했고 실제 종료 중 HTTP 응답 실험은 아직 하지 않았다. 배포 검증 체크리스트(deploy/README 의 정상 종료 항목)를 다시 돌릴 때 함께 확인할 항목으로 남겨 두면 좋다.",
+        "docs/04-jobs-and-cost.md:326-343 — 임베딩 단가의 cached-input · output 을 0 으로 둔 것은 설정상의 표현이다. ADR-187 · 공식 단가는 입력만 적는다. 표의 「캐시 입력 과금 없음」 문구는 동작에 영향이 없다."
+      ]
+    },
+    {
+      "step": 1,
+      "name": "embedding-call",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "concept-dictionary",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "material-generator",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "lesson-api",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "markdown-renderer",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "lesson-screen",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-11-23T08:16:45+0900"
 }
