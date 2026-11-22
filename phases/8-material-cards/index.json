@@ -1,0 +1,13 @@
+{
+  "project": "Mogum",
+  "phase": "8-material-cards",
+  "steps": [
+    { "step": 0, "name": "llm-timing", "status": "pending" },
+    { "step": 1, "name": "embedding-call", "status": "pending" },
+    { "step": 2, "name": "concept-dictionary", "status": "pending" },
+    { "step": 3, "name": "material-generator", "status": "pending" },
+    { "step": 4, "name": "lesson-api", "status": "pending" },
+    { "step": 5, "name": "markdown-renderer", "status": "pending" },
+    { "step": 6, "name": "lesson-screen", "status": "pending" }
+  ]
+}
