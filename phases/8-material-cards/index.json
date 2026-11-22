@@ -18,7 +18,16 @@
     {
       "step": 1,
       "name": "embedding-call",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-23T08:26:11+0900",
+      "summary": "EmbeddingProvider.send(Request(jobId, jobType, EmbeddingSettings(model, timeout), List<String> definitions)) -> Reply(List<List<Float>> vectors, LlmCallOutcome outcome, Failure failure, Integer inputTokens); EmbeddingCall.call(JobSnapshot, EmbeddingSettings, List<String>) -> EmbeddingResult.Success(value)/Failed(failure), 트랜잭션 안 전송 차단·EMBEDDING 기록·입력 비용만 계산·출력 토큰 비움·벡터 수/차원 검사·재시도 없음; OpenAiEmbeddingProvider는 채팅 HTTP 클라이언트/키와 OpenAiFailures 분류 공유, SDK 4.75.1 기본 base64와 float 변환 확인; 예상 밖 예외는 가능한 호출 기록을 PROVIDER_ERROR로 마친 뒤 원래 예외를 던져 GenerationFailures가 처리(기록 저장 예외도 전달); 공용 @Primary TestEmbeddingProvider는 reset(), vector(definition,List<Float>), reply(jobId,Reply...), failure(Failure), requests(jobId), outsideTransaction(jobId)로 설정/관찰하며 기본 결정적 3072차원; com.mogum.generation.llm.ConceptSimilarityMeasurementTest(같음15·다름15)는 llmTest 전용, 보고서 backend/build/reports/concept-similarity.txt, 유료 실행 없이 키 없음/공백 건너뛰기 확인; 지정 AC와 전체 build 통과, 서버 테스트 2077→2112(+35)",
+      "completed_at": "2026-11-23T08:39:31+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/generation/EmbeddingCall.java:30 — ChatCall 은 llmCallWriter.start/finish 의 예외를 삼켜 PROVIDER_UNAVAILABLE 로 바꾸지만, EmbeddingCall 은 다시 던진다. step 지시와 04 §10 에 맞는 선택이다. 다만 두 호출 경로가 기록 실패를 다르게 다룬다는 점을 step 3 에서 생성 처리기에 연결할 때 의식해야 한다 → 처리기 쪽에서 두 경로 모두 GenerationFailures 로 귀결되는지 시험으로 확인한다.",
+        "backend/src/main/java/com/mogum/generation/EmbeddingCall.java:45 — 정의가 빈 목록이면 요청을 보낸 뒤 INVALID_OUTPUT 이 된다(OpenAI 는 빈 input 을 400 으로 거절할 수 있다). 지금은 일어나지 않는 경우다 → step 3 의 호출자가 카드가 없을 때 임베딩을 부르지 않게 한다.",
+        "backend/src/test/java/com/mogum/support/IntegrationTestConfiguration.java:218 — java.util.Random · java.util.stream.IntStream 을 import 하지 않고 전체 이름으로 쓴다. OpenAiEmbeddingProviderTest · EmbeddingCallIntegrationTest 에도 java.util.stream.Stream · AtomicInteger 를 같은 방식으로 쓴 곳이 있다. 동작에는 영향이 없다 → 다음에 손댈 때 import 로 바꾼다.",
+        "backend/src/test/java/com/mogum/support/IntegrationTestConfiguration.java:153 — TestEmbeddingProvider 는 DatabaseCleaner 가 자동으로 비우지 않는다. 쓰는 시험이 매번 reset() 을 불러야 한다(07 §2 에 적혀 있다) → step 2 · 3 의 시험에서 reset() 을 빠뜨리면 앞 시험의 vector 설정이 새어 들어오니 리뷰 때 확인한다."
+      ]
     },
     {
       "step": 2,
