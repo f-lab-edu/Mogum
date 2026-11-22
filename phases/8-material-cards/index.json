@@ -32,7 +32,15 @@
     {
       "step": 2,
       "name": "concept-dictionary",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-23T08:39:31+0900",
+      "summary": "card.service.LessonCardWriter.writeLessonCards(long userId, long lessonId, List<NewCard>)와 중첩 public record NewCard(String question, String answer, List<NewConcept> concepts)·NewConcept(String name, String definition, float[] embedding) 추가; 트랜잭션 전파 MANDATORY, UserRepository.findByIdForUpdate의 사용자 행 잠금으로 판정·넣기를 커밋까지 직렬화; ConceptSimilaritySearchImpl의 pgvector 코사인 검색(기준값 이상·작은 ID 동률 처리) 전 명시적 flush, 같은 저장의 새 개념 재사용·카드별 중복 연결 제거·Card.write의 ACTIVE/빈 due_at/FSRS 처음 상태 보존; app.concept.same-threshold=0.80(임시 값 — 실측 전), 0 초과 1 이하 기동 검사와 02 §6·§9/04 §10 문서 반영; 두 스레드·래치로 같은 사용자 DB 대기/다른 사용자 독립 확인 및 잠금 제거 시 실패 확인 후 복원; 지정 AC와 전체 build 통과, 서버 테스트 2112→2138(+26)",
+      "completed_at": "2026-11-23T08:49:01+0900",
+      "review_notes": [
+        "LessonCardWriter.java:35 — step 3 결과 저장 트랜잭션의 잠금 순서. 금지 9 때문에 첫 쓰기는 `generation_jobs` 행 UPDATE(작업 행 잠금)이고, 그 뒤에 이 서비스가 `users` 행 FOR UPDATE 를 잡는다. 사용자 행을 먼저 잡고 같은 작업 행을 지우거나 고치는 요청 경로(코스 지우기 · 탈퇴 등)가 있으면 서로를 기다리다 교착이 날 수 있다(PostgreSQL 이 감지해 한쪽을 중단한다). → step 3 · 4 를 설계할 때 잠금 순서를 맞추거나, 교착이 났을 때의 처리를 정하고 시험한다.",
+        "LessonCardWriter.java:35 — 사용자 행이 없으면 워커 경로에서 `ApiException(NOT_FOUND)` 를 던진다. 금지 9 의 작업 확인이 먼저 0 rows 를 내므로 실제로는 거의 닿지 않지만, 워커 경로에 API 오류 타입이 섞인 모양이다. → step 3 에서 그대로 둘지 정한다.",
+        "docs/04-jobs-and-cost.md §10 — 기준값을 기존 표의 한 줄이 아니라 표 위의 문단으로 적었다. 동작 영향은 없다. → phase 리뷰 때 표 형식에 맞출지 본다."
+      ]
     },
     {
       "step": 3,
