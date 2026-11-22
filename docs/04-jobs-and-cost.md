@@ -284,6 +284,8 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 
 ## 10. 아직 정하지 않은 값
 
+같은 개념 판정은 `app.concept.same-threshold`(`config.ConceptProperties.sameThreshold()`)로 설정한다. `0.80`은 임시 값 — 실측 전이며, 0 초과 1 이하가 아니면 기동을 거부한다. 강의 자료 TASK의 phase 뒤 · 병합 전에 `llmTest`로 실제 개념 쌍을 재서 바꾼다(ADR-187).
+
 | 값 | 근거 |
 |---|---|
 | 한 사람이 동시에 걸 수 있는 수 — `app.job.max-in-progress-per-user` 임시 값 3(`JobProperties.maxInProgressPerUser()`). `6-job-worker` step 2에서 사용자 행 잠금으로 동시 요청을 직렬화했다(§6). 실제 운영 값은 재 보고 정한다 | ADR-104 · ADR-133 |

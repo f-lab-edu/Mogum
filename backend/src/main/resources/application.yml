@@ -97,6 +97,9 @@ app:
     retry-delay: 1s
   job:
     max-in-progress-per-user: 3
+  concept:
+    # 임시 값 — 실측 전. phase 뒤 · 병합 전에 llmTest 실측으로 바꾼다(ADR-187).
+    same-threshold: 0.80
   credit:
     monthly-amount: 100
     new-course: 1
