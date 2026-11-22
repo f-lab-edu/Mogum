@@ -142,7 +142,7 @@
 - 한 시도는 호출 한 번이고 중간 결과가 없어 처음부터 다시 만든다(ADR-119 · ADR-120 · ADR-125).
 - 다른 워커가 되찾아 간 뒤 늦게 끝난 옛 워커는 결과를 쓰지 않는다 — 결과를 저장할 때 아직 자기 작업인지 확인한다.
 - **배포처럼 정상적으로 끌 때는 진행 중인 시도가 끝나기를 기다린다**(ADR-126) — 새 작업은 꺼내지 않고, 진행 중인 시도가 결과를 저장하기를 정한 한도까지 기다린 뒤 끈다. 한도를 넘기면 들고 있던 작업을 기다림으로 돌려놓는다. 기다리는 동안 시한은 그대로 늘린다.
-    - 기다리는 한도는 Spring 의 종료 대기(`timeout-per-shutdown-phase` — 지금 130초)와 컨테이너의 강제 종료 대기(`deploy/compose.yaml` 의 `stop_grace_period` — 지금 150초)보다 짧게 둔다. 길면 기다리는 도중 강제로 죽어 시한으로 되찾는 길로 떨어진다.
+    - 기다리는 한도는 Spring 의 종료 대기(`timeout-per-shutdown-phase` — 지금 180초)와 컨테이너의 강제 종료 대기(`deploy/compose.yaml` 의 `stop_grace_period` — 지금 220초)보다 짧게 둔다. 길면 기다리는 도중 강제로 죽어 시한으로 되찾는 길로 떨어진다.
 - 서버가 갑자기 죽으면 시한이 지날 때까지 그 작업이 멈춘다. 되찾은 작업에 이미 나간 호출 비용은 운영자가 낸다.
 - 처리하는 중에 서버를 계속 죽이는 작업은 시한이 지날 때마다 되찾아져 다시 돈다 — 꺼낸 횟수에 상한을 두지 않는다. 드물어 장치를 두지 않고, 운영자가 남은 작업의 `claim_count` 로 알아본다(ADR-102 · README 2026-11-15).
 
@@ -299,24 +299,24 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 
 | 설정 키 | 읽는 메서드 | 임시 값 |
 |---|---|---|
-| `app.worker.lease-duration` | `leaseDuration()` | `6m` |
+| `app.worker.lease-duration` | `leaseDuration()` | `16m` |
 | `app.worker.renewal-interval` | `renewalInterval()` | `30s` |
 | `app.worker.max-retries` | `maxRetries()` | `2`(최대 호출 3번) |
 | `app.worker.retry-delay` | `retryDelay()` | `1s` |
 | `app.worker.count` | `count()` | `2`(0이면 API만 실행) |
 | `app.worker.poll-interval` | `pollInterval()` | `1s` |
-| `app.worker.shutdown-wait` | `shutdownWait()` | `100s` |
+| `app.worker.shutdown-wait` | `shutdownWait()` | `150s` |
 
-시한은 **한 번 꺼낸 시도의 최장 시간보다 길어야 한다**. `R`은 추가 자동 다시 시도 횟수, `C`는 호출마다 허용한 이어 쓰기 횟수, `T호출`은 호출 시간 제한, `D이어쓰기`는 이어 쓰기 사이 간격, `D다시시도`는 자동 다시 시도 사이 간격이다. `T_DB`는 재료 읽기 · 시한 처리 · 결과/실패 쓰기를 포함한 DB 처리의 여유다.
+시한은 **한 번 꺼낸 시도의 최장 시간보다 길어야 한다**. `R`은 추가 자동 다시 시도 횟수, `C`는 호출마다 허용한 이어 쓰기 횟수, `T호출`은 채팅 호출 시간 제한, `T임베딩`은 한 시도에서 개념 정의를 한 번에 보내는 임베딩 호출 한 번의 시간 제한, `D다시시도`는 자동 다시 시도 사이 간격이다. 이어 쓰기 사이 간격은 0초다. `T_DB`는 재료 읽기 · 시한 처리 · 결과/실패 쓰기를 포함한 DB 처리의 여유다.
 
 ```text
-시한 > (R + 1) × ((C + 1) × T호출 + C × D이어쓰기) + R × D다시시도 + T_DB
-현재: 360초 > 3 × (2 × 50초 + 1 × 0초) + 2 × 1초 + 10초 = 312초
+시한 > (R + 1) × (max_묶음((C + 1) × T호출) + T임베딩) + R × D다시시도 + T_DB
+현재: 960초 > 3 × (2 × 140초 + 20초) + 2 × 1초 + 10초 = 912초
 ```
 
-`7-course-planning` step 1에서 `T호출=50초`, `C=1`, `D이어쓰기=0초`, `T_DB=10초`의 임시 여유를 정했다. `T_DB`는 재료 읽기 · 호출 기록 · 시한 처리 · 결과/실패 쓰기에 남기는 예산이며 실측 상한은 아니다. 운영 프롬프트와 DB 부하로 다시 잰다. `config.LlmConfiguration`의 생성자는 모든 채팅 묶음 중 `(C + 1) × T호출`이 가장 큰 값을 식에 넣고 엄격한 부등식을 검사하며, 각 호출 시간 제한보다 정상 종료 대기(100초)가 길어야 한다. 깨지면 빈 생성 실패로 기동을 거부한다.
+`8-material-cards` step 0에서 강의 자료 채팅 `T호출=140초`, `C=1`과 임베딩 `T임베딩=20초`의 임시 값을 더했다(ADR-186 · ADR-187). 강의 목록 채팅은 50초 · 이어 쓰기 1번이며, 임베딩을 하지 않는 강의 목록에도 임베딩 시간을 더해 식 하나로 보수적으로 검사한다. `T_DB=10초`는 재료 읽기 · 호출 기록 · 시한 처리 · 결과/실패 쓰기에 남기는 예산이며 실측 상한은 아니다. 운영 프롬프트와 DB 부하로 다시 잰다. `config.LlmConfiguration`의 생성자는 모든 채팅 묶음 중 `(C + 1) × T호출`이 가장 큰 값에 임베딩 시간을 더해 엄격한 부등식을 검사하며, 각 채팅 호출 시간 제한보다 정상 종료 대기(150초)가 길어야 한다. 깨지면 빈 생성 실패로 기동을 거부한다.
 
-채팅 설정은 `application.yml`의 `app.llm` 한 곳이고 `config.LlmProperties` record로 읽는다. 아직 쓰지 않는 용도의 묶음은 없다. `7-course-planning` step 10에서 `LlmProperties` 생성자가 `planning` 묶음의 누락을 검사해 설정 바인딩 실패로 기동을 거부한다. `GenerationConfiguration`은 `LlmProperties.planning()`으로 이 묶음을 받아 다섯 생성 처리기에 넘긴다.
+채팅 · 임베딩 설정은 `application.yml`의 `app.llm` 한 곳이고 `config.LlmProperties` record로 읽는다. 생성자는 `planning` · `material` · `embedding`의 누락, 채팅 설정의 유효성, 임베딩 모델이 빈 값인지와 시간 제한이 양수인지를 검사해 설정 바인딩 실패로 기동을 거부한다. `GenerationConfiguration`은 `LlmProperties.planning()`으로 계획 묶음을 받아 다섯 생성 처리기에 넘긴다. `material()`과 `embedding()`은 후속 강의 자료 · 임베딩 step이 쓸 설정으로, 아직 생성 처리기에 연결하지 않았다. 임베딩은 별도 `LlmProperties.Embedding(model, timeout)` record이며 채팅의 출력 상한 · 이어 쓰기 설정은 쓰지 않는다.
 
 | 설정 키 | 값 |
 |---|---|
@@ -326,12 +326,21 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 | `app.llm.chats.planning.max-completion-tokens` | 출력 상한 — [03 §7](./03-generation.md#7-아직-정하지-않은-값) |
 | `app.llm.chats.planning.timeout` | `50s` |
 | `app.llm.chats.planning.max-continuations` | `1` |
+| `app.llm.chats.material.model` | `gpt-5.6-terra` |
+| `app.llm.chats.material.max-completion-tokens` | `10000` — 임시 값(ADR-186) |
+| `app.llm.chats.material.timeout` | `140s` — 임시 값 |
+| `app.llm.chats.material.max-continuations` | `1` |
+| `app.llm.embedding.model` | `text-embedding-3-large` |
+| `app.llm.embedding.timeout` | `20s` — 임시 값 |
 | `app.llm.database-allowance` | `10s` |
 | `app.llm.prices[gpt-5.6-terra].input` | `2.00` USD / 1M 토큰 |
 | `app.llm.prices[gpt-5.6-terra].cached-input` | `0.20` USD / 1M 토큰 |
 | `app.llm.prices[gpt-5.6-terra].output` | `12.00` USD / 1M 토큰 |
+| `app.llm.prices[text-embedding-3-large].input` | `0.13` USD / 1M 토큰(ADR-187) |
+| `app.llm.prices[text-embedding-3-large].cached-input` | `0` — 캐시 입력 과금 없음 |
+| `app.llm.prices[text-embedding-3-large].output` | `0` — 출력 없음 |
 
-모든 채팅 모델에 단가가 있어야 기동한다. 비용은 `(입력 − 캐시 입력) × 입력 단가 + 캐시 입력 × 캐시 단가 + 출력 × 출력 단가`를 1,000,000으로 나눈 USD다. 사용량이 없으면 비용도 비우고, 캐시 정보만 없으면 캐시 입력을 0으로 계산한다. SDK 자동 재시도는 `maxRetries(0)`이며, `RequestOptions`로 요청별 시간 제한을 건다. `CompletionUsage.PromptTokensDetails.cachedTokens()`, `ChatCompletionCreateParams.Builder.addAssistantMessage(String)`, `OpenAIServiceException.statusCode()/code()`, `OpenAIIoException` · `OpenAIInvalidDataException`과 그 `InterruptedIOException` 원인을 4.75.1 소스 JAR로 확인했다. `JsonHandler`가 본문 읽기 시간 초과를 데이터 예외로 감싸므로 원인 타입으로도 검사한다. SDK `OkHttpClient`는 `retryOnConnectionFailure(false)`도 적용한다.
+모든 채팅 · 임베딩 모델에 단가가 있어야 기동한다. 임베딩 단가는 기존 `TokenPrices(input, cachedInput, output)`에 입력 `0.13` · 캐시 입력과 출력 `0`으로 담는다. 임베딩 사용량은 입력 토큰과 출력 `0`을 넘기면 같은 비용 식으로 입력 비용만 계산된다. 비용은 `(입력 − 캐시 입력) × 입력 단가 + 캐시 입력 × 캐시 단가 + 출력 × 출력 단가`를 1,000,000으로 나눈 USD다. 사용량이 없으면 비용도 비우고, 캐시 정보만 없으면 캐시 입력을 0으로 계산한다. SDK 자동 재시도는 `maxRetries(0)`이며, `RequestOptions`로 요청별 시간 제한을 건다. `CompletionUsage.PromptTokensDetails.cachedTokens()`, `ChatCompletionCreateParams.Builder.addAssistantMessage(String)`, `OpenAIServiceException.statusCode()/code()`, `OpenAIIoException` · `OpenAIInvalidDataException`과 그 `InterruptedIOException` 원인을 4.75.1 소스 JAR로 확인했다. `JsonHandler`가 본문 읽기 시간 초과를 데이터 예외로 감싸므로 원인 타입으로도 검사한다. SDK `OkHttpClient`는 `retryOnConnectionFailure(false)`도 적용한다.
 
 | 프로바이더 결과 | 호출 결과 | 작업 실패 |
 |---|---|---|
@@ -347,7 +356,9 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 
 실제 유료 호출은 실행하지 않았다. 가짜 서버가 요청 형식 · 요청 수 · 이어 쓰기와 오류 분류를 확인한다([07 §2](./07-testing.md#2-llm-스텁)).
 
-현재 계산할 수 있는 제약은 `WorkerProperties`의 생성자에서 검사해 설정 바인딩 실패로 기동을 거부한다: 시한 · 갱신/쉬는 간격 · 종료 대기는 양수, `갱신 간격 < 시한`, 워커 수 · 추가 다시 시도 횟수/간격은 0 이상, `종료 대기 < 120초`다. Spring의 130초와 컨테이너의 150초는 늘리지 않고, 반환 트랜잭션 제한 5초를 위한 여유를 남긴다. 워커(단계 `Integer.MAX_VALUE`)는 Tomcat 정상 종료보다 먼저, 따로 멈춘다 — 그래서 실제 종료 시간은 `종료 대기(100초) + 반환(최대 5초) + Tomcat 정상 종료` 의 합이고, 이 합이 컨테이너의 150초 안에 들어와야 한다. 지금 API 요청은 짧아 여유가 있다. 종료 대기 상한 120초는 `WorkerProperties` 에 상수로 있으니 130초를 바꾸면 함께 본다. `WorkerPropertiesTest`는 잘못된 설정의 기동 거부와 실제 Spring 종료 설정이 120초보다 긴 것을 검사하고, 기존 배포 파일 시험이 컨테이너 대기와 Spring 대기의 관계를 검사한다.
+현재 계산할 수 있는 제약은 `WorkerProperties`의 생성자에서 검사해 설정 바인딩 실패로 기동을 거부한다: 시한 · 갱신/쉬는 간격 · 종료 대기는 양수, `갱신 간격 < 시한`, 워커 수 · 추가 다시 시도 횟수/간격은 0 이상, `종료 대기 < 170초`다. Spring 단계 대기는 180초로 반환 트랜잭션 제한 5초를 위한 여유를 10초 이상 남기고, 로컬 · 운영 컨테이너 대기는 220초다. 워커는 Tomcat 정상 종료보다 먼저, 따로 멈춘다 — 실제 종료 시간은 `종료 대기(150초) + 반환(최대 5초) + Tomcat 정상 종료`의 합이다. 컨테이너의 220초에서 워커 대기와 반환을 빼면 Tomcat에 65초가 남는다. 지금 API 요청은 짧아 여유가 있지만, 단계별 제한 180초 전부를 Tomcat이 쓰는 경우까지 보장하는 값은 아니다. 종료 대기 상한 170초는 `WorkerProperties`에 상수로 있으니 Spring 단계 대기를 바꾸면 함께 본다. `WorkerPropertiesTest`는 상한의 엄격한 부등식과 실제 Spring 단계 대기 180초를, `DeployFilesTest`는 두 Compose 파일의 220초가 Spring 단계 대기보다 길고 워커 대기 · 반환 뒤 Tomcat 여유가 남는지를 검사한다.
+
+2026-11-23 로컬 Gradle 캐시의 Spring Boot **4.1.1** · Spring Context **7.0.9** 소스 JAR로 종료 순서를 확인했다. `WorkerLifecycle.getPhase()`는 `Integer.MAX_VALUE`(2,147,483,647), `WebServerGracefulShutdownLifecycle.getPhase()`는 `WebServerApplicationContext.GRACEFUL_SHUTDOWN_PHASE` = `SmartLifecycle.DEFAULT_PHASE - 1024`(2,147,482,623), 서블릿의 `WebServerStartStopLifecycle.getPhase()`는 `START_STOP_LIFECYCLE_PHASE` = 위 값 − 1024(2,147,481,599)다. `DefaultLifecycleProcessor.stopBeans()`는 단계를 내림차순으로 처리하고 `LifecycleGroup.stop()`에서 해당 단계의 콜백을 기다린다. 웹 정상 종료 단계가 호출하는 `TomcatWebServer.shutDownGracefully()` → `GracefulShutdown.doShutdown()`에서 비로소 커넥터를 pause하고 수신 소켓을 닫는다. 따라서 **워커 종료 대기 중 Tomcat은 계속 요청을 받을 수 있다** — 소스의 단계 순서로 확인한 결과이며, 실제 종료 중 HTTP 응답을 보내는 실험은 수행하지 않았다. `AbstractApplicationContext.doClose()`도 `lifecycleProcessor.onClose()` 뒤에 `destroyBeans()`를 호출하므로 이 대기 동안 singleton과 DB 풀은 아직 파괴되지 않는다.
 
 기본 통합 테스트는 공용 `IntegrationTestConfiguration.OAuthInitializer`가 `app.worker.count=0`을 적용한다. 별도 앱 컨텍스트를 늘리지 않고, 워커 시험이 `runOnce()` 또는 짧은 설정으로 직접 만든 `WorkerLifecycle`의 시작 · 종료를 제어한다.
 

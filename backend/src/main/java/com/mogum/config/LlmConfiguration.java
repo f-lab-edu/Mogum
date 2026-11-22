@@ -26,11 +26,12 @@ public class LlmConfiguration {
 		}
 
 		// 이어 쓰기 간격은 0이다. R은 첫 시도 뒤 추가 다시 시도 횟수다.
-		var required = longest.multipliedBy((long)workerProperties.maxRetries() + 1)
+		var required = longest.plus(llmProperties.embedding().timeout())
+			.multipliedBy((long)workerProperties.maxRetries() + 1)
 			.plus(workerProperties.retryDelay().multipliedBy(workerProperties.maxRetries()))
 			.plus(llmProperties.databaseAllowance());
 		Assert.isTrue(workerProperties.leaseDuration().compareTo(required) > 0,
-			"Worker lease must exceed retries, chat calls and database allowance");
+			"Worker lease must exceed retries, chat and embedding calls and database allowance");
 	}
 
 	@Bean(destroyMethod = "close")

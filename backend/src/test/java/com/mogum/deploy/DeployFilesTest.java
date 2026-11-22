@@ -12,6 +12,8 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.yaml.snakeyaml.Yaml;
 
 class DeployFilesTest {
@@ -47,7 +49,7 @@ class DeployFilesTest {
 		var gracePeriod = seconds(service("backend").get("stop_grace_period"));
 
 		// then
-		assertThat(gracePeriod).isGreaterThanOrEqualTo(150);
+		assertThat(gracePeriod).isGreaterThanOrEqualTo(220);
 
 		long total = 0;
 
@@ -69,6 +71,34 @@ class DeployFilesTest {
 		var environment = map(service("backend").get("environment"));
 		assertThat(environment.get("SPRING_PROFILES_ACTIVE")).isEqualTo("aws");
 		assertThat(environment.get("DB_URL")).isEqualTo("jdbc:postgresql://postgres:5432/mogum");
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@ValueSource(strings = {"../compose.yaml", "../deploy/compose.yaml"})
+	@DisplayName("로컬과 운영 컨테이너는 Spring 단계와 워커 종료 및 반환보다 오래 기다린다")
+	void allowsWorkerReleaseAndWebServerShutdown(String file) throws Exception {
+		// given
+		Map<String, Object> application;
+		try (var input = Files.newInputStream(Path.of("src/main/resources/application.yml"))) {
+			application = new Yaml().load(input);
+		}
+		var springWait = seconds(map(map(application.get("spring")).get("lifecycle"))
+			.get("timeout-per-shutdown-phase"));
+		var workerWait = seconds(map(map(application.get("app")).get("worker")).get("shutdown-wait"));
+
+		// when
+		Map<String, Object> compose;
+		try (var input = Files.newInputStream(Path.of(file))) {
+			compose = new Yaml().load(input);
+		}
+		var gracePeriod = seconds(map(map(compose.get("services")).get("backend")).get("stop_grace_period"));
+
+		// then
+		assertThat(workerWait).isEqualTo(150).isLessThan(170);
+		assertThat(springWait).isEqualTo(180).isGreaterThan(170);
+		assertThat(gracePeriod).isEqualTo(220).isGreaterThan(springWait);
+		// 단계별 제한은 전체 제한이 아니다. 워커 반환(최대 5초) 뒤 Tomcat에 남는 컨테이너 여유다.
+		assertThat(gracePeriod - workerWait - 5).isEqualTo(65).isPositive();
 	}
 
 	@Test

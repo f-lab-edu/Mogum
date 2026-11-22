@@ -44,7 +44,9 @@ class GenerationConfigurationTest {
 			.withBean(RoadmapRepository.class, () -> mock(RoadmapRepository.class))
 			.withBean(LessonRepository.class, () -> mock(LessonRepository.class))
 			.withBean(LlmProperties.class, () -> new LlmProperties(new LlmProperties.Openai("fake-key", ""),
-				Map.of("planning", new ChatSettings("test-model", 4000, Duration.ofSeconds(50), 1)),
+				Map.of("planning", new ChatSettings("test-model", 4000, Duration.ofSeconds(50), 1),
+					"material", new ChatSettings("test-model", 10000, Duration.ofSeconds(140), 1)),
+				new LlmProperties.Embedding("test-model", Duration.ofSeconds(20)),
 				Map.of("test-model", new TokenPrices(BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE)),
 				Duration.ofSeconds(10)));
 

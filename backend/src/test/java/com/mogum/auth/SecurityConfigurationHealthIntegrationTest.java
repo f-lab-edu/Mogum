@@ -91,7 +91,7 @@ class SecurityConfigurationHealthIntegrationTest {
 		var timeout = Binder.get(environment).bind("spring.lifecycle.timeout-per-shutdown-phase", Duration.class).get();
 
 		// then
-		assertThat(timeout).isEqualTo(Duration.ofSeconds(130));
+		assertThat(timeout).isEqualTo(Duration.ofSeconds(180));
 		assertThat(environment.getProperty("server.shutdown")).isEqualTo("graceful");
 	}
 }

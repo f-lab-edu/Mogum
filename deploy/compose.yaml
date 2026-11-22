@@ -23,7 +23,7 @@ services:
     logging:
       driver: journald
     mem_limit: 1024m
-    stop_grace_period: 150s
+    stop_grace_period: 220s
     environment:
       SPRING_PROFILES_ACTIVE: aws
       DB_URL: jdbc:postgresql://postgres:5432/mogum
