@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 @SpringBootApplication
 @ConfigurationPropertiesScan
 public class MogumApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(MogumApplication.class, args);
-    }
+	public static void main(String[] args) {
+		SpringApplication.run(MogumApplication.class, args);
+	}
 }

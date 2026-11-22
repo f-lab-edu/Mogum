@@ -1,6 +1,7 @@
 package com.mogum.course.domain;
 
 import com.mogum.common.persistence.AuditedEntity;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -18,25 +19,24 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "materials", uniqueConstraints = @UniqueConstraint(
-        name = "materials_lesson_id_key", columnNames = "lesson_id"))
+@Table(name = "materials", uniqueConstraints = @UniqueConstraint(name = "materials_l"
+	+ "esson_id_key", columnNames = "lesson_id"))
 public class Material extends AuditedEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "lesson_id", nullable = false)
-    private Lesson lesson;
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "lesson_id", nullable = false)
+	private Lesson lesson;
 
-    @Column(nullable = false, columnDefinition = "text")
-    private String body;
+	@Column(nullable = false, columnDefinition = "text")
+	private String body;
 
-    public static Material write(Lesson lesson, String body) {
-        var material = new Material();
-        material.lesson = lesson;
-        material.body = body;
-        return material;
-    }
+	public static Material write(Lesson lesson, String body) {
+		var material = new Material();
+		material.lesson = lesson;
+		material.body = body;
+		return material;
+	}
 }
-

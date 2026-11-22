@@ -1,12 +1,10 @@
 package com.mogum.common.persistence;
 
-import com.mogum.account.domain.User;
-import com.mogum.account.domain.UserFixtures;
-import com.mogum.account.repository.UserRepository;
-import com.mogum.support.RepositoryTest;
-import com.mogum.support.TestClock;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Duration;
+import java.time.Instant;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,61 +12,70 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.Duration;
-import java.time.Instant;
+import com.mogum.account.domain.User;
+import com.mogum.account.domain.UserFixtures;
+import com.mogum.account.repository.UserRepository;
+import com.mogum.support.RepositoryTest;
+import com.mogum.support.TestClock;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 
 @RepositoryTest
 class AuditedEntityTest {
-    @Autowired private UserRepository userRepository;
-    @Autowired private JdbcTemplate jdbcTemplate;
-    @Autowired private TestClock testClock;
-    @Autowired private PlatformTransactionManager platformTransactionManager;
-    @PersistenceContext private EntityManager entityManager;
+	@Autowired
+	private UserRepository userRepository;
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
+	@Autowired
+	private TestClock testClock;
+	@Autowired
+	private PlatformTransactionManager platformTransactionManager;
+	@PersistenceContext
+	private EntityManager entityManager;
 
-    @Test
-    @DisplayName("저장하면 생성과 수정 시각을 주입한 시계의 마이크로초 정밀도로 채운다")
-    void fillsCreationAndModificationTimesOnSave() {
-        // given
-        var created = Instant.parse("2026-10-28T01:02:03.123456Z");
-        testClock.set(created);
+	@Test
+	@DisplayName("저장하면 생성과 수정 시각을 주입한 시계의 마이크로초 정밀도로 채운다")
+	void fillsCreationAndModificationTimesOnSave() {
+		// given
+		var created = Instant.parse("2026-10-28T01:02:03.123456Z");
+		testClock.set(created);
 
-        // when
-        var saved = userRepository.save(UserFixtures.user("audit@example.com"));
+		// when
+		var saved = userRepository.save(UserFixtures.user("audit@example.com"));
 
-        // then
-        assertTimes(saved.getId(), created, created);
-    }
+		// then
+		assertTimes(saved.getId(), created, created);
+	}
 
-    @Test
-    @DisplayName("변경을 커밋하면 생성 시각은 보존하고 수정 시각만 새 시각으로 바뀐다")
-    void updatesOnlyModificationTimeOnCommit() {
-        // given
-        var created = Instant.parse("2026-10-28T01:02:03.123456Z");
-        testClock.set(created);
-        var saved = userRepository.save(UserFixtures.user("audit@example.com"));
-        testClock.advance(Duration.ofSeconds(60));
-        var transactions = new TransactionTemplate(platformTransactionManager);
+	@Test
+	@DisplayName("변경을 커밋하면 생성 시각은 보존하고 수정 시각만 새 시각으로 바뀐다")
+	void updatesOnlyModificationTimeOnCommit() {
+		// given
+		var created = Instant.parse("2026-10-28T01:02:03.123456Z");
+		testClock.set(created);
+		var saved = userRepository.save(UserFixtures.user("audit@example.com"));
+		testClock.advance(Duration.ofSeconds(60));
+		var transactions = new TransactionTemplate(platformTransactionManager);
 
-        // when
-        transactions.executeWithoutResult(status ->
-                UserFixtures.withEmail(entityManager.find(User.class, saved.getId()), "changed@example.com"));
+		// when
+		transactions.executeWithoutResult(
+			status -> UserFixtures.withEmail(entityManager.find(User.class, saved.getId()), "changed@example.com"));
 
-        // then
-        assertThat(userRepository.findById(saved.getId()).orElseThrow().getEmail()).isEqualTo("changed@example.com");
-        assertTimes(saved.getId(), created, created.plusSeconds(60));
-    }
+		// then
+		assertThat(userRepository.findById(saved.getId()).orElseThrow().getEmail()).isEqualTo("changed@example.com");
+		assertTimes(saved.getId(), created, created.plusSeconds(60));
+	}
 
-    private void assertTimes(long id, Instant created, Instant updated) {
-        var reloaded = userRepository.findById(id).orElseThrow();
-        assertThat(reloaded.getCreatedAt()).isEqualTo(created);
-        assertThat(reloaded.getUpdatedAt()).isEqualTo(updated);
+	private void assertTimes(long id, Instant created, Instant updated) {
+		var reloaded = userRepository.findById(id).orElseThrow();
+		assertThat(reloaded.getCreatedAt()).isEqualTo(created);
+		assertThat(reloaded.getUpdatedAt()).isEqualTo(updated);
 
-        jdbcTemplate.queryForObject("SELECT created_at, updated_at FROM users WHERE id = ?", (row, index) -> {
-            assertThat(row.getTimestamp("created_at").toInstant()).isEqualTo(created);
-            assertThat(row.getTimestamp("updated_at").toInstant()).isEqualTo(updated);
-            return id;
-        }, id);
-    }
+		jdbcTemplate.queryForObject("SELECT created_at, updated_at FROM users WHERE id = ?", (row, index) -> {
+			assertThat(row.getTimestamp("created_at").toInstant()).isEqualTo(created);
+			assertThat(row.getTimestamp("updated_at").toInstant()).isEqualTo(updated);
+			return id;
+		}, id);
+	}
 }

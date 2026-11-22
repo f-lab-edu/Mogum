@@ -1,61 +1,66 @@
 package com.mogum.card.repository;
 
-import com.mogum.account.domain.UserFixtures;
-import com.mogum.account.repository.UserRepository;
-import com.mogum.card.domain.ConceptFixtures;
-import com.mogum.support.RepositoryTest;
-import com.mogum.support.TestClock;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import com.mogum.account.domain.UserFixtures;
+import com.mogum.account.repository.UserRepository;
+import com.mogum.card.domain.ConceptFixtures;
+import com.mogum.support.RepositoryTest;
+import com.mogum.support.TestClock;
 
 @RepositoryTest
 class ConceptRepositoryTest {
-    @Autowired private UserRepository userRepository;
-    @Autowired private ConceptRepository conceptRepository;
-    @Autowired private JdbcTemplate jdbcTemplate;
-    @Autowired private TestClock testClock;
+	@Autowired
+	private UserRepository userRepository;
+	@Autowired
+	private ConceptRepository conceptRepository;
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
+	@Autowired
+	private TestClock testClock;
 
-    @Test
-    @DisplayName("차원 없는 vector 매핑은 3차원과 5차원 임베딩의 값과 개념 및 시각을 함께 보존한다")
-    void reloadsEmbeddingsWithDifferentDimensions() {
-        // given
-        var user = userRepository.save(UserFixtures.user("me@example.com"));
-        var shortVector = new float[]{0.25f, -0.5f, 1.125f};
-        var longVector = new float[]{-1, 0, 0.125f, 2.5f, 3};
+	@Test
+	@DisplayName("차원 없는 vector 매핑은 3차원과 5차원 임베딩의 값과 개념 및 시각을 함께 보존한다")
+	void reloadsEmbeddingsWithDifferentDimensions() {
+		// given
+		var user = userRepository.save(UserFixtures.user("me@example.com"));
+		var shortVector = new float[] {0.25f, -0.5f, 1.125f};
+		var longVector = new float[] {-1, 0, 0.125f, 2.5f, 3};
 
-        var first = conceptRepository.save(ConceptFixtures.concept(user.getId(), "변수", "값을 담는 이름", shortVector));
-        var second = conceptRepository.save(ConceptFixtures.concept(user.getId(), "타입", "값의 종류", longVector));
+		var first = conceptRepository.save(ConceptFixtures.concept(user.getId(), "변수", "값을 담는 이름", shortVector));
+		var second = conceptRepository.save(ConceptFixtures.concept(user.getId(), "타입", "값의 종류", longVector));
 
-        // when
-        var actual = conceptRepository.findById(first.getId()).orElseThrow();
+		// when
+		var actual = conceptRepository.findById(first.getId()).orElseThrow();
 
-        // then
-        assertThat(actual).isNotSameAs(first);
-        assertThat(actual.getId()).isPositive();
-        assertThat(actual.getUserId()).isEqualTo(user.getId());
-        assertThat(actual.getName()).isEqualTo("변수");
-        assertThat(actual.getDefinition()).isEqualTo("값을 담는 이름");
-        assertThat(actual.getEmbedding()).containsExactly(shortVector);
+		// then
+		assertThat(actual).isNotSameAs(first);
+		assertThat(actual.getId()).isPositive();
+		assertThat(actual.getUserId()).isEqualTo(user.getId());
+		assertThat(actual.getName()).isEqualTo("변수");
+		assertThat(actual.getDefinition()).isEqualTo("값을 담는 이름");
+		assertThat(actual.getEmbedding()).containsExactly(shortVector);
 
-        assertThat(actual.getCreatedAt()).isEqualTo(testClock.instant());
-        assertThat(actual.getUpdatedAt()).isEqualTo(testClock.instant());
+		assertThat(actual.getCreatedAt()).isEqualTo(testClock.instant());
+		assertThat(actual.getUpdatedAt()).isEqualTo(testClock.instant());
 
-        var other = conceptRepository.findById(second.getId()).orElseThrow();
-        assertThat(other).isNotSameAs(second);
-        assertThat(other.getUserId()).isEqualTo(user.getId());
-        assertThat(other.getName()).isEqualTo("타입");
-        assertThat(other.getDefinition()).isEqualTo("값의 종류");
-        assertThat(other.getEmbedding()).containsExactly(longVector);
+		var other = conceptRepository.findById(second.getId()).orElseThrow();
+		assertThat(other).isNotSameAs(second);
+		assertThat(other.getUserId()).isEqualTo(user.getId());
+		assertThat(other.getName()).isEqualTo("타입");
+		assertThat(other.getDefinition()).isEqualTo("값의 종류");
+		assertThat(other.getEmbedding()).containsExactly(longVector);
 
-        assertThat(jdbcTemplate.queryForList("SELECT vector_dims(embedding) FROM concepts ORDER BY id", Integer.class))
-                .containsExactly(3, 5);
-        assertThat(jdbcTemplate.queryForObject("""
-                SELECT format_type(atttypid, atttypmod) FROM pg_attribute
-                WHERE attrelid = 'concepts'::regclass AND attname = 'embedding'
-                """, String.class)).isEqualTo("vector");
-    }
+		assertThat(jdbcTemplate.queryForList("SELECT vector_dims(embedding) FROM concepts ORDER BY id", Integer.class))
+			.containsExactly(3, 5);
+		assertThat(jdbcTemplate.queryForObject("""
+			SELECT format_type(atttypid, atttypmod) FROM pg_attribute
+			WHERE attrelid = 'concepts'::regclass AND attname = 'embedding'
+			""", String.class)).isEqualTo("vector");
+	}
 }

@@ -5,6 +5,6 @@ import jakarta.persistence.Id;
 
 @Entity
 public class UnauditedEntity {
-    @Id
-    private Long id;
+	@Id
+	private Long id;
 }

@@ -1,7 +1,9 @@
 package repositoryfixture;
 
-import com.mogum.account.domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface BroadUserRepository extends JpaRepository<User, Long> {
-}
+import com.mogum.account.domain.User;
+
+// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
+public interface BroadUserRepository extends JpaRepository<User, Long> {}
+// @checkstyle:on
