@@ -86,7 +86,15 @@
     {
       "step": 6,
       "name": "lesson-screen",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-23T13:51:36+0900",
+      "summary": "강의 화면 /courses/:courseId/lessons/:lessonId(frontend/src/pages/LessonPage.tsx)·축하 화면 /courses/:courseId/done(frontend/src/pages/CelebrationPage.tsx) 연결; 완료한 강의·nextLessonId만 링크, 최신 강의 읽기 뒤 useRef 요청 표식+mutation으로 StrictMode MATERIAL 받기 한 번 및 작업 화면 replace 이동; useLesson의 완료 중 잠금·서버 문구·강의 캐시 삭제/코스 캐시 무효화와 코스/축하 replace 분기, 모구미 사본·코스 제목 문구 하나·홈으로 구현; CoursePage.test.tsx 두 줄·RoadmapPage.test.tsx 한 줄의 ROADMAP_REPLAN_IN_PROGRESS를 REPLAN_IN_PROGRESS로 교체; UI_GUIDE §13·§14와 기존 주소/코스 링크 사실 반영, 화면 시험 423→448(+25)·test/lint/build 통과, Chromium 390px/1280px에서 코드·표·그림·블록 수식 내부 스크롤·페이지 폭·오류 뒤 본문·축하 화면/홈 이동 확인, 실제 OpenAI 호출·커밋 없음",
+      "completed_at": "2026-11-23T18:30:39+0900",
+      "review_notes": [
+        "docs/UI_GUIDE.md §13 끝 문단 — 「API만 대역으로 둔 로컬 Vite 화면을 실제 Chromium의 390px·1280px에서 수동 확인했다」는 문장은 리뷰에서 다시 확인할 수 없다(테스트·AC 밖이다). 실제로 확인한 게 아니라면 \"수동 확인은 아직\"으로 고친다.",
+        "frontend/src/api/useLesson.ts:44-49 — 학습 완료 뒤 코스 캐시만 무효화한다. 로드맵의 마지막 코스를 마치면 로드맵이 다 마침이 되는데, 로드맵 캐시(`roadmapKey`)는 그대로라 로드맵 화면을 열면 다시 읽기 전까지 잠깐 옛 상태가 보일 수 있다. 다시 읽기 전의 짧은 순간이라 동작에 큰 영향은 없다. 필요하면 roadmaps 캐시도 refetchType 'none'으로 무효화한다.",
+        "frontend/src/pages/LessonPage.tsx:35 — `lesson.isFetching` 중에는 본문 대신 불러오는 중 표시를 보인다. 지금은 창 포커스·재연결 때 다시 읽기를 꺼 둬서 괜찮다. 뒤에 다시 읽기 조건을 켜면 읽던 본문이 깜빡이니, 그때 갈래 판단(ready)과 렌더링 조건을 나눈다."
+      ]
     }
   ],
   "created_at": "2026-11-23T08:16:45+0900"
