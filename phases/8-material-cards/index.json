@@ -111,7 +111,13 @@
     {
       "step": 8,
       "name": "lesson-screen-fixes",
-      "status": "pending"
+      "status": "completed",
+      "summary": "Mermaid 그림 id를 보안 컨텍스트가 필요 없는 모듈 카운터+material-diagram- 접두사로 변경하고 UUID 부재·여러 그림·재마운트 유일성 검증; 학습 완료 뒤 코스와 같은 방식으로 로드맵 목록·상세 읽기 취소 및 refetchType none 무효화 추가, 코스 완료 여부 무관·늦은 읽기 차단·즉시 재조회 없음 검증; UI_GUIDE §12·§13 반영, TDD·화면 테스트 448→453(+5)·test/lint 통과, 렌더러 보안 설정 유지·서버 변경·커밋 없음",
+      "started_at": "2026-11-23T19:58:12+0900",
+      "completed_at": "2026-11-23T20:00:30+0900",
+      "review_notes": [
+        "frontend/src/components/MaterialBody.test.tsx:92 — `Object.create(crypto, …)`로 만든 대역은 jsdom·Node 환경이라 통과한다. 실제 브라우저의 `Crypto` 에서는 프로토타입 getter 호출이 `Illegal invocation` 으로 실패할 수 있으니, 환경을 바꿀 때는 `{ ...필요한 것만 }` 같은 평범한 객체 대역을 고려한다."
+      ]
     }
   ],
   "created_at": "2026-11-23T08:16:45+0900",
