@@ -129,6 +129,16 @@
       "review_notes": [
         "backend/src/test/java/com/mogum/card/service/LessonCardWriterIntegrationTest.java:56-59,134-136 — 「기준값 이상이면 붙인다」 시험은 유사도 0.8 인 벡터({4,3}·{1,0})와 실제 설정값을 씁니다. 그래서 설정이 0.8 보다 높아지면 시험이 조용히 깨집니다. 지금 값 0.72 에서는 통과하니 승인은 막지 않습니다 → 다음에 기준값을 다시 잴 때, 벡터를 설정값 바로 위 · 아래로 정하거나 경계 케이스를 ConceptSimilaritySearchImplTest 쪽에만 두는 것을 생각해 보세요."
       ]
+    },
+    {
+      "step": 10,
+      "name": "sonar-record-array",
+      "status": "pending"
+    },
+    {
+      "step": 11,
+      "name": "sonar-scroll-tabindex",
+      "status": "pending"
     }
   ],
   "created_at": "2026-11-23T08:16:45+0900",
