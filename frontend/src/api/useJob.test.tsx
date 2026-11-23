@@ -102,3 +102,9 @@ test.each([
   expect(fetch).toHaveBeenCalledWith('/api/jobs', expect.objectContaining({ method: 'POST', credentials: 'include', body: JSON.stringify(request) }))
   expect(new Headers(vi.mocked(fetch).mock.calls[0][1]!.headers).get('X-XSRF-TOKEN')).toBe('roadmap-csrf')
 })
+
+test('강의 자료 받기는 종류와 강의 ID만 보낸다', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { id: 77, type: 'MATERIAL', status: 'QUEUED', subject: { title: '변수' } } }))))
+  expect(await receiveJob({ type: 'MATERIAL', lessonId: 51 })).toMatchObject({ id: 77, type: 'MATERIAL' })
+  expect(fetch).toHaveBeenCalledWith('/api/jobs', expect.objectContaining({ method: 'POST', body: JSON.stringify({ type: 'MATERIAL', lessonId: 51 }) }))
+})
