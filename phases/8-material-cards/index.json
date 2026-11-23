@@ -133,7 +133,13 @@
     {
       "step": 10,
       "name": "sonar-record-array",
-      "status": "pending"
+      "status": "completed",
+      "summary": "NewConcept의 배열 내용 기반 equals·hashCode와 차원 수만 표시하는 toString 및 생성자·접근자 방어 복사 구현; 단위 시험 7개를 먼저 작성해 실패 확인 후 통과, 개념 판정·저장 로직 유지, 지정 card·generation 시험과 전체 build·Spotless·Checkstyle 통과, 커밋 없음",
+      "started_at": "2026-11-24T06:34:13+0900",
+      "completed_at": "2026-11-24T06:40:51+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/card/service/LessonCardWriter.java:58 — 이제 생성자가 `embedding.clone()` 을 하므로 `embedding` 이 null 이면 record 를 만드는 순간 NPE 가 난다. 전에는 `Concept.add` 의 clone 에서 났다. `MaterialGenerator.java:63` 의 `byDefinition.get(...)` 은 같은 definitions 목록으로 채운 맵에서 꺼내므로 실제로는 null 이 나오지 않는다. 혹시 나오더라도 이제는 generate 의 try 안에서 터져 '서비스 사용 불가'(unavailable) 실패로 처리된다. 정상 흐름에는 영향이 없다 → 고치지 않아도 된다. 참고로만 적는다."
+      ]
     },
     {
       "step": 11,
