@@ -286,7 +286,7 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 
 ## 10. 아직 정하지 않은 값
 
-같은 개념 판정은 `app.concept.same-threshold`(`config.ConceptProperties.sameThreshold()`)로 설정한다. `0.80`은 임시 값 — 실측 전이며, 0 초과 1 이하가 아니면 기동을 거부한다. 강의 자료 TASK의 phase 뒤 · 병합 전에 `llmTest`로 실제 개념 쌍을 재서 바꾼다(ADR-187).
+같은 개념 판정은 `app.concept.same-threshold`(`config.ConceptProperties.sameThreshold()`)로 설정한다. `0.72` — 2026-11-23 실측(ADR-187)으로 정함. 숙련도 고리 TASK 전에 실제 흐름으로 다시 잰다. 0 초과 1 이하가 아니면 기동을 거부한다.
 
 | 값 | 근거 |
 |---|---|

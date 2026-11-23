@@ -519,4 +519,4 @@ PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md)
 
 | 것 | 근거 |
 |---|---|
-| 같은 개념 판정의 기준값 — `app.concept.same-threshold`(`ConceptProperties.sameThreshold()`), `0.80`은 임시 값 — 실측 전. 임베딩 모델은 `text-embedding-3-large` 로 정했다. 강의 자료 TASK 의 phase 뒤 · 병합 전에 `llmTest` 실측 시험(실제 개념 쌍)으로 잰다 | ADR-030 · ADR-161 · ADR-187 |
+| 같은 개념 판정의 기준값 — `app.concept.same-threshold`(`ConceptProperties.sameThreshold()`), `0.72` — 2026-11-23 실측(ADR-187)으로 정함. 임베딩 모델은 `text-embedding-3-large` 로 정했다. 숙련도 고리 TASK 전에 실제 흐름으로 다시 잰다 | ADR-030 · ADR-161 · ADR-187 |

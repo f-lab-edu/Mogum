@@ -17,13 +17,13 @@ class ConceptPropertiesTest {
 		.withUserConfiguration(PropertiesConfiguration.class);
 
 	@Test
-	@DisplayName("같은 개념 기준값은 설정에서 실측 전 임시 값 0.80을 읽는다")
-	void readsTemporaryThreshold() {
+	@DisplayName("같은 개념 기준값은 설정에서 실측으로 정한 0.72를 읽는다")
+	void readsMeasuredThreshold() {
 		// when
 		applicationContextRunner.run(context -> {
 			// then
 			assertThat(context).hasNotFailed();
-			assertThat(context.getBean(ConceptProperties.class).sameThreshold()).isEqualTo(0.80);
+			assertThat(context.getBean(ConceptProperties.class).sameThreshold()).isEqualTo(0.72);
 		});
 	}
 

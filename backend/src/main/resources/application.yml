@@ -98,8 +98,8 @@ app:
   job:
     max-in-progress-per-user: 3
   concept:
-    # 임시 값 — 실측 전. phase 뒤 · 병합 전에 llmTest 실측으로 바꾼다(ADR-187).
-    same-threshold: 0.80
+    # 2026-11-23 실측으로 정함(ADR-187) — 숙련도 고리 TASK 전에 실제 흐름으로 다시 잰다.
+    same-threshold: 0.72
   credit:
     monthly-amount: 100
     new-course: 1
