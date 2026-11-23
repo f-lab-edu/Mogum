@@ -46,17 +46,10 @@
 - 강의 목록 TASK(`7-course-planning` step 5) 구현: 코스 · 로드맵의 다시 짜기 받기는 검토 중이 아니면 `REPLAN_NOT_ALLOWED`(409), 「검토 중일 때만 다시 짤 수 있어요」로 거절한다. 화면에서 현재 대상 상태를 확인하도록 두 종류가 같은 묶음을 쓴다.
 - 강의 목록 TASK(`7-course-planning` step 6) 구현: 짜기 전 코스의 「이대로 시작」은 `COURSE_START_NOT_ALLOWED`(409), 「강의 목록이 만들어진 뒤 시작할 수 있어요」로 거절한다. 검토 중 코스에 성공하지 않은 코스 다시 짜기(`QUEUED` · `RUNNING` · `FAILED`)가 있으면 같은 `REPLAN_IN_PROGRESS`(409)로 거절한다. 제목의 누락 · 빈 글 · 공백만 있는 글은 `FIELD_INVALID`(400)의 `title: REQUIRED`, 100 코드 포인트 초과는 `title: TOO_LONG`이다.
 - 강의 목록 TASK(`7-course-planning` step 7) 구현: 칸 오류(`FIELD_INVALID`)의 서버 문구는 「입력을 확인해 주십시오」 하나이고, 칸 옆의 설명은 화면이 `reason`(`REQUIRED` · `TOO_LONG` · `INVALID_VALUE` · `NOT_ALLOWED`)으로 고른다(`frontend/src/components/FieldError.tsx`). 오류 code · `reason` 자체는 화면에 보이지 않는다(§1.4).
-
-강의 자료 TASK(`8-material-cards` step 3)의 강의 열기 거절은 다음 묶음을 쓴다. 강의 읽기 · 학습 완료에서도 같은 묶음을 쓴다.
-
-| 묶음(code) | 언제 | 상태 코드 | 문구 |
-|---|---|---|---|
-| `LESSON_NOT_OPEN` | 코스가 학습 중 · 다 마침이 아니거나 앞 순서 강의 중 미완료가 있을 때 | 409 | 코스를 시작하고 앞 강의를 학습 완료하면 열 수 있어요 |
-
+- 강의 자료 TASK(`8-material-cards` step 3) 구현: 강의를 열 수 없으면 — 코스가 학습 중 · 다 마침이 아니거나 앞 순서 강의 가운데 학습 완료하지 않은 것이 있으면 — `LESSON_NOT_OPEN`(409), 「코스를 시작하고 앞 강의를 학습 완료하면 열 수 있어요」로 거절한다. 강의 자료 받기(`MATERIAL`) · 강의 읽기 · 학습 완료가 같은 code 를 쓴다.
+- 강의 자료 TASK(`8-material-cards` step 4) 구현: 강의 자료가 없는 강의의 학습 완료는 `LESSON_MATERIAL_REQUIRED`(409), 「강의 자료가 만들어진 뒤 학습 완료할 수 있어요」로 거절한다. 화면은 강의를 다시 읽어 자료 또는 작업을 확인한다.
 - 기술적인 원인(응답이 잘림 · 서버 응답 없음 등)은 싣지 않는다(ADR-088).
 - 만들기 실패도 작업을 읽을 때 같은 모양으로 싣는다.
-
-- 강의 자료 TASK(`8-material-cards` step 4) 구현: 강의 자료가 없는 강의의 학습 완료는 `LESSON_MATERIAL_REQUIRED`(409), 「강의 자료가 만들어진 뒤 학습 완료할 수 있어요」로 거절한다. 화면은 강의를 다시 읽어 자료 또는 작업을 확인한다.
 
 ### 1.3 소유권 — 남의 것은 없는 것으로
 
