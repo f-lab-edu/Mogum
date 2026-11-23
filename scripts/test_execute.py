@@ -617,6 +617,54 @@ class TestReviewStep:
         assert "notes" in prompt
         assert "확인하지 못한 위험" in prompt
 
+    def _review_prompt(self, executor, step_num=2):
+        mock_result = MagicMock(returncode=0, stdout=_claude_json(self.APPROVE), stderr="")
+        with patch("subprocess.run", return_value=mock_result) as mock_run:
+            executor._review_step({"step": step_num, "name": "ui"}, "abc123")
+        return mock_run.call_args[1]["input"]
+
+    def _set_notes(self, executor, notes_by_step):
+        index = json.loads(executor._index_file.read_text())
+        for s in index["steps"]:
+            if s["step"] in notes_by_step:
+                s["review_notes"] = notes_by_step[s["step"]]
+        executor._index_file.write_text(json.dumps(index, ensure_ascii=False))
+
+    def test_prompt_carries_previous_review_notes(self, executor):
+        """앞 step 승인 리뷰가 뒤 step 에 넘긴 권고를 다음 리뷰어가 받는다(H26)."""
+        self._set_notes(executor, {0: ["a.py:1 — step 2 리뷰 때 X 를 확인한다"], 1: ["b.py:2 — Y 는 다음 step 에서"]})
+
+        prompt = self._review_prompt(executor)
+
+        assert "앞 step 리뷰가 넘긴 권고" in prompt
+        assert "Step 0 (setup): a.py:1 — step 2 리뷰 때 X 를 확인한다" in prompt
+        assert "Step 1 (core): b.py:2 — Y 는 다음 step 에서" in prompt
+        assert "summary" in prompt[prompt.index("앞 step 리뷰가 넘긴 권고"):]
+
+    def test_prompt_has_no_previous_notes_section_without_notes(self, executor):
+        prompt = self._review_prompt(executor)
+
+        assert "앞 step 리뷰가 넘긴 권고" not in prompt
+
+    def test_prompt_carries_only_earlier_completed_steps_notes(self, executor):
+        """이번 step 이나 끝나지 않은 step 의 권고는 넘기지 않는다."""
+        index = json.loads(executor._index_file.read_text())
+        index["steps"].append({"step": 3, "name": "later", "status": "pending"})
+        executor._index_file.write_text(json.dumps(index, ensure_ascii=False))
+        self._set_notes(executor, {1: ["앞 권고"], 2: ["이번 step 의 옛 권고"], 3: ["뒤 권고"]})
+
+        prompt = self._review_prompt(executor)
+
+        assert "앞 권고" in prompt
+        assert "이번 step 의 옛 권고" not in prompt
+        assert "뒤 권고" not in prompt
+
+    def test_prompt_asks_for_korean_output(self, executor):
+        """사람이 읽는 summary · findings · notes 가 영어로 나오지 않게 한다(H25)."""
+        prompt = self._review_prompt(executor)
+
+        assert "summary · findings · notes 는 한국어로 쓴다" in prompt
+
     def test_returns_structured_output_and_saves(self, executor):
         mock_result = MagicMock(returncode=0, stdout=_claude_json(self.APPROVE), stderr="")
         step = {"step": 2, "name": "ui"}

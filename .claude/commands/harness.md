@@ -172,7 +172,7 @@ python3 scripts/execute.py {task-name} --push  # 실행 후 push
 step 하나의 흐름:
 
 1. **Codex 구현** — `codex exec --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust`. 프롬프트는 작업 규칙 · 이전 step summary · step 파일이다. `AGENTS.md` 는 Codex 가 스스로 읽는다. 샌드박스를 끄는 이유는 Gradle(`~/.gradle` · 네트워크)과 Testcontainers(Docker 소켓)가 workspace-write 에서 막히기 때문이다. 되돌리기 어려운 명령은 `.codex/rules/harness.rules` 가 막는다. TDD 는 `.codex/hooks.json` 의 TDD 가드가 강제한다. 훅 신뢰 승인을 건너뛰는 이유는, 승인 전이거나 고친 뒤 재승인 전인 훅이 `exec` 에서 조용히 빠지기 때문이다.
-2. **Claude 리뷰** — Codex 가 `completed` 로 끝내면 `claude -p --permission-mode dontAsk` 가 읽기 전용으로 리뷰한다. 볼 수 있는 것은 이 step 시작 커밋 이후의 diff 와 untracked 파일이다. AC 를 다시 돌리고 `approve` / `request_changes` 를 JSON 으로 판정한다. 승인을 막지 않는 권고는 `notes` 에 따로 적는다 — 핵심 흐름을 깰 수 있는데 확인하지 못한 위험은 권고가 아니라 반려다. 결과는 `phases/{task}/step{N}-review.json` 에 남는다.
+2. **Claude 리뷰** — Codex 가 `completed` 로 끝내면 `claude -p --permission-mode dontAsk` 가 읽기 전용으로 리뷰한다. 볼 수 있는 것은 이 step 시작 커밋 이후의 diff 와 untracked 파일이다. AC 를 다시 돌리고 `approve` / `request_changes` 를 JSON 으로 판정한다. 승인을 막지 않는 권고는 `notes` 에 따로 적는다 — 핵심 흐름을 깰 수 있는데 확인하지 못한 위험은 권고가 아니라 반려다. 결과는 `phases/{task}/step{N}-review.json` 에 남는다. summary · findings · notes 는 한국어로 쓰게 지시한다. 앞 step 들의 `review_notes` 를 「앞 step 리뷰가 넘긴 권고」로 함께 받아, 이 step 에 넘긴 것이 있으면 확인 결과를 summary 에 「앞 권고:」로 적는다 — 권고만을 이유로 반려하지는 않는다. Codex 프롬프트에는 넣지 않는다(step 범위를 넓히지 않게).
 3. **승인** → 코드(`feat`)와 메타데이터(`chore`)를 나눠 커밋한다. 권고(`notes`)가 있으면 승인 줄 아래 `⚑ 권고:` 로 찍고 index 의 그 step 에 `review_notes` 로 남긴다 — 감시할 때 · `/review` 때 이것을 본다.
    **반려** → 지적 사항(findings)을 다음 Codex 시도의 프롬프트에 넣는다. 이전 시도의 변경은 작업 트리에 남긴 채로 고치게 한다. Codex 실패와 리뷰 반려를 합쳐 최대 3회 시도한다.
    **판정 없음**(리뷰 출력 파싱 실패 · 시간 초과) → Codex 를 다시 돌리지 않고 리뷰만 한 번 더 한다. 그래도 없으면 `error`. 리뷰가 사용 한도에 걸린 것은 판정 없음으로 세지 않는다(아래 「사용 한도」).
@@ -189,6 +189,8 @@ execute.py가 자동으로 처리하는 것:
 - 타임스탬프 — started_at, completed_at, failed_at, blocked_at 자동 기록
 
 실행을 감시할 때 — 재시도 · 반려 · blocked 와 그 원인, 사람이 끼어든 지점, 유난히 오래 걸린 step 을 메모해 둔다. F 의 하네스 회고에 쓴다. 로그 파일로 돌리면(`> log 2>&1`) 진행 표시는 프레임 대신 `◐ {작업} — 시작` · `◐ {작업} — 끝 [N초]` 두 줄만 남고 결과 줄과 순서가 맞는다.
+
+대화 Claude 가 실행을 대신 돌릴 때 — 실행기는 `( nohup python3 scripts/execute.py {task-name} >> logs/{task-name}-execute.log 2>&1 < /dev/null & )` 로 도구와 떼어 띄운다. Bash 의 `run_in_background` 로 직접 띄우지 않는다 — 도구의 최대 2시간 제한에 같이 끊기는데, 하네스는 사용 한도 리셋까지 몇 시간씩 기다린다. 감시는 로그를 Monitor(30분 · 승인 · 반려 · 오류 · 한도 줄만 거름)로 본다. 한도 대기에 들어가면 로그에 적힌 재개 시각까지 감시를 거듭 다시 걸지 말고, 재개 시각 근처에 다시 건다(H27).
 
 중간에 멈추기 — 프로세스를 죽이지 않는다. 아래 파일을 만들면 **지금 step 이 리뷰 · 커밋까지 끝난 뒤** 다음 step 앞에서 멈추고 파일을 지운다(`.git` 안이라 커밋되지 않는다). 다시 실행하면 이어 한다. step 파일을 실행 중에 고쳐야 할 때 쓴다.
 
