@@ -1,7 +1,9 @@
 package com.mogum.card.service;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -53,5 +55,35 @@ public class LessonCardWriter {
 	}
 
 	public record NewConcept(String name, String definition, float[] embedding) {
+		public NewConcept {
+			embedding = embedding.clone();
+		}
+
+		@Override
+		public float[] embedding() {
+			return embedding.clone();
+		}
+
+		@Override
+		public boolean equals(Object other) {
+			if (this == other) {
+				return true;
+			}
+			return other instanceof NewConcept concept
+				&& Objects.equals(name, concept.name)
+				&& Objects.equals(definition, concept.definition)
+				&& Arrays.equals(embedding, concept.embedding);
+		}
+
+		@Override
+		public int hashCode() {
+			return 31 * Objects.hash(name, definition) + Arrays.hashCode(embedding);
+		}
+
+		@Override
+		public String toString() {
+			return "NewConcept[name=" + name + ", definition=" + definition
+				+ ", embedding=float[" + embedding.length + "]]";
+		}
 	}
 }
