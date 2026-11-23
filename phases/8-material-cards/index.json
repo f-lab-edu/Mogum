@@ -95,6 +95,16 @@
         "frontend/src/api/useLesson.ts:44-49 — 학습 완료 뒤 코스 캐시만 무효화한다. 로드맵의 마지막 코스를 마치면 로드맵이 다 마침이 되는데, 로드맵 캐시(`roadmapKey`)는 그대로라 로드맵 화면을 열면 다시 읽기 전까지 잠깐 옛 상태가 보일 수 있다. 다시 읽기 전의 짧은 순간이라 동작에 큰 영향은 없다. 필요하면 roadmaps 캐시도 refetchType 'none'으로 무효화한다.",
         "frontend/src/pages/LessonPage.tsx:35 — `lesson.isFetching` 중에는 본문 대신 불러오는 중 표시를 보인다. 지금은 창 포커스·재연결 때 다시 읽기를 꺼 둬서 괜찮다. 뒤에 다시 읽기 조건을 켜면 읽던 본문이 깜빡이니, 그때 갈래 판단(ready)과 렌더링 조건을 나눈다."
       ]
+    },
+    {
+      "step": 7,
+      "name": "material-format-tolerance",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "lesson-screen-fixes",
+      "status": "pending"
     }
   ],
   "created_at": "2026-11-23T08:16:45+0900",
