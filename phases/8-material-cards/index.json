@@ -59,7 +59,15 @@
     {
       "step": 4,
       "name": "lesson-api",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-23T13:30:01+0900",
+      "summary": "GET /api/lessons/{id}는 id·courseId·courseTitle·position·title·completed와 선택 material:{body} 또는 job:{id,status}를 반환하고 마지막으로 연 때만 갱신; POST /api/lessons/{id}/complete는 {courseId,courseCompleted}(이번 요청으로 코스 다 마침일 때만 true)를 반환; LessonAccessService로 MATERIAL 받기·읽기·완료의 열기 조건 공유, NOT_FOUND·LESSON_NOT_OPEN과 자료 없는 완료의 LESSON_MATERIAL_REQUIRED(409, 강의 자료가 만들어진 뒤 학습 완료할 수 있어요) 적용; 코스 행 PESSIMISTIC_WRITE 선잠금 후 강의를 읽어 동시 완료·읽기를 직렬화하고 재전송은 무변경, MANDATORY LessonCardActivator가 ACTIVE 카드의 빈 due_at·updated_at만 완료 시각으로 채우며 FSRS·기존 일정·복습 기록 보존; 강의·카드·코스·마지막 순서 코스의 로드맵을 한 트랜잭션에서 완료, 경합 대기·재전송·롤백·소유권 검증; 지정 AC·전체 build·Spotless·Checkstyle 통과, 실제 OpenAI 호출 없음, 서버 테스트 2196→2254(+58)",
+      "completed_at": "2026-11-23T13:42:31+0900",
+      "review_notes": [
+        "docs/05-api.md:59 — LESSON_MATERIAL_REQUIRED was added to §1.2 as a separate bullet instead of a row in the error-code table there (around line 54). The screen developer has to find codes in two places. → Add a row to the table: `LESSON_MATERIAL_REQUIRED | when | 409 | message`.",
+        "backend/src/main/java/com/mogum/course/repository/LessonRepository.java:16 — `findCourseForUpdate` is a query that returns a Course but sits in LessonRepository. Moving it to CourseRepository would make it easier to find. It does not change behaviour.",
+        "backend/src/main/java/com/mogum/course/service/LessonReadService.java:24 — every GET (lesson read) takes a PESSIMISTIC_WRITE lock on the course row. This is fine at the MVP user count and matches what 05 §4 says. If the waiting screen's polling ever re-reads this endpoint, reads would queue behind completion transactions, so keep polling on the job read."
+      ]
     },
     {
       "step": 5,
