@@ -232,7 +232,7 @@ Mermaid는 해당 코드 블록이 처음 나타날 때만 동적 `import()`한�
 
 글은 §2의 `text-body`(16px/26px), 큰 제목은 `text-title`(24px/32px)·800 굵기, 작은 제목은 `text-body`·700 굵기다. 코드·표는 `text-small`(14px/24px), 최상위 블록 간격은 `space-y-6`(24px), 목록은 `space-y-2`(8px)·왼쪽 24px이다. 코드와 인용은 `surface-soft` 바탕·16px 여백·`radius-control`, 인용 왼쪽 테두리와 강조는 `primary`를 쓴다. 코드 강조도 기존 글자·보라색 토큰만 쓰며 다크 테마는 없다.
 
-컨테이너는 `min-w-0`·`max-w-full`, 긴 글은 `overflow-wrap: anywhere`로 줄바꿈한다. 코드·표·그림은 각각 최대 폭 안의 `overflow-x-auto` 영역이며 키보드 포커스를 받는다. 코드 줄과 표의 내용 너비, Mermaid SVG의 `viewBox`에서 얻은 실제 너비를 유지해 블록 안에서 가로 스크롤한다. SVG 너비는 본문 데이터에서 얻은 크기이며 고정 UI 토큰이 아니다. 블록 수식은 `.katex-display` 자체에서만 가로 스크롤한다. 이 규칙은 화면 크기에 관계없이 같다.
+컨테이너는 `min-w-0`·`max-w-full`, 긴 글은 `overflow-wrap: anywhere`로 줄바꿈한다. 코드·표·그림은 각각 최대 폭 안의 `overflow-x-auto` 영역이며 `role="region"`과 이름만 두고 `tabIndex`는 두지 않는다(SonarCloud `typescript:S6845` · 사용자 결정 2026-11-24). 코드 줄과 표의 내용 너비, Mermaid SVG의 `viewBox`에서 얻은 실제 너비를 유지해 블록 안에서 가로 스크롤한다. SVG 너비는 본문 데이터에서 얻은 크기이며 고정 UI 토큰이 아니다. 블록 수식은 `.katex-display` 자체에서만 가로 스크롤한다. 이 규칙은 화면 크기에 관계없이 같다.
 
 step 5에서 로컬 Vite의 컴포넌트를 실제 Chromium으로 390px·1280px에서 수동 확인했다. 확인 항목은 긴 코드·표·그림·블록 수식의 내부 스크롤과 페이지 너비 보존이다. 깨진 Mermaid의 오류 메시지·KaTeX 오류 표시·뒤 본문이 함께 남는 것도 확인했다. step 6의 강의 화면 연결 검증은 §13에 적었다.
 

@@ -174,7 +174,7 @@ test('안전한 링크만 새 탭·noopener noreferrer로 열고 javascript 주�
   expect(screen.queryByRole('link', { name: '인코딩' })).not.toBeInTheDocument()
 })
 
-test('긴 코드·표·그림·블록 수식에 각각 내부 스크롤 영역을 둔다', async () => {
+test('긴 코드·표·그림·블록 수식은 내부 스크롤하고 영역 이름만 두며 tabindex는 두지 않는다', async () => {
   const { container } = render(<MaterialBody body={'```text\n' + 'long'.repeat(100) + '\n```\n\n| 열 |\n| --- |\n| 긴 셀 |\n\n$$\nx^2\n$$\n\n```mermaid\ngraph TD; A-->B\n```'} />)
   expect(container.firstElementChild).toHaveClass('material-body', 'min-w-0', 'max-w-full', 'text-body')
   expect(screen.getByRole('region', { name: '코드 블록' })).toHaveClass('overflow-x-auto', 'max-w-full')
@@ -183,6 +183,9 @@ test('긴 코드·표·그림·블록 수식에 각각 내부 스크롤 영역�
     expect(container.querySelector('svg')).toBeInTheDocument()
     expect(screen.getByRole('region', { name: '다이어그램' })).toHaveClass('overflow-x-auto', 'max-w-full')
   })
+  for (const name of ['코드 블록', '표', '다이어그램']) {
+    expect(screen.getByRole('region', { name })).not.toHaveAttribute('tabindex')
+  }
   // jsdom은 너비를 계산하지 않으므로 수식의 스크롤 규칙은 스타일시트도 확인한다.
   expect(container.querySelector('.katex-display')).toBeInTheDocument()
 })

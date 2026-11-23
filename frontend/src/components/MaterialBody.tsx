@@ -8,7 +8,7 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import 'katex/dist/katex.min.css'
 
-const scrollClass = 'min-w-0 max-w-full overflow-x-auto rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
+const scrollClass = 'min-w-0 max-w-full overflow-x-auto rounded-control'
 // 브라우저의 코드 로딩만 공유한다. 여러 블록이 동시에 처음 나타나도 import는 한 번이다.
 let mermaidModule: Promise<typeof import('mermaid')> | undefined
 let diagramSequence = 0
@@ -59,7 +59,7 @@ function MermaidBlock({ source }: { source: string }) {
     }
   }, [source])
 
-  return <div ref={host} role="region" aria-label="다이어그램" tabIndex={0} className={`material-diagram ${scrollClass}`} />
+  return <div ref={host} role="region" aria-label="다이어그램" className={`material-diagram ${scrollClass}`} />
 }
 
 const components: Components = {
@@ -68,9 +68,9 @@ const components: Components = {
       && children.props.className?.split(' ').includes('language-mermaid')) {
       return <MermaidBlock source={String(children.props.children).replace(/\n$/, '')} />
     }
-    return <pre role="region" aria-label="코드 블록" tabIndex={0} className={`${scrollClass} bg-surface-soft p-4 text-small`}>{children}</pre>
+    return <pre role="region" aria-label="코드 블록" className={`${scrollClass} bg-surface-soft p-4 text-small`}>{children}</pre>
   },
-  table: ({ children }) => <div role="region" aria-label="표" tabIndex={0} className={scrollClass}><table>{children}</table></div>,
+  table: ({ children }) => <div role="region" aria-label="표" className={scrollClass}><table>{children}</table></div>,
   a: ({ href, children }) => href
     ? <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
     : <span>{children}</span>,
