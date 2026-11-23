@@ -164,7 +164,7 @@ export default function CoursePage() {
 
     {nextLesson && <section aria-label="다음에 열 강의" className="space-y-3 rounded-panel bg-primary p-6 text-on-primary sm:p-8">
       <p className="font-bold">다음에 열 강의</p>
-      <h2 className="text-title font-extrabold">{nextLesson.position}강 · {nextLesson.title}</h2>
+      <h2 className="text-title font-extrabold"><Link to={`/courses/${data.id}/lessons/${nextLesson.id}`} className="inline-flex min-h-11 items-center rounded-google underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-on-primary">{nextLesson.position}강 · {nextLesson.title}</Link></h2>
       <p>{nextLesson.description}</p>
     </section>}
 
@@ -173,7 +173,10 @@ export default function CoursePage() {
       <ol aria-label="강의 목록" className="space-y-4">
         {data.lessons.map((lesson) => <li key={lesson.id} className={`space-y-3 rounded-panel border bg-surface p-6 sm:p-8 ${nextLesson?.id === lesson.id ? 'border-primary' : 'border-border'}`}>
           {lesson.completed && <p className="text-small font-bold text-primary">학습 완료</p>}
-          <h3 className="font-bold">{lesson.position}강 · {lesson.title}</h3>
+          <h3 className="font-bold">{(learning || completed) && (lesson.completed || lesson.id === data.nextLessonId)
+            ? <PageLink to={`/courses/${data.id}/lessons/${lesson.id}`}>{lesson.position}강 · {lesson.title}</PageLink>
+            : <>{lesson.position}강 · {lesson.title}</>}</h3>
+          {(learning || completed) && !lesson.completed && lesson.id !== data.nextLessonId && <p className="text-small text-text-secondary">앞 강의를 학습 완료하면 열 수 있어요.</p>}
           <p className="text-text-secondary">{lesson.description}</p>
           <dl className="flex flex-wrap gap-3">
             {lesson.concepts.map((concept, index) => <div key={index} className="rounded-control bg-surface-soft px-3 py-2 text-small">

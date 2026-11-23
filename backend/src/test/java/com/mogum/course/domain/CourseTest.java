@@ -135,4 +135,34 @@ class CourseTest {
 		assertThat(course.getPlanConcepts()).containsExactly(new PlannedConcept("개념", "정의"));
 		assertThatThrownBy(course::planLessons).isInstanceOf(IllegalStateException.class);
 	}
+
+	@Test
+	@DisplayName("학습 중 코스만 다 마침이 되고 완료 시각은 처음 한 번만 채운다")
+	void completesOnlyLearningCourse() {
+		// given
+		var course = CourseFixtures.single(1L);
+		var now = Instant.parse("2026-11-23T00:00:00Z");
+		assertThatThrownBy(() -> course.complete(now)).isInstanceOf(IllegalStateException.class);
+		course.start(now.minusSeconds(10));
+		course.complete(now);
+
+		// when
+		course.complete(now.plusSeconds(10));
+		// then
+		assertThat(course.getStatus()).isEqualTo(CourseStatus.COMPLETED);
+		assertThat(course.getCompletedAt()).isEqualTo(now);
+	}
+
+	@Test
+	@DisplayName("강의를 연 때는 코스의 마지막으로 연 때에 담는다")
+	void recordsLessonOpening() {
+		// given
+		var course = CourseFixtures.single(1L);
+		var now = Instant.parse("2026-11-23T00:00:00Z");
+		course.start(now);
+		// when
+		course.openLesson(now.plusSeconds(10));
+		// then
+		assertThat(course.getLastLessonOpenedAt()).isEqualTo(now.plusSeconds(10));
+	}
 }

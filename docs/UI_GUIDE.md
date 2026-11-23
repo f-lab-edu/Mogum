@@ -109,7 +109,8 @@ Google 링크는 기존 Roboto 500·44px 높이·흰 바탕·1px 테두리·4px 
 | `/jobs/:jobId` | `APPROVED`의 기다리는 화면. 위 바 제목 「기다리는 화면」·뒤로 가기 |
 | `/courses/:courseId` | `APPROVED`의 코스 화면(`CoursePage`). 위 바 제목 「코스」·뒤로 가기. 검토 중·학습 중·다 마침을 같은 주소에서 표시(§9) |
 | `/roadmaps/:roadmapId` | `APPROVED`의 로드맵 화면(`RoadmapPage`). 위 바 제목 「로드맵」·뒤로 가기. 검토 중·진행 중·다 마침을 같은 주소에서 표시(§10) |
-| `/courses/:courseId/lessons/:lessonId` | 성공 결과의 강의 자리. 위 바 제목 「강의」·뒤로 가기만 표시 |
+| `/courses/:courseId/lessons/:lessonId` | `APPROVED`의 강의 화면(`LessonPage`). 위 바 제목 「강의」·뒤로 가기(§13) |
+| `/courses/:courseId/done` | `APPROVED`의 축하 화면(`CelebrationPage`). 위 바 제목 「축하 화면」·뒤로 가기(§14) |
 | `/privacy` | 개인정보처리방침 자리. 로그인·상태 읽기 없이 제목·준비 중·돌아가기만 표시 |
 
 계정 화면 세 개는 [AccountPage.tsx](../frontend/src/pages/AccountPage.tsx)에서 상태별로 구성한다. `/`와 계정 주소를 열 때 「나」를 읽어 현재 상태의 주소로 보낸다. 모르는 상태는 기존 불러오기 실패·다시 시도로 처리하며 값을 노출하지 않는다. 승인 대기에 폴링·새로고침 버튼을 두지 않는다. `ACCOUNT_NOT_APPROVED`를 받으면 「나」를 다시 읽어 현재 상태를 반영한다.
@@ -184,13 +185,13 @@ sips -Z 384 docs/design/assets/mogumi-reading.png --out frontend/src/assets/mogu
 | 짜기 전 | 코스 내용 대신 소속 로드맵 화면으로 가는 링크만 제공한다. |
 | 읽는 중·읽기 실패 | 읽는 중 한 줄은 `role="status"`. 404·연결 실패·모르는 상태는 `FailureNotice`에 읽지 못한 것·서버 문구(연결 실패는 공통 안내)·다시 시도·홈으로를 표시한다. |
 
-강의 목록은 이름 있는 `ol`이며 각 행은 순서·제목 → 한 줄 설명 → 다룰 개념의 이름·정의 순서다. 행은 흰 면·24px 모서리·옅은 테두리·24px 여백(640px부터 32px), 행 사이 16px 간격이다. 개념은 안내 바탕·16px 모서리·작은 글자이며 완료한 강의는 「학습 완료」로 표시한다. 강의 줄과 다음 강의 영역에는 이동 동작을 연결하지 않았다. 강의 열기는 강의 자료 TASK에서 연결한다.
+강의 목록은 이름 있는 `ol`이며 각 행은 순서·제목 → 한 줄 설명 → 다룰 개념의 이름·정의 순서다. 행은 흰 면·24px 모서리·옅은 테두리·24px 여백(640px부터 32px), 행 사이 16px 간격이다. 개념은 안내 바탕·16px 모서리·작은 글자이며 완료한 강의는 「학습 완료」로 표시한다. 학습 중·다 마침의 강의 제목은 학습 완료했거나 `nextLessonId`인 경우에만 강의 화면 링크다. 그 뒤의 강의는 「앞 강의를 학습 완료하면 열 수 있어요.」를 보이며 링크를 두지 않는다. 검토 중에는 모두 링크가 없다. 보라색 다음에 열 강의 영역의 제목도 같은 강의를 여는 링크이며, 흰 글자·밑줄·흰 포커스 outline을 쓴다.
 
 코스 제목 고치기는 §3의 `TextField`와 저장·취소 버튼을 제목 영역에 펼친다. 편집 중에는 「코스 제목 고치기」 버튼을 비활성화해 입력을 보존하고, 취소·저장 성공으로 닫으면 다시 활성화한다. 보이는 이름만 바뀐다고 안내하며 공백·100 코드 포인트 초과는 저장을 막고 서버의 `title` 칸 오류는 해당 입력과 연결한다. 다시 짜기는 선택적인 「고칠 점」 여러 줄 입력·500 코드 포인트 길이 안내·요청·취소 버튼을 펼친다. 펼침 버튼의 `aria-expanded`는 펼침 상태와 맞추고, `aria-controls`는 입력이 펼쳐져 DOM에 있을 때만 붙인다. 두 펼침은 입력으로 포커스를 옮기며, 제목 저장·취소와 다시 짜기 취소는 원래 버튼으로 돌아간다. 요청 중에는 화면의 입력·동작 버튼을 잠그고 같은 순간의 중복 제출도 막는다. 실패하면 서버 문구 원문과 다시 누를 동작을 알리고 입력을 보존한다.
 
 [api/useCourse.ts](../frontend/src/api/useCourse.ts)의 `readCourse`·`startCourse`·`updateCourseTitle`은 공통 `apiFetch`를 쓰며, `useCourse`는 코스 하나를 `['courses', courseId]`에 캐시한다. 시작·제목 고치기의 `useCourseAction`은 성공 뒤 진행 중인 읽기를 취소하고 응답 전체로 같은 코스 캐시를 바꾼다. 시작해도 주소를 유지하고 1강을 열지 않는다. 다시 짜기는 [api/useJob.ts](../frontend/src/api/useJob.ts)의 `receiveJob(ReplanCourseRequest)`로 `REPLAN_COURSE`·`courseId`·선택 `feedback`만 보내며, 빈 피드백은 생략하고 서버가 반환한 작업의 `/jobs/{id}`로 이동한다. 이미 있는 작업을 반환해도 같은 경로다. 읽기·쓰기는 자동 재시도하지 않으며, 읽기 실패는 다시 시도 버튼으로 다시 읽는다.
 
-상태별 내용·시작 후 같은 화면 유지·다시 짜기 본문과 이동·버튼 잠금·제목 저장/칸 오류·한국 날짜·조건부 로드맵 링크·강의 줄 이동 부재·금지 정보 부재를 API 대역으로 시험한다. 포커스와 효과 결과는 `waitFor` 안에서 확인한다. 브라우저에서 실제 너비별 렌더링을 검증한 것으로 보지는 않는다.
+상태별 내용·시작 후 같은 화면 유지·다시 짜기 본문과 이동·버튼 잠금·제목 저장/칸 오류·한국 날짜·조건부 로드맵 링크·순서에 따른 강의 링크·금지 정보 부재를 API 대역으로 시험한다. 포커스와 효과 결과는 `waitFor` 안에서 확인한다. 브라우저에서 실제 너비별 렌더링을 검증한 것으로 보지는 않는다.
 
 ## 10. 로드맵 화면
 
@@ -218,3 +219,45 @@ sips -Z 384 docs/design/assets/mogumi-reading.png --out frontend/src/assets/mogu
 코스 행은 굵은 제목과 §3의 상태 표시를 나란히 두며 좁은 화면·긴 제목은 줄바꿈한다. 로드맵 행은 굵은 제목 → 설명 → 작은 보라 글자의 진행 한 줄로 세로 배치한다. 완료 상태의 진행 문구는 「다 마침」이다. 비었을 때는 각 탭에 「아직 만든 코스가 없어요」·「아직 만든 로드맵이 없어요」 한 줄을 보인다. 읽는 중은 상태 안내, 실패는 `FailureNotice`와 다시 시도로 표시하며 실패를 빈 목록으로 보이지 않는다. 새로 배우기 입구·거르기·정렬·진도 막대·다음 강의·로드맵의 코스 목록은 두지 않는다.
 
 `useCourses`·`useRoadmaps`가 공통 `apiFetch`로 목록을 읽어 각각 `['courses']`·`['roadmaps']`에 캐시한다. 자동 재시도·창 포커스·재연결에 따른 별도 읽기는 없으며 실패 뒤 버튼으로 다시 읽는다. 행 구성·이동·빈 목록·오류 후 재시도·금지 동작 부재·제목 포커스와 문서 제목을 API 대역으로 시험한다.
+
+## 12. 강의 자료 본문
+
+[components/MaterialBody.tsx](../frontend/src/components/MaterialBody.tsx)의 기본 내보내기 `MaterialBody`는 `body: string` 하나를 받는다. 강의 화면 틀·제목·동작·API 없이 본문만 그린다. 표현 수단과 오류 처리의 계약은 [03 §3](./03-generation.md#3-강의-자료와-카드) · [06 §9](./06-screens.md#9-강의-화면)를 따른다.
+
+`react-markdown ^10.1.0`·`remark-gfm ^4.0.1`·`remark-math ^6.0.0`·`rehype-katex ^7.0.1`·`katex ^0.19.1`·`mermaid ^12.3.0`·`rehype-highlight ^7.0.2`를 쓴다. KaTeX는 CSS와 렌더러 버전이 같도록 npm `overrides.katex: "$katex"`로 하위 의존성도 맞춘다. 문법 강조는 전체 언어 묶음보다 작은 기본 37개 언어만 포함하는 `rehype-highlight`로 정했다. 언어 표시가 있을 때만 강조하고 자동 감지는 끈다. 모르는 언어·언어 없는 코드는 원문으로 남긴다.
+
+원본 HTML은 `skipHtml`로 버리며 `rehype-raw`는 쓰지 않는다. 마크다운 이미지는 대체 글만 보이고 `img`를 만들지 않는다. 링크는 `react-markdown` 기본 URL 검사를 유지하며, 제거된 주소는 글로만 남긴다. 허용된 링크는 새 탭과 `rel="noopener noreferrer"`로 연다. KaTeX는 `trust: false`이며, 문법 오류는 `rehype-katex`의 `throwOnError: false` 대체 렌더링으로 오류 표시를 그대로 남긴다.
+
+Mermaid는 해당 코드 블록이 처음 나타날 때만 동적 `import()`한다. 브라우저의 모듈 로딩 Promise를 공유하며 `securityLevel: 'strict'`·`startOnLoad: false`로 직접 그린다. 그림을 그릴 때마다 모듈 카운터를 늘려 `material-diagram-1` 형태의 id와 별도 렌더 컨테이너를 쓴다. 보안 컨텍스트가 필요 없어 휴대폰의 HTTP 개발 서버에서도 그릴 수 있고, 여러 그림·StrictMode·본문 변경·재마운트에서 충돌하거나 이전 결과가 덮어쓰지 않게 한다. `suppressErrorRendering: true`로 임시 오류 SVG 삽입을 막고, 실패한 자리에는 라이브러리의 오류 메시지를 HTML이 아닌 글로 표시한다. 다시 시도·수정 없이 나머지 본문을 유지하며, 부모가 같은 본문으로 다시 렌더되어도 실패한 그림을 다시 그리지 않는다.
+
+글은 §2의 `text-body`(16px/26px), 큰 제목은 `text-title`(24px/32px)·800 굵기, 작은 제목은 `text-body`·700 굵기다. 코드·표는 `text-small`(14px/24px), 최상위 블록 간격은 `space-y-6`(24px), 목록은 `space-y-2`(8px)·왼쪽 24px이다. 코드와 인용은 `surface-soft` 바탕·16px 여백·`radius-control`, 인용 왼쪽 테두리와 강조는 `primary`를 쓴다. 코드 강조도 기존 글자·보라색 토큰만 쓰며 다크 테마는 없다.
+
+컨테이너는 `min-w-0`·`max-w-full`, 긴 글은 `overflow-wrap: anywhere`로 줄바꿈한다. 코드·표·그림은 각각 최대 폭 안의 `overflow-x-auto` 영역이며 `role="region"`과 이름만 두고 `tabIndex`는 두지 않는다(SonarCloud `typescript:S6845` · 사용자 결정 2026-11-24). 코드 줄과 표의 내용 너비, Mermaid SVG의 `viewBox`에서 얻은 실제 너비를 유지해 블록 안에서 가로 스크롤한다. SVG 너비는 본문 데이터에서 얻은 크기이며 고정 UI 토큰이 아니다. 블록 수식은 `.katex-display` 자체에서만 가로 스크롤한다. 이 규칙은 화면 크기에 관계없이 같다.
+
+step 5에서 로컬 Vite의 컴포넌트를 실제 Chromium으로 390px·1280px에서 수동 확인했다. 확인 항목은 긴 코드·표·그림·블록 수식의 내부 스크롤과 페이지 너비 보존이다. 깨진 Mermaid의 오류 메시지·KaTeX 오류 표시·뒤 본문이 함께 남는 것도 확인했다. step 6의 강의 화면 연결 검증은 §13에 적었다.
+
+짝 테스트 [MaterialBody.test.tsx](../frontend/src/components/MaterialBody.test.tsx)는 `vi.hoisted`로 만든 `initialize`·`render` 대역을 `vi.mock('mermaid', () => ({ default: { initialize, render } }))`로 돌려준다. 모듈을 정적으로 import하지 않아 팩토리 호출로 지연 로딩도 관찰하며, 효과 결과는 `waitFor` 안에서 단언한다. 뒤 강의 화면 테스트도 이 대역을 사용할 수 있다.
+
+## 13. 강의 화면
+
+`8-material-cards` step 6의 [LessonPage.tsx](../frontend/src/pages/LessonPage.tsx)는 `/courses/:courseId/lessons/:lessonId`에서 §7의 `AppLayout`(제목 「강의」)을 쓴다. 흰 면·24px 모서리·옅은 테두리·안쪽 여백 24px(640px부터 32px) 안에서 순서가 포함된 강의 제목(「1강 · 변수」) → §12의 `MaterialBody` → 완료 영역 순서다. 제목은 24px·800 굵기, 영역 사이 간격은 24px이고 새 토큰은 없다. 화면 내용과 동작의 규칙은 [06 §9](./06-screens.md#9-강의-화면)를 따른다.
+
+| 읽은 상태 | 구성 · 동작 |
+|---|---|
+| 자료 있음·학습 완료 전 | 제목·본문과 공통 `Button`의 「학습 완료」. 바로 위에 「학습 완료는 되돌릴 수 없어요. 다시 열어 읽을 수 있어요.」를 보이고 `aria-describedby`로 버튼과 연결한다. |
+| 자료 있음·학습 완료 | 같은 제목·본문과 「학습 완료한 강의예요.」 표시. 완료 버튼은 없다. |
+| 자료 없음·작업 있음 | 상태와 관계없이 `/jobs/{id}`로 `replace` 이동한다. 실패한 작업의 동작도 기존 기다리는 화면에서 처리한다. |
+| 자료·작업 없음 | 「강의 자료를 요청하고 있어요.」를 `role="status"`로 보이고 `receiveJob({type: 'MATERIAL', lessonId})`를 호출한다. 받은 작업으로 `replace` 이동한다. |
+| 읽기·받기 거절 | `FailureNotice`에 실패한 동작·서버 문구 원문(연결 실패는 공통 안내)·「코스로 돌아가기」 링크를 보인다. 오류 code는 표시하지 않는다. |
+
+[api/useLesson.ts](../frontend/src/api/useLesson.ts)의 `useLesson`은 공통 `apiFetch`로 강의 하나를 읽어 `['lessons', lessonId]`에 캐시한다. 읽기·받기·완료는 자동 재시도하지 않는다. 최신 읽기가 끝난 뒤 자료·작업 분기를 결정하므로 기다리는 화면에서 돌아왔을 때 낡은 작업 캐시로 다시 이동하지 않는다. 받기 직전에 `useRef`의 요청 여부를 기록하고 TanStack Query mutation으로 요청 상태를 표시한다. React StrictMode의 효과 재실행에서도 받기를 한 번만 보내며, 주소가 바뀌면 `App`의 `key={pathname}`으로 요청 상태를 새로 시작한다. 받기 결과의 이동은 렌더링에서 처리해 화면을 떠난 뒤 늦은 응답이 이동시키지 않는다.
+
+완료 중에는 버튼을 잠그고 `useRef`로 같은 순간의 중복 제출도 막는다. 성공하면 진행 중인 강의·코스·로드맵 읽기를 취소하고 강의 캐시를 지우며 코스·로드맵 읽기 캐시(각각 목록과 상세)를 무효화한다. 코스 다 마침 여부와 관계없이 `refetchType: 'none'`으로 즉시 다시 읽지 않고 해당 화면을 열 때 읽는다. 응답의 `courseCompleted`가 참이면 `/courses/{courseId}/done`, 아니면 `/courses/{courseId}`로 `replace` 이동한다. 코스 화면은 새 진도와 다음 강의를 읽으며, 다음 강의를 저절로 열지 않는다. 완료 실패는 본문과 버튼을 보존하며 서버 문구를 표시한다.
+
+짝 테스트는 `fetch` 대역과 §12의 Mermaid 대역으로 본문·수식·그림·상태별 분기·StrictMode 받기 한 번·거절 문구·완료 중 잠금·실패·캐시 정리·교체 이동을 확인한다. `App.test.tsx`는 실제 라우터로 코스 → 첫 강의의 자료 받기 → 기다리는 화면의 성공 결과 → 본문 → 완료 → 새 진도의 코스 또는 축하 화면을 확인한다. API만 대역으로 둔 로컬 Vite 화면을 실제 Chromium의 390px·1280px에서 수동 확인했다. 두 너비 모두 문서 너비가 화면 너비와 같고, 긴 코드·표·블록 수식·Mermaid는 각각 내부 스크롤을 유지했다. 깨진 Mermaid·KaTeX의 오류 표시와 뒤 본문 유지, 축하 화면의 배치·「홈으로」 이동도 확인했다.
+
+## 14. 축하 화면
+
+[CelebrationPage.tsx](../frontend/src/pages/CelebrationPage.tsx)는 `/courses/:courseId/done`에서 §7의 `AppLayout`(제목 「축하 화면」)을 쓴다. 최대 폭 440px·가운데 정렬의 흰 면·24px 모서리·옅은 테두리·안쪽 여백 24px(640px부터 32px)에 §5의 책 읽기 모구미 사본 → 「{코스 제목} 코스를 마쳤어요. 고생했어요!」라는 문구 하나 → 공통 `Button`의 「홈으로」 순서다. 간격은 24px, 문구는 24px·800 굵기이며 새 토큰은 없다.
+
+코스 제목은 `useCourse`의 코스 읽기로 가져온다. 읽는 중에는 상태 한 줄, 읽기 실패는 서버 문구(연결 실패는 공통 안내)와 「홈으로」를 `FailureNotice`에 표시한다. 단일 코스와 로드맵의 코스는 같은 구성이다. 「홈으로」를 누르면 바로 `/`로 가며 자동 이동은 없다. 축하 모구미는 [design README의 이미지 표](./design/README.md#모구미-이미지)에 요청된 상태를 유지한다. 짝 테스트는 코스 제목·모구미 사본·유일한 본문 버튼·홈 이동·읽기 실패를 확인한다.

@@ -1,7 +1,5 @@
 package com.mogum.course.domain;
 
-import org.springframework.test.util.ReflectionTestUtils;
-
 public final class RoadmapFixtures {
 	// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 	private RoadmapFixtures() {}
@@ -19,8 +17,9 @@ public final class RoadmapFixtures {
 	public static Roadmap withStatus(Roadmap roadmap, RoadmapStatus status) {
 		if (status == RoadmapStatus.IN_PROGRESS) {
 			roadmap.start();
-		} else {
-			ReflectionTestUtils.setField(roadmap, "status", status);
+		} else if (status == RoadmapStatus.COMPLETED) {
+			roadmap.start();
+			roadmap.complete();
 		}
 		return roadmap;
 	}

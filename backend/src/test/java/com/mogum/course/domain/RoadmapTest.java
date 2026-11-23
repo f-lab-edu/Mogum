@@ -80,4 +80,19 @@ class RoadmapTest {
 		assertThat(roadmap.getTitle()).isEqualTo("자바 로드맵");
 		assertThat(roadmap.getDescription()).isEqualTo("자바로 프로그램을 만들 수 있어요");
 	}
+
+	@Test
+	@DisplayName("진행 중 로드맵만 다 마침이 되고 다시 완료해도 그대로다")
+	void completesOnlyInProgressRoadmap() {
+		// given
+		var roadmap = RoadmapFixtures.roadmap(1L);
+		assertThatThrownBy(roadmap::complete).isInstanceOf(IllegalStateException.class);
+		roadmap.start();
+		roadmap.complete();
+
+		// when
+		roadmap.complete();
+		// then
+		assertThat(roadmap.getStatus()).isEqualTo(RoadmapStatus.COMPLETED);
+	}
 }

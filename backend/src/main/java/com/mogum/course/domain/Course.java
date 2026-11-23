@@ -112,4 +112,19 @@ public class Course extends AuditedEntity {
 		}
 		status = CourseStatus.REVIEWING;
 	}
+
+	public void openLesson(Instant openedAt) {
+		lastLessonOpenedAt = Objects.requireNonNull(openedAt);
+	}
+
+	public void complete(Instant completedAt) {
+		if (status == CourseStatus.COMPLETED) {
+			return;
+		}
+		if (status != CourseStatus.LEARNING) {
+			throw new IllegalStateException("Course must be learning");
+		}
+		this.completedAt = Objects.requireNonNull(completedAt);
+		status = CourseStatus.COMPLETED;
+	}
 }

@@ -6,7 +6,7 @@ import org.springframework.data.repository.Repository;
 
 import com.mogum.card.domain.Concept;
 
-public interface ConceptRepository extends Repository<Concept, Long> {
+public interface ConceptRepository extends Repository<Concept, Long>, ConceptSimilaritySearch {
 	<S extends Concept> S save(S entity);
 
 	Optional<Concept> findById(Long id);

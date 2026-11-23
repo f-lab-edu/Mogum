@@ -70,6 +70,11 @@
       "dir": "7a-naver-style",
       "status": "completed",
       "completed_at": "2026-11-21T11:50:58+0900"
+    },
+    {
+      "dir": "8-material-cards",
+      "status": "completed",
+      "completed_at": "2026-11-24T06:42:07+0900"
     }
   ]
 }

@@ -1,0 +1,155 @@
+{
+  "project": "Mogum",
+  "phase": "8-material-cards",
+  "steps": [
+    {
+      "step": 0,
+      "name": "llm-timing",
+      "status": "completed",
+      "summary": "LlmProperties.material()(gpt-5.6-terra·출력 10000·140s·이어 쓰기 1)과 app.llm.embedding.model/timeout의 embedding()(text-embedding-3-large·20s), 필수 묶음·전체 모델 단가 검사 추가; 임베딩은 TokenPrices(0.13, 0, 0)과 출력 토큰 0으로 입력 비용 계산; 종료 대기 150s·상한 170s·Spring 180s·두 컨테이너 220s·시한 16m·갱신 30s, 시한 > (R+1)×(max_묶음((C+1)×T호출)+T임베딩)+R×D다시시도+T_DB(960초 > 912초) 검증; Boot 4.1.1·Context 7.0.9 소스에서 워커 대기 중 Tomcat 수신 유지 확인(실제 HTTP 응답 실험 미수행), 지정 테스트와 전체 build 통과",
+      "started_at": "2026-11-23T08:16:45+0900",
+      "completed_at": "2026-11-23T08:26:11+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/deploy/DeployFilesTest.java:98-102 — 관계식 검사에 `isEqualTo(150/180/220/65)` 같은 상수 단언이 함께 붙어 있다. 임시 값을 다시 잴 때마다 이 시험도 고쳐야 한다. 관계(`gracePeriod > springWait > 170 > workerWait`)만 남기거나, 상수는 설정 바인딩 시험 한 곳에만 두는 것을 고려할 수 있다.",
+        "docs/04-jobs-and-cost.md:359 — 「단계별 제한 180초 전부를 Tomcat이 쓰는 경우까지 보장하는 값은 아니다」는 사실대로 적었다. 다만 ADR-186 의 「API 가 계속 응답하는지」는 소스로만 확인했고 실제 종료 중 HTTP 응답 실험은 아직 하지 않았다. 배포 검증 체크리스트(deploy/README 의 정상 종료 항목)를 다시 돌릴 때 함께 확인할 항목으로 남겨 두면 좋다.",
+        "docs/04-jobs-and-cost.md:326-343 — 임베딩 단가의 cached-input · output 을 0 으로 둔 것은 설정상의 표현이다. ADR-187 · 공식 단가는 입력만 적는다. 표의 「캐시 입력 과금 없음」 문구는 동작에 영향이 없다."
+      ]
+    },
+    {
+      "step": 1,
+      "name": "embedding-call",
+      "status": "completed",
+      "started_at": "2026-11-23T08:26:11+0900",
+      "summary": "EmbeddingProvider.send(Request(jobId, jobType, EmbeddingSettings(model, timeout), List<String> definitions)) -> Reply(List<List<Float>> vectors, LlmCallOutcome outcome, Failure failure, Integer inputTokens); EmbeddingCall.call(JobSnapshot, EmbeddingSettings, List<String>) -> EmbeddingResult.Success(value)/Failed(failure), 트랜잭션 안 전송 차단·EMBEDDING 기록·입력 비용만 계산·출력 토큰 비움·벡터 수/차원 검사·재시도 없음; OpenAiEmbeddingProvider는 채팅 HTTP 클라이언트/키와 OpenAiFailures 분류 공유, SDK 4.75.1 기본 base64와 float 변환 확인; 예상 밖 예외는 가능한 호출 기록을 PROVIDER_ERROR로 마친 뒤 원래 예외를 던져 GenerationFailures가 처리(기록 저장 예외도 전달); 공용 @Primary TestEmbeddingProvider는 reset(), vector(definition,List<Float>), reply(jobId,Reply...), failure(Failure), requests(jobId), outsideTransaction(jobId)로 설정/관찰하며 기본 결정적 3072차원; com.mogum.generation.llm.ConceptSimilarityMeasurementTest(같음15·다름15)는 llmTest 전용, 보고서 backend/build/reports/concept-similarity.txt, 유료 실행 없이 키 없음/공백 건너뛰기 확인; 지정 AC와 전체 build 통과, 서버 테스트 2077→2112(+35)",
+      "completed_at": "2026-11-23T08:39:31+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/generation/EmbeddingCall.java:30 — ChatCall 은 llmCallWriter.start/finish 의 예외를 삼켜 PROVIDER_UNAVAILABLE 로 바꾸지만, EmbeddingCall 은 다시 던진다. step 지시와 04 §10 에 맞는 선택이다. 다만 두 호출 경로가 기록 실패를 다르게 다룬다는 점을 step 3 에서 생성 처리기에 연결할 때 의식해야 한다 → 처리기 쪽에서 두 경로 모두 GenerationFailures 로 귀결되는지 시험으로 확인한다.",
+        "backend/src/main/java/com/mogum/generation/EmbeddingCall.java:45 — 정의가 빈 목록이면 요청을 보낸 뒤 INVALID_OUTPUT 이 된다(OpenAI 는 빈 input 을 400 으로 거절할 수 있다). 지금은 일어나지 않는 경우다 → step 3 의 호출자가 카드가 없을 때 임베딩을 부르지 않게 한다.",
+        "backend/src/test/java/com/mogum/support/IntegrationTestConfiguration.java:218 — java.util.Random · java.util.stream.IntStream 을 import 하지 않고 전체 이름으로 쓴다. OpenAiEmbeddingProviderTest · EmbeddingCallIntegrationTest 에도 java.util.stream.Stream · AtomicInteger 를 같은 방식으로 쓴 곳이 있다. 동작에는 영향이 없다 → 다음에 손댈 때 import 로 바꾼다.",
+        "backend/src/test/java/com/mogum/support/IntegrationTestConfiguration.java:153 — TestEmbeddingProvider 는 DatabaseCleaner 가 자동으로 비우지 않는다. 쓰는 시험이 매번 reset() 을 불러야 한다(07 §2 에 적혀 있다) → step 2 · 3 의 시험에서 reset() 을 빠뜨리면 앞 시험의 vector 설정이 새어 들어오니 리뷰 때 확인한다."
+      ]
+    },
+    {
+      "step": 2,
+      "name": "concept-dictionary",
+      "status": "completed",
+      "started_at": "2026-11-23T08:39:31+0900",
+      "summary": "card.service.LessonCardWriter.writeLessonCards(long userId, long lessonId, List<NewCard>)와 중첩 public record NewCard(String question, String answer, List<NewConcept> concepts)·NewConcept(String name, String definition, float[] embedding) 추가; 트랜잭션 전파 MANDATORY, UserRepository.findByIdForUpdate의 사용자 행 잠금으로 판정·넣기를 커밋까지 직렬화; ConceptSimilaritySearchImpl의 pgvector 코사인 검색(기준값 이상·작은 ID 동률 처리) 전 명시적 flush, 같은 저장의 새 개념 재사용·카드별 중복 연결 제거·Card.write의 ACTIVE/빈 due_at/FSRS 처음 상태 보존; app.concept.same-threshold=0.80(임시 값 — 실측 전), 0 초과 1 이하 기동 검사와 02 §6·§9/04 §10 문서 반영; 두 스레드·래치로 같은 사용자 DB 대기/다른 사용자 독립 확인 및 잠금 제거 시 실패 확인 후 복원; 지정 AC와 전체 build 통과, 서버 테스트 2112→2138(+26)",
+      "completed_at": "2026-11-23T08:49:01+0900",
+      "review_notes": [
+        "LessonCardWriter.java:35 — step 3 결과 저장 트랜잭션의 잠금 순서. 금지 9 때문에 첫 쓰기는 `generation_jobs` 행 UPDATE(작업 행 잠금)이고, 그 뒤에 이 서비스가 `users` 행 FOR UPDATE 를 잡는다. 사용자 행을 먼저 잡고 같은 작업 행을 지우거나 고치는 요청 경로(코스 지우기 · 탈퇴 등)가 있으면 서로를 기다리다 교착이 날 수 있다(PostgreSQL 이 감지해 한쪽을 중단한다). → step 3 · 4 를 설계할 때 잠금 순서를 맞추거나, 교착이 났을 때의 처리를 정하고 시험한다.",
+        "LessonCardWriter.java:35 — 사용자 행이 없으면 워커 경로에서 `ApiException(NOT_FOUND)` 를 던진다. 금지 9 의 작업 확인이 먼저 0 rows 를 내므로 실제로는 거의 닿지 않지만, 워커 경로에 API 오류 타입이 섞인 모양이다. → step 3 에서 그대로 둘지 정한다.",
+        "docs/04-jobs-and-cost.md §10 — 기준값을 기존 표의 한 줄이 아니라 표 위의 문단으로 적었다. 동작 영향은 없다. → phase 리뷰 때 표 형식에 맞출지 본다."
+      ]
+    },
+    {
+      "step": 3,
+      "name": "material-generator",
+      "status": "completed",
+      "started_at": "2026-11-23T08:49:01+0900",
+      "summary": "MaterialIntakeHandler·MaterialGenerator 조립, MaterialReader가 읽기 전용 트랜잭션에서 MaterialInput(이번 강의 한 줄·코스 제목·주제·강의 목록의 이번 표시·목적·메모만)으로 복사; MaterialFormat·MaterialContent는 마크다운 본문 + 한 줄 <!-- MOGUM_CARDS --> + cards JSON 객체 형식이며 필수 글·최소 카드/개념만 검사하고 권장 개수·Mermaid·KaTeX 문법은 검사하지 않음; material() 채팅 한 번(+ 이어 쓰기)·중복 정의 제거 후 embedding() 일괄 한 번을 트랜잭션 밖에서 호출, MaterialGenerator.Result와 워커 소유권 확인 뒤 Material.write·LessonCardWriter의 원자 저장·LESSON 결과·실패 시 결과 부재와 크레딧 복구 검증; LESSON_NOT_OPEN(409, 코스를 시작하고 앞 강의를 학습 완료하면 열 수 있어요)·HTTP 소유권/순서/동시 받기 중복 방지·이미 성공한 작업 반환 검증; 프롬프트 prompts/material/rules.txt·output.txt와 planning 사용자 틀·목적 문구 공유, TestChatProvider.defaultText(MATERIAL)의 세 카드·겹치는 개념 추가; 지운 시험 JobControllerNoHandlersIntegrationTest → 여섯 종류 모두 운영 처리기가 생겨 대상 없음(처리기 없는 종류 거절은 기존 JobIntakeServiceTest 유지); 지정 AC·전체 build·Spotless·Checkstyle 통과, 실제 OpenAI 호출 없음, 서버 테스트 2138→2196(+58)",
+      "completed_at": "2026-11-23T13:30:01+0900",
+      "review_notes": [
+        "docs/05-api.md:50-57 — `LESSON_NOT_OPEN` 의 별도 표와 머리 문장이 §1.2 의 공통 글머리(「기술적인 원인 … 싣지 않는다」 · 「만들기 실패도 … 같은 모양으로 싣는다」) 앞에 끼어들었다. 그 두 줄이 강의 자료 표에 딸린 것처럼 읽힌다. 다른 code 들처럼 「강의 자료 TASK(`8-material-cards` step 3) 구현: …」 글머리 한 줄로 바꾸거나, 표를 공통 글머리 뒤로 옮기면 된다.",
+        "backend/src/test/java/com/mogum/support/IntegrationTestConfiguration.java:221-222 — `java.util.Random` · `IntStream` 을 FQN 에서 import 로 바꾼 것은 이 step 과 관계없는 정리다. 동작 영향은 없다.",
+        "backend/src/main/java/com/mogum/generation/material/MaterialFormat.java:20 — 구분 줄 정규식이 줄 끝 공백을 허용하지 않는다. LLM 이 구분 줄 뒤에 공백을 붙이거나 카드 JSON 을 코드펜스로 감싸면 형식 불합격이 되어 다시 시도에 돈이 든다. 프롬프트로 금지는 했으니, 공개 전 품질 점검 때 불합격 비율을 보고 필요하면 허용 폭을 넓힌다.",
+        "backend/src/test/java/com/mogum/generation/MaterialGeneratorIntegrationTest.java:115-178 — 로드맵 경우의 재료 시험에서 로드맵 입력과 코스 입력이 같은 값(`LEAKCHECK-topic`)이다. 로드맵의 코스는 코스 입력이 비어 있어 지금은 문제가 없다. 다만 두 값을 다르게 두면 '로드맵의 것을 쓴다'는 사실이 더 직접 드러난다."
+      ]
+    },
+    {
+      "step": 4,
+      "name": "lesson-api",
+      "status": "completed",
+      "started_at": "2026-11-23T13:30:01+0900",
+      "summary": "GET /api/lessons/{id}는 id·courseId·courseTitle·position·title·completed와 선택 material:{body} 또는 job:{id,status}를 반환하고 마지막으로 연 때만 갱신; POST /api/lessons/{id}/complete는 {courseId,courseCompleted}(이번 요청으로 코스 다 마침일 때만 true)를 반환; LessonAccessService로 MATERIAL 받기·읽기·완료의 열기 조건 공유, NOT_FOUND·LESSON_NOT_OPEN과 자료 없는 완료의 LESSON_MATERIAL_REQUIRED(409, 강의 자료가 만들어진 뒤 학습 완료할 수 있어요) 적용; 코스 행 PESSIMISTIC_WRITE 선잠금 후 강의를 읽어 동시 완료·읽기를 직렬화하고 재전송은 무변경, MANDATORY LessonCardActivator가 ACTIVE 카드의 빈 due_at·updated_at만 완료 시각으로 채우며 FSRS·기존 일정·복습 기록 보존; 강의·카드·코스·마지막 순서 코스의 로드맵을 한 트랜잭션에서 완료, 경합 대기·재전송·롤백·소유권 검증; 지정 AC·전체 build·Spotless·Checkstyle 통과, 실제 OpenAI 호출 없음, 서버 테스트 2196→2254(+58)",
+      "completed_at": "2026-11-23T13:42:31+0900",
+      "review_notes": [
+        "docs/05-api.md:59 — LESSON_MATERIAL_REQUIRED was added to §1.2 as a separate bullet instead of a row in the error-code table there (around line 54). The screen developer has to find codes in two places. → Add a row to the table: `LESSON_MATERIAL_REQUIRED | when | 409 | message`.",
+        "backend/src/main/java/com/mogum/course/repository/LessonRepository.java:16 — `findCourseForUpdate` is a query that returns a Course but sits in LessonRepository. Moving it to CourseRepository would make it easier to find. It does not change behaviour.",
+        "backend/src/main/java/com/mogum/course/service/LessonReadService.java:24 — every GET (lesson read) takes a PESSIMISTIC_WRITE lock on the course row. This is fine at the MVP user count and matches what 05 §4 says. If the waiting screen's polling ever re-reads this endpoint, reads would queue behind completion transactions, so keep polling on the job read."
+      ]
+    },
+    {
+      "step": 5,
+      "name": "markdown-renderer",
+      "status": "completed",
+      "summary": "frontend/src/components/MaterialBody.tsx 기본 내보내기 MaterialBody({body: string}) 추가; react-markdown ^10.1.0·remark-gfm ^4.0.1·remark-math ^6.0.0·rehype-katex ^7.0.1·katex ^0.19.1·mermaid ^12.3.0·rehype-highlight ^7.0.2(전체 대신 기본 37개 언어만 포함하는 작은 묶음·자동 감지 끔), KaTeX CSS/렌더러는 overrides.katex=$katex로 통일; 원본 HTML 제거·이미지 대체 글만·기본 URL 검사와 새 탭 링크, KaTeX trust=false·문법 오류 표시, Mermaid 동적 import Promise 공유·strict/startOnLoad=false·UUID/별도 컨테이너·오류 메시지와 나머지 본문 보존·같은 본문 재렌더 시 재시도 없음; 기존 UI 토큰과 긴 블록별 내부 스크롤을 Chromium 390px/1280px에서 확인; step 6 시험은 vi.hoisted initialize/render 대역을 vi.mock('mermaid', factory)로 default에 제공하고 render는 Promise<{svg}>를 반환, 효과 결과는 waitFor에서 단언; AGENTS 화면 스택 한 줄·UI_GUIDE §12 갱신, 화면 시험 408→423(+15), test·lint·build 통과(기존 AccountPage 호출 횟수 시험 1회 실패 뒤 수정 없이 전체 재실행 통과), 커밋 없음",
+      "started_at": "2026-11-23T13:42:31+0900",
+      "completed_at": "2026-11-23T13:51:35+0900",
+      "review_notes": [
+        "frontend/src/components/MaterialBody.tsx:33 — `crypto.randomUUID()`는 보안 컨텍스트(HTTPS · localhost)에서만 있다. 운영(Vercel HTTPS)에서는 문제가 없다. 그러나 휴대폰에서 `http://192.168.x.x:5173`으로 개발 서버를 열면 함수가 없어 catch로 빠지고, 모든 그림이 'crypto.randomUUID is not a function' 오류로 보인다 → 모듈 카운터 + 접두사처럼 보안 컨텍스트가 필요 없는 id 생성을 고려한다(필수는 아님).",
+        "frontend/package.json:27 — `overrides.katex: \"$katex\"`가 rehype-katex 7.0.1 · mermaid가 선언한 katex 범위를 0.19.1로 강제한다. 지금은 테스트가 통과하지만, 메이저 범위 밖 강제라 이후 업그레이드 때 깨질 수 있다 → UI_GUIDE §12에 이 이유를 적어 둔 것은 좋다. step 6에서 실제 화면으로 수식이 그려지는지 한 번 더 본다.",
+        "docs/UI_GUIDE.md:236 — 「실제 Chromium에서 390px · 1280px로 열어 … 확인했다」는 이번 변경의 테스트 · 산출물로는 확인할 수 없는 수동 검증 서술이다 → 근거(스크린샷 경로 등)가 없으면 step 6의 화면 검증 때 다시 확인하고, 문구를 「step 5에서 수동 확인」처럼 검증 상태가 드러나게 다듬는 것을 권한다.",
+        "frontend/src/components/MaterialBody.test.tsx:151 — 수식의 가로 스크롤은 jsdom에서 `.katex-display`가 있는지만 확인하고, 스크롤 규칙 자체는 CSS(index.css `.material-body .katex-display`)에만 있다 → step 6에서 Playwright 등 실제 브라우저로 390px 페이지 폭이 넘치지 않는지 확인하면 회귀를 막을 수 있다."
+      ]
+    },
+    {
+      "step": 6,
+      "name": "lesson-screen",
+      "status": "completed",
+      "started_at": "2026-11-23T13:51:36+0900",
+      "summary": "강의 화면 /courses/:courseId/lessons/:lessonId(frontend/src/pages/LessonPage.tsx)·축하 화면 /courses/:courseId/done(frontend/src/pages/CelebrationPage.tsx) 연결; 완료한 강의·nextLessonId만 링크, 최신 강의 읽기 뒤 useRef 요청 표식+mutation으로 StrictMode MATERIAL 받기 한 번 및 작업 화면 replace 이동; useLesson의 완료 중 잠금·서버 문구·강의 캐시 삭제/코스 캐시 무효화와 코스/축하 replace 분기, 모구미 사본·코스 제목 문구 하나·홈으로 구현; CoursePage.test.tsx 두 줄·RoadmapPage.test.tsx 한 줄의 ROADMAP_REPLAN_IN_PROGRESS를 REPLAN_IN_PROGRESS로 교체; UI_GUIDE §13·§14와 기존 주소/코스 링크 사실 반영, 화면 시험 423→448(+25)·test/lint/build 통과, Chromium 390px/1280px에서 코드·표·그림·블록 수식 내부 스크롤·페이지 폭·오류 뒤 본문·축하 화면/홈 이동 확인, 실제 OpenAI 호출·커밋 없음",
+      "completed_at": "2026-11-23T18:30:39+0900",
+      "review_notes": [
+        "docs/UI_GUIDE.md §13 끝 문단 — 「API만 대역으로 둔 로컬 Vite 화면을 실제 Chromium의 390px·1280px에서 수동 확인했다」는 문장은 리뷰에서 다시 확인할 수 없다(테스트·AC 밖이다). 실제로 확인한 게 아니라면 \"수동 확인은 아직\"으로 고친다.",
+        "frontend/src/api/useLesson.ts:44-49 — 학습 완료 뒤 코스 캐시만 무효화한다. 로드맵의 마지막 코스를 마치면 로드맵이 다 마침이 되는데, 로드맵 캐시(`roadmapKey`)는 그대로라 로드맵 화면을 열면 다시 읽기 전까지 잠깐 옛 상태가 보일 수 있다. 다시 읽기 전의 짧은 순간이라 동작에 큰 영향은 없다. 필요하면 roadmaps 캐시도 refetchType 'none'으로 무효화한다.",
+        "frontend/src/pages/LessonPage.tsx:35 — `lesson.isFetching` 중에는 본문 대신 불러오는 중 표시를 보인다. 지금은 창 포커스·재연결 때 다시 읽기를 꺼 둬서 괜찮다. 뒤에 다시 읽기 조건을 켜면 읽던 본문이 깜빡이니, 그때 갈래 판단(ready)과 렌더링 조건을 나눈다."
+      ]
+    },
+    {
+      "step": 7,
+      "name": "material-format-tolerance",
+      "status": "completed",
+      "summary": "MaterialFormat이 구분 줄 앞뒤 공백·탭·CR과 카드 JSON을 감싼 펜스 하나(언어 없음 또는 json·대소문자 무관)를 허용; 펜스 바깥 글·미닫힘·중첩/복수 펜스·중복 구분자·JSON 뒤 추가 값 거절과 본문 코드/Mermaid/KaTeX·같은 줄 표식 보존·이어 붙인 출력 시험 27개 추가(TDD), 프롬프트와 기존 형식 규칙·원문 로그 부재 유지, 03 §3 반영; 지정 생성 시험·전체 build·Spotless·Checkstyle 통과, 서버 테스트 2254→2281(+27), 실제 OpenAI 호출·커밋 없음",
+      "started_at": "2026-11-23T19:50:24+0900",
+      "completed_at": "2026-11-23T19:58:11+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/generation/material/MaterialFormatTest.java:113 — `parsesConcatenatedToleratedOutput` 는 원문을 잘라 `first + continuation` 으로 다시 붙이므로 원래 문자열과 똑같다. 그래서 이어 쓰기 경로를 따로 검증하지 못하고 한 번에 해석하는 시험과 같다 → 이어 쓰기 흐름을 확인하려면 처리기 쪽 시험에서 잘린 응답(`length` 종료)과 이어 쓰기 응답을 스텁으로 주고, 그 결과가 펜스 · 공백 허용 규칙으로 저장되는지 보는 편이 의미가 있다.",
+        "backend/src/main/java/com/mogum/generation/material/MaterialFormat.java:58 — 카드 글을 펜스가 없을 때도 `strip()` 한다. `strip()` 은 유니코드 공백까지 지우므로, 예전에는 JSON 해석에서 떨어지던 앞뒤의 유니코드 공백(전각 공백 등)도 이제 받는다. 동작상 해는 없지만 step 이 말한 두 허용 바깥의 작은 확장이다 → 필요하면 펜스 판정에만 strip 한 글을 쓰고, 펜스가 아닐 때는 원래 글을 넘기면 된다."
+      ]
+    },
+    {
+      "step": 8,
+      "name": "lesson-screen-fixes",
+      "status": "completed",
+      "summary": "Mermaid 그림 id를 보안 컨텍스트가 필요 없는 모듈 카운터+material-diagram- 접두사로 변경하고 UUID 부재·여러 그림·재마운트 유일성 검증; 학습 완료 뒤 코스와 같은 방식으로 로드맵 목록·상세 읽기 취소 및 refetchType none 무효화 추가, 코스 완료 여부 무관·늦은 읽기 차단·즉시 재조회 없음 검증; UI_GUIDE §12·§13 반영, TDD·화면 테스트 448→453(+5)·test/lint 통과, 렌더러 보안 설정 유지·서버 변경·커밋 없음",
+      "started_at": "2026-11-23T19:58:12+0900",
+      "completed_at": "2026-11-23T20:00:30+0900",
+      "review_notes": [
+        "frontend/src/components/MaterialBody.test.tsx:92 — `Object.create(crypto, …)`로 만든 대역은 jsdom·Node 환경이라 통과한다. 실제 브라우저의 `Crypto` 에서는 프로토타입 getter 호출이 `Illegal invocation` 으로 실패할 수 있으니, 환경을 바꿀 때는 `{ ...필요한 것만 }` 같은 평범한 객체 대역을 고려한다."
+      ]
+    },
+    {
+      "step": 9,
+      "name": "concept-threshold",
+      "status": "completed",
+      "summary": "app.concept.same-threshold를 ADR-187의 2026-11-23 실측 결정값 0.72로 변경하고 설정 주석·02 §9·04 §10에 숙련도 고리 TASK 전 실제 흐름 재측정 명시; 설정 시험을 먼저 변경해 실패 확인 후 통과, 직접 벡터를 쓰는 판정 시험과 판정 방법 유지; 지정 config·card 시험·전체 build·Spotless·Checkstyle 통과, 실제 OpenAI 호출·커밋 없음",
+      "started_at": "2026-11-23T20:00:44+0900",
+      "completed_at": "2026-11-23T20:06:02+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/card/service/LessonCardWriterIntegrationTest.java:56-59,134-136 — 「기준값 이상이면 붙인다」 시험은 유사도 0.8 인 벡터({4,3}·{1,0})와 실제 설정값을 씁니다. 그래서 설정이 0.8 보다 높아지면 시험이 조용히 깨집니다. 지금 값 0.72 에서는 통과하니 승인은 막지 않습니다 → 다음에 기준값을 다시 잴 때, 벡터를 설정값 바로 위 · 아래로 정하거나 경계 케이스를 ConceptSimilaritySearchImplTest 쪽에만 두는 것을 생각해 보세요."
+      ]
+    },
+    {
+      "step": 10,
+      "name": "sonar-record-array",
+      "status": "completed",
+      "summary": "NewConcept의 배열 내용 기반 equals·hashCode와 차원 수만 표시하는 toString 및 생성자·접근자 방어 복사 구현; 단위 시험 7개를 먼저 작성해 실패 확인 후 통과, 개념 판정·저장 로직 유지, 지정 card·generation 시험과 전체 build·Spotless·Checkstyle 통과, 커밋 없음",
+      "started_at": "2026-11-24T06:34:13+0900",
+      "completed_at": "2026-11-24T06:40:51+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/card/service/LessonCardWriter.java:58 — 이제 생성자가 `embedding.clone()` 을 하므로 `embedding` 이 null 이면 record 를 만드는 순간 NPE 가 난다. 전에는 `Concept.add` 의 clone 에서 났다. `MaterialGenerator.java:63` 의 `byDefinition.get(...)` 은 같은 definitions 목록으로 채운 맵에서 꺼내므로 실제로는 null 이 나오지 않는다. 혹시 나오더라도 이제는 generate 의 try 안에서 터져 '서비스 사용 불가'(unavailable) 실패로 처리된다. 정상 흐름에는 영향이 없다 → 고치지 않아도 된다. 참고로만 적는다."
+      ]
+    },
+    {
+      "step": 11,
+      "name": "sonar-scroll-tabindex",
+      "status": "completed",
+      "summary": "MaterialBody의 그림·코드·표 영역 tabIndex와 공통 focus-visible 테두리 제거, 영역 이름·가로 스크롤·렌더러 보안 설정 유지; 짝 시험을 먼저 변경해 실패 확인 후 전체 화면 시험 453개·lint 통과, UI_GUIDE §12에 사용자 결정(2026-11-24) 반영, 커밋 없음",
+      "started_at": "2026-11-24T06:40:51+0900",
+      "completed_at": "2026-11-24T06:42:07+0900"
+    }
+  ],
+  "created_at": "2026-11-23T08:16:45+0900",
+  "completed_at": "2026-11-24T06:42:07+0900"
+}

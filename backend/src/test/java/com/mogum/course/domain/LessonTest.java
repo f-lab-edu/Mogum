@@ -2,6 +2,7 @@ package com.mogum.course.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Instant;
 import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
@@ -29,5 +30,19 @@ class LessonTest {
 		assertThat(lesson.getDescription()).isEqualTo("값을 다루는 법을 배워요");
 		assertThat(lesson.getConcepts()).containsExactlyElementsOf(concepts);
 		assertThat(lesson.getCompletedAt()).isNull();
+	}
+
+	@Test
+	@DisplayName("학습 완료 시각은 처음 한 번만 채운다")
+	void completesOnlyOnce() {
+		// given
+		var lesson = LessonFixtures.lesson(CourseFixtures.single(1L), 1);
+		var now = Instant.parse("2026-11-23T00:00:00Z");
+		lesson.complete(now);
+
+		// when
+		lesson.complete(now.plusSeconds(10));
+		// then
+		assertThat(lesson.getCompletedAt()).isEqualTo(now);
 	}
 }

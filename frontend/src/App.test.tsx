@@ -13,19 +13,32 @@ test('작업 주소를 직접 열면 승인 뒤 작업을 읽고 기다리는 �
   expect(fetch).toHaveBeenCalledWith('/api/jobs/12', expect.objectContaining({ method: 'GET' }))
 })
 
-test.each([
-  ['/courses/31/lessons/51', '강의'],
-])('결과 주소 %s는 승인 뒤 제목 %s와 뒤로 가기만 있는 자리를 표시한다', async (path, title) => {
-  window.history.replaceState(null, '', path)
-  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/courses' ? { courses: [] } : path === '/api/roadmaps' ? { roadmaps: [] } : { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
+test('강의 주소는 승인 뒤 실제 강의와 본문을 표시한다', async () => {
+  window.history.replaceState(null, '', '/courses/31/lessons/51')
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+    ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
+    : { id: 51, courseId: 31, courseTitle: '자바 기초', position: 1, title: '변수', completed: false, material: { body: '값을 담아요.' } } })))))
   render(<App />)
-  expect(await screen.findByRole('heading', { name: title })).toBeVisible()
-  expect(screen.getByRole('main')).toHaveTextContent(/^$/)
-  expect(screen.getByRole('button', { name: '뒤로 가기' })).toBeVisible()
-  await waitFor(() => expect(screen.getByRole('heading', { name: title })).toHaveFocus())
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { name: '1강 · 변수' })).toBeVisible()
+    expect(screen.getByText('값을 담아요.')).toBeVisible()
+    expect(screen.getByRole('heading', { name: '강의' })).toHaveFocus()
+  })
 })
 
-test.each(['/new', '/jobs/12', '/courses/31', '/roadmaps/41', '/courses/31/lessons/51'])('승인 전에는 %s에서 작업이나 결과를 읽지 않는다', async (path) => {
+test('축하 주소는 승인 뒤 코스 제목과 홈으로를 표시한다', async () => {
+  window.history.replaceState(null, '', '/courses/31/done')
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+    ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
+    : { id: 31, title: '자바 기초', status: 'COMPLETED' } })))))
+  render(<App />)
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { name: '자바 기초 코스를 마쳤어요. 고생했어요!' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '홈으로' })).toBeEnabled()
+  })
+})
+
+test.each(['/new', '/jobs/12', '/courses/31', '/roadmaps/41', '/courses/31/lessons/51', '/courses/31/done'])('승인 전에는 %s에서 작업이나 결과를 읽지 않는다', async (path) => {
   window.history.replaceState(null, '', path)
   vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: { status: 'APPLIED', name: '민서', email: 'minseo@example.com' } })))))
   render(<App />)
@@ -195,4 +208,54 @@ test('로드맵 주소를 직접 열면 승인 뒤 실제 계획을 읽는다', 
   expect(await screen.findByRole('heading', { name: '자바 로드맵' })).toBeVisible()
   expect(fetch).toHaveBeenCalledWith('/api/roadmaps/41', expect.objectContaining({ method: 'GET' }))
   await waitFor(() => expect(screen.getByRole('heading', { name: '로드맵' })).toHaveFocus())
+})
+
+test.each([false, true])('코스에서 처음 연 강의를 만들고 읽은 뒤 완료하면 다 마침 %s에 맞게 이동한다', async (lastLesson) => {
+  window.history.replaceState(null, '', '/courses/31')
+  let materialReady = false
+  let completed = false
+  const lessons = [
+    { id: 51, position: 1, title: '변수', description: '값을 담아요', concepts: [], completed: false },
+    ...(!lastLesson ? [{ id: 52, position: 2, title: '반복문', description: '여러 번 실행해요', concepts: [], completed: false }] : []),
+  ]
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path, options) => {
+    let data: unknown
+    if (path === '/api/me') data = { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
+    else if (path === '/api/courses/31') data = {
+      id: 31, title: '자바 기초', status: completed && lastLesson ? 'COMPLETED' : 'LEARNING',
+      lessons: lessons.map((lesson) => ({ ...lesson, completed: completed && lesson.id === 51 })),
+      progress: { completedLessons: completed ? 1 : 0, totalLessons: lessons.length },
+      nextLessonId: completed ? (lastLesson ? undefined : 52) : 51,
+    }
+    else if (path === '/api/lessons/51/complete') {
+      completed = true
+      data = { courseId: 31, courseCompleted: lastLesson }
+    } else if (path === '/api/lessons/51') data = {
+      id: 51, courseId: 31, courseTitle: '자바 기초', position: 1, title: '변수', completed,
+      ...(materialReady ? { material: { body: '값을 담는 변수예요.' } } : {}),
+    }
+    else if (path === '/api/jobs' && options.method === 'POST') data = { id: 77, type: 'MATERIAL', status: 'QUEUED', subject: { title: '변수' } }
+    else if (path === '/api/jobs/77') {
+      materialReady = true
+      data = { id: 77, type: 'MATERIAL', status: 'SUCCEEDED', subject: { title: '변수' }, result: { type: 'LESSON', id: 51, courseId: 31 } }
+    } else throw new Error(`Unexpected test request: ${path}`)
+    return Promise.resolve(new Response(JSON.stringify({ data })))
+  }))
+  render(<App />)
+  const next = await screen.findByRole('region', { name: '다음에 열 강의' })
+  fireEvent.click(within(next).getByRole('link', { name: '1강 · 변수' }))
+  await waitFor(() => {
+    expect(screen.getByText('값을 담는 변수예요.')).toBeVisible()
+    expect(window.location.pathname).toBe('/courses/31/lessons/51')
+    expect(vi.mocked(fetch).mock.calls.filter(([path, options]) => path === '/api/jobs' && options?.method === 'POST')).toHaveLength(1)
+  })
+  fireEvent.click(screen.getByRole('button', { name: '학습 완료' }))
+  await waitFor(() => {
+    expect(window.location.pathname).toBe(lastLesson ? '/courses/31/done' : '/courses/31')
+    if (lastLesson) expect(screen.getByRole('heading', { name: '자바 기초 코스를 마쳤어요. 고생했어요!' })).toBeVisible()
+    else {
+      expect(screen.getByRole('region', { name: '다음에 열 강의' })).toHaveTextContent('2강 · 반복문')
+      expect(screen.getByRole('progressbar', { name: '학습 진도' })).toHaveAttribute('aria-valuenow', '1')
+    }
+  })
 })

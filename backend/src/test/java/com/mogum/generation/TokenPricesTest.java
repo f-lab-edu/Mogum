@@ -40,4 +40,17 @@ class TokenPricesTest {
 		// then
 		assertThat(cost).isEqualByComparingTo("0.00044");
 	}
+
+	@Test
+	@DisplayName("출력과 캐시가 없는 임베딩은 입력 단가만으로 계산한다")
+	void pricesEmbeddingInputOnly() {
+		// given
+		var embedding = new TokenPrices(new BigDecimal("0.13"), BigDecimal.ZERO, BigDecimal.ZERO);
+
+		// when
+		var cost = embedding.cost(new ChatProvider.Usage(1000, null, 0));
+
+		// then
+		assertThat(cost).isEqualByComparingTo("0.00013");
+	}
 }

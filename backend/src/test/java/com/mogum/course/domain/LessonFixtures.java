@@ -3,15 +3,13 @@ package com.mogum.course.domain;
 import java.time.Instant;
 import java.util.List;
 
-import org.springframework.test.util.ReflectionTestUtils;
-
 public final class LessonFixtures {
 	// @checkstyle:off — 포매터가 빈 선언과 블록을 한 줄로 유지한다.
 	private LessonFixtures() {}
 	// @checkstyle:on
 
 	public static Lesson withCompletedAt(Lesson lesson, Instant completedAt) {
-		ReflectionTestUtils.setField(lesson, "completedAt", completedAt);
+		lesson.complete(completedAt);
 		return lesson;
 	}
 

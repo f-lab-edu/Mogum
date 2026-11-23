@@ -15,6 +15,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.course.domain.CourseFixtures;
+import com.mogum.course.domain.LessonFixtures;
 import com.mogum.course.domain.RoadmapFixtures;
 import com.mogum.job.domain.GenerationJobFixtures;
 import com.mogum.job.domain.JobErrorType;
@@ -83,4 +84,38 @@ class JpaCourseJobRepositoryIntegrationTest {
 		assertThat(result.get(3)).isEqualTo(List.of());
 		assertThat(result.get(4)).isEqualTo(false);
 	}
+
+	@ParameterizedTest(name = "작업 상태={0}")
+	@ValueSource(strings = {"QUEUED", "RUNNING", "FAILED", "SUCCEEDED"})
+	@DisplayName("강의 작업은 주인과 강의 및 종류로 읽고 상태 이외의 시스템 값은 내보내지 않는다")
+	void readsMaterialJobByOwnerAndLesson(String status) {
+		// given
+		var user = userRepository.save(UserFixtures.user("me@example.com"));
+		var course = courseRepository.save(CourseFixtures.single(user.getId()));
+		var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
+		var other = lessonRepository.save(LessonFixtures.lesson(course, 2));
+		generationJobRepository.save(GenerationJobFixtures.material(user.getId(), other.getId()));
+		generationJobRepository.save(GenerationJobFixtures.replanCourse(user.getId(), course.getId(), null));
+		var job = generationJobRepository.save(GenerationJobFixtures.material(user.getId(), lesson.getId()));
+		if (status.equals("RUNNING")) {
+			GenerationJobFixtures.running(jdbcTemplate, job.getId(), 1, testClock.instant(),
+				testClock.instant().plusSeconds(960));
+		} else if (status.equals("FAILED")) {
+			GenerationJobFixtures.failed(jdbcTemplate, job.getId(), JobErrorType.INVALID_OUTPUT, testClock.instant());
+		} else if (status.equals("SUCCEEDED")) {
+			GenerationJobFixtures.succeeded(jdbcTemplate, job.getId(), null, null, lesson.getId(), testClock.instant());
+		}
+		// when
+		var result = new TransactionTemplate(platformTransactionManager).execute(tx -> List.of(
+			courseJobRepository.findMaterialJob(user.getId(), lesson.getId()),
+			courseJobRepository.findMaterialJob(999L, lesson.getId()),
+			courseJobRepository.findMaterialJob(user.getId(), 999L)));
+		// then
+		assertThat(result.get(0)).contains(new CourseJobRepository.MaterialJob(job.getId(), status));
+		assertThat(result.get(1)).isEmpty();
+		assertThat(result.get(2)).isEmpty();
+	}
+
+	@Autowired
+	LessonRepository lessonRepository;
 }

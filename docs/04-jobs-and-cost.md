@@ -80,6 +80,8 @@
 
 - **로드맵 코스 처리기** — `7-course-planning` step 4: `job.PlanRoadmapCourseIntakeHandler`와 `generation.PlanRoadmapCourseGenerator`를 짝으로 더했다. 받기 트랜잭션의 `check`에서 순서 · 앞 코스 다 마침 · 끝나지 않은 로드맵 다시 짜기를 확인하고 첫 코스면 `Roadmap.start()`로 진행 중으로 바꾼다. 뒤의 건 수 · 크레딧 거절도 같은 트랜잭션에서 이 변경을 롤백한다. `generation.RoadmapCoursePlanReader.read(courseId)`는 읽기 전용 `TransactionTemplate` 안에서 로드맵 입력(수준은 첫 코스만) · 이 코스 계획 · 바로 앞 코스 실제 강의 목록 · 뒤 코스 계획을 `CoursePlanInput.RoadmapCourse` 값으로 복사하고 트랜잭션을 닫는다. 계획과 강의는 레포지토리의 부모 ID별 순서 조회를 쓰며, 이 읽기는 다시 짜기에서도 쓸 수 있다. 생성기는 그 뒤 `planning` 채팅과 `parseLessons`를 부르고 저장 트랜잭션에서 강의와 `Course.planLessons()`의 검토 중 상태를 함께 저장한다. 제목과 계획은 그대로이고 결과 ID는 원래 코스다. `config.GenerationConfiguration`이 읽기와 생성 빈을 조립한다.
 
+- **강의 자료 처리기** — `8-material-cards` step 3: `job.MaterialIntakeHandler`와 `generation.MaterialGenerator`를 짝으로 조립했다. 받기는 자료 유무를 보지 않고 코스 상태와 앞 강의 전체 완료만 확인한다. `generation.MaterialReader`는 읽기 전용 `TransactionTemplate`에서 `generation.material.MaterialInput`으로 이번 강의 한 줄 · 코스 제목 · 주제 · 순서 있는 강의 목록(다른 강의의 개념 제외) · 목적 · 메모만 복사한다. `MaterialFormat`은 마크다운 본문 뒤 한 줄 `<!-- MOGUM_CARDS -->`와 카드 JSON 객체를 해석해 `MaterialContent`로 돌려준다. 비지 않은 본문 · 카드 · 질문/답 · 개념 이름/정의만 검사하고 권장 개수와 그림/수식 문법은 검사하지 않는다. 채팅 한 번(+ 이어 쓰기) 뒤 중복 정의를 제거해 임베딩 한 번을 트랜잭션 밖에서 부른다. 워커의 소유권 확인 뒤 같은 트랜잭션에서 `Material.write`와 `LessonCardWriter`로 결과를 함께 저장하고 결과는 원래 강의 ID다. 코스와 강의 상태는 바꾸지 않는다.
+
 - **다시 짜기 처리기** — `7-course-planning` step 5 구현: `job.ReplanCourseIntakeHandler` · `ReplanRoadmapIntakeHandler`와 `generation.ReplanCourseGenerator` · `ReplanRoadmapGenerator`를 짝으로 조립했다. 받기는 검토 중 상태만 허용하고 기존 사용자 행 잠금 · 성공하지 않은 같은 대상 작업 반환 · 크레딧 처리를 쓴다. 생성 재료는 읽기 전용 `TransactionTemplate`에서 값으로 복사한 뒤 호출하며 로드맵 코스는 `RoadmapCoursePlanReader`를 다시 쓴다. 저장은 워커의 소유권 확인 뒤 같은 트랜잭션에서 이전 강의 또는 짜기 전 코스를 `EntityManager.remove` → `flush()` → 순서 1부터 새 자식 저장으로 교체한다. 코스 제목과 상태는 유지하고 로드맵은 `Roadmap.replan(title, description)`으로 제목 · 설명을 함께 바꾸며 검토 중 상태를 유지한다. 저장 시 검토 중이 아니거나 로드맵 코스가 짜기 전이 아니면 불변식 위반으로 예외를 낸다. 결과 ID는 원래 대상이며 생성 실패 · 버리기는 이전 결과를 건드리지 않는다.
 
 - **호출 기록** — `7-course-planning` step 0에서 `V12__create_llm_calls.sql`과 `generation.call.domain.LlmCall` · `LlmCallType` · `LlmCallOutcome`, `generation.call.repository.LlmCallRepository`를 더했다. `generation.call.LlmCallWriter`의 `long start(Long jobId, Long userId, JobType jobType, LlmCallType callType, String model)` · `void finish(long callId, LlmCallOutcome outcome, Integer inputTokens, Integer outputTokens, BigDecimal cost, int durationMs)`는 각각 `TransactionTemplate`의 `REQUIRES_NEW`로 짧게 커밋한다. 존재하지 않는 작업 · 사용자 연결만 비우고, 확인 직후 삭제되어 FK 위반이면 롤백 후 새 트랜잭션에서 연결을 재확인해 한 번 재시도한다. `job_type`은 남기며 종료는 끊긴 행도 채운다. `outcome`과 `duration_ms`는 함께 비거나 함께 찬다. JPA 쓰기의 시각은 공용 `Clock`의 Auditing이 채우고, 빈은 `config.GenerationConfiguration.llmCallWriter`가 조립한다.
@@ -88,7 +90,7 @@
 
 - `6-job-worker` step 4 구현: `generation.JobGenerator`는 `type()` · `generate(JobSnapshot)` · `save(JobSnapshot, GeneratedResult)`를 나눈다. 운영 구현은 이 절의 새로 배우기 처리기부터 더했다. `JobSnapshot`과 그 안의 `Input`은 ID · 입력 · 피드백 · 이번 `claimCount`만 담는 record이고, 결과 값은 `GeneratedResult`로 전달한다. `GenerationOutcome.Success` 또는 `Failure`의 `PROVIDER_UNAVAILABLE` · `INVALID_OUTPUT` · `PROVIDER_REJECTED` · `INPUT_TOO_LARGE`를 반환한다. `ResultRef(long id)`는 새로 만든 결과 또는 원래 대상 ID다.
 - `worker.JobRunner`의 `boolean runOnce()`는 작업 하나를 집었는지 반환한다. `EntityManager` 네이티브 SQL과 `TransactionTemplate`으로 꺼내기 · 갱신 · 저장 · 실패의 경계를 두고, 만들기는 트랜잭션 밖에서 한다. 호출자 트랜잭션도 거절한다. 저장의 첫 조건부 쓰기로 소유권을 확인한 뒤 `save` · 명시적 `flush()` · 작업 성공을 함께 커밋한다. 실패 전환과 `CreditLedger.restoreIfOwed`도 한 트랜잭션이다. 시각은 주입받은 `Clock` 하나로 계산하고 비교한다. 시한 갱신은 외부에서 받은 `ScheduledExecutorService`에 한 바퀴 동안만 예약하고, 완료 전에 진행 중인 갱신을 마치고 취소한다.
-- `6-job-worker` step 5 구현: `config.WorkerConfiguration`이 `worker.WorkerLifecycle`을 조립한다. `SmartLifecycle`의 자동 시작에서 워커 수만큼 플랫폼 스레드와 각각의 `JobRunner` · 갱신 스케줄러를 만든다. 빈손과 한 바퀴 밖 예외 뒤에는 설정 간격을 쉰다. 워커 수 0은 실행기 · 스레드를 만들지 않는다. 운영 처리기는 `7-course-planning` step 3의 새 코스 · 새 로드맵과 step 4의 로드맵 코스와 step 5의 코스 · 로드맵 다시 짜기 다섯 종류이며, 강의 자료는 아직 받지 않는다. **종류를 받기 시작하는 TASK 는 그 종류의 `job.JobIntakeHandler` 와 `generation.JobGenerator` 를 같은 step 에서 함께 더한다** — 받기 처리기만 있으면 `JobRunner` 가 처리기 없는 작업에서 예외를 던져 `RUNNING` 으로 남고, 시한마다 되찾아져 끝나지 않는다(크레딧도 돌아오지 않는다).
+- `6-job-worker` step 5 구현: `config.WorkerConfiguration`이 `worker.WorkerLifecycle`을 조립한다. `SmartLifecycle`의 자동 시작에서 워커 수만큼 플랫폼 스레드와 각각의 `JobRunner` · 갱신 스케줄러를 만든다. 빈손과 한 바퀴 밖 예외 뒤에는 설정 간격을 쉰다. 워커 수 0은 실행기 · 스레드를 만들지 않는다. 운영 처리기는 `7-course-planning`의 다섯 종류와 `8-material-cards` step 3의 강의 자료까지 여섯 종류다. **종류를 받기 시작하는 TASK 는 그 종류의 `job.JobIntakeHandler` 와 `generation.JobGenerator` 를 같은 step 에서 함께 더한다** — 받기 처리기만 있으면 `JobRunner` 가 처리기 없는 작업에서 예외를 던져 `RUNNING` 으로 남고, 시한마다 되찾아져 끝나지 않는다(크레딧도 돌아오지 않는다).
 - 종료는 `SmartLifecycle`의 단계 `Integer.MAX_VALUE`에서 시작한다. 각 실행기에 새 꺼내기 금지를 먼저 알리고 빈손 대기를 깨운 뒤, 모든 워커에 같은 종료 시각을 적용한다. 진행 중 갱신은 기다리는 동안 유지한다. 한도를 넘긴 워커는 `releaseCurrent()`의 `TransactionTemplate`(반환 트랜잭션 제한 5초)에서 같은 `claim_count` · `RUNNING` 조건으로 `QUEUED` · `lease_until = NULL` · `updated_at`을 쓰며 크레딧은 건드리지 않는다. 반환은 워커별로 나란히 처리한다. 늦은 호출은 해당 시도의 시한 상실 표시와 DB 쓰기 조건으로 막는다. 실행 스레드는 데몬 플랫폼 스레드라 한도 뒤 외부 호출이 JVM 종료를 붙잡지 않는다. 각 실행기의 현재 시도와 종료 표시는 그 실행기의 수명 제어에만 쓰고, 워커 사이 작업 분배 · 소유권은 DB로만 판단한다.
 - 종료 순서의 근거: 로컬 의존성 `spring-context-7.0.9-sources.jar`의 `AbstractApplicationContext.doClose()`는 `lifecycleProcessor.onClose()` 뒤에 `destroyBeans()`를 호출하며, `DefaultLifecycleProcessor.stopBeans()`는 높은 단계부터 멈추고 `stop(Runnable)`의 콜백을 기다린다. `WorkerLifecycleTest.stopsBeforeConnectionPoolDestruction`은 실제 Spring 컨텍스트를 닫아 반환 시점에 Hikari 풀이 열려 있고, 콜백 뒤 풀의 `close()`가 끝나는 순서를 검증한다. 따라서 JPA · DB 풀의 singleton 파괴 전에 워커 반환을 마친다.
 
@@ -142,7 +144,7 @@
 - 한 시도는 호출 한 번이고 중간 결과가 없어 처음부터 다시 만든다(ADR-119 · ADR-120 · ADR-125).
 - 다른 워커가 되찾아 간 뒤 늦게 끝난 옛 워커는 결과를 쓰지 않는다 — 결과를 저장할 때 아직 자기 작업인지 확인한다.
 - **배포처럼 정상적으로 끌 때는 진행 중인 시도가 끝나기를 기다린다**(ADR-126) — 새 작업은 꺼내지 않고, 진행 중인 시도가 결과를 저장하기를 정한 한도까지 기다린 뒤 끈다. 한도를 넘기면 들고 있던 작업을 기다림으로 돌려놓는다. 기다리는 동안 시한은 그대로 늘린다.
-    - 기다리는 한도는 Spring 의 종료 대기(`timeout-per-shutdown-phase` — 지금 130초)와 컨테이너의 강제 종료 대기(`deploy/compose.yaml` 의 `stop_grace_period` — 지금 150초)보다 짧게 둔다. 길면 기다리는 도중 강제로 죽어 시한으로 되찾는 길로 떨어진다.
+    - 기다리는 한도는 Spring 의 종료 대기(`timeout-per-shutdown-phase` — 지금 180초)와 컨테이너의 강제 종료 대기(`deploy/compose.yaml` 의 `stop_grace_period` — 지금 220초)보다 짧게 둔다. 길면 기다리는 도중 강제로 죽어 시한으로 되찾는 길로 떨어진다.
 - 서버가 갑자기 죽으면 시한이 지날 때까지 그 작업이 멈춘다. 되찾은 작업에 이미 나간 호출 비용은 운영자가 낸다.
 - 처리하는 중에 서버를 계속 죽이는 작업은 시한이 지날 때마다 되찾아져 다시 돈다 — 꺼낸 횟수에 상한을 두지 않는다. 드물어 장치를 두지 않고, 운영자가 남은 작업의 `claim_count` 로 알아본다(ADR-102 · README 2026-11-15).
 
@@ -233,7 +235,7 @@
 
 `6-job-worker` step 4의 워커 줄은 커밋 뒤 `INFO`의 `job finished status={SUCCEEDED|FAILED}`, 소유권 확인이 0행이면 한 시도에 한 번 `WARN`의 `job lease lost`, 결과 저장 트랜잭션의 예외에는 스택과 함께 `ERROR`의 `job save failed`다. 처리와 갱신 중 `jobId` · `userId`를 넣고 끝나면 지운다. 저장 예외는 원래 메시지 · cause · suppressed를 넘기지 않고 예외 타입 이름과 스택 위치만 남긴다.
 
-`7-course-planning` step 10의 `generation.GenerationFailures`는 다섯 생성 처리기의 재료 읽기 · 프롬프트 준비 등에서 예상 밖 `RuntimeException`을 잡으면 `ERROR`의 `job generate failed`를 한 번 남기고 `PROVIDER_UNAVAILABLE`을 반환한다. 자동 다시 시도마다 한 줄씩 남을 수 있다. `jobId` · `userId`는 워커가 넣은 MDC를 그대로 쓰며, 스택에는 원래 메시지 · cause · suppressed 없이 예외 타입 이름과 위치만 싣는다. 정상 생성과 프로바이더 실패에는 이 줄을 남기지 않는다.
+`7-course-planning` step 10의 `generation.GenerationFailures`는 생성 처리기의 재료 읽기 · 프롬프트 준비 등에서 예상 밖 `RuntimeException`을 잡으면 `ERROR`의 `job generate failed`를 한 번 남기고 `PROVIDER_UNAVAILABLE`을 반환한다. `8-material-cards` step 3의 `MaterialGenerator`도 같은 경로를 쓴다. 자동 다시 시도마다 한 줄씩 남을 수 있다. `jobId` · `userId`는 워커가 넣은 MDC를 그대로 쓰며, 스택에는 원래 메시지 · cause · suppressed 없이 예외 타입 이름과 위치만 싣는다. 정상 생성과 프로바이더 실패에는 이 줄을 남기지 않는다.
 
 `NewCourseGeneratorIntegrationTest`의 `OutputCaptureExtension`이 캡처한 실제 출력:
 
@@ -284,6 +286,8 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 
 ## 10. 아직 정하지 않은 값
 
+같은 개념 판정은 `app.concept.same-threshold`(`config.ConceptProperties.sameThreshold()`)로 설정한다. `0.72` — 2026-11-23 실측(ADR-187)으로 정함. 숙련도 고리 TASK 전에 실제 흐름으로 다시 잰다. 0 초과 1 이하가 아니면 기동을 거부한다.
+
 | 값 | 근거 |
 |---|---|
 | 한 사람이 동시에 걸 수 있는 수 — `app.job.max-in-progress-per-user` 임시 값 3(`JobProperties.maxInProgressPerUser()`). `6-job-worker` step 2에서 사용자 행 잠금으로 동시 요청을 직렬화했다(§6). 실제 운영 값은 재 보고 정한다 | ADR-104 · ADR-133 |
@@ -299,24 +303,24 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 
 | 설정 키 | 읽는 메서드 | 임시 값 |
 |---|---|---|
-| `app.worker.lease-duration` | `leaseDuration()` | `6m` |
+| `app.worker.lease-duration` | `leaseDuration()` | `16m` |
 | `app.worker.renewal-interval` | `renewalInterval()` | `30s` |
 | `app.worker.max-retries` | `maxRetries()` | `2`(최대 호출 3번) |
 | `app.worker.retry-delay` | `retryDelay()` | `1s` |
 | `app.worker.count` | `count()` | `2`(0이면 API만 실행) |
 | `app.worker.poll-interval` | `pollInterval()` | `1s` |
-| `app.worker.shutdown-wait` | `shutdownWait()` | `100s` |
+| `app.worker.shutdown-wait` | `shutdownWait()` | `150s` |
 
-시한은 **한 번 꺼낸 시도의 최장 시간보다 길어야 한다**. `R`은 추가 자동 다시 시도 횟수, `C`는 호출마다 허용한 이어 쓰기 횟수, `T호출`은 호출 시간 제한, `D이어쓰기`는 이어 쓰기 사이 간격, `D다시시도`는 자동 다시 시도 사이 간격이다. `T_DB`는 재료 읽기 · 시한 처리 · 결과/실패 쓰기를 포함한 DB 처리의 여유다.
+시한은 **한 번 꺼낸 시도의 최장 시간보다 길어야 한다**. `R`은 추가 자동 다시 시도 횟수, `C`는 호출마다 허용한 이어 쓰기 횟수, `T호출`은 채팅 호출 시간 제한, `T임베딩`은 한 시도에서 개념 정의를 한 번에 보내는 임베딩 호출 한 번의 시간 제한, `D다시시도`는 자동 다시 시도 사이 간격이다. 이어 쓰기 사이 간격은 0초다. `T_DB`는 재료 읽기 · 시한 처리 · 결과/실패 쓰기를 포함한 DB 처리의 여유다.
 
 ```text
-시한 > (R + 1) × ((C + 1) × T호출 + C × D이어쓰기) + R × D다시시도 + T_DB
-현재: 360초 > 3 × (2 × 50초 + 1 × 0초) + 2 × 1초 + 10초 = 312초
+시한 > (R + 1) × (max_묶음((C + 1) × T호출) + T임베딩) + R × D다시시도 + T_DB
+현재: 960초 > 3 × (2 × 140초 + 20초) + 2 × 1초 + 10초 = 912초
 ```
 
-`7-course-planning` step 1에서 `T호출=50초`, `C=1`, `D이어쓰기=0초`, `T_DB=10초`의 임시 여유를 정했다. `T_DB`는 재료 읽기 · 호출 기록 · 시한 처리 · 결과/실패 쓰기에 남기는 예산이며 실측 상한은 아니다. 운영 프롬프트와 DB 부하로 다시 잰다. `config.LlmConfiguration`의 생성자는 모든 채팅 묶음 중 `(C + 1) × T호출`이 가장 큰 값을 식에 넣고 엄격한 부등식을 검사하며, 각 호출 시간 제한보다 정상 종료 대기(100초)가 길어야 한다. 깨지면 빈 생성 실패로 기동을 거부한다.
+`8-material-cards` step 0에서 강의 자료 채팅 `T호출=140초`, `C=1`과 임베딩 `T임베딩=20초`의 임시 값을 더했다(ADR-186 · ADR-187). 강의 목록 채팅은 50초 · 이어 쓰기 1번이며, 임베딩을 하지 않는 강의 목록에도 임베딩 시간을 더해 식 하나로 보수적으로 검사한다. `T_DB=10초`는 재료 읽기 · 호출 기록 · 시한 처리 · 결과/실패 쓰기에 남기는 예산이며 실측 상한은 아니다. 운영 프롬프트와 DB 부하로 다시 잰다. `config.LlmConfiguration`의 생성자는 모든 채팅 묶음 중 `(C + 1) × T호출`이 가장 큰 값에 임베딩 시간을 더해 엄격한 부등식을 검사하며, 각 채팅 호출 시간 제한보다 정상 종료 대기(150초)가 길어야 한다. 깨지면 빈 생성 실패로 기동을 거부한다.
 
-채팅 설정은 `application.yml`의 `app.llm` 한 곳이고 `config.LlmProperties` record로 읽는다. 아직 쓰지 않는 용도의 묶음은 없다. `7-course-planning` step 10에서 `LlmProperties` 생성자가 `planning` 묶음의 누락을 검사해 설정 바인딩 실패로 기동을 거부한다. `GenerationConfiguration`은 `LlmProperties.planning()`으로 이 묶음을 받아 다섯 생성 처리기에 넘긴다.
+채팅 · 임베딩 설정은 `application.yml`의 `app.llm` 한 곳이고 `config.LlmProperties` record로 읽는다. 생성자는 `planning` · `material` · `embedding`의 누락, 채팅 설정의 유효성, 임베딩 모델이 빈 값인지와 시간 제한이 양수인지를 검사해 설정 바인딩 실패로 기동을 거부한다. `GenerationConfiguration`은 `LlmProperties.planning()`으로 계획 묶음을 받아 다섯 생성 처리기에 넘긴다. `8-material-cards` step 3의 `MaterialGenerator`는 `material()` 채팅 묶음과 `embedding()`의 모델 · 시간 제한을 `EmbeddingSettings`로 받아 쓴다. step 1의 임베딩 호출 경계에는 SDK 없는 `generation.EmbeddingSettings(model, timeout)`을 넘긴다. 임베딩 설정 바인딩은 별도 `LlmProperties.Embedding(model, timeout)` record이며 채팅의 출력 상한 · 이어 쓰기 설정은 쓰지 않는다.
 
 | 설정 키 | 값 |
 |---|---|
@@ -326,12 +330,21 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 | `app.llm.chats.planning.max-completion-tokens` | 출력 상한 — [03 §7](./03-generation.md#7-아직-정하지-않은-값) |
 | `app.llm.chats.planning.timeout` | `50s` |
 | `app.llm.chats.planning.max-continuations` | `1` |
+| `app.llm.chats.material.model` | `gpt-5.6-terra` |
+| `app.llm.chats.material.max-completion-tokens` | `10000` — 임시 값(ADR-186) |
+| `app.llm.chats.material.timeout` | `140s` — 임시 값 |
+| `app.llm.chats.material.max-continuations` | `1` |
+| `app.llm.embedding.model` | `text-embedding-3-large` |
+| `app.llm.embedding.timeout` | `20s` — 임시 값 |
 | `app.llm.database-allowance` | `10s` |
 | `app.llm.prices[gpt-5.6-terra].input` | `2.00` USD / 1M 토큰 |
 | `app.llm.prices[gpt-5.6-terra].cached-input` | `0.20` USD / 1M 토큰 |
 | `app.llm.prices[gpt-5.6-terra].output` | `12.00` USD / 1M 토큰 |
+| `app.llm.prices[text-embedding-3-large].input` | `0.13` USD / 1M 토큰(ADR-187) |
+| `app.llm.prices[text-embedding-3-large].cached-input` | `0` — 캐시 입력 과금 없음 |
+| `app.llm.prices[text-embedding-3-large].output` | `0` — 출력 없음 |
 
-모든 채팅 모델에 단가가 있어야 기동한다. 비용은 `(입력 − 캐시 입력) × 입력 단가 + 캐시 입력 × 캐시 단가 + 출력 × 출력 단가`를 1,000,000으로 나눈 USD다. 사용량이 없으면 비용도 비우고, 캐시 정보만 없으면 캐시 입력을 0으로 계산한다. SDK 자동 재시도는 `maxRetries(0)`이며, `RequestOptions`로 요청별 시간 제한을 건다. `CompletionUsage.PromptTokensDetails.cachedTokens()`, `ChatCompletionCreateParams.Builder.addAssistantMessage(String)`, `OpenAIServiceException.statusCode()/code()`, `OpenAIIoException` · `OpenAIInvalidDataException`과 그 `InterruptedIOException` 원인을 4.75.1 소스 JAR로 확인했다. `JsonHandler`가 본문 읽기 시간 초과를 데이터 예외로 감싸므로 원인 타입으로도 검사한다. SDK `OkHttpClient`는 `retryOnConnectionFailure(false)`도 적용한다.
+모든 채팅 · 임베딩 모델에 단가가 있어야 기동한다. 임베딩 단가는 기존 `TokenPrices(input, cachedInput, output)`에 입력 `0.13` · 캐시 입력과 출력 `0`으로 담는다. 임베딩 사용량은 입력 토큰과 출력 `0`을 넘기면 같은 비용 식으로 입력 비용만 계산된다. 비용은 `(입력 − 캐시 입력) × 입력 단가 + 캐시 입력 × 캐시 단가 + 출력 × 출력 단가`를 1,000,000으로 나눈 USD다. 사용량이 없으면 비용도 비우고, 캐시 정보만 없으면 캐시 입력을 0으로 계산한다. SDK 자동 재시도는 `maxRetries(0)`이며, `RequestOptions`로 요청별 시간 제한을 건다. `CompletionUsage.PromptTokensDetails.cachedTokens()`, `ChatCompletionCreateParams.Builder.addAssistantMessage(String)`, `OpenAIServiceException.statusCode()/code()`, `OpenAIIoException` · `OpenAIInvalidDataException`과 그 `InterruptedIOException` 원인을 4.75.1 소스 JAR로 확인했다. `JsonHandler`가 본문 읽기 시간 초과를 데이터 예외로 감싸므로 원인 타입으로도 검사한다. SDK `OkHttpClient`는 `retryOnConnectionFailure(false)`도 적용한다.
 
 | 프로바이더 결과 | 호출 결과 | 작업 실패 |
 |---|---|---|
@@ -345,9 +358,17 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 | 401 · 403 · 그 밖의 4xx | `REJECTED` | `PROVIDER_REJECTED` |
 | 400 `context_length_exceeded` | `REJECTED` | `INPUT_TOO_LARGE` |
 
+`8-material-cards` step 1의 `generation.EmbeddingProvider.send(Request)`는 작업 ID · 종류 · `EmbeddingSettings` · 정의 글 목록을 받아 입력 순서의 `List<List<Float>>` · 호출 결과 · 작업 실패 · 입력 토큰을 돌려준다. `EmbeddingCall.call(JobSnapshot, EmbeddingSettings, List<String>)`은 `EmbeddingResult.Success(value)` 또는 `Failed(failure)`를 돌려준다. 호출 전 `EMBEDDING` 기록을 커밋하고, 트랜잭션 밖에서 한 번 호출한 뒤 결과 · 입력 토큰 · 입력 단가 비용 · 시간을 기록한다. 출력 토큰은 비워 둔다. 벡터 수가 입력 수와 다르거나 차원이 0 · 불일치이면 `INVALID_OUTPUT`이며, 확인한 사용량은 그대로 기록한다. 한 시도에서 카드 개념 정의를 한 번에 보내는 임베딩은 한 번이고, 임베딩 안의 다시 시도 · 이어 쓰기는 없다. 호출자가 트랜잭션을 쥐면 전송과 기록을 시작하지 않는다. 예상 밖 예외는 호출 기록을 마칠 수 있으면 `PROVIDER_ERROR`로 마친 뒤 다시 던져 기존 생성 처리기의 `GenerationFailures`가 원문 없는 `job generate failed`로 기록하게 한다. 기록 저장의 예상 밖 예외도 던진다.
+
+`generation.llm.OpenAiEmbeddingProvider`는 채팅 어댑터가 소유한 같은 `OpenAIClient`(키 · 기준 주소 · HTTP 풀 · `maxRetries(0)`)를 쓰고, 빈 조립은 `config.LlmConfiguration`에 둔다. `RequestOptions`의 시간 제한은 요청의 임베딩 설정이다. HTTP · 시간 초과 · 연결 실패 분류는 위 채팅 표와 같고 `OpenAiFailures`로 공유한다. SDK 데이터/JSON 형식 오류는 `INVALID_OUTPUT`으로 돌리며, 그 밖의 예외는 숨기지 않는다. 응답 `index`로 순서를 복원하고 중복 · 범위 밖 · 누락 index는 형식 실패다. 정의 글 · 벡터 · 프로바이더 원문은 DB와 로그에 넣지 않는다.
+
+SDK **4.75.1 소스 JAR**의 `EmbeddingCreateParams.Body.Builder`는 `encodingFormat`을 `BASE64`로 초기화한다. 따라서 이 어댑터가 실제 보내는 `encoding_format`은 `base64`다. [공식 API 문서](https://developers.openai.com/api/reference/resources/embeddings/methods/create)의 HTTP 기본값 `float`와 SDK가 넣는 기본값은 구별한다. 같은 JAR의 `Embedding.embedding()` → `EmbeddingValue.asFloats()`는 base64 바이트를 little-endian IEEE 754 32비트 float로 풀어 `List<Float>`를 반환하며, float 배열 응답도 그대로 받는다. 가짜 서버가 실제 SDK 요청의 기본값과 두 응답 형식을 확인한다.
+
 실제 유료 호출은 실행하지 않았다. 가짜 서버가 요청 형식 · 요청 수 · 이어 쓰기와 오류 분류를 확인한다([07 §2](./07-testing.md#2-llm-스텁)).
 
-현재 계산할 수 있는 제약은 `WorkerProperties`의 생성자에서 검사해 설정 바인딩 실패로 기동을 거부한다: 시한 · 갱신/쉬는 간격 · 종료 대기는 양수, `갱신 간격 < 시한`, 워커 수 · 추가 다시 시도 횟수/간격은 0 이상, `종료 대기 < 120초`다. Spring의 130초와 컨테이너의 150초는 늘리지 않고, 반환 트랜잭션 제한 5초를 위한 여유를 남긴다. 워커(단계 `Integer.MAX_VALUE`)는 Tomcat 정상 종료보다 먼저, 따로 멈춘다 — 그래서 실제 종료 시간은 `종료 대기(100초) + 반환(최대 5초) + Tomcat 정상 종료` 의 합이고, 이 합이 컨테이너의 150초 안에 들어와야 한다. 지금 API 요청은 짧아 여유가 있다. 종료 대기 상한 120초는 `WorkerProperties` 에 상수로 있으니 130초를 바꾸면 함께 본다. `WorkerPropertiesTest`는 잘못된 설정의 기동 거부와 실제 Spring 종료 설정이 120초보다 긴 것을 검사하고, 기존 배포 파일 시험이 컨테이너 대기와 Spring 대기의 관계를 검사한다.
+현재 계산할 수 있는 제약은 `WorkerProperties`의 생성자에서 검사해 설정 바인딩 실패로 기동을 거부한다: 시한 · 갱신/쉬는 간격 · 종료 대기는 양수, `갱신 간격 < 시한`, 워커 수 · 추가 다시 시도 횟수/간격은 0 이상, `종료 대기 < 170초`다. Spring 단계 대기는 180초로 반환 트랜잭션 제한 5초를 위한 여유를 10초 이상 남기고, 로컬 · 운영 컨테이너 대기는 220초다. 워커는 Tomcat 정상 종료보다 먼저, 따로 멈춘다 — 실제 종료 시간은 `종료 대기(150초) + 반환(최대 5초) + Tomcat 정상 종료`의 합이다. 컨테이너의 220초에서 워커 대기와 반환을 빼면 Tomcat에 65초가 남는다. 지금 API 요청은 짧아 여유가 있지만, 단계별 제한 180초 전부를 Tomcat이 쓰는 경우까지 보장하는 값은 아니다. 종료 대기 상한 170초는 `WorkerProperties`에 상수로 있으니 Spring 단계 대기를 바꾸면 함께 본다. `WorkerPropertiesTest`는 상한의 엄격한 부등식과 실제 Spring 단계 대기 180초를, `DeployFilesTest`는 두 Compose 파일의 220초가 Spring 단계 대기보다 길고 워커 대기 · 반환 뒤 Tomcat 여유가 남는지를 검사한다.
+
+2026-11-23 로컬 Gradle 캐시의 Spring Boot **4.1.1** · Spring Context **7.0.9** 소스 JAR로 종료 순서를 확인했다. `WorkerLifecycle.getPhase()`는 `Integer.MAX_VALUE`(2,147,483,647), `WebServerGracefulShutdownLifecycle.getPhase()`는 `WebServerApplicationContext.GRACEFUL_SHUTDOWN_PHASE` = `SmartLifecycle.DEFAULT_PHASE - 1024`(2,147,482,623), 서블릿의 `WebServerStartStopLifecycle.getPhase()`는 `START_STOP_LIFECYCLE_PHASE` = 위 값 − 1024(2,147,481,599)다. `DefaultLifecycleProcessor.stopBeans()`는 단계를 내림차순으로 처리하고 `LifecycleGroup.stop()`에서 해당 단계의 콜백을 기다린다. 웹 정상 종료 단계가 호출하는 `TomcatWebServer.shutDownGracefully()` → `GracefulShutdown.doShutdown()`에서 비로소 커넥터를 pause하고 수신 소켓을 닫는다. 따라서 **워커 종료 대기 중 Tomcat은 계속 요청을 받을 수 있다** — 소스의 단계 순서로 확인한 결과이며, 실제 종료 중 HTTP 응답을 보내는 실험은 수행하지 않았다. `AbstractApplicationContext.doClose()`도 `lifecycleProcessor.onClose()` 뒤에 `destroyBeans()`를 호출하므로 이 대기 동안 singleton과 DB 풀은 아직 파괴되지 않는다.
 
 기본 통합 테스트는 공용 `IntegrationTestConfiguration.OAuthInitializer`가 `app.worker.count=0`을 적용한다. 별도 앱 컨텍스트를 늘리지 않고, 워커 시험이 `runOnce()` 또는 짧은 설정으로 직접 만든 `WorkerLifecycle`의 시작 · 종료를 제어한다.
 

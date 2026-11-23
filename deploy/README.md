@@ -311,7 +311,7 @@ docker exec -i "$postgres" sh -c \
 | `postgres` | `pgvector/pgvector:pg17` | 없음 | 512MiB | `mogum_postgres_data` |
 | `caddy` | 공식 `caddy:2` | 80 · 443(TCP) | 128MiB | `mogum_caddy_data`(인증서) · `mogum_caddy_config` |
 
-합계는 1664MiB이고 나머지 약 380MiB는 OS · Docker · SSM 에이전트 몫이다. 스왑 없이 측정하며 `16-capacity`가 같은 [compose.yaml](./compose.yaml)로 재서 상한을 확정한다. 앱 힙은 이미지의 `-XX:MaxRAMPercentage=75`로 컨테이너 상한의 75%를 사용한다. `backend`는 Postgres 준비 확인 후 `aws` 프로필로 기동하며, 종료 대기는 **150초**로 Spring의 130초보다 길다. 세 서비스 모두 `restart: always`로 재부팅과 비정상 종료에 대응한다.
+합계는 1664MiB이고 나머지 약 380MiB는 OS · Docker · SSM 에이전트 몫이다. 스왑 없이 측정하며 `16-capacity`가 같은 [compose.yaml](./compose.yaml)로 재서 상한을 확정한다. 앱 힙은 이미지의 `-XX:MaxRAMPercentage=75`로 컨테이너 상한의 75%를 사용한다. `backend`는 Postgres 준비 확인 후 `aws` 프로필로 기동하며, 종료 대기는 **220초**로 Spring의 단계별 180초보다 길다. 세 서비스 모두 `restart: always`로 재부팅과 비정상 종료에 대응한다.
 
 환경 변수는 Compose의 `--env-file /etc/mogum/mogum.env`로 읽고 서비스마다 필요한 이름만 전달한다. `API_DOMAIN`은 Caddy에만, Google 비밀과 `OPENAI_API_KEY`는 앱에만, DB 비밀번호는 앱과 Postgres에만 전달한다. `APP_IMAGE`는 `deploy.sh`가 지문 파일을 검증한 뒤 지정한다. DB와 인증서는 이름 있는 볼륨에 보존하며, 고정된 프로젝트 이름과 Caddy 설정 경로 덕분에 릴리스 디렉터리가 바뀌어도 정의가 같은 Postgres와 Caddy는 재생성되지 않는다.
 이 변경을 처음 배포할 때는 세 서비스의 정의가 바뀌어 한 번 다시 만들어진다. 데이터 · 인증서는 볼륨에 남고, 그 직전까지의 json-file 로그는 그때 사라진다.

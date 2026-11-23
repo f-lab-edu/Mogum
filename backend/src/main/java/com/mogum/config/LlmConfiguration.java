@@ -8,8 +8,11 @@ import org.springframework.util.Assert;
 
 import com.mogum.generation.ChatCall;
 import com.mogum.generation.ChatProvider;
+import com.mogum.generation.EmbeddingCall;
+import com.mogum.generation.EmbeddingProvider;
 import com.mogum.generation.call.LlmCallWriter;
 import com.mogum.generation.llm.OpenAiChatProvider;
+import com.mogum.generation.llm.OpenAiEmbeddingProvider;
 
 @Configuration(proxyBeanMethods = false)
 public class LlmConfiguration {
@@ -26,11 +29,12 @@ public class LlmConfiguration {
 		}
 
 		// 이어 쓰기 간격은 0이다. R은 첫 시도 뒤 추가 다시 시도 횟수다.
-		var required = longest.multipliedBy((long)workerProperties.maxRetries() + 1)
+		var required = longest.plus(llmProperties.embedding().timeout())
+			.multipliedBy((long)workerProperties.maxRetries() + 1)
 			.plus(workerProperties.retryDelay().multipliedBy(workerProperties.maxRetries()))
 			.plus(llmProperties.databaseAllowance());
 		Assert.isTrue(workerProperties.leaseDuration().compareTo(required) > 0,
-			"Worker lease must exceed retries, chat calls and database allowance");
+			"Worker lease must exceed retries, chat and embedding calls and database allowance");
 	}
 
 	@Bean(destroyMethod = "close")
@@ -40,6 +44,17 @@ public class LlmConfiguration {
 			.max(Duration::compareTo)
 			.orElseThrow();
 		return new OpenAiChatProvider(llmProperties.openai().apiKey(), llmProperties.openai().baseUrl(), timeout);
+	}
+
+	@Bean
+	public OpenAiEmbeddingProvider embeddingProvider(OpenAiChatProvider openAiChatProvider) {
+		return new OpenAiEmbeddingProvider(openAiChatProvider);
+	}
+
+	@Bean
+	public EmbeddingCall embeddingCall(EmbeddingProvider embeddingProvider, LlmCallWriter llmCallWriter,
+		LlmProperties llmProperties) {
+		return new EmbeddingCall(embeddingProvider, llmCallWriter, llmProperties.prices());
 	}
 
 	@Bean

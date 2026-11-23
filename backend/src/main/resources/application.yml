@@ -2,7 +2,7 @@ spring:
   application:
     name: mogum
   lifecycle:
-    timeout-per-shutdown-phase: 130s
+    timeout-per-shutdown-phase: 180s
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/mogum}
     username: ${DB_USERNAME:mogum_local}
@@ -69,22 +69,37 @@ app:
         max-completion-tokens: 4000
         timeout: 50s
         max-continuations: 1
+      material:
+        model: gpt-5.6-terra
+        max-completion-tokens: 10000
+        timeout: 140s
+        max-continuations: 1
+    embedding:
+      model: text-embedding-3-large
+      timeout: 20s
     prices:
       "[gpt-5.6-terra]":
         input: 2.00
         cached-input: 0.20
         output: 12.00
+      "[text-embedding-3-large]":
+        input: 0.13
+        cached-input: 0
+        output: 0
     database-allowance: 10s
   worker:
     count: 2
     poll-interval: 1s
-    shutdown-wait: 100s
-    lease-duration: 6m
+    shutdown-wait: 150s
+    lease-duration: 16m
     renewal-interval: 30s
     max-retries: 2
     retry-delay: 1s
   job:
     max-in-progress-per-user: 3
+  concept:
+    # 2026-11-23 실측으로 정함(ADR-187) — 숙련도 고리 TASK 전에 실제 흐름으로 다시 잰다.
+    same-threshold: 0.72
   credit:
     monthly-amount: 100
     new-course: 1

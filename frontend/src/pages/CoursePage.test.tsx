@@ -27,7 +27,7 @@ function open(data: unknown = review) {
       { path: '/courses/:courseId', element: <AppLayout title="코스"><CoursePage key={31} /></AppLayout> },
       { path: '/jobs/:jobId', element: <h1>기다리는 화면 자리</h1> },
       { path: '/roadmaps/:roadmapId', element: <h1>로드맵 자리</h1> },
-      { path: '/courses/:courseId/lessons/:lessonId', element: <h1>금지된 강의 이동</h1> },
+      { path: '/courses/:courseId/lessons/:lessonId', element: <h1>강의 자리</h1> },
     ],
   }], { initialEntries: ['/', '/courses/31'] })
   render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>)
@@ -88,14 +88,14 @@ test('이대로 시작은 응답으로 같은 코스 화면을 학습 중으로 
 
 test('끝나지 않은 다시 짜기로 시작이 거절되면 서버 문구와 검토 중을 유지한다', async () => {
   const message = '다시 짜는 중에는 시작할 수 없어요'
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response(review)).mockResolvedValue(failure('ROADMAP_REPLAN_IN_PROGRESS', message)))
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response(review)).mockResolvedValue(failure('REPLAN_IN_PROGRESS', message)))
   const { router } = open()
   fireEvent.click(await screen.findByRole('button', { name: '이대로 시작' }))
   expect(await screen.findByText(message)).toBeVisible()
   expect(screen.getByText('시작하지 못했어요.')).toBeVisible()
   expect(screen.getByText('검토 중')).toBeVisible()
   expect(router.state.location.pathname).toBe('/courses/31')
-  expect(screen.queryByText('ROADMAP_REPLAN_IN_PROGRESS')).not.toBeInTheDocument()
+  expect(screen.queryByText('REPLAN_IN_PROGRESS')).not.toBeInTheDocument()
 })
 
 test.each(['start', 'replan', 'title'])('%s 요청 중 모든 동작을 잠그고 중복 제출하지 않는다', async (action) => {
@@ -194,8 +194,9 @@ test('피드백 칸 오류는 해당 칸과 연결된다', async () => {
   await waitFor(() => expect(input).toHaveAccessibleDescription(/글자 수 상한을 넘었어요/))
 })
 
-test('학습 중은 진도·다음 강의를 강조하고 모든 강의 줄은 이동하지 않는다', async () => {
-  const { router } = open(learning)
+test('학습 중은 진도·다음 강의를 강조하고 완료한 강의와 다음 강의만 연다', async () => {
+  const locked = { ...lessons[1], id: 53, position: 3, title: '배열' }
+  const { router } = open({ ...learning, lessons: [...learning.lessons, locked] })
   await screen.findByRole('heading', { name: review.title })
   expect(screen.getByText('학습 중')).toBeVisible()
   expect(screen.getByRole('progressbar', { name: '학습 진도' })).toHaveAttribute('aria-valuenow', '1')
@@ -207,11 +208,18 @@ test('학습 중은 진도·다음 강의를 강조하고 모든 강의 줄은 �
   expect(within(list).getByText('학습 완료')).toBeVisible()
   for (const row of within(list).getAllByRole('listitem')) fireEvent.click(row)
   expect(router.state.location.pathname).toBe('/courses/31')
-  expect(within(list).queryByRole('link')).not.toBeInTheDocument()
+  expect(within(list).getAllByRole('link')).toHaveLength(2)
+  expect(within(list).getByRole('link', { name: '1강 · 변수' })).toHaveAttribute('href', '/courses/31/lessons/51')
+  expect(within(list).getByRole('link', { name: '2강 · 반복문' })).toHaveAttribute('href', '/courses/31/lessons/52')
+  const lockedRow = within(list).getAllByRole('listitem')[2]
+  expect(within(lockedRow).queryByRole('link')).not.toBeInTheDocument()
+  expect(lockedRow).toHaveTextContent('앞 강의를 학습 완료하면 열 수 있어요.')
   expect(within(list).queryByRole('button')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '다시 짜기' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '이대로 시작' })).not.toBeInTheDocument()
   expect(screen.queryByRole('link', { name: '로드맵 화면으로 가기' })).not.toBeInTheDocument()
+  fireEvent.click(within(next).getByRole('link', { name: '2강 · 반복문' }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/courses/31/lessons/52'))
 })
 
 test.each([undefined, 41])('다 마침은 한국 날짜·강의 목록을 보이고 로드맵 %s일 때만 돌아갈 길을 둔다', async (roadmapId) => {
@@ -220,7 +228,9 @@ test.each([undefined, 41])('다 마침은 한국 날짜·강의 목록을 보이
   expect(screen.getByText('다 마침')).toBeVisible()
   expect(screen.getByText('이 코스의 모든 강의를 다 마쳤어요.')).toBeVisible()
   expect(screen.getByText('2026. 11. 18.')).toHaveAttribute('dateTime', done.completedAt)
-  expect(screen.getByRole('list', { name: '강의 목록' })).toBeVisible()
+  const list = screen.getByRole('list', { name: '강의 목록' })
+  expect(list).toBeVisible()
+  expect(within(list).getAllByRole('link')).toHaveLength(2)
   expect(screen.getByRole('button', { name: '코스 제목 고치기' })).toBeVisible()
   expect(screen.queryByRole('button', { name: '다시 짜기' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '이대로 시작' })).not.toBeInTheDocument()
@@ -345,5 +355,4 @@ test.each([review, learning, done])('$status에서 미구현 동작·시스템 �
   open({ ...data, model: 'secret-model', credits: 999, masteryReport: 'secret-mastery', memo: 'secret-memo' })
   await screen.findByRole('heading', { name: review.title })
   expect(screen.getByRole('main')).not.toHaveTextContent(/secret-|999|토큰|비용|모델|크레딧|수료|배지|퀴즈|예상|소요|핵심 복습 반영|메모|지우기|복습하기|처음부터|순서 바꾸기|첫 강의가 열/)
-  expect(screen.queryByRole('link', { name: /강의 열기/ })).not.toBeInTheDocument()
 })

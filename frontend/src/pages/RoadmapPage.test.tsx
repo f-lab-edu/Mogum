@@ -76,7 +76,7 @@ test('이대로 시작은 순서 1의 코스 받기만 보내고 받은 작업�
 })
 
 test.each([
-  ['ROADMAP_REPLAN_IN_PROGRESS', '다시 짜는 중에는 시작할 수 없어요'],
+  ['REPLAN_IN_PROGRESS', '다시 짜는 중에는 시작할 수 없어요'],
   ['CREDIT_INSUFFICIENT', '크레딧이 부족합니다. 2026-12-01에 다시 채워집니다'],
   ['TOO_MANY_IN_PROGRESS', '지금 만드는 것이 끝나면 다시 시도해 주세요'],
 ])('시작 거절 %s는 서버 문구를 보이고 검토 중에 남는다', async (code, message) => {

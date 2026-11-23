@@ -132,8 +132,8 @@ class JobRunnerIntegrationTest {
 
 		// then
 		assertThat(values).isEqualTo(new WorkerProperties(
-			Duration.ofMinutes(6), Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
-			0, Duration.ofSeconds(1), Duration.ofSeconds(100)));
+			Duration.ofMinutes(16), Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
+			0, Duration.ofSeconds(1), Duration.ofSeconds(150)));
 	}
 
 	@ParameterizedTest

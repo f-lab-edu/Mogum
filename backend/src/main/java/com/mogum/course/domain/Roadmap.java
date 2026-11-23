@@ -64,4 +64,14 @@ public class Roadmap extends AuditedEntity {
 		this.title = title;
 		this.description = description;
 	}
+
+	public void complete() {
+		if (status == RoadmapStatus.COMPLETED) {
+			return;
+		}
+		if (status != RoadmapStatus.IN_PROGRESS) {
+			throw new IllegalStateException("Roadmap must be in progress");
+		}
+		status = RoadmapStatus.COMPLETED;
+	}
 }

@@ -14,6 +14,7 @@ import java.util.Base64;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.IntStream;
 
 import javax.sql.DataSource;
 
@@ -75,6 +77,7 @@ import com.mogum.course.repository.CourseRepository;
 import com.mogum.course.repository.LessonRepository;
 import com.mogum.course.repository.RoadmapRepository;
 import com.mogum.generation.ChatProvider;
+import com.mogum.generation.EmbeddingProvider;
 import com.mogum.generation.GeneratedResult;
 import com.mogum.generation.GenerationOutcome;
 import com.mogum.generation.JobGenerator;
@@ -143,6 +146,82 @@ public class IntegrationTestConfiguration {
 		return new TestChatProvider(entityManager);
 	}
 
+	@Bean
+	@Primary
+	public TestEmbeddingProvider testEmbeddingProvider(EntityManager entityManager) {
+		return new TestEmbeddingProvider(entityManager);
+	}
+
+	/** 정의별 벡터와 작업별 응답을 정하는 공용 임베딩 대역. */
+	public static final class TestEmbeddingProvider implements EmbeddingProvider {
+		private final ConcurrentMap<String, List<Float>> vectors = new ConcurrentHashMap<>();
+		private final ConcurrentMap<Long, Deque<Reply>> replies = new ConcurrentHashMap<>();
+		private final List<Request> requests = new CopyOnWriteArrayList<>();
+		private final ConcurrentMap<Long, Boolean> outsideTransactions = new ConcurrentHashMap<>();
+		private final EntityManagerFactory entityManagerFactory;
+
+		public TestEmbeddingProvider(EntityManager entityManager) {
+			this.entityManagerFactory = entityManager.getEntityManagerFactory();
+		}
+
+		public void reset() {
+			vectors.clear();
+			replies.clear();
+			requests.clear();
+			outsideTransactions.clear();
+		}
+
+		public void vector(String definition, List<Float> vector) {
+			vectors.put(definition, List.copyOf(vector));
+		}
+
+		public void reply(long jobId, Reply... sequence) {
+			replies.put(jobId, new ArrayDeque<>(List.of(sequence)));
+		}
+
+		public List<Request> requests(long jobId) {
+			return requests.stream().filter(request -> request.jobId() == jobId).toList();
+		}
+
+		public boolean outsideTransaction(long jobId) {
+			return Boolean.TRUE.equals(outsideTransactions.get(jobId));
+		}
+
+		@Override
+		public Reply send(Request request) {
+			requests.add(request);
+			boolean outside = !TransactionSynchronizationManager.isActualTransactionActive()
+				&& !TransactionSynchronizationManager.hasResource(entityManagerFactory);
+			outsideTransactions.merge(request.jobId(), outside, (previous, current) -> previous && current);
+			var sequence = replies.get(request.jobId());
+			if (sequence != null) {
+				synchronized (sequence) {
+					if (!sequence.isEmpty()) {
+						return sequence.removeFirst();
+					}
+				}
+			}
+			return new Reply(request.definitions().stream()
+				.map(definition -> vectors.getOrDefault(definition, deterministicVector(definition))).toList(),
+				LlmCallOutcome.SUCCEEDED, null, 100);
+		}
+
+		public static Reply failure(GenerationOutcome.Failure failure) {
+			var outcome = switch (failure) {
+				case INVALID_OUTPUT -> LlmCallOutcome.INVALID_OUTPUT;
+				case PROVIDER_UNAVAILABLE -> LlmCallOutcome.PROVIDER_ERROR;
+				case PROVIDER_REJECTED, INPUT_TOO_LARGE -> LlmCallOutcome.REJECTED;
+			};
+			return new Reply(null, outcome, failure, null);
+		}
+
+		private static List<Float> deterministicVector(String definition) {
+			// 테스트 재현성만 위한 벡터다. 실제 의미 유사도를 흉내 내지 않는다.
+			var random = new Random(definition.hashCode());
+			return IntStream.range(0, 3072).mapToObj(index -> random.nextFloat() - 0.5f).toList();
+		}
+	}
+
 	/** 운영 생성 흐름에서 교체하는 유일한 경계. 응답은 작업별 순서대로 소비한다. */
 	public static final class TestChatProvider implements ChatProvider {
 		private final ConcurrentMap<Long, Deque<Reply>> replies = new ConcurrentHashMap<>();
@@ -203,6 +282,23 @@ public class IntegrationTestConfiguration {
 
 		public static String defaultText(JobType type) {
 			// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
+			if (type == JobType.MATERIAL) {
+				return """
+					# 이번 강의에서 배울 것
+					변수와 함수를 배운다.
+					## 개념 설명
+					변수는 값을 담는 이름이고 함수는 동작의 묶음이다.
+					## 정리
+					값을 변수에 담고 함수를 호출한다.
+					<!-- MOGUM_CARDS -->
+					{"cards":[
+					  {"question":"변수란?","answer":"값을 담는 이름","concepts":[{"name":"변수","definition":"값을 담는 이름"}]},
+					  {"question":"함수란?","answer":"동작의 묶음","concepts":[{"name":"함수","definition":"동작의 묶음"}]},
+					  {"question":"변수와 함수의 관계는?","answer":"변수의 값을 함수에 전달한다","concepts":[
+					    {"name":"변수","definition":"값을 담는 이름"},{"name":"함수","definition":"동작의 묶음"}]}]}
+					""";
+			}
+
 			String outlines = """
 				[{"title":"기초", "description":"기초 설명",
 				  "concepts":[{"name":"변수", "definition":"값을 담는 이름"}]},

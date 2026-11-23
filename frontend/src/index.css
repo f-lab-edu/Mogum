@@ -55,3 +55,84 @@
     outline: none;
   }
 }
+
+@layer components {
+  .material-body {
+    overflow-wrap: anywhere;
+  }
+
+  .material-body :is(h1, h2) {
+    @apply text-title font-extrabold;
+  }
+
+  .material-body :is(h3, h4, h5, h6) {
+    @apply text-body font-bold;
+  }
+
+  .material-body :is(ul, ol) {
+    @apply space-y-2 pl-6;
+  }
+
+  .material-body ul {
+    list-style-type: disc;
+  }
+
+  .material-body ol {
+    list-style-type: decimal;
+  }
+
+  .material-body li > :is(p, ul, ol) + * {
+    @apply mt-2;
+  }
+
+  .material-body blockquote {
+    @apply space-y-4 rounded-control border-l-4 border-primary bg-surface-soft p-4;
+  }
+
+  .material-body a {
+    @apply rounded-google text-primary underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary;
+  }
+
+  .material-body :not(pre) > code {
+    @apply rounded-google bg-surface-soft px-1 py-0.5 text-small text-primary;
+  }
+
+  .material-body pre {
+    white-space: pre;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  .material-body table {
+    @apply w-full border-collapse text-small;
+    min-width: max-content;
+  }
+
+  .material-body :is(th, td) {
+    @apply border border-border px-4 py-3;
+  }
+
+  .material-body th {
+    @apply bg-surface-soft font-bold;
+  }
+
+  .material-body .katex-display {
+    @apply m-0 max-w-full overflow-x-auto overflow-y-hidden py-2;
+  }
+
+  .material-body .katex-error {
+    color: var(--color-error) !important;
+  }
+
+  .material-body .hljs-comment {
+    @apply text-text-secondary;
+  }
+
+  .material-body :is(.hljs-keyword, .hljs-selector-tag, .hljs-literal) {
+    @apply font-bold text-primary;
+  }
+
+  .material-body :is(.hljs-string, .hljs-number, .hljs-title, .hljs-built_in, .hljs-attr) {
+    @apply text-primary-hover;
+  }
+}

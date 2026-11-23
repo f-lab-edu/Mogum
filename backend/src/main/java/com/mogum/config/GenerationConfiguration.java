@@ -4,10 +4,16 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import com.mogum.card.service.LessonCardWriter;
 import com.mogum.course.repository.CourseRepository;
 import com.mogum.course.repository.LessonRepository;
+import com.mogum.course.repository.MaterialRepository;
 import com.mogum.course.repository.RoadmapRepository;
 import com.mogum.generation.ChatCall;
+import com.mogum.generation.EmbeddingCall;
+import com.mogum.generation.EmbeddingSettings;
+import com.mogum.generation.MaterialGenerator;
+import com.mogum.generation.MaterialReader;
 import com.mogum.generation.NewCourseGenerator;
 import com.mogum.generation.NewRoadmapGenerator;
 import com.mogum.generation.PlanRoadmapCourseGenerator;
@@ -16,6 +22,7 @@ import com.mogum.generation.ReplanRoadmapGenerator;
 import com.mogum.generation.RoadmapCoursePlanReader;
 import com.mogum.generation.call.LlmCallWriter;
 import com.mogum.generation.call.repository.LlmCallRepository;
+import com.mogum.generation.material.MaterialFormat;
 import com.mogum.generation.plan.CoursePlanFormat;
 import com.mogum.generation.plan.RoadmapPlanFormat;
 
@@ -23,6 +30,22 @@ import jakarta.persistence.EntityManager;
 
 @Configuration(proxyBeanMethods = false)
 public class GenerationConfiguration {
+	@Bean
+	public MaterialReader materialReader(LessonRepository lessonRepository,
+		PlatformTransactionManager platformTransactionManager) {
+		return new MaterialReader(lessonRepository, platformTransactionManager);
+	}
+
+	@Bean
+	public MaterialGenerator materialGenerator(ChatCall chatCall, EmbeddingCall embeddingCall,
+		LlmProperties llmProperties,
+		MaterialReader materialReader, LessonRepository lessonRepository, MaterialRepository materialRepository,
+		LessonCardWriter lessonCardWriter) {
+		return new MaterialGenerator(chatCall, llmProperties.material(), embeddingCall,
+			new EmbeddingSettings(llmProperties.embedding().model(), llmProperties.embedding().timeout()),
+			new MaterialFormat(), materialReader, lessonRepository, materialRepository, lessonCardWriter);
+	}
+
 	@Bean
 	public NewCourseGenerator newCourseGenerator(ChatCall chatCall, LlmProperties llmProperties,
 		CourseRepository courseRepository, LessonRepository lessonRepository) {

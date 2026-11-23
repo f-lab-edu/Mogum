@@ -27,22 +27,24 @@ class WorkerPropertiesTest {
 			// then
 			assertThat(context).hasNotFailed();
 			assertThat(context.getBean(WorkerProperties.class)).isEqualTo(new WorkerProperties(
-				Duration.ofMinutes(6), Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
-				2, Duration.ofSeconds(1), Duration.ofSeconds(100)));
+				Duration.ofMinutes(16), Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
+				2, Duration.ofSeconds(1), Duration.ofSeconds(150)));
 			assertThat(Binder.get(context.getEnvironment())
 				.bind("spring.lifecycle.timeout-per-shutdown-phase", Duration.class)
 				.get())
-				.isGreaterThan(Duration.ofSeconds(120));
+				.isEqualTo(Duration.ofSeconds(180)).isGreaterThan(Duration.ofSeconds(170));
+			assertThat(context.getBean(WorkerProperties.class).shutdownWait())
+				.isLessThan(Duration.ofSeconds(170));
 		});
 	}
 
 	@ParameterizedTest(name = "{0}")
 	@ValueSource(strings = {"app.worker.count=-1", "app.worker.poll-interval=0s",
 		"app.worker.poll-interval=-1s", "app.worker.lease-duration=0s",
-		"app.worker.renewal-interval=0s", "app.worker.renewal-interval=6m",
-		"app.worker.renewal-interval=7m", "app.worker.max-retries=-1",
+		"app.worker.renewal-interval=0s", "app.worker.renewal-interval=16m",
+		"app.worker.renewal-interval=17m", "app.worker.max-retries=-1",
 		"app.worker.retry-delay=-1s", "app.worker.shutdown-wait=0s",
-		"app.worker.shutdown-wait=120s", "app.worker.shutdown-wait=130s",
+		"app.worker.shutdown-wait=170s", "app.worker.shutdown-wait=180s",
 		"app.worker.shutdown-wait=-1s"})
 	@DisplayName("시한 및 종료 대기 여유를 깨거나 음수인 설정은 기동을 거부한다")
 	void rejectsInvalidSettings(String property) {

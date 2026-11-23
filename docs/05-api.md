@@ -46,6 +46,8 @@
 - 강의 목록 TASK(`7-course-planning` step 5) 구현: 코스 · 로드맵의 다시 짜기 받기는 검토 중이 아니면 `REPLAN_NOT_ALLOWED`(409), 「검토 중일 때만 다시 짤 수 있어요」로 거절한다. 화면에서 현재 대상 상태를 확인하도록 두 종류가 같은 묶음을 쓴다.
 - 강의 목록 TASK(`7-course-planning` step 6) 구현: 짜기 전 코스의 「이대로 시작」은 `COURSE_START_NOT_ALLOWED`(409), 「강의 목록이 만들어진 뒤 시작할 수 있어요」로 거절한다. 검토 중 코스에 성공하지 않은 코스 다시 짜기(`QUEUED` · `RUNNING` · `FAILED`)가 있으면 같은 `REPLAN_IN_PROGRESS`(409)로 거절한다. 제목의 누락 · 빈 글 · 공백만 있는 글은 `FIELD_INVALID`(400)의 `title: REQUIRED`, 100 코드 포인트 초과는 `title: TOO_LONG`이다.
 - 강의 목록 TASK(`7-course-planning` step 7) 구현: 칸 오류(`FIELD_INVALID`)의 서버 문구는 「입력을 확인해 주십시오」 하나이고, 칸 옆의 설명은 화면이 `reason`(`REQUIRED` · `TOO_LONG` · `INVALID_VALUE` · `NOT_ALLOWED`)으로 고른다(`frontend/src/components/FieldError.tsx`). 오류 code · `reason` 자체는 화면에 보이지 않는다(§1.4).
+- 강의 자료 TASK(`8-material-cards` step 3) 구현: 강의를 열 수 없으면 — 코스가 학습 중 · 다 마침이 아니거나 앞 순서 강의 가운데 학습 완료하지 않은 것이 있으면 — `LESSON_NOT_OPEN`(409), 「코스를 시작하고 앞 강의를 학습 완료하면 열 수 있어요」로 거절한다. 강의 자료 받기(`MATERIAL`) · 강의 읽기 · 학습 완료가 같은 code 를 쓴다.
+- 강의 자료 TASK(`8-material-cards` step 4) 구현: 강의 자료가 없는 강의의 학습 완료는 `LESSON_MATERIAL_REQUIRED`(409), 「강의 자료가 만들어진 뒤 학습 완료할 수 있어요」로 거절한다. 화면은 강의를 다시 읽어 자료 또는 작업을 확인한다.
 - 기술적인 원인(응답이 잘림 · 서버 응답 없음 등)은 싣지 않는다(ADR-088).
 - 만들기 실패도 작업을 읽을 때 같은 모양으로 싣는다.
 
@@ -71,11 +73,12 @@
 - 서버는 받는 자리에서 한 사람이 건 수(ADR-104)를 확인하고 크레딧을 쓴다 — 실패하면 복구한다(ADR-112 · ADR-166).
 - **로드맵의 「이대로 시작」은 첫 코스의 받기다** — 받으면 로드맵이 진행 중이 되고(ADR-136), 못 받으면 아무것도 바뀌지 않는다.
 - **강의 자료는 화면이 건다** — 강의를 열었을 때 자료도 작업도 없으면 화면이 받기를 부른다. 강의를 가져오는 것만으로는 만들지 않는다.
+- `8-material-cards` step 3부터 `MATERIAL`을 받는다. 주인을 먼저 확인하고, 코스가 `LEARNING` 또는 `COMPLETED`이며 앞 순서 강의가 모두 학습 완료일 때만 허용한다. 열 수 없으면 `LESSON_NOT_OPEN`(409), 남의 강의와 없는 강의는 `NOT_FOUND`(404)다. 자료 유무로 거절하지 않으며, 같은 강의의 작업이 있으면 성공한 작업까지 그대로 반환하고 크레딧을 쓰지 않는다. 동시 받기도 사용자 행 잠금과 기존 고유 색인으로 작업 · 크레딧 사용 하나만 남긴다.
 - 기다리는 화면은 작업을 정한 간격으로 다시 읽고, 성공하면 작업이 가리키는 결과로 넘어간다(ADR-077).
 
 - 만드는 작업 TASK 구현: `6-job-worker` step 7의 기다리는 화면은 작업을 **2초 간격**으로 다시 읽는다. `QUEUED` · `RUNNING`일 때만 이어 읽고, 성공 · 실패 또는 읽기 오류가 되면 멈춘다. 읽기 오류는 화면의 「다시 시도」로 다시 읽고, 실패한 작업의 다시 시도가 성공하면 응답으로 읽기 캐시를 교체해 간격 읽기를 재개한다. 버리기 성공은 해당 작업 캐시를 지운다.
 
-- 만드는 작업 TASK 구현: `6-job-worker` step 3의 네 주소는 아래와 같다. 받기와 다시 시도는 step 2의 트랜잭션이 커밋된 뒤 작업을 다시 읽어 같은 응답을 반환한다. `7-course-planning` step 3부터 `NEW_COURSE` · `NEW_ROADMAP`, step 4부터 `PLAN_ROADMAP_COURSE`는 운영 받기 · 생성 처리기로 받는다. step 5부터 `REPLAN_COURSE` · `REPLAN_ROADMAP`도 검토 중인 대상을 운영 받기 · 생성 처리기로 받는다. `MATERIAL`은 아직 운영 처리기가 없어 `INVALID_REQUEST`(400)다. 새로 배우기 · 다시 짜기의 HTTP 받기 · 크레딧 사용은 운영 처리기로 검증한다.
+- 만드는 작업 TASK 구현: `6-job-worker` step 3의 네 주소는 아래와 같다. 받기와 다시 시도는 step 2의 트랜잭션이 커밋된 뒤 작업을 다시 읽어 같은 응답을 반환한다. `7-course-planning` step 3부터 `NEW_COURSE` · `NEW_ROADMAP`, step 4부터 `PLAN_ROADMAP_COURSE`는 운영 받기 · 생성 처리기로 받는다. step 5부터 `REPLAN_COURSE` · `REPLAN_ROADMAP`도 검토 중인 대상을 운영 받기 · 생성 처리기로 받는다. `8-material-cards` step 3부터 `MATERIAL`도 운영 받기 · 생성 처리기로 받는다. 새로 배우기 · 다시 짜기의 HTTP 받기 · 크레딧 사용은 운영 처리기로 검증한다.
 
 | 동작 | 메서드 · 경로 | 성공 |
 |---|---|---|
@@ -137,6 +140,7 @@
 - 로드맵 하나의 `courses`는 `[{id, position, title, description, concepts: [{name, definition}], status, progress, jobId}]`다. `description` · `concepts`는 계획의 설명 · 개념이다. 코스의 `status`는 [02 §8.7](./02-domain-data.md#87-값-목록)을 그대로 쓰고, `progress`는 `NOT_PLANNED`(짜기 전) · `GENERATING`(만드는 중) · `FAILED`(실패) · `GENERATED`(만들어짐)다. 짜기 전 코스의 `PLAN_ROADMAP_COURSE` 작업이 `QUEUED` · `RUNNING`이면 `GENERATING`, `FAILED`이면 `FAILED`이고 그때만 `jobId`를 싣는다. 코스가 `REVIEWING` · `LEARNING` · `COMPLETED`이면 `GENERATED`다.
 - `nextCourse`는 `{courseId, enabled}`다. `IN_PROGRESS` 로드맵에서 성공하지 않은 강의 목록 작업이 없는 짜기 전 코스 가운데 가장 앞의 코스를 가리킨다. 첫 코스이거나 바로 앞 코스가 `COMPLETED`이면 `enabled: true`, 그 전에는 `false`다. 대상이 없거나 로드맵이 `REVIEWING` · `COMPLETED`이면 칸을 생략한다. 검토 중 로드맵의 「이대로 시작」 대상은 `courses`의 첫 코스다.
 - 위 네 응답에는 입력(주제 · 수준 · 목적 · 메모) · 사용자 ID · 시스템 정보 · 숙련도 반영 내역 · 오늘 복습할 카드 수를 싣지 않는다. 뒤 두 칸은 각각 해당 TASK에서 더한다.
+- 강의 자료 TASK(`8-material-cards` step 4) 구현: 「강의 하나」는 `GET /api/lessons/{id}`이며 HTTP 200의 `ApiResponse<LessonResponse>`로 감싼다. `data`는 `id` · `courseId` · `courseTitle` · `position` · `title` · `completed`를 담는다. 자료가 있으면 `material: {body}`를 싣고, 자료가 없고 그 강의의 `MATERIAL` 작업이 있으면 `job: {id, status}`를 싣는다. `status`는 `QUEUED` · `RUNNING` · `SUCCEEDED` · `FAILED`이며 작업의 오류 · 횟수 · 시한은 싣지 않는다. 비어 있는 선택 칸은 생략한다. 주인과 열기 조건을 확인하며 거절은 §1.2 · §1.3을 따른다. 성공한 읽기는 코스의 `last_lesson_opened_at`과 JPA Auditing의 수정 시각만 적고, 자료 · 작업을 만들거나 크레딧을 바꾸지 않는다.
 - 「나」의 크레딧(남은 크레딧 · 다음에 채워지는 날)은 내 정보 탭 TASK 에서 더한다 — 계정 TASK 의 「나」는 누구인지(이메일 · 이름)와 상태만 싣는다. 응답이 객체라 칸만 더하면 된다(§1 · 사용자 확인 2026-11-08).
 - 개인정보처리방침은 화면에 둔 글이라 읽기가 없다.
 
@@ -166,6 +170,8 @@
 
 - 코스 시작은 `REVIEWING`에서 성공하지 않은 다시 짜기가 없을 때만 `LEARNING`과 `started_at`을 함께 적는다. `LEARNING` · `COMPLETED`는 원래 상태 · 시각을 그대로 돌려준다. 거절의 code와 문구는 §1.2, 받기와 경합을 막는 구현은 [04 §2.2](./04-jobs-and-cost.md#22-패키지-경계)에 있다. 시작은 강의를 열거나 만들기를 걸지 않는다.
 - 제목 고치기는 단일 코스와 로드맵의 코스 모두 상태와 상관없이 받는다. `@Valid CourseTitleRequest`의 `@NotBlank` · `@CodePointLength(max = 100, message = "field.TOO_LONG")`로 검사하고, 공통 오류 경로가 칸별 reason으로 변환한다. 제목과 JPA Auditing의 수정 시각을 바꾸며 입력 · 계획 · 강의 목록 · 상태는 유지한다.
+- 강의 자료 TASK(`8-material-cards` step 4) 구현: 학습 완료는 본문 없는 `POST /api/lessons/{id}/complete`다. 성공(200)은 `ApiResponse<LessonCompletionResponse>`로 감싸며 `data: {courseId, courseCompleted}`를 반환한다. `courseCompleted`는 이번 요청으로 코스가 다 마침이 되었을 때만 참이다. 주인 · 열 수 있는 강의 · 자료 존재를 확인하고, 남의 것과 없는 것은 `NOT_FOUND`(404), 열기 거절은 `LESSON_NOT_OPEN`(409), 자료가 없으면 `LESSON_MATERIAL_REQUIRED`(409)다. 이미 완료한 강의는 성공으로 `courseCompleted: false`를 반환하고 아무것도 바꾸지 않는다.
+- 강의 읽기와 완료는 강의 ID와 사용자 ID로 코스 행을 `PESSIMISTIC_WRITE`로 먼저 잠근 뒤 강의를 읽는다. 동시 완료도 뒤 요청이 커밋을 기다린 뒤 완료 여부를 다시 확인하므로 한 번만 반영된다. 완료는 한 트랜잭션에서 강의의 `completed_at`, 그 강의의 `ACTIVE` 카드 중 빈 `due_at`과 `updated_at`을 같은 완료 시각으로 채운다. FSRS 상태와 기존 일정 · 복습 기록은 바꾸지 않는다. 모든 강의가 완료되면 코스의 `COMPLETED`와 `completed_at`을 함께 적고, 로드맵에 더 뒤 순서 코스가 없으면 그 로드맵도 `COMPLETED`로 바꾼다. 완료는 마지막으로 연 때를 적지 않는다.
 - **신청은 한 사람에 한 번이다** — 이미 신청한 사람이 다시 신청하면 새로 만들지 않고 같은 결과(신청 상태)를 성공으로 돌려준다. 같은 구글 계정의 두 세션이 동시에 신청해도 사용자 · 채움 기록은 하나다. 세션 하나로 동시에 보낸 두 요청 가운데 늦은 쪽의 응답은 정하지 않는다 — 신청할 때 세션 ID 를 바꾸기 때문이고, 화면은 요청 중 버튼을 막는다(ADR-102 · 사용자 확인 2026-11-08).
 - 지우기의 범위는 [02 §7](./02-domain-data.md#7-지우기--탈퇴--함께-사라지는-범위)(ADR-140).
 
@@ -173,7 +179,7 @@
 
 | 것 | 근거 |
 |---|---|
-| 경로 · 칸 이름 · 오류 묶음의 목록과 문구 — 만드는 작업 부분은 `6-job-worker` step 3, 코스 · 로드맵 읽기 넷과 코스 시작 · 제목 고치기는 `7-course-planning` step 6에서 정했다(§1.2 ~ §4). 나머지는 각 TASK에서 정한다 | ADR-143 · ADR-145 |
+| 경로 · 칸 이름 · 오류 묶음의 목록과 문구 — 만드는 작업 부분은 `6-job-worker` step 3, 코스 · 로드맵 읽기 넷과 코스 시작 · 제목 고치기는 `7-course-planning` step 6, 강의 읽기와 학습 완료는 `8-material-cards` step 4에서 정했다(§1.2 ~ §4). 나머지는 각 TASK에서 정한다 | ADR-143 · ADR-145 |
 | 쿠키 설정 · 요청 위조 막기 | ADR-142 |
 | 기다리는 화면의 다시 읽는 간격은 `6-job-worker` step 7에서 정했다(§2). 대상이 없는 새로 배우기를 두 번 눌렀을 때는 화면이 요청 중 버튼을 막는 것만 하고 서버 장치는 두지 않는다 — 두 탭 · 재전송이면 둘이 생기는 것은 ADR-157 이 감수한 그대로다(README 2026-11-17) | ADR-143 · ADR-157 |
 | 목록을 나눠 받을지 — 정원 10명이라 MVP 에서 나눌 만큼 길지 않다 | ADR-061 |

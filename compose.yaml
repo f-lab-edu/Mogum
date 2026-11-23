@@ -30,7 +30,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    stop_grace_period: 150s         # 04 §4.5 — Spring 종료 대기(130초)보다 길게. 기본 10초면 유예 중 SIGKILL 된다
+    stop_grace_period: 220s         # 04 §4.5 — Spring 종료 대기(180초)보다 길게. 기본 10초면 유예 중 SIGKILL 된다
 
 volumes:
   postgres_data:

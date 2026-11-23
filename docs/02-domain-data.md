@@ -162,6 +162,7 @@ erDiagram
 - **가장 가까운 개념 하나가 기준값을 넘으면 같다**(ADR-161) — 정의의 임베딩이 그 사용자의 사전에서 가장 가까운 개념과 코사인 유사도가 기준값 이상이면 그 개념에 붙이고, 아니면 새 개념으로 넣는다. 애매할 때 LLM 에게 다시 묻지 않는다. 기준값은 임베딩 모델을 고른 뒤 실제 개념 쌍으로 재서 정한다.
 - **한 번 들어간 개념은 카드가 모두 사라져도 지우지 않는다**(ADR-049) — 같은 개념이 다시 나오면 그 개념에 붙는다. 사전은 탈퇴할 때만 지운다.
 - **판정이 틀려도 바로잡는 방법은 두지 않는다**(ADR-050) — 기준을 잘 맞추는 것으로 대신한다.
+- 같은 사용자의 판정 · 넣기는 `LessonCardWriter.writeLessonCards`가 기존 `UserRepository.findByIdForUpdate`의 사용자 행 잠금을 먼저 얻어 호출자의 트랜잭션 끝까지 줄 세운다 — 사용자마다 행이 달라 다른 사용자의 저장은 기다리지 않으며, 크레딧 쓰기와 같은 잠금 경로를 쓴다.
 
 ## 7. 지우기 · 탈퇴 — 함께 사라지는 범위
 
@@ -390,7 +391,7 @@ PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md)
 
 - **코스** — 그 코스 · 강의를 대상으로 한 `generation_jobs` → `cards` 의 상태를 `COURSE_DELETED` 로(지우지 않는다 — `lesson_id` 는 강의를 지울 때 저절로 빈다) → `materials` → `lessons` → `courses`. 성공하지 않은 작업에 쓴 크레딧은 작업을 지우기 전에 복구한다(§8.2 의 조건).
 - **로드맵** — 로드맵과 그 코스들의 `generation_jobs` → 코스마다 위 순서 → `roadmaps`.
-- 지우기 TASK 가 볼 것(`6-job-worker` 리뷰) — ① 대상의 작업을 찾는 조회(성공한 `NEW_COURSE` · `NEW_ROADMAP` 포함)는 `V11` 의 색인을 타지 못한다. `course_id` · `roadmap_id` · `lesson_id` 색인이 필요한지 그 TASK 에서 본다. ② 작업 읽기는 대상(코스 · 로드맵 · 강의)이 없으면 `NOT_FOUND` 다 — 대상과 그 작업을 한 트랜잭션에서 함께 지우는지 테스트로 묶는다(기다리는 화면이 404 로 빠지지 않게).
+- 지우기 TASK 가 볼 것(`6-job-worker` 리뷰) — ① 대상의 작업을 찾는 조회(성공한 `NEW_COURSE` · `NEW_ROADMAP` 포함)는 `V11` 의 색인을 타지 못한다. `course_id` · `roadmap_id` · `lesson_id` 색인이 필요한지 그 TASK 에서 본다. ② 작업 읽기는 대상(코스 · 로드맵 · 강의)이 없으면 `NOT_FOUND` 다 — 대상과 그 작업을 한 트랜잭션에서 함께 지우는지 테스트로 묶는다(기다리는 화면이 404 로 빠지지 않게). ③ 강의 자료의 결과 저장은 작업 행(소유권 확인 UPDATE) → 사용자 행(`LessonCardWriter` 의 `FOR UPDATE`) 순서로 잠근다(`8-material-cards` step 2 리뷰). 지우기 · 탈퇴가 사용자 행을 먼저 잡고 만드는 중인 작업 행을 지우면 서로 기다리다 교착이 날 수 있다 — 같은 순서로 잡거나 교착 때의 처리를 정해 시험한다.
 - **탈퇴** — `generation_jobs` → `reviews` → `card_concepts` → `cards` → `materials` → `lessons` → `courses` → `roadmaps` → `concepts` → `credit_entries` → 로그인 세션 → `users`.
 - **사용자가 카드를 지울 때**(ADR-155) — `reviews` → `card_concepts` → `cards`.
 - **운영자가 신청 중 · 거절됨인 계정을 지울 때**(ADR-059) — `credit_entries` → 로그인 세션 → `users`. 신청할 때 채움 기록이 생긴다(ADR-173).
@@ -518,4 +519,4 @@ PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md)
 
 | 것 | 근거 |
 |---|---|
-| 같은 개념 판정의 기준값 — 임베딩 모델을 고른 뒤 실제 개념 쌍으로 잰다 | ADR-030 · ADR-161 |
+| 같은 개념 판정의 기준값 — `app.concept.same-threshold`(`ConceptProperties.sameThreshold()`), `0.72` — 2026-11-23 실측(ADR-187)으로 정함. 임베딩 모델은 `text-embedding-3-large` 로 정했다. 숙련도 고리 TASK 전에 실제 흐름으로 다시 잰다 | ADR-030 · ADR-161 · ADR-187 |
