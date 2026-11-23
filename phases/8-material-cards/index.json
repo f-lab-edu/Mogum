@@ -99,7 +99,14 @@
     {
       "step": 7,
       "name": "material-format-tolerance",
-      "status": "pending"
+      "status": "completed",
+      "summary": "MaterialFormat이 구분 줄 앞뒤 공백·탭·CR과 카드 JSON을 감싼 펜스 하나(언어 없음 또는 json·대소문자 무관)를 허용; 펜스 바깥 글·미닫힘·중첩/복수 펜스·중복 구분자·JSON 뒤 추가 값 거절과 본문 코드/Mermaid/KaTeX·같은 줄 표식 보존·이어 붙인 출력 시험 27개 추가(TDD), 프롬프트와 기존 형식 규칙·원문 로그 부재 유지, 03 §3 반영; 지정 생성 시험·전체 build·Spotless·Checkstyle 통과, 서버 테스트 2254→2281(+27), 실제 OpenAI 호출·커밋 없음",
+      "started_at": "2026-11-23T19:50:24+0900",
+      "completed_at": "2026-11-23T19:58:11+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/generation/material/MaterialFormatTest.java:113 — `parsesConcatenatedToleratedOutput` 는 원문을 잘라 `first + continuation` 으로 다시 붙이므로 원래 문자열과 똑같다. 그래서 이어 쓰기 경로를 따로 검증하지 못하고 한 번에 해석하는 시험과 같다 → 이어 쓰기 흐름을 확인하려면 처리기 쪽 시험에서 잘린 응답(`length` 종료)과 이어 쓰기 응답을 스텁으로 주고, 그 결과가 펜스 · 공백 허용 규칙으로 저장되는지 보는 편이 의미가 있다.",
+        "backend/src/main/java/com/mogum/generation/material/MaterialFormat.java:58 — 카드 글을 펜스가 없을 때도 `strip()` 한다. `strip()` 은 유니코드 공백까지 지우므로, 예전에는 JSON 해석에서 떨어지던 앞뒤의 유니코드 공백(전각 공백 등)도 이제 받는다. 동작상 해는 없지만 step 이 말한 두 허용 바깥의 작은 확장이다 → 필요하면 펜스 판정에만 strip 한 글을 쓰고, 펜스가 아닐 때는 원래 글을 넘기면 된다."
+      ]
     },
     {
       "step": 8,
