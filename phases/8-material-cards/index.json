@@ -144,7 +144,10 @@
     {
       "step": 11,
       "name": "sonar-scroll-tabindex",
-      "status": "pending"
+      "status": "completed",
+      "summary": "MaterialBody의 그림·코드·표 영역 tabIndex와 공통 focus-visible 테두리 제거, 영역 이름·가로 스크롤·렌더러 보안 설정 유지; 짝 시험을 먼저 변경해 실패 확인 후 전체 화면 시험 453개·lint 통과, UI_GUIDE §12에 사용자 결정(2026-11-24) 반영, 커밋 없음",
+      "started_at": "2026-11-24T06:40:51+0900",
+      "completed_at": "2026-11-24T06:42:07+0900"
     }
   ],
   "created_at": "2026-11-23T08:16:45+0900",
