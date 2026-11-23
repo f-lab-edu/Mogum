@@ -218,3 +218,21 @@ sips -Z 384 docs/design/assets/mogumi-reading.png --out frontend/src/assets/mogu
 코스 행은 굵은 제목과 §3의 상태 표시를 나란히 두며 좁은 화면·긴 제목은 줄바꿈한다. 로드맵 행은 굵은 제목 → 설명 → 작은 보라 글자의 진행 한 줄로 세로 배치한다. 완료 상태의 진행 문구는 「다 마침」이다. 비었을 때는 각 탭에 「아직 만든 코스가 없어요」·「아직 만든 로드맵이 없어요」 한 줄을 보인다. 읽는 중은 상태 안내, 실패는 `FailureNotice`와 다시 시도로 표시하며 실패를 빈 목록으로 보이지 않는다. 새로 배우기 입구·거르기·정렬·진도 막대·다음 강의·로드맵의 코스 목록은 두지 않는다.
 
 `useCourses`·`useRoadmaps`가 공통 `apiFetch`로 목록을 읽어 각각 `['courses']`·`['roadmaps']`에 캐시한다. 자동 재시도·창 포커스·재연결에 따른 별도 읽기는 없으며 실패 뒤 버튼으로 다시 읽는다. 행 구성·이동·빈 목록·오류 후 재시도·금지 동작 부재·제목 포커스와 문서 제목을 API 대역으로 시험한다.
+
+## 12. 강의 자료 본문
+
+[components/MaterialBody.tsx](../frontend/src/components/MaterialBody.tsx)의 기본 내보내기 `MaterialBody`는 `body: string` 하나를 받는다. 강의 화면 틀·제목·동작·API 없이 본문만 그린다. 표현 수단과 오류 처리의 계약은 [03 §3](./03-generation.md#3-강의-자료와-카드) · [06 §9](./06-screens.md#9-강의-화면)를 따른다.
+
+`react-markdown ^10.1.0`·`remark-gfm ^4.0.1`·`remark-math ^6.0.0`·`rehype-katex ^7.0.1`·`katex ^0.19.1`·`mermaid ^12.3.0`·`rehype-highlight ^7.0.2`를 쓴다. KaTeX는 CSS와 렌더러 버전이 같도록 npm `overrides.katex: "$katex"`로 하위 의존성도 맞춘다. 문법 강조는 전체 언어 묶음보다 작은 기본 37개 언어만 포함하는 `rehype-highlight`로 정했다. 언어 표시가 있을 때만 강조하고 자동 감지는 끈다. 모르는 언어·언어 없는 코드는 원문으로 남긴다.
+
+원본 HTML은 `skipHtml`로 버리며 `rehype-raw`는 쓰지 않는다. 마크다운 이미지는 대체 글만 보이고 `img`를 만들지 않는다. 링크는 `react-markdown` 기본 URL 검사를 유지하며, 제거된 주소는 글로만 남긴다. 허용된 링크는 새 탭과 `rel="noopener noreferrer"`로 연다. KaTeX는 `trust: false`이며, 문법 오류는 `rehype-katex`의 `throwOnError: false` 대체 렌더링으로 오류 표시를 그대로 남긴다.
+
+Mermaid는 해당 코드 블록이 처음 나타날 때만 동적 `import()`한다. 브라우저의 모듈 로딩 Promise만 공유하며 `securityLevel: 'strict'`·`startOnLoad: false`로 직접 그린다. 효과마다 UUID와 별도 렌더 컨테이너를 써 여러 그림·StrictMode·본문 변경에서 충돌하거나 이전 결과가 덮어쓰지 않게 한다. `suppressErrorRendering: true`로 임시 오류 SVG 삽입을 막고, 실패한 자리에는 라이브러리의 오류 메시지를 HTML이 아닌 글로 표시한다. 다시 시도·수정 없이 나머지 본문을 유지하며, 부모가 같은 본문으로 다시 렌더되어도 실패한 그림을 다시 그리지 않는다.
+
+글은 §2의 `text-body`(16px/26px), 큰 제목은 `text-title`(24px/32px)·800 굵기, 작은 제목은 `text-body`·700 굵기다. 코드·표는 `text-small`(14px/24px), 최상위 블록 간격은 `space-y-6`(24px), 목록은 `space-y-2`(8px)·왼쪽 24px이다. 코드와 인용은 `surface-soft` 바탕·16px 여백·`radius-control`, 인용 왼쪽 테두리와 강조는 `primary`를 쓴다. 코드 강조도 기존 글자·보라색 토큰만 쓰며 다크 테마는 없다.
+
+컨테이너는 `min-w-0`·`max-w-full`, 긴 글은 `overflow-wrap: anywhere`로 줄바꿈한다. 코드·표·그림은 각각 최대 폭 안의 `overflow-x-auto` 영역이며 키보드 포커스를 받는다. 코드 줄과 표의 내용 너비, Mermaid SVG의 `viewBox`에서 얻은 실제 너비를 유지해 블록 안에서 가로 스크롤한다. SVG 너비는 본문 데이터에서 얻은 크기이며 고정 UI 토큰이 아니다. 블록 수식은 `.katex-display` 자체에서만 가로 스크롤한다. 이 규칙은 화면 크기에 관계없이 같다.
+
+로컬 Vite의 컴포넌트를 실제 Chromium에서 390px·1280px로 열어 긴 코드·표·그림·블록 수식의 내부 스크롤과 페이지 너비 보존을 확인했다. 깨진 Mermaid의 오류 메시지·KaTeX 오류 표시·뒤 본문이 함께 남는 것도 확인했다. 강의 화면에 연결한 검증은 다음 step에서 한다.
+
+짝 테스트 [MaterialBody.test.tsx](../frontend/src/components/MaterialBody.test.tsx)는 `vi.hoisted`로 만든 `initialize`·`render` 대역을 `vi.mock('mermaid', () => ({ default: { initialize, render } }))`로 돌려준다. 모듈을 정적으로 import하지 않아 팩토리 호출로 지연 로딩도 관찰하며, 효과 결과는 `waitFor` 안에서 단언한다. 뒤 강의 화면 테스트도 이 대역을 사용할 수 있다.
