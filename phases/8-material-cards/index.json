@@ -72,7 +72,16 @@
     {
       "step": 5,
       "name": "markdown-renderer",
-      "status": "pending"
+      "status": "completed",
+      "summary": "frontend/src/components/MaterialBody.tsx 기본 내보내기 MaterialBody({body: string}) 추가; react-markdown ^10.1.0·remark-gfm ^4.0.1·remark-math ^6.0.0·rehype-katex ^7.0.1·katex ^0.19.1·mermaid ^12.3.0·rehype-highlight ^7.0.2(전체 대신 기본 37개 언어만 포함하는 작은 묶음·자동 감지 끔), KaTeX CSS/렌더러는 overrides.katex=$katex로 통일; 원본 HTML 제거·이미지 대체 글만·기본 URL 검사와 새 탭 링크, KaTeX trust=false·문법 오류 표시, Mermaid 동적 import Promise 공유·strict/startOnLoad=false·UUID/별도 컨테이너·오류 메시지와 나머지 본문 보존·같은 본문 재렌더 시 재시도 없음; 기존 UI 토큰과 긴 블록별 내부 스크롤을 Chromium 390px/1280px에서 확인; step 6 시험은 vi.hoisted initialize/render 대역을 vi.mock('mermaid', factory)로 default에 제공하고 render는 Promise<{svg}>를 반환, 효과 결과는 waitFor에서 단언; AGENTS 화면 스택 한 줄·UI_GUIDE §12 갱신, 화면 시험 408→423(+15), test·lint·build 통과(기존 AccountPage 호출 횟수 시험 1회 실패 뒤 수정 없이 전체 재실행 통과), 커밋 없음",
+      "started_at": "2026-11-23T13:42:31+0900",
+      "completed_at": "2026-11-23T13:51:35+0900",
+      "review_notes": [
+        "frontend/src/components/MaterialBody.tsx:33 — `crypto.randomUUID()`는 보안 컨텍스트(HTTPS · localhost)에서만 있다. 운영(Vercel HTTPS)에서는 문제가 없다. 그러나 휴대폰에서 `http://192.168.x.x:5173`으로 개발 서버를 열면 함수가 없어 catch로 빠지고, 모든 그림이 'crypto.randomUUID is not a function' 오류로 보인다 → 모듈 카운터 + 접두사처럼 보안 컨텍스트가 필요 없는 id 생성을 고려한다(필수는 아님).",
+        "frontend/package.json:27 — `overrides.katex: \"$katex\"`가 rehype-katex 7.0.1 · mermaid가 선언한 katex 범위를 0.19.1로 강제한다. 지금은 테스트가 통과하지만, 메이저 범위 밖 강제라 이후 업그레이드 때 깨질 수 있다 → UI_GUIDE §12에 이 이유를 적어 둔 것은 좋다. step 6에서 실제 화면으로 수식이 그려지는지 한 번 더 본다.",
+        "docs/UI_GUIDE.md:236 — 「실제 Chromium에서 390px · 1280px로 열어 … 확인했다」는 이번 변경의 테스트 · 산출물로는 확인할 수 없는 수동 검증 서술이다 → 근거(스크린샷 경로 등)가 없으면 step 6의 화면 검증 때 다시 확인하고, 문구를 「step 5에서 수동 확인」처럼 검증 상태가 드러나게 다듬는 것을 권한다.",
+        "frontend/src/components/MaterialBody.test.tsx:151 — 수식의 가로 스크롤은 jsdom에서 `.katex-display`가 있는지만 확인하고, 스크롤 규칙 자체는 CSS(index.css `.material-body .katex-display`)에만 있다 → step 6에서 Playwright 등 실제 브라우저로 390px 페이지 폭이 넘치지 않는지 확인하면 회귀를 막을 수 있다."
+      ]
     },
     {
       "step": 6,
