@@ -45,7 +45,16 @@
     {
       "step": 3,
       "name": "material-generator",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-23T08:49:01+0900",
+      "summary": "MaterialIntakeHandler·MaterialGenerator 조립, MaterialReader가 읽기 전용 트랜잭션에서 MaterialInput(이번 강의 한 줄·코스 제목·주제·강의 목록의 이번 표시·목적·메모만)으로 복사; MaterialFormat·MaterialContent는 마크다운 본문 + 한 줄 <!-- MOGUM_CARDS --> + cards JSON 객체 형식이며 필수 글·최소 카드/개념만 검사하고 권장 개수·Mermaid·KaTeX 문법은 검사하지 않음; material() 채팅 한 번(+ 이어 쓰기)·중복 정의 제거 후 embedding() 일괄 한 번을 트랜잭션 밖에서 호출, MaterialGenerator.Result와 워커 소유권 확인 뒤 Material.write·LessonCardWriter의 원자 저장·LESSON 결과·실패 시 결과 부재와 크레딧 복구 검증; LESSON_NOT_OPEN(409, 코스를 시작하고 앞 강의를 학습 완료하면 열 수 있어요)·HTTP 소유권/순서/동시 받기 중복 방지·이미 성공한 작업 반환 검증; 프롬프트 prompts/material/rules.txt·output.txt와 planning 사용자 틀·목적 문구 공유, TestChatProvider.defaultText(MATERIAL)의 세 카드·겹치는 개념 추가; 지운 시험 JobControllerNoHandlersIntegrationTest → 여섯 종류 모두 운영 처리기가 생겨 대상 없음(처리기 없는 종류 거절은 기존 JobIntakeServiceTest 유지); 지정 AC·전체 build·Spotless·Checkstyle 통과, 실제 OpenAI 호출 없음, 서버 테스트 2138→2196(+58)",
+      "completed_at": "2026-11-23T13:30:01+0900",
+      "review_notes": [
+        "docs/05-api.md:50-57 — `LESSON_NOT_OPEN` 의 별도 표와 머리 문장이 §1.2 의 공통 글머리(「기술적인 원인 … 싣지 않는다」 · 「만들기 실패도 … 같은 모양으로 싣는다」) 앞에 끼어들었다. 그 두 줄이 강의 자료 표에 딸린 것처럼 읽힌다. 다른 code 들처럼 「강의 자료 TASK(`8-material-cards` step 3) 구현: …」 글머리 한 줄로 바꾸거나, 표를 공통 글머리 뒤로 옮기면 된다.",
+        "backend/src/test/java/com/mogum/support/IntegrationTestConfiguration.java:221-222 — `java.util.Random` · `IntStream` 을 FQN 에서 import 로 바꾼 것은 이 step 과 관계없는 정리다. 동작 영향은 없다.",
+        "backend/src/main/java/com/mogum/generation/material/MaterialFormat.java:20 — 구분 줄 정규식이 줄 끝 공백을 허용하지 않는다. LLM 이 구분 줄 뒤에 공백을 붙이거나 카드 JSON 을 코드펜스로 감싸면 형식 불합격이 되어 다시 시도에 돈이 든다. 프롬프트로 금지는 했으니, 공개 전 품질 점검 때 불합격 비율을 보고 필요하면 허용 폭을 넓힌다.",
+        "backend/src/test/java/com/mogum/generation/MaterialGeneratorIntegrationTest.java:115-178 — 로드맵 경우의 재료 시험에서 로드맵 입력과 코스 입력이 같은 값(`LEAKCHECK-topic`)이다. 로드맵의 코스는 코스 입력이 비어 있어 지금은 문제가 없다. 다만 두 값을 다르게 두면 '로드맵의 것을 쓴다'는 사실이 더 직접 드러난다."
+      ]
     },
     {
       "step": 4,
