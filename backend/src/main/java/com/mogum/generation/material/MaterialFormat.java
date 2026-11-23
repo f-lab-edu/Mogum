@@ -17,7 +17,9 @@ import tools.jackson.databind.json.JsonMapper;
 
 /** 본문은 마크다운 그대로, 구분 줄 다음은 카드 JSON 하나다. 이어 붙인 응답도 같은 형식이다. */
 public final class MaterialFormat {
-	private static final Pattern SEPARATOR = Pattern.compile("(?m)^<!-- MOGUM_CARDS -->\\r?$");
+	private static final Pattern SEPARATOR = Pattern.compile("(?m)^[ \\t\\r]*<!-- MOGUM_CARDS -->[ \\t\\r]*$");
+	private static final Pattern CARD_FENCE = Pattern.compile("```(?:json)?[ \\t]*\\r?\\n([\\s\\S]*)\\r?\\n```",
+		Pattern.CASE_INSENSITIVE);
 	private static final JsonMapper JSON_MAPPER = JsonMapper.builder()
 		.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
 
@@ -53,8 +55,13 @@ public final class MaterialFormat {
 		if (blank(body) || separator.find()) {
 			return Optional.empty();
 		}
+		String cardsText = text.substring(cardsStart).strip();
+		var fence = CARD_FENCE.matcher(cardsText);
+		if (fence.matches()) {
+			cardsText = fence.group(1);
+		}
 		try {
-			var root = JSON_MAPPER.readTree(text.substring(cardsStart));
+			var root = JSON_MAPPER.readTree(cardsText);
 			if (root == null || !root.isObject()) {
 				return Optional.empty();
 			}

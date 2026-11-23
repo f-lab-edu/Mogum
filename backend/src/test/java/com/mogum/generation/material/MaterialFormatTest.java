@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.mogum.course.domain.PlannedConcept;
 import com.mogum.course.domain.Purpose;
@@ -20,6 +21,109 @@ class MaterialFormatTest {
 	private static final String CARD = """
 		{"question":"질문?", "answer":"답", "concepts":[{"name":"개념","definition":"정의"}]}
 		""".strip();
+
+	@ParameterizedTest(name = "구분 줄={0}")
+	@MethodSource("paddedSeparators")
+	@DisplayName("구분 줄 앞뒤의 스페이스와 탭과 CRLF를 받는다")
+	void acceptsPaddedSeparator(String separator) {
+		// given
+		String output = "본문\n" + separator + "{\"cards\":[" + CARD + "]}";
+		// when
+		var parsed = materialFormat.parse(output);
+		// then
+		assertThat(parsed).isPresent();
+		assertThat(parsed.orElseThrow().body()).isEqualTo("본문");
+		assertThat(parsed.orElseThrow().cards()).hasSize(1);
+	}
+
+	static Stream<String> paddedSeparators() {
+		return Stream.of("<!-- MOGUM_CARDS --> \n", "<!-- MOGUM_CARDS -->\t\n",
+			"  <!-- MOGUM_CARDS -->\n", "\t<!-- MOGUM_CARDS -->\t \n",
+			" \t<!-- MOGUM_CARDS --> \t\r\n");
+	}
+
+	@ParameterizedTest(name = "펜스={0}")
+	@ValueSource(strings = {"```json\n", "```JSON\n", "```\n", "```JsOn\r\n"})
+	@DisplayName("카드 JSON을 감싼 펜스 하나의 안쪽만 읽고 본문의 코드와 그림과 수식을 보존한다")
+	void unwrapsCardFenceAndPreservesBody(String opening) {
+		// given
+		String body = "# 본문\n```java\nString value = \"안녕\";\n```\n"
+			+ "```mermaid\nflowchart LR\n  A --> B\n```\n$$\\frac{1}{2}$$";
+		String output = " \n" + body + "\n \t<!-- MOGUM_CARDS -->\t\r\n \t"
+			+ opening + "{\"cards\":[" + CARD + "]}\r\n```\n\t ";
+		// when
+		var parsed = materialFormat.parse(output);
+		// then
+		assertThat(parsed).isPresent();
+		assertThat(parsed.orElseThrow().body()).isEqualTo(body);
+		assertThat(parsed.orElseThrow().cards()).containsExactly(new MaterialContent.Card("질문?", "답",
+			List.of(new PlannedConcept("개념", "정의"))));
+	}
+
+	@ParameterizedTest(name = "불합격 펜스={0}")
+	@MethodSource("invalidFencedCards")
+	@DisplayName("펜스 바깥 글과 닫히지 않거나 여러 개인 펜스와 펜스 안의 잘못된 JSON은 거절한다")
+	void rejectsInvalidFencedCards(String cards) {
+		// given
+		String output = "본문\n<!-- MOGUM_CARDS -->\n" + cards;
+		// when
+		var parsed = materialFormat.parse(output);
+		// then
+		assertThat(parsed).isEmpty();
+	}
+
+	static Stream<String> invalidFencedCards() {
+		String json = "{\"cards\":[" + CARD + "]}";
+		String fenced = "```json\n" + json + "\n```";
+		return Stream.of("앞 글\n" + fenced, fenced + "\n뒤 글", "```json\n" + json,
+			fenced + "\n" + fenced, "```\n" + fenced + "\n```", "```java\n" + json + "\n```",
+			"```json\n" + json + " {}\n```", "```json\n" + json + " 뒤 글\n```",
+			"```json\n{\"cards\":[]}\n```", "```json\n{\"cards\":["
+				+ CARD.replace("질문?", " ") + "]}\n```",
+			"```json\n" + json + "\n```\n \t<!-- MOGUM_CARDS --> \t\n{}");
+	}
+
+	@ParameterizedTest(name = "같은 줄={0}")
+	@ValueSource(strings = {"설명 <!-- MOGUM_CARDS -->", "<!-- MOGUM_CARDS --> 설명",
+		"설명 <!-- MOGUM_CARDS --> 설명"})
+	@DisplayName("다른 글과 같은 줄에 있는 표식만으로는 본문과 카드를 나누지 않는다")
+	void rejectsInlineSeparator(String line) {
+		// given
+		String output = "본문\n" + line + "\n{\"cards\":[" + CARD + "]}";
+		// when
+		var parsed = materialFormat.parse(output);
+		// then
+		assertThat(parsed).isEmpty();
+	}
+
+	@Test
+	@DisplayName("본문의 같은 줄 표식은 그대로 남기고 혼자 있는 구분 줄에서만 나눈다")
+	void preservesInlineMarkerInBody() {
+		// given
+		String body = "본문의 <!-- MOGUM_CARDS --> 표식";
+		String output = body + "\n<!-- MOGUM_CARDS -->\n{\"cards\":[" + CARD + "]}";
+		// when
+		var parsed = materialFormat.parse(output);
+		// then
+		assertThat(parsed.orElseThrow().body()).isEqualTo(body);
+	}
+
+	@ParameterizedTest(name = "이어 쓰기 위치={0}")
+	@ValueSource(strings = {"MOGUM_CARDS", "```json", "definition"})
+	@DisplayName("구분 줄이나 펜스나 JSON 중간에서 이어 붙인 전체 출력에도 같은 허용 규칙을 쓴다")
+	void parsesConcatenatedToleratedOutput(String fragment) {
+		// given
+		String output = "본문\n \t<!-- MOGUM_CARDS --> \t\r\n```json\n{\"cards\":[" + CARD + "]}\n```";
+		int cut = output.indexOf(fragment) + fragment.length() / 2;
+		String first = output.substring(0, cut);
+		String continuation = output.substring(cut);
+		// when
+		var parsed = materialFormat.parse(first + continuation);
+		// then
+		assertThat(parsed).isPresent();
+		assertThat(parsed.orElseThrow().body()).isEqualTo("본문");
+		assertThat(parsed.orElseThrow().cards()).hasSize(1);
+	}
 
 	@Test
 	@DisplayName("코드와 수식과 Mermaid와 표가 든 본문을 이스케이프 없이 그대로 읽는다")
