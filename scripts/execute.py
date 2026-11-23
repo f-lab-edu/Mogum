@@ -451,7 +451,10 @@ class StepExecutor:
             f"- notes: 승인을 막지 않는 권고(동작 영향 없는 문서 · 이름 · 테스트 보강 등)는 summary 가 아니라 여기에 "
             f"같은 형식으로 적는다. 사람이 읽는다. 없으면 빈 배열.\n"
             f"- 핵심 흐름(로그인 · 결제 · 데이터 쓰기 등)을 깰 수 있는데 확인하지 못한 위험은 notes 가 아니라 "
-            f"request_changes 로 낸다 — findings 에 그 위험을 확인하는 테스트를 요구한다.\n\n---\n\n"
+            f"request_changes 로 낸다 — findings 에 그 위험을 확인하는 테스트를 요구한다.\n"
+            f"- summary · findings · notes 는 한국어로 쓴다 — 사람과 구현 담당이 그대로 읽는다. "
+            f"코드 · 파일 이름 · 명령은 원문 그대로 둔다.\n\n---\n\n"
+            f"{self._build_previous_notes(step_num)}"
             f"{step_file.read_text()}"
         )
         exit_code, stdout, stderr, timed_out = self._run_agent(
@@ -478,6 +481,26 @@ class StepExecutor:
         if limit:
             raise ReviewUsageLimit(limit)
         return review
+
+    def _build_previous_notes(self, step_num: int) -> str:
+        """앞 step 승인 리뷰의 권고(review_notes). 뒤 step 에 넘긴 확인 거리가 사람만 보고 사라지지 않게 한다(H26)."""
+        index = self._read_json(self._index_file)
+        lines = [
+            f"- Step {s['step']} ({s['name']}): {note}"
+            for s in index["steps"]
+            if s["step"] < step_num and s.get("status") == "completed"
+            for note in s.get("review_notes") or []
+        ]
+        if not lines:
+            return ""
+        return (
+            "## 앞 step 리뷰가 넘긴 권고\n\n"
+            "앞 step 의 승인 리뷰가 남긴 권고다. 「step N 에서 확인」처럼 이 step 에 넘긴 것이 있으면 이번 변경으로 확인하고, "
+            "확인한 결과(해결됨 · 해당 없음 · 아직 남음)를 summary 에 「앞 권고:」로 한 줄씩 적는다. "
+            "이 step 의 작업과 무관한 권고는 무시한다. 권고만을 이유로 반려하지 않는다 — 이번 step 의 작업 · AC · "
+            "금지 목록을 어긴 것만 반려한다.\n\n"
+            + "\n".join(lines) + "\n\n---\n\n"
+        )
 
     def _review_with_retry(self, step: dict, base: str) -> tuple:
         """판정을 얻을 때까지 리뷰만 최대 REVIEW_ATTEMPTS 번 돌린다. (판정 또는 None, 리뷰에 쓴 초)."""
