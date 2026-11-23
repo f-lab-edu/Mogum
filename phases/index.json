@@ -73,7 +73,8 @@
     },
     {
       "dir": "8-material-cards",
-      "status": "pending"
+      "status": "completed",
+      "completed_at": "2026-11-23T18:30:39+0900"
     }
   ]
 }
