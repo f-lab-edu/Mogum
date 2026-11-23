@@ -46,6 +46,13 @@
 - 강의 목록 TASK(`7-course-planning` step 5) 구현: 코스 · 로드맵의 다시 짜기 받기는 검토 중이 아니면 `REPLAN_NOT_ALLOWED`(409), 「검토 중일 때만 다시 짤 수 있어요」로 거절한다. 화면에서 현재 대상 상태를 확인하도록 두 종류가 같은 묶음을 쓴다.
 - 강의 목록 TASK(`7-course-planning` step 6) 구현: 짜기 전 코스의 「이대로 시작」은 `COURSE_START_NOT_ALLOWED`(409), 「강의 목록이 만들어진 뒤 시작할 수 있어요」로 거절한다. 검토 중 코스에 성공하지 않은 코스 다시 짜기(`QUEUED` · `RUNNING` · `FAILED`)가 있으면 같은 `REPLAN_IN_PROGRESS`(409)로 거절한다. 제목의 누락 · 빈 글 · 공백만 있는 글은 `FIELD_INVALID`(400)의 `title: REQUIRED`, 100 코드 포인트 초과는 `title: TOO_LONG`이다.
 - 강의 목록 TASK(`7-course-planning` step 7) 구현: 칸 오류(`FIELD_INVALID`)의 서버 문구는 「입력을 확인해 주십시오」 하나이고, 칸 옆의 설명은 화면이 `reason`(`REQUIRED` · `TOO_LONG` · `INVALID_VALUE` · `NOT_ALLOWED`)으로 고른다(`frontend/src/components/FieldError.tsx`). 오류 code · `reason` 자체는 화면에 보이지 않는다(§1.4).
+
+강의 자료 TASK(`8-material-cards` step 3)의 강의 열기 거절은 다음 묶음을 쓴다. 강의 읽기 · 학습 완료에서도 같은 묶음을 쓴다.
+
+| 묶음(code) | 언제 | 상태 코드 | 문구 |
+|---|---|---|---|
+| `LESSON_NOT_OPEN` | 코스가 학습 중 · 다 마침이 아니거나 앞 순서 강의 중 미완료가 있을 때 | 409 | 코스를 시작하고 앞 강의를 학습 완료하면 열 수 있어요 |
+
 - 기술적인 원인(응답이 잘림 · 서버 응답 없음 등)은 싣지 않는다(ADR-088).
 - 만들기 실패도 작업을 읽을 때 같은 모양으로 싣는다.
 
@@ -71,11 +78,12 @@
 - 서버는 받는 자리에서 한 사람이 건 수(ADR-104)를 확인하고 크레딧을 쓴다 — 실패하면 복구한다(ADR-112 · ADR-166).
 - **로드맵의 「이대로 시작」은 첫 코스의 받기다** — 받으면 로드맵이 진행 중이 되고(ADR-136), 못 받으면 아무것도 바뀌지 않는다.
 - **강의 자료는 화면이 건다** — 강의를 열었을 때 자료도 작업도 없으면 화면이 받기를 부른다. 강의를 가져오는 것만으로는 만들지 않는다.
+- `8-material-cards` step 3부터 `MATERIAL`을 받는다. 주인을 먼저 확인하고, 코스가 `LEARNING` 또는 `COMPLETED`이며 앞 순서 강의가 모두 학습 완료일 때만 허용한다. 열 수 없으면 `LESSON_NOT_OPEN`(409), 남의 강의와 없는 강의는 `NOT_FOUND`(404)다. 자료 유무로 거절하지 않으며, 같은 강의의 작업이 있으면 성공한 작업까지 그대로 반환하고 크레딧을 쓰지 않는다. 동시 받기도 사용자 행 잠금과 기존 고유 색인으로 작업 · 크레딧 사용 하나만 남긴다.
 - 기다리는 화면은 작업을 정한 간격으로 다시 읽고, 성공하면 작업이 가리키는 결과로 넘어간다(ADR-077).
 
 - 만드는 작업 TASK 구현: `6-job-worker` step 7의 기다리는 화면은 작업을 **2초 간격**으로 다시 읽는다. `QUEUED` · `RUNNING`일 때만 이어 읽고, 성공 · 실패 또는 읽기 오류가 되면 멈춘다. 읽기 오류는 화면의 「다시 시도」로 다시 읽고, 실패한 작업의 다시 시도가 성공하면 응답으로 읽기 캐시를 교체해 간격 읽기를 재개한다. 버리기 성공은 해당 작업 캐시를 지운다.
 
-- 만드는 작업 TASK 구현: `6-job-worker` step 3의 네 주소는 아래와 같다. 받기와 다시 시도는 step 2의 트랜잭션이 커밋된 뒤 작업을 다시 읽어 같은 응답을 반환한다. `7-course-planning` step 3부터 `NEW_COURSE` · `NEW_ROADMAP`, step 4부터 `PLAN_ROADMAP_COURSE`는 운영 받기 · 생성 처리기로 받는다. step 5부터 `REPLAN_COURSE` · `REPLAN_ROADMAP`도 검토 중인 대상을 운영 받기 · 생성 처리기로 받는다. `MATERIAL`은 아직 운영 처리기가 없어 `INVALID_REQUEST`(400)다. 새로 배우기 · 다시 짜기의 HTTP 받기 · 크레딧 사용은 운영 처리기로 검증한다.
+- 만드는 작업 TASK 구현: `6-job-worker` step 3의 네 주소는 아래와 같다. 받기와 다시 시도는 step 2의 트랜잭션이 커밋된 뒤 작업을 다시 읽어 같은 응답을 반환한다. `7-course-planning` step 3부터 `NEW_COURSE` · `NEW_ROADMAP`, step 4부터 `PLAN_ROADMAP_COURSE`는 운영 받기 · 생성 처리기로 받는다. step 5부터 `REPLAN_COURSE` · `REPLAN_ROADMAP`도 검토 중인 대상을 운영 받기 · 생성 처리기로 받는다. `8-material-cards` step 3부터 `MATERIAL`도 운영 받기 · 생성 처리기로 받는다. 새로 배우기 · 다시 짜기의 HTTP 받기 · 크레딧 사용은 운영 처리기로 검증한다.
 
 | 동작 | 메서드 · 경로 | 성공 |
 |---|---|---|

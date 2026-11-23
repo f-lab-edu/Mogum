@@ -46,6 +46,9 @@ public enum ErrorCode {
 	/** 짜기 전 코스의 이대로 시작을 거절한다. */
 	COURSE_START_NOT_ALLOWED(HttpStatus.CONFLICT, "강의 목록이 만들어진 뒤 시작할 수 있어요"),
 
+	/** 코스가 학습 중·다 마침이 아니거나 앞 강의를 모두 완료하지 않았으면 강의 열기를 409로 거절한다. */
+	LESSON_NOT_OPEN(HttpStatus.CONFLICT, "코스를 시작하고 앞 강의를 학습 완료하면 열 수 있어요"),
+
 	/** 입력이 너무 커 실패한 작업의 다시 시도를 거절할 때 409로 반환한다. */
 	JOB_RETRY_NOT_ALLOWED(HttpStatus.CONFLICT, "주제를 좁혀 새로 만들어 주세요"),
 

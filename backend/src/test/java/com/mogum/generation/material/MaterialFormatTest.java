@@ -1,0 +1,130 @@
+package com.mogum.generation.material;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import com.mogum.course.domain.PlannedConcept;
+import com.mogum.course.domain.Purpose;
+
+class MaterialFormatTest {
+	private final MaterialFormat materialFormat = new MaterialFormat();
+	private static final String CARD = """
+		{"question":"질문?", "answer":"답", "concepts":[{"name":"개념","definition":"정의"}]}
+		""".strip();
+
+	@Test
+	@DisplayName("코드와 수식과 Mermaid와 표가 든 본문을 이스케이프 없이 그대로 읽는다")
+	void preservesMarkdownAndParsesConcatenatedOutput() {
+		// given
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
+		String body = """
+			# 이번 강의에서 배울 것
+			`이름`과 "값"
+			```java
+			String value = "안녕";
+			```
+			$$\\frac{1}{2} \\\\ x$$
+			```mermaid
+			flowchart LR
+			  A --> B
+			```
+			| 이름 | 뜻 |
+			| --- | --- |
+			| 값 | 자료 |
+			""".strip();
+		// @checkstyle:on
+		String output = body + "\n<!-- MOGUM_CARDS -->\n{\"cards\":[" + CARD + "]}";
+		int cut = output.indexOf("definition") + 4;
+		// when
+		var parsed = materialFormat.parse(output.substring(0, cut) + output.substring(cut));
+		// then
+		assertThat(parsed).isPresent();
+		assertThat(parsed.orElseThrow().body()).isEqualTo(body);
+		assertThat(parsed.orElseThrow().cards()).singleElement().satisfies(card -> {
+			assertThat(card.question()).isEqualTo("질문?");
+			assertThat(card.answer()).isEqualTo("답");
+			assertThat(card.concepts()).containsExactly(new PlannedConcept("개념", "정의"));
+		});
+	}
+
+	@Test
+	@DisplayName("카드와 개념 수의 권장 범위를 넘거나 그림 문법이 깨져도 읽을 수 있으면 받는다")
+	void acceptsCountsOutsidePromptRanges() {
+		// given
+		String concept = "{\"name\":\"개념\",\"definition\":\"정의\"}";
+		String card = "{\"question\":\"질문\",\"answer\":\"답\",\"concepts\":["
+			+ String.join(",", IntStream.range(0, 4).mapToObj(i -> concept).toList()) + "]}";
+		String cards = String.join(",", IntStream.range(0, 7).mapToObj(i -> card).toList());
+		// when
+		var parsed = materialFormat.parse("```mermaid\nbroken\n```\n<!-- MOGUM_CARDS -->\n{\"cards\":[" + cards + "]}");
+		// then
+		assertThat(parsed.orElseThrow().cards()).hasSize(7).allSatisfy(c -> assertThat(c.concepts()).hasSize(4));
+	}
+
+	@ParameterizedTest(name = "불합격={0}")
+	@MethodSource("invalidOutputs")
+	@DisplayName("본문이나 카드의 필수 글과 개념이 없거나 JSON이 깨지면 불합격이다")
+	void rejectsUnreadableOutput(String output) {
+		// when
+		var parsed = materialFormat.parse(output);
+		// then
+		assertThat(parsed).isEmpty();
+	}
+
+	static Stream<String> invalidOutputs() {
+		String valid = "본문\n<!-- MOGUM_CARDS -->\n{\"cards\":[" + CARD + "]}";
+		return Stream.of(null, "", "본문", valid.replace("본문", "　"), valid.replace(CARD, ""),
+			valid.replace("질문?", " "), valid.replace("답", ""), valid.replace("개념", "　"),
+			valid.replace("정의", ""), valid.replace("\"question\":\"질문?\"", "\"question\":null"),
+			valid.replace("[{\"name\":\"개념\",\"definition\":\"정의\"}]", "[]"),
+			valid.substring(0, valid.length() - 1), valid + " {}", valid.replace(CARD, "null"),
+			valid.replace("\"cards\":[" + CARD + "]", "\"cards\":null"),
+			valid.replace("\"cards\":[" + CARD + "]", "\"cards\":{}"),
+			valid.replace("\"answer\":\"답\"", "\"answer\":3"),
+			valid.replace("\"concepts\":[{\"name\":\"개념\",\"definition\":\"정의\"}]", "\"concepts\":null"),
+			valid.replace("\"definition\":\"정의\"", "\"definition\":false"),
+			valid + "\n<!-- MOGUM_CARDS -->\n{}");
+	}
+
+	@ParameterizedTest(name = "목적={0}")
+	@CsvSource({"WORK,예제 · 실습 · 현업에서 주의할 점",
+		"INTERVIEW,왜 그런가 · 무엇과 비교해 어떤가 · 면접 질문형 카드", "GENERAL,비유 · 흐름"})
+	@DisplayName("고른 목적은 강의 목록과 같은 정해진 문구로 넘기고 빈 메모는 넣지 않는다")
+	void rendersSelectedPurpose(Purpose purpose, String phrase) {
+		// given
+		var input = new MaterialInput("코스", "주제", new MaterialInput.LessonLine(1, "강의", "설명", List.of()),
+			List.of(new MaterialInput.LessonSummary(1, "강의", "설명", true)), purpose, null, null);
+		// when
+		var prompt = materialFormat.prompt(input);
+		// then
+		assertThat(prompt.user()).contains("\"purpose\":\"" + phrase + "\"").doesNotContain("memo", "level",
+			"feedback");
+	}
+
+	@Test
+	@DisplayName("프롬프트는 허용된 재료와 목적 원문만 넣고 고정 뼈대와 카드 규칙을 지시한다")
+	void rendersPromptWithPurposeAndRules() {
+		// given
+		var input = new MaterialInput("코스", "주제", new MaterialInput.LessonLine(2, "강의", "설명",
+			List.of(new PlannedConcept("개념", "정의"))),
+			List.of(new MaterialInput.LessonSummary(1, "앞", "앞 설명", false),
+				new MaterialInput.LessonSummary(2, "강의", "설명", true)),
+			Purpose.OTHER, "목적 원문", "메모 원문");
+		// when
+		var prompt = materialFormat.prompt(input);
+		// then
+		assertThat(prompt.user()).contains("코스", "주제", "개념", "정의", "앞 설명", "\"current\":true", "목적 원문", "메모 원문")
+			.doesNotContain("level", "feedback", "mastery");
+		assertThat(prompt.system()).contains("이번 강의에서 배울 것", "개념 설명", "정리", "3~6", "1~3", "strict", "KaTeX",
+			"현업에서 주의할 점", "면접에서 이렇게 물어요", "과제", "<!-- MOGUM_CARDS -->");
+	}
+}
