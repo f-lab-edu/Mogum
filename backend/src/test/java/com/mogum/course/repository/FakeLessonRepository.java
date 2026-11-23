@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.mogum.course.domain.Course;
 import com.mogum.course.domain.Lesson;
 
 public final class FakeLessonRepository implements LessonRepository {
@@ -29,5 +30,9 @@ public final class FakeLessonRepository implements LessonRepository {
 		return entities.values().stream()
 			.filter(entity -> entity.getCourse() != null && entity.getCourse().getId().equals(courseId))
 			.sorted(Comparator.comparingInt(Lesson::getPosition)).toList();
+	}
+
+	public Optional<Course> findCourseForUpdate(long userId, long lessonId) {
+		return findById(lessonId).map(Lesson::getCourse).filter(course -> course.getUserId() == userId);
 	}
 }

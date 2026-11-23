@@ -32,11 +32,10 @@ public final class CourseFixtures {
 			&& course.getStatus() == CourseStatus.REVIEWING) {
 			course.start(Instant.parse("2026-11-01T00:00:00Z"));
 		}
-		if (course.getStatus() != status) {
-			ReflectionTestUtils.setField(course, "status", status);
-		}
 		if (status == CourseStatus.COMPLETED) {
-			ReflectionTestUtils.setField(course, "completedAt", Instant.parse("2026-11-02T00:00:00Z"));
+			course.complete(Instant.parse("2026-11-02T00:00:00Z"));
+		} else if (course.getStatus() != status) {
+			ReflectionTestUtils.setField(course, "status", status);
 		}
 		return course;
 	}

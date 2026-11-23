@@ -2,6 +2,7 @@ package com.mogum.course.domain;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -61,5 +62,11 @@ public class Lesson extends AuditedEntity {
 		lesson.description = description;
 		lesson.concepts = List.copyOf(concepts);
 		return lesson;
+	}
+
+	public void complete(Instant completedAt) {
+		if (this.completedAt == null) {
+			this.completedAt = Objects.requireNonNull(completedAt);
+		}
 	}
 }

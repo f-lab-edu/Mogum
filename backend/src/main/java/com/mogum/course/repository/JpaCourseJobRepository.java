@@ -1,6 +1,7 @@
 package com.mogum.course.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.stereotype.Repository;
 
@@ -43,5 +44,20 @@ public class JpaCourseJobRepository implements CourseJobRepository {
 			.setParameter("userId", userId)
 			.setParameter("courseId", courseId)
 			.getSingleResult();
+	}
+
+	@Override
+	@SuppressWarnings("unchecked")
+	public Optional<MaterialJob> findMaterialJob(long userId, long lessonId) {
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
+		List<Object[]> rows = entityManager.createNativeQuery("""
+			SELECT j.id, j.status FROM generation_jobs j
+			JOIN lessons l ON l.id = j.lesson_id JOIN courses c ON c.id = l.course_id
+			WHERE j.user_id = :userId AND c.user_id = :userId
+			  AND j.lesson_id = :lessonId AND j.type = 'MATERIAL'
+			""", Object[].class)
+			// @checkstyle:on
+			.setParameter("userId", userId).setParameter("lessonId", lessonId).getResultList();
+		return rows.stream().findFirst().map(row -> new MaterialJob(((Number)row[0]).longValue(), (String)row[1]));
 	}
 }

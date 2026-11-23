@@ -2,10 +2,7 @@ package com.mogum.job;
 
 import org.springframework.stereotype.Component;
 
-import com.mogum.common.api.ApiException;
-import com.mogum.common.api.ErrorCode;
-import com.mogum.course.domain.CourseStatus;
-import com.mogum.course.repository.LessonRepository;
+import com.mogum.course.service.LessonAccessService;
 import com.mogum.job.domain.JobType;
 
 import lombok.RequiredArgsConstructor;
@@ -14,7 +11,7 @@ import lombok.RequiredArgsConstructor;
 @Component
 @RequiredArgsConstructor
 public final class MaterialIntakeHandler implements JobIntakeHandler {
-	private final LessonRepository lessonRepository;
+	private final LessonAccessService lessonAccessService;
 
 	@Override
 	public JobType type() {
@@ -23,14 +20,6 @@ public final class MaterialIntakeHandler implements JobIntakeHandler {
 
 	@Override
 	public void check(long userId, JobRequest request) {
-		var lesson = lessonRepository.findById(request.targetId())
-			.orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
-		var course = lesson.getCourse();
-		if ((course.getStatus() != CourseStatus.LEARNING && course.getStatus() != CourseStatus.COMPLETED)
-			|| lessonRepository.findByCourseIdOrderByPositionAsc(course.getId()).stream()
-				.anyMatch(
-					previous -> previous.getPosition() < lesson.getPosition() && previous.getCompletedAt() == null)) {
-			throw new ApiException(ErrorCode.LESSON_NOT_OPEN);
-		}
+		lessonAccessService.open(userId, request.targetId());
 	}
 }
