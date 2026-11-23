@@ -11,6 +11,7 @@ import 'katex/dist/katex.min.css'
 const scrollClass = 'min-w-0 max-w-full overflow-x-auto rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
 // 브라우저의 코드 로딩만 공유한다. 여러 블록이 동시에 처음 나타나도 import는 한 번이다.
 let mermaidModule: Promise<typeof import('mermaid')> | undefined
+let diagramSequence = 0
 
 function MermaidBlock({ source }: { source: string }) {
   const host = useRef<HTMLDivElement>(null)
@@ -30,7 +31,7 @@ function MermaidBlock({ source }: { source: string }) {
           startOnLoad: false,
           suppressErrorRendering: true,
         })
-        const { svg } = await mermaid.render(`material-${crypto.randomUUID()}`, source, container)
+        const { svg } = await mermaid.render(`material-diagram-${++diagramSequence}`, source, container)
         // 원본 HTML은 전달하지 않고 strict로 생성된 SVG만 삽입한다.
         if (!cancelled) {
           container.innerHTML = svg

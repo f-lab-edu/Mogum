@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { act, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import MaterialBody from './MaterialBody'
 
 const { loaded, initialize, renderDiagram } = vi.hoisted(() => ({
@@ -17,6 +17,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   renderDiagram.mockReset().mockImplementation(async (id: string) => ({ svg: `<svg id="${id}" viewBox="0 0 1200 300" />` }))
 })
+
+afterEach(() => vi.unstubAllGlobals())
 
 test('제목·목록·강조·인용·표·인라인 코드를 그린다', () => {
   const { container } = render(<MaterialBody body={'# 제목\n\n## 소제목\n\n- 항목\n\n1. 순서\n\n**강조**와 *기울임*, `value`\n\n> 인용\n\n| 이름 | 값 |\n| --- | --- |\n| 학습 | 완료 |'} />)
@@ -83,6 +85,30 @@ test('같은 화면의 여러 Mermaid 블록과 컴포넌트에 서로 다른 id
   await waitFor(() => {
     expect(container.querySelectorAll('svg')).toHaveLength(3)
     expect(new Set(renderDiagram.mock.calls.map(([id]) => id)).size).toBe(3)
+  })
+})
+
+test('randomUUID가 없는 환경에서도 두 그림을 서로 다른 id로 그린다', async () => {
+  vi.stubGlobal('crypto', Object.create(crypto, { randomUUID: { value: undefined } }))
+  expect(crypto.randomUUID).toBeUndefined()
+  const { container } = render(<MaterialBody body={'```mermaid\ngraph TD; A-->B\n```\n\n```mermaid\ngraph TD; B-->C\n```'} />)
+  await waitFor(() => {
+    expect(renderDiagram).toHaveBeenCalledTimes(2)
+    expect(container.querySelectorAll('svg')).toHaveLength(2)
+    expect(new Set(renderDiagram.mock.calls.map(([id]) => id)).size).toBe(2)
+  })
+})
+
+test('같은 본문을 다시 마운트해도 그림 id를 재사용하지 않는다', async () => {
+  const body = '```mermaid\ngraph TD; A-->B\n```'
+  const first = render(<MaterialBody body={body} />)
+  await waitFor(() => expect(first.container.querySelector('svg')).toBeInTheDocument())
+  first.unmount()
+  const second = render(<MaterialBody body={body} />)
+  await waitFor(() => {
+    expect(second.container.querySelector('svg')).toBeInTheDocument()
+    expect(renderDiagram).toHaveBeenCalledTimes(2)
+    expect(renderDiagram.mock.calls[0][0]).not.toBe(renderDiagram.mock.calls[1][0])
   })
 })
 

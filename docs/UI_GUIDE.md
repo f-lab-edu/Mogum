@@ -228,7 +228,7 @@ sips -Z 384 docs/design/assets/mogumi-reading.png --out frontend/src/assets/mogu
 
 원본 HTML은 `skipHtml`로 버리며 `rehype-raw`는 쓰지 않는다. 마크다운 이미지는 대체 글만 보이고 `img`를 만들지 않는다. 링크는 `react-markdown` 기본 URL 검사를 유지하며, 제거된 주소는 글로만 남긴다. 허용된 링크는 새 탭과 `rel="noopener noreferrer"`로 연다. KaTeX는 `trust: false`이며, 문법 오류는 `rehype-katex`의 `throwOnError: false` 대체 렌더링으로 오류 표시를 그대로 남긴다.
 
-Mermaid는 해당 코드 블록이 처음 나타날 때만 동적 `import()`한다. 브라우저의 모듈 로딩 Promise만 공유하며 `securityLevel: 'strict'`·`startOnLoad: false`로 직접 그린다. 효과마다 UUID와 별도 렌더 컨테이너를 써 여러 그림·StrictMode·본문 변경에서 충돌하거나 이전 결과가 덮어쓰지 않게 한다. `suppressErrorRendering: true`로 임시 오류 SVG 삽입을 막고, 실패한 자리에는 라이브러리의 오류 메시지를 HTML이 아닌 글로 표시한다. 다시 시도·수정 없이 나머지 본문을 유지하며, 부모가 같은 본문으로 다시 렌더되어도 실패한 그림을 다시 그리지 않는다.
+Mermaid는 해당 코드 블록이 처음 나타날 때만 동적 `import()`한다. 브라우저의 모듈 로딩 Promise를 공유하며 `securityLevel: 'strict'`·`startOnLoad: false`로 직접 그린다. 그림을 그릴 때마다 모듈 카운터를 늘려 `material-diagram-1` 형태의 id와 별도 렌더 컨테이너를 쓴다. 보안 컨텍스트가 필요 없어 휴대폰의 HTTP 개발 서버에서도 그릴 수 있고, 여러 그림·StrictMode·본문 변경·재마운트에서 충돌하거나 이전 결과가 덮어쓰지 않게 한다. `suppressErrorRendering: true`로 임시 오류 SVG 삽입을 막고, 실패한 자리에는 라이브러리의 오류 메시지를 HTML이 아닌 글로 표시한다. 다시 시도·수정 없이 나머지 본문을 유지하며, 부모가 같은 본문으로 다시 렌더되어도 실패한 그림을 다시 그리지 않는다.
 
 글은 §2의 `text-body`(16px/26px), 큰 제목은 `text-title`(24px/32px)·800 굵기, 작은 제목은 `text-body`·700 굵기다. 코드·표는 `text-small`(14px/24px), 최상위 블록 간격은 `space-y-6`(24px), 목록은 `space-y-2`(8px)·왼쪽 24px이다. 코드와 인용은 `surface-soft` 바탕·16px 여백·`radius-control`, 인용 왼쪽 테두리와 강조는 `primary`를 쓴다. 코드 강조도 기존 글자·보라색 토큰만 쓰며 다크 테마는 없다.
 
@@ -252,7 +252,7 @@ step 5에서 로컬 Vite의 컴포넌트를 실제 Chromium으로 390px·1280px�
 
 [api/useLesson.ts](../frontend/src/api/useLesson.ts)의 `useLesson`은 공통 `apiFetch`로 강의 하나를 읽어 `['lessons', lessonId]`에 캐시한다. 읽기·받기·완료는 자동 재시도하지 않는다. 최신 읽기가 끝난 뒤 자료·작업 분기를 결정하므로 기다리는 화면에서 돌아왔을 때 낡은 작업 캐시로 다시 이동하지 않는다. 받기 직전에 `useRef`의 요청 여부를 기록하고 TanStack Query mutation으로 요청 상태를 표시한다. React StrictMode의 효과 재실행에서도 받기를 한 번만 보내며, 주소가 바뀌면 `App`의 `key={pathname}`으로 요청 상태를 새로 시작한다. 받기 결과의 이동은 렌더링에서 처리해 화면을 떠난 뒤 늦은 응답이 이동시키지 않는다.
 
-완료 중에는 버튼을 잠그고 `useRef`로 같은 순간의 중복 제출도 막는다. 성공하면 진행 중인 강의·코스 읽기를 취소하고 강의 캐시를 지우며 코스 읽기 캐시(목록 포함)를 무효화한다. 응답의 `courseCompleted`가 참이면 `/courses/{courseId}/done`, 아니면 `/courses/{courseId}`로 `replace` 이동한다. 코스 화면은 새 진도와 다음 강의를 읽으며, 다음 강의를 저절로 열지 않는다. 완료 실패는 본문과 버튼을 보존하며 서버 문구를 표시한다.
+완료 중에는 버튼을 잠그고 `useRef`로 같은 순간의 중복 제출도 막는다. 성공하면 진행 중인 강의·코스·로드맵 읽기를 취소하고 강의 캐시를 지우며 코스·로드맵 읽기 캐시(각각 목록과 상세)를 무효화한다. 코스 다 마침 여부와 관계없이 `refetchType: 'none'`으로 즉시 다시 읽지 않고 해당 화면을 열 때 읽는다. 응답의 `courseCompleted`가 참이면 `/courses/{courseId}/done`, 아니면 `/courses/{courseId}`로 `replace` 이동한다. 코스 화면은 새 진도와 다음 강의를 읽으며, 다음 강의를 저절로 열지 않는다. 완료 실패는 본문과 버튼을 보존하며 서버 문구를 표시한다.
 
 짝 테스트는 `fetch` 대역과 §12의 Mermaid 대역으로 본문·수식·그림·상태별 분기·StrictMode 받기 한 번·거절 문구·완료 중 잠금·실패·캐시 정리·교체 이동을 확인한다. `App.test.tsx`는 실제 라우터로 코스 → 첫 강의의 자료 받기 → 기다리는 화면의 성공 결과 → 본문 → 완료 → 새 진도의 코스 또는 축하 화면을 확인한다. API만 대역으로 둔 로컬 Vite 화면을 실제 Chromium의 390px·1280px에서 수동 확인했다. 두 너비 모두 문서 너비가 화면 너비와 같고, 긴 코드·표·블록 수식·Mermaid는 각각 내부 스크롤을 유지했다. 깨진 Mermaid·KaTeX의 오류 표시와 뒤 본문 유지, 축하 화면의 배치·「홈으로」 이동도 확인했다.
 

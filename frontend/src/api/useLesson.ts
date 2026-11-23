@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client'
 import { coursesKey } from './useCourse'
 import type { JobResponse } from './useJob'
+import { roadmapsKey } from './useRoadmap'
 
 export interface LessonResponse {
   id: number
@@ -44,8 +45,10 @@ export function useLessonCompletion(lessonId: string) {
     onSuccess: async () => {
       await client.cancelQueries({ queryKey: lessonKey(lessonId), exact: true })
       await client.cancelQueries({ queryKey: coursesKey })
+      await client.cancelQueries({ queryKey: roadmapsKey })
       client.removeQueries({ queryKey: lessonKey(lessonId), exact: true })
       await client.invalidateQueries({ queryKey: coursesKey, refetchType: 'none' })
+      await client.invalidateQueries({ queryKey: roadmapsKey, refetchType: 'none' })
     },
   })
 }
