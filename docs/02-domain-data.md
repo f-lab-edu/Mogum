@@ -277,7 +277,7 @@ PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md)
 | 입력 칸 묶음 | | 로드맵의 코스면 모두 비어 있다 | 단일 코스만(ADR-137) |
 | `plan_description` | text | 단일 코스면 비어 있다 | 로드맵 계획의 한두 줄 설명(ADR-132) |
 | `plan_concepts` | jsonb | 단일 코스면 비어 있다 | 계획의 다룰 개념 — `[{name, definition}]`(ADR-138) |
-| `mastery_report` | jsonb | 강의 목록 전에는 비어 있다 | 숙련도 반영 내역 — 짧게 다룬 개념 · 다시 짚은 개념의 이름 목록(ADR-121) |
+| `mastery_report` | jsonb | 강의 목록 전에는 비어 있다 | 숙련도 반영 내역 — 짧게 다룬 개념 · 다시 짚은 개념의 이름 목록 `{"shortened": [이름], "revisited": [이름]}`(ADR-121 · [03 §5](./03-generation.md#5-숙련도-반영-내역--llm-이-적고-서버는-확인하지-않는다)). 이 칸을 채우기 전에 만든 코스는 비어 있다 |
 | `started_at` | timestamptz | 시작 전에는 비어 있다 | 「이대로 시작」한 때 — 이어서 배우기(ADR-099). `LEARNING` · `COMPLETED` 일 때만 차도록 `CHECK` 로 묶는다(사용자 확인 2026-11-10) |
 | `last_lesson_opened_at` | timestamptz | 예 | 이 코스의 강의를 마지막으로 연 때 — 이어서 배우기(ADR-099) |
 | `completed_at` | timestamptz | 다 마침 전에는 비어 있다 | 다 마친 때 — 마지막 강의를 학습 완료할 때 상태와 함께 적는다(ADR-169). `COMPLETED` 일 때만 차도록 `CHECK` 로 묶는다 |
@@ -521,4 +521,4 @@ PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md)
 
 | 것 | 근거 |
 |---|---|
-| 같은 개념 판정의 기준값 — `app.concept.same-threshold`(`ConceptProperties.sameThreshold()`), `0.72` — 2026-11-23 실측(ADR-187)으로 정함. 임베딩 모델은 `text-embedding-3-large` 로 정했다. 숙련도 고리 TASK 전에 실제 흐름으로 다시 잰다 | ADR-030 · ADR-161 · ADR-187 |
+| 같은 개념 판정의 기준값 — `app.concept.same-threshold`(`ConceptProperties.sameThreshold()`), `0.72` — 2026-11-23 실측(ADR-187)으로 정함. 임베딩 모델은 `text-embedding-3-large` 로 정했다. 실제 흐름으로 다시 재는 것은 M2 1차 품질 점검으로 옮겼다(사용자 결정 2026-11-25 — 숙련도 고리 TASK 전에는 사전이 작아 표본이 모자란다). 강의 자료의 다룰 개념을 사전과 맞출 때도 이 값을 쓴다([03 §3](./03-generation.md#3-강의-자료와-카드)) | ADR-030 · ADR-161 · ADR-187 |
