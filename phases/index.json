@@ -78,7 +78,8 @@
     },
     {
       "dir": "9-card-review",
-      "status": "pending"
+      "status": "blocked",
+      "blocked_at": "2026-11-24T23:56:39+0900"
     }
   ]
 }

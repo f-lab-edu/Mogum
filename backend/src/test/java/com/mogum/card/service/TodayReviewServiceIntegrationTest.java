@@ -91,6 +91,7 @@ class TodayReviewServiceIntegrationTest {
 		"LEARNING,0,false,true", "RELEARNING,0,false,true",
 		"LEARNING,1,true,false", "RELEARNING,1,true,false",
 		"LEARNING,600,false,true", "RELEARNING,600,false,true",
+		"LEARNING,1199,false,true", "RELEARNING,1199,false,true",
 		"LEARNING,1200,false,true", "RELEARNING,1200,false,true",
 		"LEARNING,1201,false,false", "RELEARNING,1201,false,false",
 		"LEARNING,600,true,false", "RELEARNING,600,true,false"})

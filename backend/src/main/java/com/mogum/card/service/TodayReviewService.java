@@ -24,7 +24,7 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class TodayReviewService {
-	private static final Duration LEARN_AHEAD_LIMIT = Duration.ofMinutes(20);
+	static final Duration LEARN_AHEAD_LIMIT = Duration.ofMinutes(20);
 
 	private final ReviewCardRepository reviewCardRepository;
 	private final FsrsCalculator fsrsCalculator;

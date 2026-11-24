@@ -48,6 +48,7 @@
 - 강의 목록 TASK(`7-course-planning` step 7) 구현: 칸 오류(`FIELD_INVALID`)의 서버 문구는 「입력을 확인해 주십시오」 하나이고, 칸 옆의 설명은 화면이 `reason`(`REQUIRED` · `TOO_LONG` · `INVALID_VALUE` · `NOT_ALLOWED`)으로 고른다(`frontend/src/components/FieldError.tsx`). 오류 code · `reason` 자체는 화면에 보이지 않는다(§1.4).
 - 강의 자료 TASK(`8-material-cards` step 3) 구현: 강의를 열 수 없으면 — 코스가 학습 중 · 다 마침이 아니거나 앞 순서 강의 가운데 학습 완료하지 않은 것이 있으면 — `LESSON_NOT_OPEN`(409), 「코스를 시작하고 앞 강의를 학습 완료하면 열 수 있어요」로 거절한다. 강의 자료 받기(`MATERIAL`) · 강의 읽기 · 학습 완료가 같은 code 를 쓴다.
 - 강의 자료 TASK(`8-material-cards` step 4) 구현: 강의 자료가 없는 강의의 학습 완료는 `LESSON_MATERIAL_REQUIRED`(409), 「강의 자료가 만들어진 뒤 학습 완료할 수 있어요」로 거절한다. 화면은 강의를 다시 읽어 자료 또는 작업을 확인한다.
+- 복습 TASK(`9-card-review` step 2) 구현: 보이는 카드라도 지금 볼 수 있는 일정이 아니면 평가는 `CARD_REVIEW_NOT_ALLOWED`(409), 「지금은 이 카드를 복습할 수 없어요. 목록을 다시 확인해 주세요」로 거절한다. 화면은 문구를 보이고 오늘 복습 목록을 다시 읽는다.
 - 기술적인 원인(응답이 잘림 · 서버 응답 없음 등)은 싣지 않는다(ADR-088).
 - 만들기 실패도 작업을 읽을 때 같은 모양으로 싣는다.
 
@@ -175,6 +176,17 @@
 - 제목 고치기는 단일 코스와 로드맵의 코스 모두 상태와 상관없이 받는다. `@Valid CourseTitleRequest`의 `@NotBlank` · `@CodePointLength(max = 100, message = "field.TOO_LONG")`로 검사하고, 공통 오류 경로가 칸별 reason으로 변환한다. 제목과 JPA Auditing의 수정 시각을 바꾸며 입력 · 계획 · 강의 목록 · 상태는 유지한다.
 - 강의 자료 TASK(`8-material-cards` step 4) 구현: 학습 완료는 본문 없는 `POST /api/lessons/{id}/complete`다. 성공(200)은 `ApiResponse<LessonCompletionResponse>`로 감싸며 `data: {courseId, courseCompleted}`를 반환한다. `courseCompleted`는 이번 요청으로 코스가 다 마침이 되었을 때만 참이다. 주인 · 열 수 있는 강의 · 자료 존재를 확인하고, 남의 것과 없는 것은 `NOT_FOUND`(404), 열기 거절은 `LESSON_NOT_OPEN`(409), 자료가 없으면 `LESSON_MATERIAL_REQUIRED`(409)다. 이미 완료한 강의는 성공으로 `courseCompleted: false`를 반환하고 아무것도 바꾸지 않는다.
 - 강의 읽기와 완료는 강의 ID와 사용자 ID로 코스 행을 `PESSIMISTIC_WRITE`로 먼저 잠근 뒤 강의를 읽는다. 동시 완료도 뒤 요청이 커밋을 기다린 뒤 완료 여부를 다시 확인하므로 한 번만 반영된다. 완료는 한 트랜잭션에서 강의의 `completed_at`, 그 강의의 `ACTIVE` 카드 중 빈 `due_at`과 `updated_at`을 같은 완료 시각으로 채운다. FSRS 상태와 기존 일정 · 복습 기록은 바꾸지 않는다. 모든 강의가 완료되면 코스의 `COMPLETED`와 `completed_at`을 함께 적고, 로드맵에 더 뒤 순서 코스가 없으면 그 로드맵도 `COMPLETED`로 바꾼다. 완료는 마지막으로 연 때를 적지 않는다.
+- 복습 TASK(`9-card-review` step 2) 구현: 아래 두 동작은 모두 성공하면 **204 · 본문 없음**을 반환한다. 다음 카드는 반환하지 않으며, 화면은 받은 목록을 이어 보고 다 보면 다시 읽는다.
+
+| 동작 | 메서드 · 경로 | 요청 본문 |
+|---|---|---|
+| 평가 보내기 | `POST /api/cards/{id}/reviews` | `{"rating":"GOOD"}` — `AGAIN` · `HARD` · `GOOD` · `EASY`, 모르는 칸은 무시 |
+| 카드 지우기 | `DELETE /api/cards/{id}` | 없음 |
+
+- 평가 본문은 `@Valid CardReviewRequest`의 `@NotNull`과 `@Pattern`으로 검사한다. 빠진 `rating` · `null`은 `FIELD_INVALID`(400)의 `rating: REQUIRED`, 모르는 값(빈 글 · 소문자 포함)은 `rating: INVALID_VALUE`다. 깨진 JSON · 없는 본문은 `INVALID_REQUEST`(400)다. 원문은 응답 · 로그에 남기지 않는다.
+- 두 동작 모두 주인의 `ACTIVE` 카드이며 `due_at`이 있는 학습 완료 뒤 카드만 받는다. 없는 카드 · 남의 카드 · 학습 완료 전 · 코스 지워짐은 모두 `NOT_FOUND`(404), 「찾을 수 없습니다」다. 평가는 `REVIEW`의 `due_at`이 다음 하루의 시작(한국 시간 새벽 4시) **전**이거나, 학습 단계(`LEARNING` · `RELEARNING`)의 `due_at`이 지금부터 **20분 이내**일 때 받는다. 20분 한도는 읽기와 같은 상수이며, 다른 볼 카드 유무와 관계없이 이 범위 안의 평가를 받는다. 그 밖은 §1.2의 `CARD_REVIEW_NOT_ALLOWED`다.
+- `card.service.CardCommandService`는 한 트랜잭션에서 카드 ID와 사용자 ID로 카드 행을 `PESSIMISTIC_WRITE`로 먼저 잠그고 조건을 확인한다. 평가는 잠금 뒤 `Clock`에서 한 번 받은 지금으로 `FsrsCalculator.review`를 계산하고, 여섯 FSRS 칸을 그대로 반영한 뒤 `Review.record(card, rating)`를 저장한다. 복습 기록의 평가한 때는 같은 `Clock`을 쓰는 JPA Auditing의 `created_at`이고, 카드의 `updated_at`도 Auditing이 채운다.
+- 같은 카드의 동시 평가는 앞 트랜잭션의 커밋을 기다린 뒤 바뀐 상태로 조건과 FSRS를 다시 계산한다. 앞 평가로 허용 범위를 벗어나면 뒤 평가는 거절한다. 요청 ID나 서버 메모리 잠금은 두지 않는다. 카드 지우기도 같은 행 잠금을 먼저 잡고 `reviews` → `card_concepts` → `cards` 순서로 지우며, 개념 사전은 남긴다. 오늘 예정이 아닌 카드도 지울 수 있다. 지운 뒤의 평가와 두 번째 지우기는 `NOT_FOUND`다.
 - **신청은 한 사람에 한 번이다** — 이미 신청한 사람이 다시 신청하면 새로 만들지 않고 같은 결과(신청 상태)를 성공으로 돌려준다. 같은 구글 계정의 두 세션이 동시에 신청해도 사용자 · 채움 기록은 하나다. 세션 하나로 동시에 보낸 두 요청 가운데 늦은 쪽의 응답은 정하지 않는다 — 신청할 때 세션 ID 를 바꾸기 때문이고, 화면은 요청 중 버튼을 막는다(ADR-102 · 사용자 확인 2026-11-08).
 - 지우기의 범위는 [02 §7](./02-domain-data.md#7-지우기--탈퇴--함께-사라지는-범위)(ADR-140).
 
@@ -182,7 +194,7 @@
 
 | 것 | 근거 |
 |---|---|
-| 경로 · 칸 이름 · 오류 묶음의 목록과 문구 — 만드는 작업 부분은 `6-job-worker` step 3, 코스 · 로드맵 읽기 넷과 코스 시작 · 제목 고치기는 `7-course-planning` step 6, 강의 읽기와 학습 완료는 `8-material-cards` step 4, 오늘 복습할 카드 읽기와 코스 응답의 `todayReviewCount`는 `9-card-review` step 1에서 정했다(§1.2 ~ §4). 나머지는 각 TASK에서 정한다 | ADR-143 · ADR-145 |
+| 경로 · 칸 이름 · 오류 묶음의 목록과 문구 — 만드는 작업 부분은 `6-job-worker` step 3, 코스 · 로드맵 읽기 넷과 코스 시작 · 제목 고치기는 `7-course-planning` step 6, 강의 읽기와 학습 완료는 `8-material-cards` step 4, 오늘 복습할 카드 읽기와 코스 응답의 `todayReviewCount`는 `9-card-review` step 1, 평가 보내기와 카드 지우기는 step 2에서 정했다(§1.2 ~ §4). 나머지는 각 TASK에서 정한다 | ADR-143 · ADR-145 |
 | 쿠키 설정 · 요청 위조 막기 | ADR-142 |
 | 기다리는 화면의 다시 읽는 간격은 `6-job-worker` step 7에서 정했다(§2). 대상이 없는 새로 배우기를 두 번 눌렀을 때는 화면이 요청 중 버튼을 막는 것만 하고 서버 장치는 두지 않는다 — 두 탭 · 재전송이면 둘이 생기는 것은 ADR-157 이 감수한 그대로다(README 2026-11-17) | ADR-143 · ADR-157 |
 | 목록을 나눠 받을지 — 정원 10명이라 MVP 에서 나눌 만큼 길지 않다 | ADR-061 |
