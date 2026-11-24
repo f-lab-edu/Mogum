@@ -39,6 +39,7 @@ import com.mogum.account.dto.MeResponse;
 import com.mogum.account.repository.FakeUserRepository;
 import com.mogum.archfixture.account.AccountToGeneration;
 import com.mogum.archfixture.account.AccountToWorker;
+import com.mogum.archfixture.card.CardToCourse;
 import com.mogum.archfixture.card.FsrsOutsideCalculator;
 import com.mogum.archfixture.course.CourseToJob;
 import com.mogum.archfixture.generation.TransactionalGeneration;
@@ -383,6 +384,26 @@ class ArchitectureTest {
 	void rejectsUnauditedEntity() {
 		// when & then
 		assertViolation(ENTITIES_EXTEND_AUDITED_ENTITY, UnauditedEntity.class);
+	}
+
+	private static final ArchRule CARD_DOES_NOT_DEPEND_ON_COURSE = noClasses()
+		.that().resideInAPackage("..card..")
+		.should().dependOnClassesThat().resideInAPackage("..course..");
+
+	@Test
+	@DisplayName("카드는 코스의 Java 타입을 참조하지 않는다")
+	void prohibitsCardDependencyOnCourse() {
+		// when
+		var result = CARD_DOES_NOT_DEPEND_ON_COURSE.evaluate(CLASSES);
+		// then
+		assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
+	}
+
+	@Test
+	@DisplayName("코스 타입을 참조한 카드 위반 픽스처를 거부한다")
+	void rejectsCardToCourseDependency() {
+		// when & then
+		assertViolation(CARD_DOES_NOT_DEPEND_ON_COURSE, CardToCourse.class);
 	}
 
 	private static final ArchRule COURSE_DOES_NOT_DEPEND_ON_JOB = noClasses()

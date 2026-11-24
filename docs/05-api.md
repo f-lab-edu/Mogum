@@ -133,14 +133,17 @@
 |---|---|---|
 | 코스 목록 | `GET /api/courses` | `courses: [{id, title, status}]` — 본인의 단일 코스와 로드맵 코스 중 `NOT_PLANNED` 제외 |
 | 로드맵 목록 | `GET /api/roadmaps` | `roadmaps: [{id, title, description, status, completedCourses, totalCourses}]` |
-| 코스 하나 | `GET /api/courses/{id}` | `id` · `status` · `title` · `roadmapId` · `lessons` · `progress` · `nextLessonId` · `completedAt` |
+| 코스 하나 | `GET /api/courses/{id}` | `id` · `status` · `title` · `roadmapId` · `lessons` · `progress` · `nextLessonId` · `completedAt` · `todayReviewCount` |
 | 로드맵 하나 | `GET /api/roadmaps/{id}` | `id` · `status` · `title` · `description` · `courses` · `nextCourse` |
 
 - 코스 하나의 `lessons`는 `[{id, position, title, description, concepts: [{name, definition}], completed}]`다. `completed`는 학습 완료 여부다. `progress`는 `{completedLessons, totalLessons}`이며 짜기 전에는 빈 강의 목록과 0 / 0이다. `roadmapId`는 로드맵의 코스일 때, `nextLessonId`는 `LEARNING`에서 완료하지 않은 가장 앞 강의가 있을 때, `completedAt`은 `COMPLETED`일 때만 싣는다. `completedAt`은 UTC ISO-8601 시각이다. 비어 있는 선택 칸은 생략한다.
 - 로드맵 하나의 `courses`는 `[{id, position, title, description, concepts: [{name, definition}], status, progress, jobId}]`다. `description` · `concepts`는 계획의 설명 · 개념이다. 코스의 `status`는 [02 §8.7](./02-domain-data.md#87-값-목록)을 그대로 쓰고, `progress`는 `NOT_PLANNED`(짜기 전) · `GENERATING`(만드는 중) · `FAILED`(실패) · `GENERATED`(만들어짐)다. 짜기 전 코스의 `PLAN_ROADMAP_COURSE` 작업이 `QUEUED` · `RUNNING`이면 `GENERATING`, `FAILED`이면 `FAILED`이고 그때만 `jobId`를 싣는다. 코스가 `REVIEWING` · `LEARNING` · `COMPLETED`이면 `GENERATED`다.
 - `nextCourse`는 `{courseId, enabled}`다. `IN_PROGRESS` 로드맵에서 성공하지 않은 강의 목록 작업이 없는 짜기 전 코스 가운데 가장 앞의 코스를 가리킨다. 첫 코스이거나 바로 앞 코스가 `COMPLETED`이면 `enabled: true`, 그 전에는 `false`다. 대상이 없거나 로드맵이 `REVIEWING` · `COMPLETED`이면 칸을 생략한다. 검토 중 로드맵의 「이대로 시작」 대상은 `courses`의 첫 코스다.
-- 위 네 응답에는 입력(주제 · 수준 · 목적 · 메모) · 사용자 ID · 시스템 정보 · 숙련도 반영 내역 · 오늘 복습할 카드 수를 싣지 않는다. 뒤 두 칸은 각각 해당 TASK에서 더한다.
+- 위 네 응답에는 입력(주제 · 수준 · 목적 · 메모) · 사용자 ID · 시스템 정보 · 숙련도 반영 내역을 싣지 않는다. 숙련도 반영 내역은 해당 TASK에서 더한다.
 - 강의 자료 TASK(`8-material-cards` step 4) 구현: 「강의 하나」는 `GET /api/lessons/{id}`이며 HTTP 200의 `ApiResponse<LessonResponse>`로 감싼다. `data`는 `id` · `courseId` · `courseTitle` · `position` · `title` · `completed`를 담는다. 자료가 있으면 `material: {body}`를 싣고, 자료가 없고 그 강의의 `MATERIAL` 작업이 있으면 `job: {id, status}`를 싣는다. `status`는 `QUEUED` · `RUNNING` · `SUCCEEDED` · `FAILED`이며 작업의 오류 · 횟수 · 시한은 싣지 않는다. 비어 있는 선택 칸은 생략한다. 주인과 열기 조건을 확인하며 거절은 §1.2 · §1.3을 따른다. 성공한 읽기는 코스의 `last_lesson_opened_at`과 JPA Auditing의 수정 시각만 적고, 자료 · 작업을 만들거나 크레딧을 바꾸지 않는다.
+- 복습 TASK(`9-card-review` step 1) 구현: 「오늘 복습할 카드」는 `GET /api/reviews/today`이며, 선택 쿼리 `courseId`를 주면 그 코스의 강의에 달린 카드만 읽는다. HTTP 200의 `ApiResponse<TodayReviewResponse>`로 감싸고 `data`에 `cards` · `remainingCount`를 싣는다. `cards`는 `[{id, question, answer, nextIntervalsSeconds: {AGAIN, HARD, GOOD, EASY}}]`이며, 네 등급의 간격은 이 요청에서 한 번 읽은 「지금」으로 `FsrsCalculator.preview`를 부른 **초 단위 정수**다. 문구로 바꾸는 것은 화면의 일이다. `remainingCount`는 이번 목록의 카드 수이며 현재 카드도 포함한다. 목록은 나눠 받지 않고 `due_at ASC, id ASC`로 정렬한다.
+- 복습 TASK 구현: 코스로 거르면 `courseTitle`도 싣고, 전체 복습에서는 생략한다. 없는 코스와 남의 코스는 `NOT_FOUND`(404), 「찾을 수 없습니다」다. 내 코스에 카드가 없거나 오늘 볼 것이 없으면 `cards: []` · `remainingCount: 0`과 코스 제목을 돌려준다. 카드의 FSRS 칸 · 다음 볼 때 · 강의 및 코스 출처 · 시스템 정보는 싣지 않는다. 읽기는 카드 · 복습 기록 · 시각을 바꾸지 않는다.
+- 복습 TASK 구현: `card.service.TodayReviewService.selectCards(userId, courseId, now)`가 [02 §3](./02-domain-data.md#3-학습과-복습)의 오늘 복습할 카드 선택과 코스별 앞당겨 보기를 한 곳에서 맡고, 목록과 `count(userId, courseId)`가 함께 쓴다. 코스 하나의 `todayReviewCount`는 이 코스로 거른 카드 수인 정수이며 0도 싣는다. 코스 시작 · 제목 고치기도 같은 칸을 채운다. 뒤 홈의 「오늘 복습」 수도 이 서비스를 쓴다.
 - 「나」의 크레딧(남은 크레딧 · 다음에 채워지는 날)은 내 정보 탭 TASK 에서 더한다 — 계정 TASK 의 「나」는 누구인지(이메일 · 이름)와 상태만 싣는다. 응답이 객체라 칸만 더하면 된다(§1 · 사용자 확인 2026-11-08).
 - 개인정보처리방침은 화면에 둔 글이라 읽기가 없다.
 
@@ -179,7 +182,7 @@
 
 | 것 | 근거 |
 |---|---|
-| 경로 · 칸 이름 · 오류 묶음의 목록과 문구 — 만드는 작업 부분은 `6-job-worker` step 3, 코스 · 로드맵 읽기 넷과 코스 시작 · 제목 고치기는 `7-course-planning` step 6, 강의 읽기와 학습 완료는 `8-material-cards` step 4에서 정했다(§1.2 ~ §4). 나머지는 각 TASK에서 정한다 | ADR-143 · ADR-145 |
+| 경로 · 칸 이름 · 오류 묶음의 목록과 문구 — 만드는 작업 부분은 `6-job-worker` step 3, 코스 · 로드맵 읽기 넷과 코스 시작 · 제목 고치기는 `7-course-planning` step 6, 강의 읽기와 학습 완료는 `8-material-cards` step 4, 오늘 복습할 카드 읽기와 코스 응답의 `todayReviewCount`는 `9-card-review` step 1에서 정했다(§1.2 ~ §4). 나머지는 각 TASK에서 정한다 | ADR-143 · ADR-145 |
 | 쿠키 설정 · 요청 위조 막기 | ADR-142 |
 | 기다리는 화면의 다시 읽는 간격은 `6-job-worker` step 7에서 정했다(§2). 대상이 없는 새로 배우기를 두 번 눌렀을 때는 화면이 요청 중 버튼을 막는 것만 하고 서버 장치는 두지 않는다 — 두 탭 · 재전송이면 둘이 생기는 것은 ADR-157 이 감수한 그대로다(README 2026-11-17) | ADR-143 · ADR-157 |
 | 목록을 나눠 받을지 — 정원 10명이라 MVP 에서 나눌 만큼 길지 않다 | ADR-061 |
