@@ -58,7 +58,13 @@
     {
       "step": 4,
       "name": "course-review-entry",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-25T04:42:42+0900",
+      "summary": "CourseResponse에 todayReviewCount 타입을 더하고 CoursePage의 강의 목록 아래 기존 PageLink로 「이 코스 복습하기 · {장수}장」 구현; 학습 중·다 마침이고 todayReviewCount > 0일 때만 보이며 같은 탭의 /review?courseId={id}로 이동, 검토 중·짜기 전·0장은 입구와 안내 없음; 다음에 열 강의 강조와 영역 순서 유지, 상태·장수별 표시 및 실제 라우터의 코스 거른 읽기 검증, UI_GUIDE §9 반영; 화면 테스트 504→516개 전체 통과·lint·TypeScript 검사 통과",
+      "completed_at": "2026-11-25T04:45:46+0900",
+      "review_notes": [
+        "frontend/src/pages/CoursePage.tsx:191 — 입구를 감싼 `<div>` 는 꾸밈이 없는 빈 래퍼다. `PageLink` 가 inline-flex 라 줄을 나누려고 둔 것이면 동작에는 문제가 없다 → phase 리뷰 때 실제 390px 화면에서 강의 목록과의 간격만 한 번 확인하면 된다."
+      ]
     }
   ],
   "created_at": "2026-11-24T23:31:35+0900"
