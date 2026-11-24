@@ -45,7 +45,15 @@
     {
       "step": 3,
       "name": "review-screen",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-25T00:08:45+0900",
+      "summary": "ReviewPage.tsx를 /review와 /review?courseId={id}에 연결하고 api/useReview.ts의 useTodayReview·useReviewAction으로 질문→답→4단계 평가·남은 수·목록 끝/재진입 재조회·서버 거절 재조회·요청 잠금 및 중복 제출 차단·카드 지우기 구현; formatReviewInterval은 원래 초 값으로 1시간/1일/30일/365일 경계의 분·시간·일·달(30일)·년(365일)을 고르고 정수 반올림·최소 1로 표시; 뒤 지우기·탈퇴 TASK가 재사용할 InlineConfirmation(범위 안내·확인/취소·포커스) 추가; 복습 목록 키 [reviews, today, courseId]는 gcTime 0·매 진입 읽기, 성공 시 [courses] 목록·상세의 진행 중 읽기를 취소하고 refetchType none으로 무효화; UI_GUIDE §3·§6·§7·§15 반영·책 읽기 모구미 자리 이미지 사용; 화면 테스트 453→504개 전체 통과·lint·TypeScript 검사 통과",
+      "completed_at": "2026-11-25T04:42:42+0900",
+      "review_notes": [
+        "frontend/src/lib/formatReviewInterval.ts:3 — 3,599초는 「60분」, 86,399초는 「24시간」, 30일 바로 전은 「30일」, 365일 바로 전은 「12달」로 나온다. 단위를 반올림 전 값으로 고르기 때문이다. UI_GUIDE §15에 규칙으로 적혀 있고 실제 FSRS 간격이 이 경계에 걸리는 일은 드물다. → 단위를 반올림한 뒤 값으로 다시 고르면 「1시간」·「1일」처럼 더 자연스럽게 읽힌다. phase 리뷰 때 정해도 된다.",
+        "frontend/src/pages/ReviewPage.tsx:48 — 「카드 지우기」 입구와 확인 펼침이 질문 카드 위에 있어서, 화면에서 처음 눈에 들어오는 버튼이 지우기다. 시안의 가장 강조할 것(카드·평가 버튼)과 06 은 어기지 않는다. → 실제 기기 점검 때 입구를 카드 아래나 카드 안 끝으로 옮길지 확인하면 실수로 누르는 일이 줄어든다.",
+        "docs/UI_GUIDE.md §15 — 390px에서 2×2 배치는 클래스와 최소 높이만 시험했다. 문서에도 실제 브라우저의 너비별 렌더링은 검증하지 않았다고 정직하게 적혀 있다. → phase 리뷰나 공개 전 점검에서 실제 390px 화면을 한 번 보면 된다."
+      ]
     },
     {
       "step": 4,
