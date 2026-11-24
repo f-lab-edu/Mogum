@@ -32,7 +32,15 @@
     {
       "step": 2,
       "name": "review-actions",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-24T23:55:01+0900",
+      "summary": "POST /api/cards/{id}/reviews(본문 {rating: AGAIN|HARD|GOOD|EASY}) · DELETE /api/cards/{id}(본문 없음) 구현, 둘 다 성공 204·본문 없음; 빠진 평가는 FIELD_INVALID/REQUIRED, 모르는 평가는 FIELD_INVALID/INVALID_VALUE; 지금 볼 일정 밖 평가는 CARD_REVIEW_NOT_ALLOWED(409)·「지금은 이 카드를 복습할 수 없어요. 목록을 다시 확인해 주세요」, 남의 것·학습 완료 전·코스 지워짐·없는 카드와 지운 뒤 평가·두 번째 삭제는 NOT_FOUND; 두 동작 모두 카드 행 PESSIMISTIC_WRITE 잠금 후 조건 재확인, 같은 트랜잭션에서 FSRS 여섯 칸 그대로 반영·Review.record와 Auditing 기록 또는 reviews→card_concepts→cards 삭제·개념 보존; 학습 AGAIN 1분·GOOD 10분·복습 AGAIN 재학습 10분, 미리 계산 일치·동시 평가 및 삭제·롤백·원문 로그 부재 검증, docs/05-api.md 반영; 서버 테스트 2,366→2,434개(실패·오류·건너뜀 0), AC 관련 582개와 전체 build·Spotless·Checkstyle 통과",
+      "completed_at": "2026-11-25T00:08:45+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/card/service/CardCommandService.java:36 — 「다음 하루의 시작」 계산(`new SeoulClock(Clock.fixed(now, SeoulClock.ZONE)).startOfTomorrow()`)과 `REVIEW` 경계 비교가 `TodayReviewService.selectCards` 와 같은 식으로 두 곳에 있다. 받기 조건이 읽기보다 넓다(다른 볼 카드가 있어도 20분 안의 학습 단계를 받는다)는 차이는 step 이 정한 대로라 맞다 → 뒤에 경계가 바뀔 때 두 곳이 어긋나지 않도록, 「REVIEW 카드가 오늘 범위인가」를 판단하는 작은 메서드 하나를 둘이 함께 쓰는 정리를 홈 TASK 때 검토한다.",
+        "docs/05-api.md:180 — step 2 의 구현 표와 bullet 이 §4 끝 일반 규칙(「신청은 한 사람에 한 번이다」 · 지우기 범위) 앞에 끼어 있어, 그 두 줄이 복습 구현 설명처럼 읽힌다 → phase 리뷰 때 복습 구현 줄을 §4 구현 줄 묶음의 끝(일반 규칙 뒤)이나 따로 묶인 자리로 옮기면 읽기 쉽다.",
+        "backend/src/test/java/com/mogum/card/service/CardCommandServiceIntegrationTest.java:236 — 지우기와 평가의 HTTP 왕복 시험이 서비스 통합 테스트 파일 안에 있다(step 1 권고와 같은 모양) → 나중에 컨트롤러 단위 통합 파일로 나누면 찾기 쉽다."
+      ]
     },
     {
       "step": 3,
