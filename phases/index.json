@@ -80,6 +80,10 @@
       "dir": "9-card-review",
       "status": "completed",
       "completed_at": "2026-11-25T04:45:47+0900"
+    },
+    {
+      "dir": "9a-review-interval",
+      "status": "pending"
     }
   ]
 }
