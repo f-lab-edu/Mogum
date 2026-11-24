@@ -9,7 +9,7 @@ const lessons = [
   { id: 51, position: 1, title: '변수', description: '값에 이름을 붙여요', concepts: [{ name: '변수 선언', definition: '이름과 값을 연결하는 것' }], completed: false },
   { id: 52, position: 2, title: '반복문', description: '여러 번 실행해요', concepts: [{ name: '반복', definition: '같은 일을 되풀이하는 것' }], completed: false },
 ]
-const review = { id: 31, title: '자바 기초', status: 'REVIEWING', lessons, progress: { completedLessons: 0, totalLessons: 2 } }
+const review = { id: 31, title: '자바 기초', status: 'REVIEWING', lessons, progress: { completedLessons: 0, totalLessons: 2 }, todayReviewCount: 0 }
 const learning = { ...review, status: 'LEARNING', roadmapId: 41, nextLessonId: 52, lessons: [{ ...lessons[0], completed: true }, lessons[1]], progress: { completedLessons: 1, totalLessons: 2 } }
 const done = { ...learning, status: 'COMPLETED', nextLessonId: undefined, completedAt: '2026-11-17T23:50:00Z', lessons: lessons.map((lesson) => ({ ...lesson, completed: true })), progress: { completedLessons: 2, totalLessons: 2 } }
 const job = { id: 77, type: 'REPLAN_COURSE', status: 'QUEUED', subject: { title: review.title } }
@@ -239,6 +239,40 @@ test.each([undefined, 41])('다 마침은 한국 날짜·강의 목록을 보이
   if (roadmapId) expect(link).toHaveAttribute('href', '/roadmaps/41')
   else expect(link).not.toBeInTheDocument()
 })
+
+test.each([learning, done].flatMap((data) => [1, 3].map((todayReviewCount) => ({ ...data, todayReviewCount }))))(
+  '$status · 오늘 복습할 카드 $todayReviewCount 장이면 강의 목록 아래에 코스 복습 링크를 보인다', async (data) => {
+    open(data)
+    const link = await screen.findByRole('link', { name: `이 코스 복습하기 · ${data.todayReviewCount}장` })
+    expect(link).toBeVisible()
+    expect(link).toHaveAttribute('href', '/review?courseId=31')
+    expect(link).not.toHaveAttribute('target')
+    const list = screen.getByRole('list', { name: '강의 목록' })
+    expect(list.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    if (data.status === 'LEARNING') {
+      const next = screen.getByRole('region', { name: '다음에 열 강의' })
+      expect(next).toHaveClass('bg-primary', 'text-on-primary')
+      expect(next.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledWith('/api/courses/31', expect.objectContaining({ method: 'GET' }))
+  },
+)
+
+test.each([learning, done])('$status · 오늘 복습할 카드가 없으면 복습 링크와 안내를 두지 않는다', async (data) => {
+  open({ ...data, todayReviewCount: 0 })
+  await screen.findByRole('heading', { name: data.title })
+  expect(screen.getByRole('main')).not.toHaveTextContent(/복습|0장/)
+})
+
+test.each(['REVIEWING', 'NOT_PLANNED'].flatMap((status) => [0, 3].map((todayReviewCount) => ({ status, todayReviewCount }))))(
+  '$status · 오늘 복습할 카드 $todayReviewCount 장이어도 복습 입구를 두지 않는다', async ({ status, todayReviewCount }) => {
+    open({ ...review, status, todayReviewCount, roadmapId: 41 })
+    if (status === 'NOT_PLANNED') await screen.findByRole('link', { name: '로드맵 화면으로 가기' })
+    else await screen.findByRole('heading', { name: review.title })
+    expect(screen.getByRole('main')).not.toHaveTextContent(/복습|장/)
+  },
+)
 
 test('다 마친 로드맵 코스의 링크가 로드맵으로 이동한다', async () => {
   const { router } = open(done)

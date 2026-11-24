@@ -284,6 +284,31 @@ test('실제 탭 바에서 복습을 열면 첫 질문을 바로 보이고 떠�
   expect(screen.queryByText('질문 1')).not.toBeInTheDocument()
 })
 
+test.each(['LEARNING', 'COMPLETED'])('%s 코스의 복습 링크를 누르면 실제 복습 화면이 그 코스로 거른 카드를 읽는다', async (status) => {
+  window.history.replaceState(null, '', '/courses/31')
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => {
+    let data: unknown
+    if (path === '/api/me') data = { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
+    else if (path === '/api/courses/31') data = {
+      id: 31, status, title: '자바 기초', todayReviewCount: 3, lessons: [], progress: { completedLessons: 0, totalLessons: 0 },
+    }
+    else if (path === '/api/reviews/today?courseId=31') data = {
+      cards: [1, 2, 3].map((id) => ({ id, question: `변수 질문 ${id}`, answer: '값을 담아요', nextIntervalsSeconds: { AGAIN: 60, HARD: 600, GOOD: 86400, EASY: 259200 } })),
+      remainingCount: 3, courseTitle: '자바 기초',
+    }
+    else throw new Error(`Unexpected test request: ${path}`)
+    return Promise.resolve(new Response(JSON.stringify({ data })))
+  }))
+  render(<App />)
+  fireEvent.click(await screen.findByRole('link', { name: '이 코스 복습하기 · 3장' }))
+  expect(await screen.findByRole('heading', { name: '변수 질문 1' })).toBeVisible()
+  expect(screen.getByText('자바 기초')).toBeVisible()
+  expect(screen.getByText('3장 남음')).toBeVisible()
+  expect(window.location.pathname + window.location.search).toBe('/review?courseId=31')
+  expect(fetch).toHaveBeenCalledWith('/api/reviews/today?courseId=31', expect.objectContaining({ method: 'GET' }))
+  expect(fetch).not.toHaveBeenCalledWith('/api/reviews/today', expect.anything())
+})
+
 test('거른 복습에서 복습 탭을 누르면 쿼리를 지우고 같은 경로에서도 질문·답·남은 수를 새로 시작한다', async () => {
   window.history.replaceState(null, '', '/review?courseId=31')
   vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'

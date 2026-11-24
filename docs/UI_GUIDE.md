@@ -192,7 +192,9 @@ sips -Z 384 docs/design/assets/mogumi-reading.png --out frontend/src/assets/mogu
 
 [api/useCourse.ts](../frontend/src/api/useCourse.ts)의 `readCourse`·`startCourse`·`updateCourseTitle`은 공통 `apiFetch`를 쓰며, `useCourse`는 코스 하나를 `['courses', courseId]`에 캐시한다. 시작·제목 고치기의 `useCourseAction`은 성공 뒤 진행 중인 읽기를 취소하고 응답 전체로 같은 코스 캐시를 바꾼다. 시작해도 주소를 유지하고 1강을 열지 않는다. 다시 짜기는 [api/useJob.ts](../frontend/src/api/useJob.ts)의 `receiveJob(ReplanCourseRequest)`로 `REPLAN_COURSE`·`courseId`·선택 `feedback`만 보내며, 빈 피드백은 생략하고 서버가 반환한 작업의 `/jobs/{id}`로 이동한다. 이미 있는 작업을 반환해도 같은 경로다. 읽기·쓰기는 자동 재시도하지 않으며, 읽기 실패는 다시 시도 버튼으로 다시 읽는다.
 
-상태별 내용·시작 후 같은 화면 유지·다시 짜기 본문과 이동·버튼 잠금·제목 저장/칸 오류·한국 날짜·조건부 로드맵 링크·순서에 따른 강의 링크·금지 정보 부재를 API 대역으로 시험한다. 포커스와 효과 결과는 `waitFor` 안에서 확인한다. 브라우저에서 실제 너비별 렌더링을 검증한 것으로 보지는 않는다.
+`9-card-review` step 4의 「이 코스 복습하기 · {장수}장」은 강의 목록 아래에 둔다. `CourseResponse.todayReviewCount`가 0보다 큰 학습 중·다 마침 코스에서만 보이며, 0이거나 검토 중·짜기 전이면 입구와 안내를 두지 않는다. 기존 `PageLink`의 보라색 굵은 글자·밑줄·최소 높이 44px·공통 포커스 모양으로 표시하고 새 토큰은 없다. 제목·진도 → 가장 강조한 다음에 열 강의 → 강의 목록의 순서를 유지한다. 같은 브라우저 탭에서 `/review?courseId={코스 ID}`로 이동하며 장수는 코스 읽기 응답을 그대로 쓴다.
+
+상태별 내용·시작 후 같은 화면 유지·다시 짜기 본문과 이동·버튼 잠금·제목 저장/칸 오류·한국 날짜·조건부 로드맵 링크·순서에 따른 강의 링크·금지 정보 부재를 API 대역으로 시험한다. 복습 입구의 상태·장수별 표시와 강의 목록 뒤 배치를 확인하고, `App.test.tsx`에서는 실제 라우터로 학습 중·다 마침의 복습 링크를 눌러 해당 코스의 거른 읽기를 부르는지 확인한다. 포커스와 효과 결과는 `waitFor` 안에서 확인한다. 브라우저에서 실제 너비별 렌더링을 검증한 것으로 보지는 않는다.
 
 ## 10. 로드맵 화면
 
