@@ -1,0 +1,11 @@
+{
+  "project": "Mogum",
+  "phase": "9-card-review",
+  "steps": [
+    { "step": 0, "name": "fsrs-scheduler", "status": "pending" },
+    { "step": 1, "name": "review-read", "status": "pending" },
+    { "step": 2, "name": "review-actions", "status": "pending" },
+    { "step": 3, "name": "review-screen", "status": "pending" },
+    { "step": 4, "name": "course-review-entry", "status": "pending" }
+  ]
+}
