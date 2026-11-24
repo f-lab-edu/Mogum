@@ -47,12 +47,13 @@ class SeoulClockTest {
 
 	@ParameterizedTest(name = "현재 {0} 예상 {1}")
 	@CsvSource({
+		"2026-10-12T18:59:59Z, 2026-10-12",
+		"2026-10-12T19:00:00Z, 2026-10-13",
+		"2026-10-12T16:00:00Z, 2026-10-12",
 		"2026-10-12T14:59:59Z, 2026-10-12",
-		"2026-10-12T15:00:00Z, 2026-10-13",
-		"2026-10-11T23:59:59Z, 2026-10-12",
-		"2026-10-12T00:00:00Z, 2026-10-12"
+		"2026-12-31T18:59:59Z, 2026-12-31"
 	})
-	@DisplayName("한국 날짜를 계산한다")
+	@DisplayName("새벽 4시 전에는 전날이고 4시부터 그날이다")
 	void calculatesSeoulDate(String now, String expected) {
 		// given
 		var clock = new SeoulClock(Clock.fixed(Instant.parse(now), ZoneOffset.UTC));
@@ -66,12 +67,13 @@ class SeoulClockTest {
 
 	@ParameterizedTest(name = "현재 {0} 예상 {1}")
 	@CsvSource({
-		"2026-10-12T14:59:59Z, 2026-10-11T15:00:00Z",
-		"2026-10-12T15:00:00Z, 2026-10-12T15:00:00Z",
-		"2026-10-11T23:59:59Z, 2026-10-11T15:00:00Z",
-		"2026-10-12T00:00:00Z, 2026-10-11T15:00:00Z"
+		"2026-10-12T18:59:59Z, 2026-10-11T19:00:00Z",
+		"2026-10-12T19:00:00Z, 2026-10-12T19:00:00Z",
+		"2026-10-12T16:00:00Z, 2026-10-11T19:00:00Z",
+		"2026-10-12T14:59:59Z, 2026-10-11T19:00:00Z",
+		"2026-12-31T18:59:59Z, 2026-12-30T19:00:00Z"
 	})
-	@DisplayName("한국의 오늘 자정 경계를 계산한다")
+	@DisplayName("한국의 오늘 새벽 4시 경계를 계산한다")
 	void calculatesStartOfToday(String now, String expected) {
 		// given
 		var clock = new SeoulClock(Clock.fixed(Instant.parse(now), ZoneOffset.UTC));
@@ -85,12 +87,13 @@ class SeoulClockTest {
 
 	@ParameterizedTest(name = "현재 {0} 예상 {1}")
 	@CsvSource({
-		"2026-10-12T14:59:59Z, 2026-10-12T15:00:00Z",
-		"2026-10-12T15:00:00Z, 2026-10-13T15:00:00Z",
-		"2026-10-11T23:59:59Z, 2026-10-12T15:00:00Z",
-		"2026-10-12T00:00:00Z, 2026-10-12T15:00:00Z"
+		"2026-10-12T18:59:59Z, 2026-10-12T19:00:00Z",
+		"2026-10-12T19:00:00Z, 2026-10-13T19:00:00Z",
+		"2026-10-12T16:00:00Z, 2026-10-12T19:00:00Z",
+		"2026-10-12T14:59:59Z, 2026-10-12T19:00:00Z",
+		"2026-12-31T18:59:59Z, 2026-12-31T19:00:00Z"
 	})
-	@DisplayName("한국의 내일 자정 경계를 계산한다")
+	@DisplayName("한국의 내일 새벽 4시 경계를 계산한다")
 	void calculatesStartOfTomorrow(String now, String expected) {
 		// given
 		var clock = new SeoulClock(Clock.fixed(Instant.parse(now), ZoneOffset.UTC));
@@ -138,7 +141,7 @@ class SeoulClockTest {
 			var actual = clock.today();
 
 			// then
-			assertThat(actual).isEqualTo(LocalDate.of(2026, 10, 13));
+			assertThat(actual).isEqualTo(LocalDate.of(2026, 10, 12));
 		} finally {
 			TimeZone.setDefault(original);
 		}
@@ -146,7 +149,7 @@ class SeoulClockTest {
 
 	@ParameterizedTest(name = "JVM과 시계 시간대 {0}")
 	@ValueSource(strings = {"UTC", "America/Los_Angeles", "Pacific/Kiritimati"})
-	@DisplayName("JVM과 주입된 시계의 시간대와 무관하게 한국의 오늘 자정 경계를 계산한다")
+	@DisplayName("JVM과 주입된 시계의 시간대와 무관하게 한국의 오늘 새벽 4시 경계를 계산한다")
 	void calculatesStartOfTodayRegardlessOfClockAndJvmZone(String zone) {
 		// given
 		TimeZone original = TimeZone.getDefault();
@@ -159,7 +162,7 @@ class SeoulClockTest {
 			var actual = clock.startOfToday();
 
 			// then
-			assertThat(actual).isEqualTo(now);
+			assertThat(actual).isEqualTo(Instant.parse("2026-10-11T19:00:00Z"));
 		} finally {
 			TimeZone.setDefault(original);
 		}
@@ -167,7 +170,7 @@ class SeoulClockTest {
 
 	@ParameterizedTest(name = "JVM과 시계 시간대 {0}")
 	@ValueSource(strings = {"UTC", "America/Los_Angeles", "Pacific/Kiritimati"})
-	@DisplayName("JVM과 주입된 시계의 시간대와 무관하게 한국의 내일 자정 경계를 계산한다")
+	@DisplayName("JVM과 주입된 시계의 시간대와 무관하게 한국의 내일 새벽 4시 경계를 계산한다")
 	void calculatesStartOfTomorrowRegardlessOfClockAndJvmZone(String zone) {
 		// given
 		TimeZone original = TimeZone.getDefault();
@@ -180,7 +183,7 @@ class SeoulClockTest {
 			var actual = clock.startOfTomorrow();
 
 			// then
-			assertThat(actual).isEqualTo(Instant.parse("2026-10-13T15:00:00Z"));
+			assertThat(actual).isEqualTo(Instant.parse("2026-10-12T19:00:00Z"));
 		} finally {
 			TimeZone.setDefault(original);
 		}

@@ -6,12 +6,15 @@ import java.time.Instant;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.card.domain.CardFixtures;
 import com.mogum.card.domain.CardStatus;
+import com.mogum.card.domain.FsrsResult;
 import com.mogum.card.domain.FsrsState;
 import com.mogum.course.domain.CourseFixtures;
 import com.mogum.course.domain.LessonFixtures;
@@ -68,5 +71,37 @@ class CardRepositoryTest {
 
 		assertThat(actual.getCreatedAt()).isEqualTo(writtenAt);
 		assertThat(actual.getUpdatedAt()).isEqualTo(writtenAt);
+	}
+
+	@ParameterizedTest(name = "FSRS 상태 {0}")
+	@EnumSource(FsrsState.class)
+	@DisplayName("평가 결과는 상태와 단계의 CHECK를 만족하고 여섯 칸이 저장과 재조회로 보존된다")
+	void persistsReviewResultWithConsistentStateAndStep(FsrsState state) {
+		// given
+		var user = userRepository.save(UserFixtures.user("me@example.com"));
+		var course = courseRepository.save(CourseFixtures.single(user.getId()));
+		var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
+		var card = cardRepository.save(CardFixtures.card(user.getId(), lesson.getId(), 1, "질문", "답"));
+		var createdAt = card.getCreatedAt();
+		var reviewedAt = Instant.parse("2026-11-24T01:02:03Z");
+		var dueAt = Instant.parse("2026-11-25T01:02:03Z");
+		testClock.set(reviewedAt);
+		Integer step = state == FsrsState.REVIEW ? null : 0;
+		card.applyReview(new FsrsResult(state, step, 21.5, 4.2, dueAt, reviewedAt));
+		cardRepository.save(card);
+
+		// when
+		var actual = cardRepository.findById(card.getId()).orElseThrow();
+
+		// then
+		assertThat(actual).isNotSameAs(card);
+		assertThat(actual.getFsrsState()).isEqualTo(state);
+		assertThat(actual.getFsrsStep()).isEqualTo(step);
+		assertThat(actual.getStability()).isEqualTo(21.5);
+		assertThat(actual.getDifficulty()).isEqualTo(4.2);
+		assertThat(actual.getDueAt()).isEqualTo(dueAt);
+		assertThat(actual.getLastReviewedAt()).isEqualTo(reviewedAt);
+		assertThat(actual.getCreatedAt()).isEqualTo(createdAt);
+		assertThat(actual.getUpdatedAt()).isEqualTo(reviewedAt);
 	}
 }

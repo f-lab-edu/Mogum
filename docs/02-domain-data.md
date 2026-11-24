@@ -318,6 +318,7 @@ PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md)
 | `last_reviewed_at` | timestamptz | 복습 전이면 비어 있다 | 마지막으로 평가한 때 |
 
 - **FSRS 라이브러리는 `io.github.open-spaced-repetition:fsrs` 를 쓰고, 학습 단계는 라이브러리 기본값(Anki 기본과 같다)으로 둔다**(ADR-159 · ADR-164) — `fsrs_state` · `fsrs_step` · `stability` · `difficulty` · `due_at` · `last_reviewed_at` 이 라이브러리 카드의 칸과 하나씩 맞는다. `status` 와 헷갈리지 않게 `fsrs_` 를 붙인다. 복습 횟수 칸은 두지 않는다 — 필요하면 `reviews` 를 센다.
+    - `9-card-review` step 0에서 1.0.0을 운영 의존성(`implementation`)으로 옮겼다. 흔들기 씨앗은 `Objects.hash(저장된 카드 ID, last_reviewed_at)`(빈 시각의 hash는 0)을 MurmurHash3의 32비트 finalizer로 섞은 int다. 평가마다 이 씨앗으로 스케줄러를 새로 만들고, 미리 계산도 등급마다 같은 씨앗에서 시작한다(ADR-188).
 - `CHECK ((fsrs_state = 'REVIEW') = (fsrs_step IS NULL))`.
 - **코스를 지울 때** — 그 강의들의 카드를 `COURSE_DELETED` 로 바꾼 뒤 강의를 지운다. `lesson_id` 는 저절로 빈다. 상태를 바꾸지 않고 강의를 지우면 `CHECK` 에 걸려 지우기가 실패한다 — 상태를 빠뜨릴 수 없다.
 

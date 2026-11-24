@@ -51,9 +51,9 @@ class ClockConfigurationTest {
 			assertThat(context.getBean(Clock.class)).isSameAs(fixed);
 			var clock = context.getBean(SeoulClock.class);
 			assertThat(clock.now()).isEqualTo(fixed.instant());
-			assertThat(clock.today()).isEqualTo(LocalDate.of(2026, 10, 13));
-			assertThat(clock.startOfToday()).isEqualTo(fixed.instant());
-			assertThat(clock.startOfTomorrow()).isEqualTo(Instant.parse("2026-10-13T15:00:00Z"));
+			assertThat(clock.today()).isEqualTo(LocalDate.of(2026, 10, 12));
+			assertThat(clock.startOfToday()).isEqualTo(Instant.parse("2026-10-11T19:00:00Z"));
+			assertThat(clock.startOfTomorrow()).isEqualTo(Instant.parse("2026-10-12T19:00:00Z"));
 		}
 	}
 }

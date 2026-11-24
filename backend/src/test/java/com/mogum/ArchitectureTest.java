@@ -39,6 +39,7 @@ import com.mogum.account.dto.MeResponse;
 import com.mogum.account.repository.FakeUserRepository;
 import com.mogum.archfixture.account.AccountToGeneration;
 import com.mogum.archfixture.account.AccountToWorker;
+import com.mogum.archfixture.card.FsrsOutsideCalculator;
 import com.mogum.archfixture.course.CourseToJob;
 import com.mogum.archfixture.generation.TransactionalGeneration;
 import com.mogum.archfixture.job.JobToGeneration;
@@ -410,6 +411,10 @@ class ArchitectureTest {
 		.that().resideOutsideOfPackage("..generation.llm..")
 		.should().dependOnClassesThat()
 		.resideInAPackage("com.openai..");
+	private static final ArchRule FSRS_ONLY_IN_CALCULATOR = noClasses()
+		.that().doNotHaveFullyQualifiedName("com.mogum.card.service.FsrsCalculator")
+		.should().dependOnClassesThat()
+		.resideInAPackage("io.github.openspacedrepetition..");
 	private static final DescribedPredicate<JavaMethod> REST_REQUEST_MAPPINGS = new DescribedPredicate<JavaMethod>(
 		"are request mappings in REST controllers except ApiErrorController") {
 		@Override
@@ -531,6 +536,23 @@ class ArchitectureTest {
 
 		// then
 		assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
+	}
+
+	@Test
+	@DisplayName("운영 FSRS 라이브러리 타입은 계산 클래스 안에서만 쓴다")
+	void restrictsFsrsToCalculator() {
+		// when
+		var result = FSRS_ONLY_IN_CALCULATOR.evaluate(CLASSES);
+
+		// then
+		assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
+	}
+
+	@Test
+	@DisplayName("계산 클래스 밖의 FSRS 라이브러리 의존을 거부한다")
+	void rejectsFsrsOutsideCalculator() {
+		// when & then
+		assertViolation(FSRS_ONLY_IN_CALCULATOR, FsrsOutsideCalculator.class);
 	}
 
 	@Test
