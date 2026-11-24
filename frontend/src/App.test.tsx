@@ -122,12 +122,14 @@ const tabPages = [
 
 test.each(tabPages)('승인된 사람은 $entry 주소에서 틀 안의 $label 화면을 본다', async ({ entry, title, label }) => {
   window.history.replaceState(null, '', entry)
-  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/courses' ? { courses: [] } : path === '/api/roadmaps' ? { roadmaps: [] } : { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/courses' ? { courses: [] } : path === '/api/roadmaps' ? { roadmaps: [] } : path === '/api/reviews/today' ? { cards: [], remainingCount: 0 } : { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
   render(<App />)
   const heading = await screen.findByRole('heading', { level: 1, name: title })
   expect(screen.getByRole('main')).toContainElement(heading)
   if (entry === '/courses' || entry === '/roadmaps') {
     expect(await screen.findByText(entry === '/courses' ? '아직 만든 코스가 없어요' : '아직 만든 로드맵이 없어요')).toBeVisible()
+  } else if (entry === '/review') {
+    expect(await screen.findByText('오늘 복습할 카드가 없어요')).toBeVisible()
   } else expect(screen.getByRole('main').textContent).toBe(entry === '/' ? `${title}새로 배우기` : title)
   expect(screen.getByRole('banner')).toBeVisible()
   for (const navigation of screen.getAllByRole('navigation')) {
@@ -154,7 +156,7 @@ test.each(states.filter((state) => state.status !== 'APPROVED').flatMap((state) 
 
 test('홈에서 탭 링크로 다른 자리 화면을 열어도 계정 화면으로 되돌리지 않는다', async () => {
   window.history.replaceState(null, '', '/')
-  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/courses' ? { courses: [] } : path === '/api/roadmaps' ? { roadmaps: [] } : { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/courses' ? { courses: [] } : path === '/api/roadmaps' ? { roadmaps: [] } : path === '/api/reviews/today' ? { cards: [], remainingCount: 0 } : { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
   render(<App />)
   await screen.findByRole('heading', { name: '머금' })
   for (const tab of tabPages.slice(1)) {
@@ -258,4 +260,68 @@ test.each([false, true])('코스에서 처음 연 강의를 만들고 읽은 뒤
       expect(screen.getByRole('progressbar', { name: '학습 진도' })).toHaveAttribute('aria-valuenow', '1')
     }
   })
+})
+
+
+test('실제 탭 바에서 복습을 열면 첫 질문을 바로 보이고 떠났다 돌아오면 답을 닫고 새로 읽는다', async () => {
+  window.history.replaceState(null, '', '/')
+  let reads = 0
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+    ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
+    : { cards: [{ id: ++reads, question: `질문 ${reads}`, answer: '답이에요', nextIntervalsSeconds: { AGAIN: 60, HARD: 600, GOOD: 86400, EASY: 259200 } }], remainingCount: 1 } })))))
+  render(<App />)
+  await screen.findByRole('heading', { name: '머금' })
+  const tabs = () => screen.getByRole('navigation', { name: '주요 화면 (모바일)' })
+  fireEvent.click(within(tabs()).getByRole('link', { name: '복습' }))
+  expect(await screen.findByText('질문 1')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: '답 보기' }))
+  expect(screen.getByText('답이에요')).toBeVisible()
+  fireEvent.click(within(tabs()).getByRole('link', { name: '홈' }))
+  await screen.findByRole('heading', { name: '머금' })
+  fireEvent.click(within(tabs()).getByRole('link', { name: '복습' }))
+  expect(await screen.findByText('질문 2')).toBeVisible()
+  expect(screen.queryByText('답이에요')).not.toBeInTheDocument()
+  expect(screen.queryByText('질문 1')).not.toBeInTheDocument()
+})
+
+test.each(['LEARNING', 'COMPLETED'])('%s 코스의 복습 링크를 누르면 실제 복습 화면이 그 코스로 거른 카드를 읽는다', async (status) => {
+  window.history.replaceState(null, '', '/courses/31')
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => {
+    let data: unknown
+    if (path === '/api/me') data = { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
+    else if (path === '/api/courses/31') data = {
+      id: 31, status, title: '자바 기초', todayReviewCount: 3, lessons: [], progress: { completedLessons: 0, totalLessons: 0 },
+    }
+    else if (path === '/api/reviews/today?courseId=31') data = {
+      cards: [1, 2, 3].map((id) => ({ id, question: `변수 질문 ${id}`, answer: '값을 담아요', nextIntervalsSeconds: { AGAIN: 60, HARD: 600, GOOD: 86400, EASY: 259200 } })),
+      remainingCount: 3, courseTitle: '자바 기초',
+    }
+    else throw new Error(`Unexpected test request: ${path}`)
+    return Promise.resolve(new Response(JSON.stringify({ data })))
+  }))
+  render(<App />)
+  fireEvent.click(await screen.findByRole('link', { name: '이 코스 복습하기 · 3장' }))
+  expect(await screen.findByRole('heading', { name: '변수 질문 1' })).toBeVisible()
+  expect(screen.getByText('자바 기초')).toBeVisible()
+  expect(screen.getByText('3장 남음')).toBeVisible()
+  expect(window.location.pathname + window.location.search).toBe('/review?courseId=31')
+  expect(fetch).toHaveBeenCalledWith('/api/reviews/today?courseId=31', expect.objectContaining({ method: 'GET' }))
+  expect(fetch).not.toHaveBeenCalledWith('/api/reviews/today', expect.anything())
+})
+
+test('거른 복습에서 복습 탭을 누르면 쿼리를 지우고 같은 경로에서도 질문·답·남은 수를 새로 시작한다', async () => {
+  window.history.replaceState(null, '', '/review?courseId=31')
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+    ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
+    : { cards: [{ id: 1, question: path.includes('?') ? '거른 질문' : '전체 질문', answer: '거른 답', nextIntervalsSeconds: { AGAIN: 60, HARD: 600, GOOD: 86400, EASY: 259200 } }], remainingCount: 1, ...(path.includes('?') ? { courseTitle: '자바 기초' } : {}) } })))))
+  render(<App />)
+  expect(await screen.findByText('거른 질문')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: '답 보기' }))
+  expect(screen.getByText('거른 답')).toBeVisible()
+  fireEvent.click(within(screen.getByRole('navigation', { name: '주요 화면 (모바일)' })).getByRole('link', { name: '복습' }))
+  expect(await screen.findByText('전체 질문')).toBeVisible()
+  expect(window.location.search).toBe('')
+  expect(screen.queryByText('거른 답')).not.toBeInTheDocument()
+  expect(screen.queryByText('자바 기초')).not.toBeInTheDocument()
+  expect(screen.getByText('1장 남음')).toBeVisible()
 })

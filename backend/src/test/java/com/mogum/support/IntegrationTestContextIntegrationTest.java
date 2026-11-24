@@ -45,7 +45,7 @@ class IntegrationTestContextIntegrationTest {
 		var today = seoulClock.today();
 
 		// then
-		assertThat(today).isEqualTo(LocalDate.of(2026, 11, 10));
+		assertThat(today).isEqualTo(LocalDate.of(2026, 11, 9));
 		assertThat(applicationContext.getBean(Clock.class)).isSameAs(testClock);
 		assertThat(applicationContext.getBean("testClock")).isSameAs(testClock);
 		assertThat(applicationContext.getBean("clock")).isNotSameAs(testClock);

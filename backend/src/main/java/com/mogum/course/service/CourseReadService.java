@@ -3,6 +3,7 @@ package com.mogum.course.service;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.mogum.card.service.TodayReviewService;
 import com.mogum.common.api.ApiException;
 import com.mogum.common.api.ErrorCode;
 import com.mogum.course.domain.CourseStatus;
@@ -19,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 public class CourseReadService {
 	private final CourseRepository courseRepository;
 	private final LessonRepository lessonRepository;
+	private final TodayReviewService todayReviewService;
 
 	public CourseResponse read(long userId, long courseId) {
 		var course = courseRepository.findById(courseId)
@@ -42,7 +44,8 @@ public class CourseReadService {
 		return new CourseResponse(courseId, course.getStatus(), course.getTitle(),
 			course.getRoadmap() == null ? null : course.getRoadmap().getId(), lessons,
 			new CourseResponse.Progress(completed, lessons.size()), nextLessonId,
-			course.getStatus() == CourseStatus.COMPLETED ? course.getCompletedAt() : null);
+			course.getStatus() == CourseStatus.COMPLETED ? course.getCompletedAt() : null,
+			todayReviewService.count(userId, courseId));
 	}
 
 	public CourseListResponse list(long userId) {

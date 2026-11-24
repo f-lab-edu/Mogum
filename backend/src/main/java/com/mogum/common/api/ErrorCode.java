@@ -52,6 +52,9 @@ public enum ErrorCode {
 	/** 강의 자료가 없는 강의의 학습 완료를 거절한다. */
 	LESSON_MATERIAL_REQUIRED(HttpStatus.CONFLICT, "강의 자료가 만들어진 뒤 학습 완료할 수 있어요"),
 
+	/** 지금 볼 수 있는 일정이 아닌 카드의 평가를 409로 거절한다. */
+	CARD_REVIEW_NOT_ALLOWED(HttpStatus.CONFLICT, "지금은 이 카드를 복습할 수 없어요. 목록을 다시 확인해 주세요"),
+
 	/** 입력이 너무 커 실패한 작업의 다시 시도를 거절할 때 409로 반환한다. */
 	JOB_RETRY_NOT_ALLOWED(HttpStatus.CONFLICT, "주제를 좁혀 새로 만들어 주세요"),
 

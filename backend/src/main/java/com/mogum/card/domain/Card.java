@@ -77,4 +77,13 @@ public class Card extends AuditedEntity {
 		card.fsrsStep = 0;
 		return card;
 	}
+
+	public void applyReview(FsrsResult result) {
+		fsrsState = result.fsrsState();
+		fsrsStep = result.fsrsStep();
+		stability = result.stability();
+		difficulty = result.difficulty();
+		dueAt = result.dueAt();
+		lastReviewedAt = result.lastReviewedAt();
+	}
 }

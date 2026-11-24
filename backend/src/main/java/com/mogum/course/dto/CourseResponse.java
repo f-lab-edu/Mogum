@@ -9,7 +9,7 @@ import com.mogum.course.domain.PlannedConcept;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record CourseResponse(long id, CourseStatus status, String title, Long roadmapId,
-	List<LessonItem> lessons, Progress progress, Long nextLessonId, Instant completedAt) {
+	List<LessonItem> lessons, Progress progress, Long nextLessonId, Instant completedAt, int todayReviewCount) {
 	public record LessonItem(long id, int position, String title, String description,
 		List<PlannedConcept> concepts, boolean completed) {
 	}

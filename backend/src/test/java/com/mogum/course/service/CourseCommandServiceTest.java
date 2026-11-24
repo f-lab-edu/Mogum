@@ -17,6 +17,9 @@ import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.FakeCreditEntryRepository;
 import com.mogum.account.repository.FakeUserRepository;
 import com.mogum.account.service.CreditLedger;
+import com.mogum.card.repository.FakeReviewCardRepository;
+import com.mogum.card.service.FsrsCalculator;
+import com.mogum.card.service.TodayReviewService;
 import com.mogum.common.api.ApiException;
 import com.mogum.common.api.ErrorCode;
 import com.mogum.course.domain.CourseFixtures;
@@ -32,7 +35,9 @@ class CourseCommandServiceTest {
 	private final FakeUserRepository userRepository = new FakeUserRepository();
 	private final FakeLessonRepository lessonRepository = new FakeLessonRepository();
 	private final CreditLedger creditLedger = new CreditLedger(userRepository, new FakeCreditEntryRepository());
-	private final CourseReadService courseReadService = new CourseReadService(courseRepository, lessonRepository);
+	private final CourseReadService courseReadService = new CourseReadService(courseRepository, lessonRepository,
+		new TodayReviewService(new FakeReviewCardRepository(), new FsrsCalculator(),
+			Clock.fixed(Instant.parse("2026-11-18T00:00:00Z"), ZoneOffset.UTC)));
 	private final Clock clock = Clock.fixed(Instant.parse("2026-11-18T00:00:00Z"), ZoneOffset.UTC);
 	private final CourseCommandService courseCommandService = new CourseCommandService(
 		courseRepository, courseJobRepository, creditLedger, courseReadService, clock);

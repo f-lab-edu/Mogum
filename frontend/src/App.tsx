@@ -17,10 +17,11 @@ import CoursesPage from './pages/CoursesPage'
 import RoadmapsPage from './pages/RoadmapsPage'
 import LessonPage from './pages/LessonPage'
 import CelebrationPage from './pages/CelebrationPage'
+import ReviewPage from './pages/ReviewPage'
 
 function ApplicationRoutes() {
   const navigate = useNavigate()
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   const [queryClient] = useState(() => createAuthQueryClient(() => redirectToLogin(navigate)))
 
   return (
@@ -33,7 +34,7 @@ function ApplicationRoutes() {
           <Route path="/rejected" element={<AccountPage />} />
           <Route path="/courses" element={<AppLayout><CoursesPage /></AppLayout>} />
           <Route path="/roadmaps" element={<AppLayout><RoadmapsPage /></AppLayout>} />
-          <Route path="/review" element={<AppLayout><PlaceholderPage title="복습" /></AppLayout>} />
+          <Route path="/review" element={<AppLayout><ReviewPage key={pathname + search} /></AppLayout>} />
           <Route path="/profile" element={<AppLayout><PlaceholderPage title="내 정보" /></AppLayout>} />
           <Route path="/new" element={<AppLayout title="새로 배우기"><NewLearningPage /></AppLayout>} />
           <Route path="/jobs/:jobId" element={<AppLayout title="기다리는 화면"><WaitingPage key={pathname} /></AppLayout>} />

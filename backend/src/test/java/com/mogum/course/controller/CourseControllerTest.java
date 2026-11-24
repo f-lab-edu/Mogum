@@ -73,7 +73,7 @@ class CourseControllerTest {
 			{"data":{"id":1,"status":"LEARNING","title":"코스","roadmapId":9,
 			"lessons":[{"id":3,"position":1,"title":"강의","description":"설명",
 			"concepts":[{"name":"개념","definition":"정의"}],"completed":false}],
-			"progress":{"completedLessons":0,"totalLessons":1},"nextLessonId":3}}
+			"progress":{"completedLessons":0,"totalLessons":1},"nextLessonId":3,"todayReviewCount":2}}
 			""");
 	}
 
@@ -104,6 +104,7 @@ class CourseControllerTest {
 
 		// then
 		assertThat(result).hasStatusOk().bodyJson().extractingPath("$.data.status").isEqualTo("LEARNING");
+		assertThat(result).bodyJson().extractingPath("$.data.todayReviewCount").isEqualTo(2);
 	}
 
 	@ParameterizedTest(name = "제목={0}")
@@ -137,7 +138,7 @@ class CourseControllerTest {
 			.content(jsonMapper.writeValueAsString(Map.of("title", title, "future", true))).exchange();
 
 		// then
-		assertThat(result).hasStatusOk();
+		assertThat(result).hasStatusOk().bodyJson().extractingPath("$.data.todayReviewCount").isEqualTo(2);
 		then(courseCommandService).should().rename(7L, 1L, title);
 	}
 
@@ -159,6 +160,6 @@ class CourseControllerTest {
 		return new CourseResponse(1L, CourseStatus.LEARNING, "코스", 9L,
 			List.of(new CourseResponse.LessonItem(3L, 1, "강의", "설명",
 				List.of(new PlannedConcept("개념", "정의")), false)),
-			new CourseResponse.Progress(0, 1), 3L, null);
+			new CourseResponse.Progress(0, 1), 3L, null, 2);
 	}
 }

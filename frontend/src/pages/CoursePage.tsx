@@ -187,5 +187,9 @@ export default function CoursePage() {
         </li>)}
       </ol>
     </section>
+
+    {(learning || completed) && data.todayReviewCount > 0 && <div>
+      <PageLink to={`/review?courseId=${data.id}`}>이 코스 복습하기 · {data.todayReviewCount}장</PageLink>
+    </div>}
   </div>
 }

@@ -3,7 +3,9 @@ package com.mogum.course.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +14,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import com.mogum.card.repository.FakeReviewCardRepository;
+import com.mogum.card.service.FsrsCalculator;
+import com.mogum.card.service.TodayReviewService;
 import com.mogum.common.api.ApiException;
 import com.mogum.common.api.ErrorCode;
 import com.mogum.course.domain.CourseFixtures;
@@ -24,7 +29,9 @@ import com.mogum.course.repository.FakeLessonRepository;
 class CourseReadServiceTest {
 	private final FakeCourseRepository courseRepository = new FakeCourseRepository();
 	private final FakeLessonRepository lessonRepository = new FakeLessonRepository();
-	private final CourseReadService courseReadService = new CourseReadService(courseRepository, lessonRepository);
+	private final CourseReadService courseReadService = new CourseReadService(courseRepository, lessonRepository,
+		new TodayReviewService(new FakeReviewCardRepository(), new FsrsCalculator(),
+			Clock.fixed(Instant.parse("2026-11-18T00:00:00Z"), ZoneOffset.UTC)));
 
 	@ParameterizedTest(name = "상태={0}")
 	@EnumSource(CourseStatus.class)
@@ -46,6 +53,7 @@ class CourseReadServiceTest {
 
 		// then
 		assertThat(result.status()).isEqualTo(status);
+		assertThat(result.todayReviewCount()).isZero();
 		assertThat(result.progress().completedLessons()).isEqualTo(status == CourseStatus.NOT_PLANNED ? 0 : 1);
 		assertThat(result.progress().totalLessons()).isEqualTo(status == CourseStatus.NOT_PLANNED ? 0 : 2);
 		assertThat(result.nextLessonId()).isEqualTo(status == CourseStatus.LEARNING ? 2L : null);
