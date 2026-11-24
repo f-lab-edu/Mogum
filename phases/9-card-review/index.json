@@ -2,10 +2,39 @@
   "project": "Mogum",
   "phase": "9-card-review",
   "steps": [
-    { "step": 0, "name": "fsrs-scheduler", "status": "pending" },
-    { "step": 1, "name": "review-read", "status": "pending" },
-    { "step": 2, "name": "review-actions", "status": "pending" },
-    { "step": 3, "name": "review-screen", "status": "pending" },
-    { "step": 4, "name": "course-review-entry", "status": "pending" }
-  ]
+    {
+      "step": 0,
+      "name": "fsrs-scheduler",
+      "status": "completed",
+      "started_at": "2026-11-24T23:31:35+0900",
+      "summary": "FSRS 1.0.0을 implementation으로 옮기고 card.service.FsrsCalculator.review(Card, Rating, Instant): FsrsResult · preview(Card, Instant): Map<Rating, Duration>, card.domain.FsrsResult(FsrsState fsrsState, Integer fsrsStep, Double stability, Double difficulty, Instant dueAt, Instant lastReviewedAt), Card.applyReview(FsrsResult) 구현; 씨앗은 Objects.hash(저장된 카드 ID, last_reviewed_at[null hash=0])를 MurmurHash3 32비트 finalizer로 섞은 int이며 평가와 미리 계산의 등급마다 새 Scheduler로 기본값·fuzz 유지, ArchUnit FSRS_ONLY_IN_CALCULATOR와 위반 픽스처로 라이브러리 경계 검증; SeoulClock.today()는 KST 새벽 4시 전이면 전날, startOfToday()·startOfTomorrow()는 그날·다음날 새벽 4시 Instant; HTTP JSON은 기본 JacksonJsonHttpMessageConverter의 Jackson 3.1.5(설정 추가 없음), Hibernate는 기존 json_format_mapper: jackson3 유지; runtimeClasspath 신규 아티팩트는 fsrs:1.0.0이며 전이 의존 Jackson 2 databind·jsr310은 BOM 2.21.5로 선택되고 이미 OpenAI SDK를 통해 운영에 포함되어 그 밖의 신규 전이 아티팩트는 없음; 관련 문서 반영, 서버 테스트 2,288→2,325개(실패·오류·건너뜀 0), AC 관련 501개와 전체 build·Spotless·Checkstyle 통과",
+      "completed_at": "2026-11-24T23:43:20+0900",
+      "review_notes": [
+        "docs/04-jobs-and-cost.md §2.3 커리큘럼 모델 줄 — 기존 문장 「FSRS 테스트 의존성의 Jackson 2와 운영의 Jackson 3가」를 「클래스패스에 Jackson 2와 3가 함께 있어도」로 고쳤다. 이 step 이 FSRS 를 운영 의존성으로 옮겨 사실이 바뀐 것이라 반영은 맞다. 다만 끝난 step 의 기록 문장을 고친 것이므로 phase 리뷰 때 한 번 보면 된다.",
+        "backend/src/test/java/com/mogum/config/HttpJsonIntegrationTest.java:27 — 변환기를 고르는 데 쓰는 타입으로 도메인 enum `FsrsState` 를 썼다. 이 테스트는 card 도메인과 관계가 없어 읽는 사람이 이유를 헷갈릴 수 있다 → `Map.class` 같은 중립 타입이면 의도가 더 분명하다.",
+        "backend/src/main/java/com/mogum/card/service/FsrsCalculator.java:57 — 씨앗은 카드 ID 와 `lastReviewedAt` 만으로 정해진다. 그래서 같은 카드를 같은 시각에 다시 평가하는 일이 있으면 같은 흔들기가 나오는데, 이것은 ADR-188 이 의도한 동작이다. step 2 의 평가 API 가 `preview` 와 `review` 에 같은 저장 상태의 카드를 넘기는지(평가 전에 다시 읽기) 그 step 리뷰에서 확인하면 된다."
+      ]
+    },
+    {
+      "step": 1,
+      "name": "review-read",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "review-actions",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "review-screen",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "course-review-entry",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-11-24T23:31:35+0900"
 }
