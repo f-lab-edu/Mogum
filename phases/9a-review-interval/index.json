@@ -2,6 +2,14 @@
   "project": "Mogum",
   "phase": "9a-review-interval",
   "steps": [
-    { "step": 0, "name": "interval-unit-carry", "status": "pending" }
-  ]
+    {
+      "step": 0,
+      "name": "interval-unit-carry",
+      "status": "completed",
+      "summary": "3599초→1시간·86399초→1일·30일 바로 전→1달·365일 바로 전→1년으로 기대값과 구현을 수정하고, 네 단위 올림 경계·직전값 8행 추가; 화면 테스트 516→524개(41파일) 및 린트 통과",
+      "started_at": "2026-11-25T08:10:32+0900",
+      "completed_at": "2026-11-25T08:12:32+0900"
+    }
+  ],
+  "created_at": "2026-11-25T08:10:32+0900"
 }
