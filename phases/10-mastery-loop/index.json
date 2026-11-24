@@ -1,0 +1,46 @@
+{
+  "project": "Mogum",
+  "phase": "10-mastery-loop",
+  "steps": [
+    {
+      "step": 0,
+      "name": "mastery-judgment",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "concept-lookup",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "material-mastery",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "course-plan-mastery",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "roadmap-plan-mastery",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "mastery-report",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "course-report-api",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "course-report-screen",
+      "status": "pending"
+    }
+  ]
+}
