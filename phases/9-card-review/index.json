@@ -18,7 +18,16 @@
     {
       "step": 1,
       "name": "review-read",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-24T23:43:20+0900",
+      "summary": "GET /api/reviews/today(선택 쿼리 courseId) 구현: data.cards[{id, question, answer, nextIntervalsSeconds:{AGAIN,HARD,GOOD,EASY}(초 단위 정수)}] · remainingCount(현재 카드 포함 목록 장수) · 코스로 거를 때 courseTitle; due_at ASC, id ASC 정렬; CourseResponse.todayReviewCount를 읽기·시작·제목 고치기에 채움; card.service.TodayReviewService.selectCards(userId, courseId, now)를 read·count가 공유해 KST 새벽 4시·학습 단계·범위 안 20분 앞당겨 보기 적용; 네이티브 코스 거르기·소유권 확인, card→course 금지 ArchUnit 및 위반 픽스처, 읽기 불변·preview 일치·원문 로그 부재 검증; docs/05-api.md 반영; 서버 테스트 2,325→2,366개(실패·오류·건너뜀 0), AC 관련 518개와 전체 build·Spotless·Checkstyle 통과",
+      "completed_at": "2026-11-24T23:55:00+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/card/service/TodayReviewService.java:51 — 05 §3 은 `selectCards(userId, courseId, now)` 를 규칙의 한 곳으로 적었는데, 이 메서드가 private 이라 뒤 TASK(홈)는 `count(userId, null)` 으로만 닿는다. 동작에는 문제가 없다 → 홈 TASK 에서 05 의 문장을 공개 메서드(`count`) 기준으로 맞추면 덜 헷갈린다.",
+        "backend/src/main/java/com/mogum/card/service/TodayReviewService.java:52 — 「다음 하루의 시작」을 구하려고 `new SeoulClock(Clock.fixed(now, SeoulClock.ZONE))` 을 매번 만든다. 맞는 값이지만 다소 우회한다 → 뒤 step 에서 `SeoulClock` 에 Instant 를 받는 경계 계산이 필요해지면 그때 정리를 검토한다.",
+        "backend/src/test/java/com/mogum/card/repository/FakeReviewCardRepository.java:18 — `add` · `addCourse` 를 지금 어느 테스트도 쓰지 않는다(코스 서비스 단위 테스트는 빈 Fake 만 쓴다) → step 2 이후에도 Fake 를 쓰는 테스트가 없으면 줄이는 것을 검토한다.",
+        "backend/src/test/java/com/mogum/card/service/TodayReviewServiceIntegrationTest.java:224 — 코스 시작 · 제목 고치기 · HTTP 읽기 시험이 서비스 통합 테스트 파일 안에 있다. TEST_GUIDE 의 이름 규칙상 큰 문제는 아니다 → 나중에 컨트롤러 단위 통합 파일로 나누면 찾기 쉽다."
+      ]
     },
     {
       "step": 2,
