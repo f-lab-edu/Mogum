@@ -200,7 +200,7 @@ test('홈에서 탭 링크로 다른 탭을 열어도 계정 화면으로 되돌
   }
 })
 
-test('임시 홈의 입구에서 새로 배우기로 가고 받기 뒤 실제 기다리는 화면을 연다', async () => {
+test('홈의 새로 배우기 입구에서 새로 배우기로 가고 받기 뒤 실제 기다리는 화면을 연다', async () => {
   window.history.replaceState(null, '', '/')
   stubFetch(vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
     ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }

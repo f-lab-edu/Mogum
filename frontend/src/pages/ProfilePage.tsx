@@ -35,7 +35,7 @@ export default function ProfilePage() {
   return <div className="space-y-6">
     <h1 ref={heading} tabIndex={-1} className="text-title font-extrabold">내 정보</h1>
     <div className="space-y-6 rounded-panel border border-border bg-surface p-6 sm:p-8">
-      <AccountIdentity name={me.name} email={me.email} />
+      <AccountIdentity name={me.name} email={me.email} title="구글 계정" />
       {me.credit && date && <section aria-label="크레딧" className="space-y-2">
         <p className="text-title font-extrabold text-primary">남은 크레딧 {me.credit.balance}</p>
         <p className="text-text-secondary"><time dateTime={me.credit.nextRefillDate}>{Number(date[1])}월 {Number(date[2])}일에 채워져요</time></p>
