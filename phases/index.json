@@ -93,7 +93,8 @@
     },
     {
       "dir": "11-home-credits",
-      "status": "pending"
+      "status": "completed",
+      "completed_at": "2026-11-26T01:08:51+0900"
     }
   ]
 }
