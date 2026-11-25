@@ -41,7 +41,14 @@
     {
       "step": 3,
       "name": "home-review-streak",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-25T20:02:57+0900",
+      "summary": "홈의 영역별 실패·재시도를 나누도록 GET /api/home/reviews(data={remainingCount: 정수, 0 포함})와 GET /api/home/streak(data={days: 정수, filledToday: 불리언})를 별도 읽기로 구현; 화면의 오늘 복습 수는 /api/home/reviews의 remainingCount를 쓰고 TodayReviewService.count(userId, null)을 그대로 호출해 카드 본문·간격 계산 없이 전체 수만 읽음; 복습이 속한 card 패키지의 StreakReadService·StreakActivityRepository에서 course Java 타입 참조 없이 EntityManager 네이티브 SQL로 reviews.created_at·lessons.completed_at을 서울 04시 경계로 합쳐 스트릭 계산, 저장·캐시 없음; 정원 10명 범위로 색인 추가 없음; 경계·중복·소유권·삭제·인증·읽기 불변 검증과 05 §3 구현 줄 반영, 서버 테스트 2662→2696개(34개 추가) 전체 통과 · 카드/아키텍처 AC 350개 통과 · spotlessApply · build 통과",
+      "completed_at": "2026-11-25T20:13:03+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/card/service/StreakReadServiceIntegrationTest.java:212 — 이 파일에 `/api/home/reviews` 의 HTTP 시험과 인증 거절 시험(239~263)이 함께 있어 클래스 이름(스트릭 서비스)과 범위가 어긋납니다 → 다음에 고칠 때 `HomeReviewControllerIntegrationTest` 같은 이름으로 HTTP 시험을 나누면 찾기 쉽습니다. 동작 영향은 없습니다.",
+        "backend/src/main/java/com/mogum/card/repository/StreakActivityRepository.java:17 — 지난 모든 날짜를 읽은 뒤 서비스에서 끊긴 곳까지만 씁니다. 정원 10명이라 지금은 문제가 없습니다. 활동 기간이 길어지면 SQL 쪽에서 연속 구간만 세는 방식을 고려할 수 있습니다(참고용)."
+      ]
     },
     {
       "step": 4,
