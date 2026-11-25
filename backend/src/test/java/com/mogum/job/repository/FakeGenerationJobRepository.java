@@ -1,7 +1,9 @@
 package com.mogum.job.repository;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -26,6 +28,15 @@ public final class FakeGenerationJobRepository implements GenerationJobRepositor
 
 	public Optional<GenerationJob> findById(Long id) {
 		return Optional.ofNullable(jobs.get(id));
+	}
+
+	public List<GenerationJob> findByUserIdAndStatusInOrderByCreatedAtDescIdDesc(long userId,
+		Collection<JobStatus> statuses) {
+		return jobs.values().stream()
+			.filter(job -> job.getUserId() == userId && statuses.contains(job.getStatus()))
+			.sorted(Comparator.comparing(GenerationJob::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+				.thenComparing(GenerationJob::getId, Comparator.reverseOrder()))
+			.toList();
 	}
 
 	public Optional<GenerationJob> findSameTarget(long userId, JobType type, long targetId, boolean includeSucceeded) {
