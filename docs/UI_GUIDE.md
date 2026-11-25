@@ -136,7 +136,7 @@ sips -Z 384 docs/design/assets/mogumi-reading.png --out frontend/src/assets/mogu
 
 ## 6. 아직 정하지 않은 것 — 처음 쓰는 TASK가 정한다
 
-추가 버튼 모양·애니메이션은 처음 필요한 TASK에서 정한다. 홈 배치·페이지 내부 영역 틀은 `11-home-credits` step 6에서 §16으로 정했다. 확인 펼침은 `9-card-review` step 3에서 §3·§15의 `InlineConfirmation`으로 정했다. 상태 표시·진도 막대는 `7-course-planning` step 8에서 §3의 공통 컴포넌트로 정했다. 글 입력·여러 줄 입력·선택 버튼 묶음·체크·칸 오류는 `7-course-planning` step 7에서 §3의 공통 컴포넌트로 정했다. 지금의 중앙 면과 안내 문단을 미리 카드 컴포넌트로 만들지 않는다. 다크 모드는 미정 항목이 아니라 MVP에서 제외한 기능이다(ADR-064).
+공통 카드·추가 버튼 모양·애니메이션은 처음 필요한 TASK에서 정한다. 홈 배치·홈 페이지 안의 영역 틀(`HomeSection` — 공통 컴포넌트가 아니다)은 `11-home-credits` step 6에서 §16으로 정했다. 확인 펼침은 `9-card-review` step 3에서 §3·§15의 `InlineConfirmation`으로 정했다. 상태 표시·진도 막대는 `7-course-planning` step 8에서 §3의 공통 컴포넌트로 정했다. 글 입력·여러 줄 입력·선택 버튼 묶음·체크·칸 오류는 `7-course-planning` step 7에서 §3의 공통 컴포넌트로 정했다. 지금의 중앙 면과 안내 문단을 미리 카드 컴포넌트로 만들지 않는다. 다크 모드는 미정 항목이 아니라 MVP에서 제외한 기능이다(ADR-064).
 
 ## 7. 승인 뒤 화면의 틀
 
