@@ -16,7 +16,15 @@
     {
       "step": 1,
       "name": "credit-refill",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-25T17:37:47+0900",
+      "summary": "CreditRefillService.refillDue() · User.refillCredits() · UserRepository.findApprovedIdsDueForRefill() 구현: 사용자별 REQUIRES_NEW와 users 행 잠금 뒤 상태·시각 재확인, 0·음수 REFILL 기록과 밀린 주기 1회 채움; CreditRefillConfiguration의 서울 04시 cron(0 0 4 * * *) · ApplicationReadyEvent, app.credit.refill-enabled(운영 기본 true · 공용 시험 false); ERROR credit refill failed(userId · 첫 실패만 원문 없는 스택)와 정상 무로그 검증, 04 §8·§9.1·§10 및 07 §1 구현 근거 반영; 서버 테스트 2624→2648개(24개 추가) 전체 통과 · AC 대상 277개 통과 · spotlessApply · build 통과",
+      "completed_at": "2026-11-25T19:53:35+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/account/domain/UserTest.java:13 — `java.time.Instant` 를 import 하지 않고 전체 이름으로 두 번 쓴다 → 다음에 이 파일을 고칠 때 import 로 바꾸면 읽기 쉽다.",
+        "backend/src/test/java/com/mogum/account/service/CreditRefillServiceIntegrationTest.java:208 — `org.springframework.jdbc.datasource.SingleConnectionDataSource` 를 전체 이름으로 쓴다 → import 로 옮기면 깔끔하다(동작 영향 없음).",
+        "backend/src/test/java/com/mogum/account/repository/FakeCreditEntryRepository.java:20 — 빈 람다 한 줄 때문에 `@checkstyle:off/on` 주석을 둔다 → `entry -> { }` 대신 정적 no-op 메서드 참조 등으로 억제 주석 없이 쓸 수 있는지 다음에 보면 좋다."
+      ]
     },
     {
       "step": 2,
