@@ -7,6 +7,7 @@ import type { NewLearningRequest } from '../api/useJob'
 import Button from '../components/Button'
 import CheckboxField from '../components/CheckboxField'
 import ChoiceGroup from '../components/ChoiceGroup'
+import CreationBlockedNotice, { isCreationBlockedError } from '../components/CreationBlockedNotice'
 import FailureNotice from '../components/FailureNotice'
 import Mogumi from '../components/Mogumi'
 import TextField from '../components/TextField'
@@ -81,9 +82,9 @@ export default function NewLearningPage() {
         <p>이럴 때 좋아요 — 한 번에 배우기 어려운 넓은 주제(예: Spring 백엔드 · 컴퓨터 네트워크) · 기초부터 실무까지 길게 배우고 싶을 때</p>
         <p>체크하지 않으면 한 주제를 강의 목록 하나로 만들어요(예: JPA 연관관계 · 트랜잭션 격리 수준).</p>
       </>} />
-      {mutation.isError && <FailureNotice title="만들기를 요청하지 못했어요." message={mutation.error instanceof ApiError ? mutation.error.message : CONNECTION_ERROR_MESSAGE}>
+      {mutation.isError && (isCreationBlockedError(mutation.error) ? <CreationBlockedNotice error={mutation.error} /> : <FailureNotice title="만들기를 요청하지 못했어요." message={mutation.error instanceof ApiError ? mutation.error.message : CONNECTION_ERROR_MESSAGE}>
         <p className="text-small">안내를 확인한 뒤 만들기를 다시 눌러 주세요.</p>
-      </FailureNotice>}
+      </FailureNotice>)}
       <Button type="submit" disabled={!valid || mutation.isPending} className="w-full">만들기</Button>
     </form>
   </div>

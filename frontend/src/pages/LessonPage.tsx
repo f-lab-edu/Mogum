@@ -5,6 +5,7 @@ import { ApiError, CONNECTION_ERROR_MESSAGE } from '../api/client'
 import { receiveJob } from '../api/useJob'
 import { useLesson, useLessonCompletion } from '../api/useLesson'
 import Button from '../components/Button'
+import CreationBlockedNotice, { isCreationBlockedError } from '../components/CreationBlockedNotice'
 import FailureNotice from '../components/FailureNotice'
 import MaterialBody from '../components/MaterialBody'
 
@@ -37,7 +38,9 @@ export default function LessonPage() {
   if (!data.material) {
     if (data.job) return <Navigate to={`/jobs/${data.job.id}`} replace />
     if (receive.data) return <Navigate to={`/jobs/${receive.data.id}`} replace />
-    if (receive.isError) return <FailureNotice title="강의 자료를 요청하지 못했어요." message={message(receive.error)}>{back}</FailureNotice>
+    if (receive.isError) return isCreationBlockedError(receive.error)
+      ? <CreationBlockedNotice error={receive.error}>{back}</CreationBlockedNotice>
+      : <FailureNotice title="강의 자료를 요청하지 못했어요." message={message(receive.error)}>{back}</FailureNotice>
     return <p role="status" className="text-text-secondary">강의 자료를 요청하고 있어요.</p>
   }
 

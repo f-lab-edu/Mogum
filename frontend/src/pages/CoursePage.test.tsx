@@ -220,18 +220,46 @@ test('피드백은 코드 포인트 500자까지 보내며 초과하면 막는�
 test.each([
   ['CREDIT_INSUFFICIENT', '크레딧이 부족합니다. 2026-12-01에 다시 채워집니다'],
   ['TOO_MANY_IN_PROGRESS', '지금 만드는 것이 끝나면 다시 시도해 주세요'],
-])('다시 짜기 거절 %s는 서버 문구·피드백을 보존하고 다시 보낼 수 있다', async (code, message) => {
+])('다시 짜기 거절 %s는 공통 안내·피드백을 보존한다', async (code, message) => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response(review)).mockResolvedValue(failure(code, message)))
   const { router } = open()
   const input = await replan()
   fireEvent.change(input, { target: { value: '기초를 더해 주세요' } })
   fireEvent.click(screen.getByRole('button', { name: '다시 짜기 요청' }))
-  expect(await screen.findByText(message)).toBeVisible()
-  expect(input).toHaveValue('기초를 더해 주세요')
-  expect(screen.getByRole('button', { name: '다시 짜기 요청' })).toBeEnabled()
-  expect(screen.queryByText(code)).not.toBeInTheDocument()
-  expect(router.state.location.pathname).toBe('/courses/31')
-  expect(fetch).toHaveBeenCalledTimes(2)
+  await screen.findByText('지금은 만들 수 없어요')
+  await waitFor(() => {
+    const notice = screen.getByRole('status')
+    expect(notice).toHaveTextContent(message)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText(/안내를 확인한 뒤 다시 짜기 요청을 다시/)).not.toBeInTheDocument()
+    expect(within(notice).queryByRole('button')).not.toBeInTheDocument()
+    const link = within(notice).queryByRole('link', { name: '남은 크레딧 보기' })
+    if (code === 'CREDIT_INSUFFICIENT') expect(link).toHaveAttribute('href', '/profile')
+    else expect(link).not.toBeInTheDocument()
+    expect(input).toHaveValue('기초를 더해 주세요')
+    expect(screen.getByRole('button', { name: '다시 짜기 요청' })).toBeEnabled()
+    expect(screen.queryByText(code)).not.toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/courses/31')
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+})
+
+test.each(['REPLAN_NOT_ALLOWED', 'network'])('다시 짜기 실패 %s는 기존 실패·재제출 안내를 유지한다', async (kind) => {
+  const fetcher = vi.fn().mockResolvedValueOnce(response(review))
+  if (kind === 'network') fetcher.mockRejectedValueOnce(new Error('secret-network-detail'))
+  else fetcher.mockResolvedValueOnce(failure(kind, '검토 중일 때만 다시 짤 수 있어요'))
+  vi.stubGlobal('fetch', fetcher)
+  open()
+  await replan()
+  fireEvent.click(screen.getByRole('button', { name: '다시 짜기 요청' }))
+  await screen.findByRole('alert')
+  await waitFor(() => {
+    expect(screen.getByRole('alert')).toHaveTextContent('다시 짜기를 요청하지 못했어요.')
+    expect(screen.getByRole('alert')).toHaveTextContent(kind === 'network' ? '연결하지 못했어요. 다시 시도해 주세요.' : '검토 중일 때만 다시 짤 수 있어요')
+    expect(screen.getByText('안내를 확인한 뒤 다시 짜기 요청을 다시 눌러 주세요.')).toBeVisible()
+    expect(screen.queryByText('지금은 만들 수 없어요')).not.toBeInTheDocument()
+    expect(screen.queryByText('secret-network-detail')).not.toBeInTheDocument()
+  })
 })
 
 test('피드백 칸 오류는 해당 칸과 연결된다', async () => {

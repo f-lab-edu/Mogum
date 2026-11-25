@@ -7,6 +7,7 @@ import { receiveJob } from '../api/useJob'
 import type { PlanRoadmapCourseRequest, ReplanRoadmapRequest } from '../api/useJob'
 import { useRoadmap } from '../api/useRoadmap'
 import Button from '../components/Button'
+import CreationBlockedNotice, { isCreationBlockedError } from '../components/CreationBlockedNotice'
 import FailureNotice from '../components/FailureNotice'
 import Mogumi from '../components/Mogumi'
 import ProgressBar from '../components/ProgressBar'
@@ -118,9 +119,9 @@ export default function RoadmapPage() {
       </form>}
     </section>}
 
-    {jobAction.isError && <FailureNotice title={jobAction.variables?.type === 'REPLAN_ROADMAP' ? '다시 짜기를 요청하지 못했어요.' : '코스 만들기를 요청하지 못했어요.'} message={message(jobAction.error)}>
+    {jobAction.isError && (isCreationBlockedError(jobAction.error) ? <CreationBlockedNotice error={jobAction.error} /> : <FailureNotice title={jobAction.variables?.type === 'REPLAN_ROADMAP' ? '다시 짜기를 요청하지 못했어요.' : '코스 만들기를 요청하지 못했어요.'} message={message(jobAction.error)}>
       <p className="text-small">안내를 확인한 뒤 같은 버튼을 다시 눌러 주세요.</p>
-    </FailureNotice>}
+    </FailureNotice>)}
     {titleAction.isError && <FailureNotice title="제목을 바꾸지 못했어요." message={message(titleAction.error)}>
       <p className="text-small">안내를 확인한 뒤 제목 저장을 다시 눌러 주세요.</p>
     </FailureNotice>}

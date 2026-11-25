@@ -75,20 +75,62 @@ test('이대로 시작은 순서 1의 코스 받기만 보내고 받은 작업�
   expect(fetch).toHaveBeenLastCalledWith('/api/jobs', expect.objectContaining({ method: 'POST', body: JSON.stringify({ type: 'PLAN_ROADMAP_COURSE', courseId: 31 }) }))
 })
 
-test.each([
-  ['REPLAN_IN_PROGRESS', '다시 짜는 중에는 시작할 수 없어요'],
-  ['CREDIT_INSUFFICIENT', '크레딧이 부족합니다. 2026-12-01에 다시 채워집니다'],
-  ['TOO_MANY_IN_PROGRESS', '지금 만드는 것이 끝나면 다시 시도해 주세요'],
-])('시작 거절 %s는 서버 문구를 보이고 검토 중에 남는다', async (code, message) => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response(review)).mockResolvedValue(failure(code, message)))
+test.each(['시작', '다시 짜기', '다음 코스'].flatMap((action) => [
+  { action, code: 'CREDIT_INSUFFICIENT', message: '크레딧이 부족합니다. 2026-12-01에 다시 채워집니다' },
+  { action, code: 'TOO_MANY_IN_PROGRESS', message: '지금 만드는 것이 끝나면 다시 시도해 주세요' },
+]))('$action 거절 $code는 공통 안내·서버 문구를 보이고 화면에 남는다', async ({ action, code, message }) => {
+  const data = action === '다음 코스' ? { ...running, nextCourse: { courseId: 32, enabled: true } } : review
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response(data)).mockResolvedValue(failure(code, message)))
   const { router } = open()
-  fireEvent.click(await screen.findByRole('button', { name: '이대로 시작' }))
-  expect(await screen.findByText(message)).toBeVisible()
-  expect(screen.getByText('검토 중')).toBeVisible()
-  expect(screen.getByRole('button', { name: '이대로 시작' })).toBeEnabled()
-  expect(router.state.location.pathname).toBe('/roadmaps/41')
-  expect(screen.getByRole('main')).not.toHaveTextContent(code)
-  expect(fetch).toHaveBeenCalledTimes(2)
+  if (action === '다시 짜기') {
+    const input = await replan()
+    fireEvent.change(input, { target: { value: '기초를 더해 주세요' } })
+  }
+  const buttonName = action === '시작' ? '이대로 시작' : action === '다시 짜기' ? '다시 짜기 요청' : '다음 코스 만들기'
+  fireEvent.click(await screen.findByRole('button', { name: buttonName }))
+  await screen.findByText('지금은 만들 수 없어요')
+  await waitFor(() => {
+    const notice = screen.getByRole('status')
+    expect(notice).toHaveTextContent(message)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText(/안내를 확인한 뒤 같은 버튼을 다시/)).not.toBeInTheDocument()
+    expect(within(notice).queryByRole('button')).not.toBeInTheDocument()
+    const link = within(notice).queryByRole('link', { name: '남은 크레딧 보기' })
+    if (code === 'CREDIT_INSUFFICIENT') expect(link).toHaveAttribute('href', '/profile')
+    else expect(link).not.toBeInTheDocument()
+    if (action === '다시 짜기') expect(screen.getByRole('textbox', { name: '고칠 점' })).toHaveValue('기초를 더해 주세요')
+    expect(screen.getByText(action === '다음 코스' ? '진행 중' : '검토 중')).toBeVisible()
+    expect(screen.getByRole('button', { name: buttonName })).toBeEnabled()
+    expect(router.state.location.pathname).toBe('/roadmaps/41')
+    expect(screen.getByRole('main')).not.toHaveTextContent(code)
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+})
+
+test.each(['시작', '다시 짜기', '다음 코스'].flatMap((action) => [
+  { action, code: action === '다시 짜기' ? 'REPLAN_NOT_ALLOWED' : 'REPLAN_IN_PROGRESS' },
+  { action, code: 'network' },
+]))('$action 실패 $code는 기존 실패·재제출 안내를 유지한다', async ({ action, code }) => {
+  const data = action === '다음 코스' ? { ...running, nextCourse: { courseId: 32, enabled: true } } : review
+  const message = code === 'REPLAN_NOT_ALLOWED' ? '검토 중일 때만 다시 짤 수 있어요' : '다시 짜는 중에는 시작할 수 없어요'
+  const fetcher = vi.fn().mockResolvedValueOnce(response(data))
+  if (code === 'network') fetcher.mockRejectedValueOnce(new Error('secret-network-detail'))
+  else fetcher.mockResolvedValueOnce(failure(code, message))
+  vi.stubGlobal('fetch', fetcher)
+  const { router } = open()
+  if (action === '다시 짜기') await replan()
+  const buttonName = action === '시작' ? '이대로 시작' : action === '다시 짜기' ? '다시 짜기 요청' : '다음 코스 만들기'
+  fireEvent.click(await screen.findByRole('button', { name: buttonName }))
+  await screen.findByRole('alert')
+  await waitFor(() => {
+    expect(screen.getByRole('alert')).toHaveTextContent(action === '다시 짜기' ? '다시 짜기를 요청하지 못했어요.' : '코스 만들기를 요청하지 못했어요.')
+    expect(screen.getByRole('alert')).toHaveTextContent(code === 'network' ? '연결하지 못했어요. 다시 시도해 주세요.' : message)
+    expect(screen.getByText('안내를 확인한 뒤 같은 버튼을 다시 눌러 주세요.')).toBeVisible()
+    expect(screen.queryByText('지금은 만들 수 없어요')).not.toBeInTheDocument()
+    expect(screen.queryByText('secret-network-detail')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: buttonName })).toBeEnabled()
+    expect(router.state.location.pathname).toBe('/roadmaps/41')
+  })
 })
 
 test.each(['', '예제를 더해 주세요'])('로드맵 다시 짜기는 대상·선택 피드백 %s만 보내고 작업으로 간다', async (feedback) => {
