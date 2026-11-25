@@ -105,7 +105,15 @@
     {
       "step": 8,
       "name": "creation-blocked-notice",
-      "status": "pending"
+      "status": "completed",
+      "summary": "CreationBlockedNotice·isCreationBlockedError와 짝 테스트 추가, NewLearningPage·LessonPage·CoursePage·RoadmapPage의 두 만들기 거절을 서버 문구 그대로·크레딧 부족만 /profile 링크·재시도 안내 없는 공통 안내로 전환하고 강의 돌아가기와 다른 오류 표시 보존; 기존 surface-soft·text 토큰 및 동작 직후 기다림 안내를 방해 없이 읽는 role=status 채택, UI_GUIDE §3과 관련 화면 구현 사실 반영; 화면 테스트 579→601개(22개 추가) 전체 통과, npm --prefix frontend run test·lint 및 TypeScript 검사 통과",
+      "started_at": "2026-11-26T01:04:21+0900",
+      "completed_at": "2026-11-26T01:08:51+0900",
+      "review_notes": [
+        "frontend/src/components/CreationBlockedNotice.tsx:5 — 판별 함수를 컴포넌트 파일에 함께 두느라 `react-refresh/only-export-components` 를 eslint-disable 로 끈다. step 이 '함께 둔다'고 지시했으므로 결함은 아니다 → 다른 곳에서도 이 판별이 필요해지면 `api/` 아래 작은 모듈로 옮기면 억제 주석 없이 쓸 수 있다.",
+        "frontend/src/pages/RoadmapPage.tsx:122 · CoursePage.tsx:164 · NewLearningPage.tsx:85 — 삼항식과 긴 JSX 가 한 줄에 붙어 읽기가 조금 어렵다. 동작 영향은 없다 → 다음에 이 줄을 고칠 때 분기를 여러 줄로 나누면 읽기 쉽다.",
+        "실제 브라우저에서 안내 모양(`surface-soft` 바탕 · `text` 제목)은 확인하지 않았다. phase 리뷰 때 기존 `FailureNotice` 와 나란히 한 번 보면 좋다."
+      ]
     }
   ],
   "created_at": "2026-11-25T17:27:04+0900"
