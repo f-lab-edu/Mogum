@@ -71,7 +71,15 @@
     {
       "step": 5,
       "name": "mastery-report",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-25T14:30:00+0900",
+      "summary": "MasteryReport(List<String> shortened, List<String> revisited)를 courses.mastery_report jsonb에 매핑하고 Course.getMasteryReport()로 읽는다; Course.single(long userId, LearningInput input, String title, MasteryReport masteryReport) · planLessons(MasteryReport masteryReport) · replanLessons(MasteryReport masteryReport)로 새 내역 저장·교체, 출력 masteryReport 해석과 누락·모양 오류 시 빈 목록 둘 처리·재시도 없음·이름 무검증·기존 NULL 보존·로드맵 계획 미반영 검증; AC test/build·Spotless·Checkstyle 통과, 서버 테스트 2,553→2,609개(56개 추가).",
+      "completed_at": "2026-11-25T14:49:51+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/course/domain/MasteryReport.java:8 — compact 생성자의 `List.copyOf` 는 null 을 받으면 NPE 가 난다. 우리 코드가 쓰는 길에서는 null 이 들어가지 않는다. 하지만 운영자가 DB 를 직접 고쳐 `{\"shortened\":[...]}` 처럼 키 하나를 빠뜨리면 그 코스를 읽을 때 역직렬화가 실패한다 → 필요하면 phase 리뷰에서 null 을 빈 목록으로 바꾸는 처리를 검토할 만하다(MVP 에서는 드문 경우).",
+        "backend/src/test/java/com/mogum/course/domain/CourseTest.java:68 — `// given` 블록 안에서 `input` 과 `report` 사이에 빈 줄이 하나 더 있다. 동작에는 영향이 없다(취향).",
+        "backend/src/test/java/com/mogum/generation/NewCourseGeneratorIntegrationTest.java:244 — 기대값을 `report.startsWith(\"{\\\"shortened\\\":[\\\"\")` 로 고르는 분기는 입력 목록이 바뀌면 조용히 틀린 기대값을 고를 수 있다 → 정상 · 비정상 경우를 `@MethodSource` 로 (입력, 기대값) 쌍으로 넘기면 더 읽기 쉽다(취향)."
+      ]
     },
     {
       "step": 6,
