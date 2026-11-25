@@ -92,7 +92,15 @@
     {
       "step": 7,
       "name": "profile-tab",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-26T01:00:18+0900",
+      "summary": "ProfilePage.tsx·ProfilePage.test.tsx 추가, /profile 내 정보 탭에 AccountIdentity·남은 크레딧·문자열 월/일의 다음 채움 날짜·로그아웃·/privacy 구현; RequireAuth outlet context와 진입/재진입 시 [me] 재읽기, 기존 계정 화면과 같은 로그아웃 요청·쿼리 취소·캐시 제거·/login 이동 및 잠금/실패 재시도 적용; Me.credit 선택 칸과 App 시험·UI_GUIDE §7·§17 반영, 고아 PlaceholderPage.tsx·PlaceholderPage.test.tsx 삭제; 화면 테스트 568→579개(12개 추가·자리 시험 1개 제거) 전체 통과, npm --prefix frontend run test·lint 및 TypeScript 검사 통과",
+      "completed_at": "2026-11-26T01:04:21+0900",
+      "review_notes": [
+        "frontend/src/pages/ProfilePage.tsx:38 — `AccountIdentity` 의 영역 이름이 「신청 계정」이라 승인된 사람의 내 정보 탭에서도 화면 읽기 프로그램이 「신청 계정」이라고 읽습니다 → 다음에 이 컴포넌트를 고칠 때 영역 이름을 prop 으로 받거나 「계정」처럼 중립 이름을 쓸지 검토하면 좋습니다(동작 영향 없음).",
+        "frontend/src/pages/ProfilePage.tsx:15 — 로그아웃 mutation 이 `AccountPage` 의 로그아웃 흐름과 같은 코드로 두 곳에 있습니다. step 이 허용한 재량입니다 → 세 번째로 쓰는 곳이 생기면 훅 하나로 모으면 됩니다.",
+        "frontend/src/App.test.tsx:203 — 시험 이름 '임시 홈의 입구에서…'가 아직 남아 있습니다(step 6 권고) → '홈의 새로 배우기 입구에서…'로 바꾸면 이름과 내용이 맞습니다."
+      ]
     },
     {
       "step": 8,
