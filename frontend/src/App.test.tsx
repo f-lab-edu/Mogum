@@ -140,7 +140,7 @@ const tabPages = [
 
 test.each(tabPages)('승인된 사람은 $entry 주소에서 틀 안의 $label 화면을 본다', async ({ entry, title, label }) => {
   window.history.replaceState(null, '', entry)
-  stubFetch(vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/courses' ? { courses: [] } : path === '/api/roadmaps' ? { roadmaps: [] } : path === '/api/reviews/today' ? { cards: [], remainingCount: 0 } : { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
+  stubFetch(vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/courses' ? { courses: [] } : path === '/api/roadmaps' ? { roadmaps: [] } : path === '/api/reviews/today' ? { cards: [], remainingCount: 0 } : { status: 'APPROVED', name: '민서', email: 'minseo@example.com', credit: { balance: 18, nextRefillDate: '2026-12-02' } } })))))
   render(<App />)
   const heading = await screen.findByRole('heading', { level: 1, name: title })
   expect(screen.getByRole('main')).toContainElement(heading)
@@ -154,7 +154,16 @@ test.each(tabPages)('승인된 사람은 $entry 주소에서 틀 안의 $label �
       expect(screen.getByText('오늘 복습 1장이나 강의 하나로 시작해요')).toBeVisible()
       expect(screen.getByRole('link', { name: '새로 배우기' })).toHaveAttribute('href', '/new')
     })
-  } else expect(screen.getByRole('main').textContent).toBe(title)
+  } else if (entry === '/profile') {
+    await waitFor(() => {
+      expect(screen.getByText('민서')).toBeVisible()
+      expect(screen.getByText('minseo@example.com')).toBeVisible()
+      expect(screen.getByText('남은 크레딧 18')).toBeVisible()
+      expect(screen.getByText('12월 2일에 채워져요')).toBeVisible()
+      expect(screen.getByRole('button', { name: '로그아웃' })).toBeEnabled()
+      expect(screen.getByRole('link', { name: '처리방침 보기' })).toHaveAttribute('href', '/privacy')
+    })
+  }
   if (entry !== '/') expect(screen.queryByRole('region', { name: '스트릭' })).not.toBeInTheDocument()
   expect(screen.getByRole('banner')).toBeVisible()
   for (const navigation of screen.getAllByRole('navigation')) {
@@ -179,7 +188,7 @@ test.each(states.filter((state) => state.status !== 'APPROVED').flatMap((state) 
   },
 )
 
-test('홈에서 탭 링크로 다른 자리 화면을 열어도 계정 화면으로 되돌리지 않는다', async () => {
+test('홈에서 탭 링크로 다른 탭을 열어도 계정 화면으로 되돌리지 않는다', async () => {
   window.history.replaceState(null, '', '/')
   stubFetch(vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/courses' ? { courses: [] } : path === '/api/roadmaps' ? { roadmaps: [] } : path === '/api/reviews/today' ? { cards: [], remainingCount: 0 } : { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
   render(<App />)
