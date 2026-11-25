@@ -152,6 +152,8 @@ erDiagram
 - 개념마다 — 센 카드가 없으면 기록 없음. 떠올릴 확률의 평균이 **0.9 이상**이고 단단함의 평균이 **21일 이상**이면 잘 앎. 나머지는 흔들림.
 - 0.9 는 FSRS 가 다음 볼 날을 잡는 목표 확률이다 — 예정대로 복습해 왔으면 넘는다. 단단함 21일은 보통 첫날 학습 단계를 마친 뒤 다른 날 「좋음」을 두 번 더 눌러야(3주쯤) 닿는다 — 「충분히 여러 번」을 횟수 대신 단단함으로 본다.
 
+- 구현 — `MasteryJudgmentService.judge(long userId, Collection<Long> conceptIds, Instant now)`가 판정한다. 복습 기록 유무는 `reviews` 행의 존재로 본다(`CardCommandService.review`가 같은 트랜잭션에서 카드 상태와 기록을 함께 쓰며, 학습 완료는 `due_at`만 채운다). 기준값은 `MasteryJudgmentCalculator`의 `WELL_KNOWN_RETRIEVABILITY` · `WELL_KNOWN_STABILITY_DAYS`에 둔다.
+
 - 어떤 개념도 판정으로 빼지 않는다 — 얼마나 자세히 다룰지만 바꾼다. 판정을 생성에 쓰는 곳은 [03 §2 · §3](./03-generation.md#2-강의-목록--로드맵-계획).
 
 ## 6. 개념

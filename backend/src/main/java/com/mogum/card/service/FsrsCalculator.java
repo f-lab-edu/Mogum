@@ -46,6 +46,20 @@ public class FsrsCalculator {
 			result.getStability(), result.getDifficulty(), result.getDue(), result.getLastReview());
 	}
 
+	public double retrievability(Card card, Instant now) {
+		Objects.requireNonNull(now, "now");
+		var input = io.github.openspacedrepetition.Card.builder()
+			.cardId(0)
+			.state(State.valueOf(card.getFsrsState().name()))
+			.step(card.getFsrsStep())
+			.stability(card.getStability())
+			.difficulty(card.getDifficulty())
+			.due(card.getDueAt())
+			.lastReview(card.getLastReviewedAt())
+			.build();
+		return Scheduler.builder().build().getCardRetrievability(input, now);
+	}
+
 	public Map<Rating, Duration> preview(Card card, Instant now) {
 		var intervals = new EnumMap<Rating, Duration>(Rating.class);
 		for (var rating : Rating.values()) {
