@@ -1,0 +1,15 @@
+{
+  "project": "Mogum",
+  "phase": "11-home-credits",
+  "steps": [
+    { "step": 0, "name": "weekly-cycle", "status": "pending" },
+    { "step": 1, "name": "credit-refill", "status": "pending" },
+    { "step": 2, "name": "me-credits", "status": "pending" },
+    { "step": 3, "name": "home-review-streak", "status": "pending" },
+    { "step": 4, "name": "home-course-todo", "status": "pending" },
+    { "step": 5, "name": "home-jobs", "status": "pending" },
+    { "step": 6, "name": "home-screen", "status": "pending" },
+    { "step": 7, "name": "profile-tab", "status": "pending" },
+    { "step": 8, "name": "creation-blocked-notice", "status": "pending" }
+  ]
+}
