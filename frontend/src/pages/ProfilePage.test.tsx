@@ -139,3 +139,36 @@ test('탭 진입과 재진입 때 나를 다시 읽어 사용 뒤 바뀐 잔액�
   })
   expect(vi.mocked(fetch).mock.calls.filter(([path]) => path === '/api/me')).toHaveLength(2)
 })
+
+test.each(['연결', '서버'])('나를 받은 뒤 내 정보 탭의 %s 재조회가 재시도까지 실패해도 이전 잔액과 화면을 유지한다', async (failure) => {
+  const client = open()
+  await screen.findByText('남은 크레딧 18')
+  await waitFor(() => {
+    expect(client.isFetching()).toBe(0)
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+  fireEvent.click(screen.getAllByRole('link', { name: '코스' })[0])
+  const back = await screen.findByRole('link', { name: '내 정보로' })
+  if (failure === '연결') vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'))
+  else vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
+    code: 'INTERNAL_ERROR', message: '서버 내부 문구',
+  }), { status: 500 })))
+
+  fireEvent.click(back)
+  await waitFor(() => {
+    expect(client.getQueryState(['me'])).toMatchObject({ status: 'error', fetchStatus: 'idle' })
+    expect(fetch).toHaveBeenCalledTimes(4)
+  }, { timeout: 5000 })
+  await screen.findByRole('heading', { level: 1, name: '내 정보' })
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { level: 1, name: '내 정보' })).toBeVisible()
+    expect(screen.getByText(me.name)).toBeVisible()
+    expect(screen.getByText(me.email)).toBeVisible()
+    expect(screen.getByText('남은 크레딧 18')).toBeVisible()
+    expect(screen.getByText('12월 2일에 채워져요')).toBeVisible()
+    expect(screen.queryByText('불러오지 못했어요.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+}, 10000)
