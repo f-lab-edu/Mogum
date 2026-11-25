@@ -58,7 +58,15 @@
     {
       "step": 4,
       "name": "roadmap-plan-mastery",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-25T14:14:59+0900",
+      "summary": "NewRoadmapGenerator·ReplanRoadmapGenerator에 RelatedConceptPreparer 연결, RoadmapPlanInput에 relatedConcepts·withRelatedConcepts·queryTexts 추가 및 주제·목적 질의와 relatedConcepts(name·definition·instruction) 변환 공용화; 빈 사전·임베딩 실패·트랜잭션 밖 호출과 로드맵 배분·피드백 우선 규칙 검증, AC test/build·Spotless·Checkstyle 통과, 서버 테스트 2,527→2,553개(26개 추가).",
+      "completed_at": "2026-11-25T14:30:00+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/generation/NewRoadmapGenerator.java:49 · ReplanRoadmapGenerator.java:66 — `instanceof Failed` 로 검사한 뒤 `(RelatedResult.Success)related` 로 캐스팅하는 모양이 두 생성기에 반복된다. 동작은 맞다 → sealed 결과이므로 `switch` 패턴으로 바꾸면 캐스팅이 없어진다(취향).",
+        "backend/src/test/java/com/mogum/generation/NewRoadmapGeneratorIntegrationTest.java:350 · ReplanRoadmapGeneratorIntegrationTest.java:540 — 관련 개념 준비 시험과 임베딩 실패 시험의 given/then 블록이 두 파일에서 거의 같다. 지금은 읽기 쉬워서 문제는 없다 → 시나리오가 더 늘면 카드 · 리뷰를 심는 부분을 Fixtures 도우미로 모을 수 있다.",
+        "AC `./backend/gradlew -p backend build` 의 첫 실행에서 실제 HTTP 를 쓰는 통합 시험 25개 클래스가 localhost 404 로 실패했다. 다시 돌리니 통과했다. 다른 워크트리나 프로세스와 같은 시간에 빌드하면 포트가 겹칠 수 있다. 하네스의 step AC 가 반복해서 흔들리면 HARNESS-BACKLOG 에 적을 만하다."
+      ]
     },
     {
       "step": 5,
