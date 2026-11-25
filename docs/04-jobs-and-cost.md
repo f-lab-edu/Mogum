@@ -54,6 +54,8 @@
 
 `7-course-planning` step 6 구현: `course.controller` · `course.service` · `course.dto`가 코스 · 로드맵 읽기와 코스 시작 · 제목 고치기를 담당한다. `job`이 이미 `course`를 참조하므로 역방향 Java 의존은 ArchUnit으로 막았다. `course.repository.JpaCourseJobRepository`는 `EntityManager` 네이티브 SQL로 `generation_jobs`에서 성공하지 않은 강의 목록 작업의 ID · 실패 여부와 코스 다시 짜기의 존재 여부만 읽는다. 진행과 다음 코스는 읽기 서비스에서 계산하고 저장하지 않는다. 코스 시작은 받기와 같은 `CreditLedger.lock`의 사용자 행 잠금 뒤에 상태와 다시 짜기를 확인한다. API 계약은 [05 §3 · §4](./05-api.md#3-읽기--화면마다-한-번)에 있다.
 
+`11-home-credits` step 4 구현: `course.service.CourseReadService.nextLesson(Course, List<Lesson>)`의 순서대로 읽은 강의 중 다음 강의 판정을 코스 읽기와 `HomeCourseReadService.continueLearning`이 함께 쓰고, `HomeCourseReadService.todos`는 기존 `RoadmapReadService.read()`의 `nextCourse`를 그대로 사용한다 — 다음 코스 상태 · 앞 코스 완료 · 성공하지 않은 강의 목록 작업의 판정은 기존 읽기 한 곳에 있다.
+
 ### 2.3 기존 구현 — 그대로 · 바꾼다 · 버린다
 
 이미 구현한 TASK(`0-skeleton` ~ `3a-test-conventions`)를 새 설계와 맞댄 결과다. 바꾸는 방법은 각 TASK 에서 정한다.
@@ -198,23 +200,38 @@
 | 종류마다 정한 크레딧 | 만들기마다 쓰는 토큰을 재서 정한다 — 모델 · 프롬프트가 바뀌면 다시 잰다 | ADR-107 |
 | 다시 짜기도 쓴다 | 횟수 상한은 없다 | ADR-111 |
 | 성공한 만들기만 크레딧이 나간다 | 받을 때 쓰고, 실패하면 복구한다 — 성공하면 그대로 둔다. 다시 시도는 다시 쓴다 | ADR-112 · ADR-166 |
-| 한 달마다 채운다 | 남은 것은 넘기지 않고 한 달 몫으로 다시 맞춘다 | ADR-108 · ADR-109 |
-| 채우는 날 | 첫 몫은 신청할 때 넣는다 — 승인 전에는 쓰지 못한다. 그 뒤 사람마다 승인한 날부터 30일마다 새벽 4시(하루의 경계와 같다 — ADR-017) | ADR-110 · ADR-173 |
-| 한 달 몫 | 운영자의 한 달 예산 ÷ 정원 10명 — 그 몫으로 코스 몇 개도 만들 수 없으면 정원을 다시 본다 | ADR-115 |
+| 7일마다 채운다 | 남은 것은 넘기지 않고 한 주 몫으로 다시 맞춘다 | ADR-108 · ADR-109 · ADR-189 |
+| 채우는 날 | 첫 몫은 신청할 때 넣는다 — 승인 전에는 쓰지 못한다. 그 뒤 사람마다 승인한 날부터 7일마다 새벽 4시(하루의 경계와 같다 — ADR-017) | ADR-110 · ADR-173 · ADR-189 |
+| 한 주 몫 | 운영자의 한 달 예산 ÷ 정원 10명 × 7/30 — 그 몫으로 코스 몇 개도 만들 수 없으면 정원을 다시 본다 | ADR-115 · ADR-189 |
 | 보이는 곳 | 내 정보 탭에서만 — 남은 크레딧 · 다음에 채워지는 날 | ADR-113 |
 | 모자라면 | 받지 않는다 — 「크레딧 부족」, 다음에 채워지는 날과 함께 | ADR-116 |
 
-- 한 달 몫의 구현 설정은 `application.yml`의 `app.credit.monthly-amount` 한 곳이며 `config.CreditProperties.monthlyAmount`로 읽는다. 현재 임시 값은 §10대로 두고, 신청 서비스와 검증도 이 설정을 사용한다.
+- 한 주 몫의 구현 설정은 `application.yml`의 `app.credit.weekly-amount` 한 곳이며 `config.CreditProperties.weeklyAmount`로 읽는다(ADR-189 — 처음에는 `monthly-amount`였다). 현재 임시 값은 §10대로 두고, 신청 서비스와 검증도 이 설정을 사용한다.
 - 종류별 값도 `application.yml`의 `app.credit` 아래에 두고 `config.CreditProperties`로 읽는다. 받는 쪽이 종류에 맞는 값을 골라 `CreditLedger.consume`에 양수 `amount`로 넘긴다. 설정 키 · 읽는 메서드 · 임시 값은 §10에 적었다.
 - **담는 모양** — 남은 양과 움직인 기록(채움 · 씀 · 복구 — ADR-166)을 함께 둔다(ADR-131). 남은 양은 `users` 의 칸이고 계정 패키지가 다룬다(ADR-153). 나중에 충전을 더하면 충전 몫과 기록 종류를 하나씩 더해 채워 주는 크레딧과 나눈다.
 - 실패에 든 비용은 크레딧으로 묶이지 않는다 — 자동 다시 시도 횟수와 한 사람이 동시에 걸 수 있는 수로 묶는다(ADR-125).
 - 학습과 상관없는 요청은 따로 막지 않는다 — 그 사람의 크레딧 안에서 든다(ADR-114).
-- 달력 달로 보면 한 사람이 채우는 날 앞뒤로 두 번 몫을 쓸 수 있어, 운영자가 보는 한 달 비용이 「한 달 몫 × 10」을 넘을 수 있다.
+- 운영자가 보는 한 달 비용은 「한 주 몫 × 30/7 × 10명」 근처다 — 달력 달에는 채움이 네 번 또는 다섯 번 들어 조금 넘을 수 있다.
 - 탈퇴했다가 다시 승인받은 사람은 새 주기 · 새 크레딧이다(ADR-084) — 알고 넘어간다.
 
 ## 8. 서버가 정해진 때 하는 일
 
-**지금까지 정한 것은 크레딧 채우기 하나다**(ADR-110 · ADR-173) — 매일 새벽 4시에 다음에 채우는 때(`credit_refill_at`)가 지난 승인된 사람을 한 달 몫으로 다시 맞추고, 그 때를 30일 뒤로 옮긴다(ADR-175). 첫 몫은 신청할 때 넣으므로 이 일이 채우지 않는다. 서버가 여러 대여도 한 번만 일어나게 한다(ADR-133).
+**지금까지 정한 것은 크레딧 채우기 하나다**(ADR-110 · ADR-173) — 매일 새벽 4시에 다음에 채우는 때(`credit_refill_at`)가 지난 승인된 사람을 한 주 몫으로 다시 맞추고, 그 때를 7일 뒤로 옮긴다(ADR-175 · ADR-189). 첫 몫은 신청할 때 넣으므로 이 일이 채우지 않는다. 서버가 여러 대여도 한 번만 일어나게 한다(ADR-133).
+
+- **금액이 0 · 음수여도 채움 기록을 남긴다** — 크레딧 복구 조건(ADR-166)이 마지막 채움 기록으로 주기를 가른다. 한 주 몫을 낮추면 잔액이 몫보다 많은 사람은 음수로 맞춰진다.
+- **서버가 꺼져 있던 때를 따라잡는다** — 서버가 뜰 때도 한 번 돈다. 여러 주기가 밀렸으면 한 번만 채우고, 다음에 채우는 때를 7일씩 옮겨 지금 뒤의 첫 새벽 4시로 맞춘다.
+- **여러 서버 · 여러 번 돌아도 사람마다 한 번** — 사람마다 사용자 행을 잠그고 「다음에 채우는 때가 지났는지」를 다시 확인한 뒤 바꾼다. 서버 메모리의 잠금 · 표시에 기대지 않는다(금지 22). 구현은 아래 `11-home-credits` step 1 문단.
+
+`11-home-credits` step 1 구현: `account.service.CreditRefillService.refillDue()`가 `Clock` 빈에서 지금 시각을 한 번 읽고, `UserRepository.findApprovedIdsDueForRefill(now)`로 `APPROVED`이고 `credit_refill_at <= now`인 ID 목록을 잠금 없이 읽는다. 목록 조회가 끝난 뒤 사용자마다 `TransactionTemplate`의 `REQUIRES_NEW` 트랜잭션을 연다. `findByIdForUpdate`로 사용자 행을 잠근 뒤 상태와 다음 때를 다시 확인하며, 삭제되었거나 조건이 바뀌었으면 건너뛴다. 맞으면 `User.refillCredits`의 잔액 · 다음 때 변경과 `CreditEntry.refill`의 차액 기록을 함께 커밋한다. 다음 때는 이전 값을 `Asia/Seoul`로 바꾸고 날짜에 7일씩 더해 지금보다 뒤의 첫 시각을 고른다. 엔티티 변경 감지와 JPA Auditing이 `updated_at`을 채운다.
+
+트리거는 `config.CreditRefillConfiguration.refillDue()`의 `@Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")`과 `ApplicationReadyEvent`다. `app.credit.refill-enabled`는 운영 기본 `true`이며 `false`면 설정 클래스와 두 트리거를 등록하지 않는다. 공용 `IntegrationTestConfiguration.OAuthInitializer`는 이 값을 `false`로 넣고 시험이 채움 메서드를 직접 부른다. 별도 잠금 라이브러리나 서버 메모리의 실행 표시는 없다.
+
+사용자 하나가 실패하면 그 사람의 트랜잭션만 롤백하고 다음 사람을 계속 채운다. 목록 조회 실패는 실행을 끝내며 두 경우 모두 예외를 트리거 밖으로 던지지 않는다. 실패 줄의 수준 · 키 · 스택 규칙은 §9.1에 있다. `CreditRefillServiceIntegrationTest`의 `OutputCaptureExtension`이 캡처한 실제 출력(시각 · 사용자 ID · PID · 스레드는 실행마다 다르다):
+
+```text
+2026-11-25T19:44:48.669+09:00 ERROR userId=81 37140 --- [mogum] [    Test worker] c.m.account.service.CreditRefillService  : credit refill failed
+2026-11-25T19:44:48.671+09:00 ERROR userId=82 37140 --- [mogum] [    Test worker] c.m.account.service.CreditRefillService  : credit refill failed
+```
 
 ## 9. 관측
 
@@ -234,6 +251,8 @@
 | `WARN` | 외부 실패 · 이상 징후 — 시스템은 계속 돈다 | 구글 토큰 교환 실패 · 외부 호출 실패 · 시한 상실 |
 | `INFO` | 흐름 한 줄 | 접근 줄 · 로그인 결과(신청 전 로그인 `login result=not_applied` 는 MDC 에 `userId` 가 없다) · 기동/종료 · 작업 받기 · 끝남 |
 | `DEBUG` 이하 | 운영에서 끈다 | — |
+
+`11-home-credits` step 1의 `account.service.CreditRefillService`는 예상 밖 실패에 `ERROR`의 `credit refill failed`만 남긴다. 사용자별 채움 실패는 MDC `userId`(`RequestLogFilter.USER_ID`)를 넣고 끝나면 지운다. 대상 목록 조회 실패에는 `userId`가 없다. 한 실행 안에서 첫 실패에만 스택을 싣고, 뒤 실패는 같은 한 줄만 남긴다. 스택에는 원래 메시지 · cause · suppressed 없이 예외 타입 이름과 위치만 싣는다. 정상 채움은 기록이 DB에 있으므로 로그를 남기지 않는다. 실제 캡처는 §8에 있다.
 
 `6-job-worker` step 4의 워커 줄은 커밋 뒤 `INFO`의 `job finished status={SUCCEEDED|FAILED}`, 소유권 확인이 0행이면 한 시도에 한 번 `WARN`의 `job lease lost`, 결과 저장 트랜잭션의 예외에는 스택과 함께 `ERROR`의 `job save failed`다. 처리와 갱신 중 `jobId` · `userId`를 넣고 끝나면 지운다. 저장 예외는 원래 메시지 · cause · suppressed를 넘기지 않고 예외 타입 이름과 스택 위치만 남긴다.
 
@@ -297,8 +316,7 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 | 시한 · 늘리는 간격은 아래 임시 설정. 각 워커의 `ScheduledExecutorService.scheduleWithFixedDelay`로 만드는 동안과 정상 종료 대기 중에 갱신한다. 시한 식과 강의 목록 TASK에서 정한 호출 값은 아래에 적었다 | ADR-126 |
 | 자동 다시 시도는 아래 임시 설정. 이어 쓰기 횟수 · 간격 · 프로바이더 오류 분류는 아래 step 1 구현 값이다(갈래 자체는 ADR-163) | ADR-127 |
 | 꺼내기는 PostgreSQL CTE 하나에서 `SELECT … ORDER BY created_at, id FOR UPDATE SKIP LOCKED LIMIT 1` → `UPDATE … RETURNING id`. `QUEUED` 또는 같은 `Clock`의 현재 시각보다 `lease_until`이 작은 `RUNNING` 하나를 집고 `claim_count + 1` · 시한 · 시작/수정 시각을 바꾼다 | ADR-129 |
-| 종류별 크레딧 값 · 한 달 몫 — 한 달 몫은 계정 TASK 가 설정 한 곳에 임시 값 100 으로 두고, 홈 · 크레딧 TASK 에서 M1 · M2 동안 쌓인 호출 기록(`llm_calls`)으로 정한다(README 2026-11-17 — 처음에는 강의 목록 TASK 였다). 종류별 값은 `6-job-worker` step 1에서 아래 설정에 모두 임시 값 1로 두었다 | ADR-107 · ADR-115 |
-| 크레딧 채우기를 여러 서버에서 한 번만 일어나게 하는 방법 · 새벽 4시에 서버가 꺼져 있었을 때 따라잡는 방법 | ADR-133 · ADR-173 |
+| 종류별 크레딧 값 · 한 주 몫 — 한 주 몫(처음에는 한 달 몫 · 계정 TASK 의 임시 값 100)은 `11-home-credits` 에서 임시 값 25 로 바꿨다(ADR-189). 둘 다 M2 뒤 수정 phase `11a` 에서 M1 · M2 동안 쌓인 호출 기록(`llm_calls`)과 운영자의 한 달 예산으로 정한다(README 2026-11-25 — 처음에는 강의 목록 TASK, 다음에는 홈 · 크레딧 TASK 였다). 종류별 값은 `6-job-worker` step 1에서 아래 설정에 모두 임시 값 1로 두었다 | ADR-107 · ADR-115 |
 | 패키지를 코스 · 로드맵 등으로 나누는 방식 — 테이블은 02 §8 에서 정했다 | ADR-148 |
 
 워커의 임시 값은 `application.yml`의 `app.worker` 한 곳이며 `config.WorkerProperties`로 읽는다(`6-job-worker` step 4 · 5). 테스트는 생성자로 짧은 간격 또는 0의 다시 시도 간격을 전달한다. 자동 다시 시도 횟수는 첫 호출 **뒤에 더 부르는 횟수**다.

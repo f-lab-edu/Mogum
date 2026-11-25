@@ -32,7 +32,7 @@ export default function RequireAuth() {
     )
   }
 
-  if (me.isError || !['NOT_APPLIED', 'APPLIED', 'APPROVED', 'REJECTED'].includes(me.data.status)) {
+  if (!me.data || !['NOT_APPLIED', 'APPLIED', 'APPROVED', 'REJECTED'].includes(me.data.status)) {
     const message = me.error instanceof ApiError && me.error.code === 'RATE_LIMITED'
       ? messages.rateLimited : messages.loadFailed
 

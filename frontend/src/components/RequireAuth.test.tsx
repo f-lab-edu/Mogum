@@ -119,30 +119,34 @@ test.each([401, 503])('로그인 확인의 %s 모르는 code는 일반 실패로
   expect(fetch).toHaveBeenCalledTimes(1)
 })
 
-test('UNAUTHORIZED는 HTTP 상태와 관계없이 이동 전 로그인 확인 표시를 유지한다', async () => {
+test.each([false, true])('나 데이터 유무 %s에서 UNAUTHORIZED는 HTTP 상태와 관계없이 이동 전 로그인 확인 표시를 유지한다', async (hasData) => {
   vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ code: 'UNAUTHORIZED', message: '서버 내부 문구' }), { status: 403 })))
   const unauthorized = vi.fn()
   const client = createAuthQueryClient(unauthorized)
+  if (hasData) client.setQueryData(['me'], me)
   window.history.replaceState(null, '', '/')
   const view = render(<BrowserRouter><QueryClientProvider client={client}>
     <Routes><Route element={<RequireAuth />}><Route path="/" element={<ProtectedContent />} /></Route></Routes>
   </QueryClientProvider></BrowserRouter>)
   await waitFor(() => expect(unauthorized).toHaveBeenCalledTimes(1))
-  expect(screen.getByRole('status', { name: '로그인 확인 중' })).toHaveAttribute('aria-busy', 'true')
-  expect(screen.queryByText('불러오지 못했어요.')).not.toBeInTheDocument()
+  await screen.findByRole('status', { name: '로그인 확인 중' })
+  await waitFor(() => {
+    expect(screen.getByRole('status', { name: '로그인 확인 중' })).toHaveAttribute('aria-busy', 'true')
+    expect(screen.queryByText('불러오지 못했어요.')).not.toBeInTheDocument()
+  })
   view.unmount()
   client.clear()
 })
 
-test('다시 시도는 응답을 기다리는 동안 잠겨 추가 요청을 보내지 않는다', async () => {
+test('모르는 상태의 다시 시도는 응답을 기다리는 동안 잠겨 추가 요청을 보내지 않는다', async () => {
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ data: { ...me, status: 'FUTURE_STATUS' } })))
   renderAt('/')
-  await screen.findByRole('heading', { name: '보호된 화면' })
-  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 'RATE_LIMITED', message: '서버 문구' }), { status: 429 }))
-  fireEvent.click(screen.getByRole('button', { name: '사용자 다시 확인' }))
   const button = await screen.findByRole('button', { name: '다시 시도' })
-  expect(button).toBeEnabled()
-  expect(button).toHaveAttribute('type', 'button')
-  expect(button).toHaveClass('bg-primary', 'shadow-button', 'rounded-control')
+  await waitFor(() => {
+    expect(button).toBeEnabled()
+    expect(button).toHaveAttribute('type', 'button')
+    expect(button).toHaveClass('bg-primary', 'shadow-button', 'rounded-control')
+  })
 
   let resolve!: (response: Response) => void
   vi.mocked(fetch).mockImplementation(() => new Promise((done) => { resolve = done }))
@@ -150,13 +154,50 @@ test('다시 시도는 응답을 기다리는 동안 잠겨 추가 요청을 보
   await waitFor(() => expect(button).toBeDisabled())
   expect(button).toHaveTextContent('다시 시도')
   fireEvent.click(button)
-  expect(fetch).toHaveBeenCalledTimes(3)
+  expect(fetch).toHaveBeenCalledTimes(2)
 
   await act(async () => resolve(new Response(JSON.stringify({ code: 'RATE_LIMITED', message: '서버 문구' }), { status: 429 })))
   await waitFor(() => expect(button).toBeEnabled())
   vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: me }))))
   fireEvent.click(button)
-  expect(await screen.findByRole('heading', { name: '보호된 화면' })).toBeVisible()
+  await screen.findByRole('heading', { name: '보호된 화면' })
+  await waitFor(() => expect(screen.getByRole('heading', { name: '보호된 화면' })).toBeVisible())
+})
+
+test('처음 읽기 실패의 다시 시도 중에는 로그인 확인 표시로 중복 요청을 막는다', async () => {
+  vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ code: 'RATE_LIMITED', message: '서버 문구' }), { status: 429 }))
+  renderAt('/')
+  const button = await screen.findByRole('button', { name: '다시 시도' })
+  let resolve!: (response: Response) => void
+  vi.mocked(fetch).mockImplementation(() => new Promise((done) => { resolve = done }))
+  fireEvent.click(button)
+  await screen.findByRole('status', { name: '로그인 확인 중' })
+  await waitFor(() => {
+    expect(screen.getByRole('status', { name: '로그인 확인 중' })).toHaveAttribute('aria-busy', 'true')
+    expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+  fireEvent.click(button)
+  expect(fetch).toHaveBeenCalledTimes(2)
+  await act(async () => resolve(new Response(JSON.stringify({ data: me }))))
+  await screen.findByRole('heading', { name: '보호된 화면' })
+  await waitFor(() => expect(screen.getByRole('heading', { name: '보호된 화면' })).toBeVisible())
+})
+
+test('다시 읽은 나의 상태가 모르는 값이면 오류 화면을 표시한다', async () => {
+  renderAt('/')
+  await screen.findByRole('heading', { name: '보호된 화면' })
+  vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
+    data: { ...me, status: 'FUTURE_STATUS' },
+  }))))
+  fireEvent.click(screen.getByRole('button', { name: '사용자 다시 확인' }))
+  await screen.findByText('불러오지 못했어요.')
+  await waitFor(() => {
+    expect(screen.getByRole('status')).toHaveTextContent('불러오지 못했어요.')
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeEnabled()
+    expect(screen.queryByRole('heading', { name: '보호된 화면' })).not.toBeInTheDocument()
+    expect(screen.queryByText('FUTURE_STATUS')).not.toBeInTheDocument()
+  })
 })
 
 test.each(['네트워크', '서버'])('로그인 확인의 %s 실패는 불러오기 실패 안내와 다시 시도를 표시한다', async (failure) => {

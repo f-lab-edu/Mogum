@@ -2,7 +2,7 @@ package com.mogum.account.domain;
 
 /** 크레딧이 움직인 까닭. */
 public enum CreditEntryType {
-	/** 채움 — 신청할 때 · 다음에 채우는 때(credit_refill_at)가 지났을 때 — 한 달 몫으로 다시 맞춘다 */
+	/** 채움 — 신청할 때 · 다음에 채우는 때(credit_refill_at)가 지났을 때 — 한 주 몫으로 다시 맞춘다. 금액이 0 이어도 남긴다 — 주기의 경계다 */
 	REFILL,
 
 	/** 씀 — 만들기를 받을 때 · 다시 시도할 때(−) */

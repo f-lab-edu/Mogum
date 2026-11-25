@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -15,9 +16,18 @@ import com.mogum.account.domain.CreditEntryType;
 public final class FakeCreditEntryRepository implements CreditEntryRepository {
 	private final Map<Long, CreditEntry> entries = new LinkedHashMap<>();
 	private long nextId = 1;
+	// DB 쓰기 실패를 주입하거나 실제 레포지토리에 저장하는 통합 시험에서 쓴다.
+	// @checkstyle:off — 포매터가 빈 람다 블록을 한 줄로 유지한다.
+	private Consumer<CreditEntry> beforeSave = entry -> {};
+	// @checkstyle:on
+
+	public void beforeSave(Consumer<CreditEntry> action) {
+		beforeSave = action;
+	}
 
 	@Override
 	public <S extends CreditEntry> S save(S entry) {
+		beforeSave.accept(entry);
 		if (entry.getId() == null) {
 			ReflectionTestUtils.setField(entry, "id", nextId++);
 		}

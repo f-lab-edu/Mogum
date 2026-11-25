@@ -231,13 +231,13 @@ PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md)
 | `email` · `name` | text | 아니오 | 구글 이메일 · 이름(ADR-062) — `name` 은 새로 더한다. 구글이 이름을 주지 않으면 이메일의 `@` 앞부분을 쓴다(`test123@gmail.com` → `test123` · 사용자 확인 2026-11-08) |
 | `status` | text | 아니오 | 계정 상태 — 값은 §8.7 |
 | `approved_at` | timestamptz | `APPROVED` 일 때만 있다 | 승인한 때 — 다음에 채우는 때는 `credit_refill_at` 이 담는다(ADR-175) |
-| `credit_balance` | integer | 아니오 | 지금 쓸 수 있는 크레딧 — 신청할 때 한 달 몫으로 채운다(ADR-173). `CHECK (credit_balance >= 0)` |
-| `credit_refill_at` | timestamptz | `APPROVED` 일 때만 있다 | 다음에 채우는 때 — 승인 SQL 이 「승인한 날(하루의 경계 — ADR-017) + 30일 새벽 4시」로 넣고, 채울 때마다 30일 뒤로 옮긴다(ADR-110 · ADR-175). `CHECK ((status = 'APPROVED') = (credit_refill_at IS NOT NULL))` |
+| `credit_balance` | integer | 아니오 | 지금 쓸 수 있는 크레딧 — 신청할 때 한 주 몫으로 채운다(ADR-173 · ADR-189). `CHECK (credit_balance >= 0)` |
+| `credit_refill_at` | timestamptz | `APPROVED` 일 때만 있다 | 다음에 채우는 때 — 승인 SQL 이 「승인한 날(하루의 경계 — ADR-017) + 7일 새벽 4시」로 넣고, 채울 때마다 7일 뒤로 옮긴다(ADR-110 · ADR-175 · ADR-189). `CHECK ((status = 'APPROVED') = (credit_refill_at IS NOT NULL))` |
 
 - 지우는 칸 — `role` · `terms_agreed_at` · `terms_version`(ADR-147). 옛 `ACTIVE` 는 `APPROVED` 로 옮기고, 한 달 몫을 채움 기록과 함께 채우고 `credit_refill_at` 을 넣는다(운영자뿐이다). 옛 `PENDING` · `WAITLISTED` 가 있으면 `APPLIED` 로 옮기고 한 달 몫을 채움 기록과 함께 채운다. 옮기는 행의 `name` 은 이메일의 `@` 앞부분이고, 한 달 몫은 그때의 임시 값(100)을 마이그레이션에 숫자로 쓴다(사용자 확인 2026-11-08).
 - `created_at` 이 신청한 때다. 거절을 풀면 `APPLIED` 로 돌린다(ADR-058).
-- **첫 크레딧은 신청할 때 넣는다**(ADR-173) — 행을 만들 때 한 달 몫을 채우고 채움 기록을 남긴다. 승인 전에는 만들기를 받지 않아 쓰지 못한다. 운영자의 승인 SQL 은 `status` · `approved_at` · `credit_refill_at` 을 바꾼다 — 다음에 채우는 때를 빠뜨리면 `CHECK` 가 막는다(ADR-175).
-- **그 뒤 채우기는 서버가 매일 새벽 4시에 한다**(ADR-110 · ADR-173 · [04 §8](./04-jobs-and-cost.md#8-서버가-정해진-때-하는-일)) — `credit_refill_at` 이 지난 승인된 사람을 한 달 몫으로 다시 맞추고 `credit_refill_at` 을 30일 뒤로 옮긴다. 채움 기록이 곧 주기의 경계다.
+- **첫 크레딧은 신청할 때 넣는다**(ADR-173) — 행을 만들 때 한 주 몫을 채우고 채움 기록을 남긴다. 승인 전에는 만들기를 받지 않아 쓰지 못한다. 운영자의 승인 SQL 은 `status` · `approved_at` · `credit_refill_at` 을 바꾼다 — 다음에 채우는 때를 빠뜨리면 `CHECK` 가 막는다(ADR-175).
+- **그 뒤 채우기는 서버가 매일 새벽 4시에 한다**(ADR-110 · ADR-173 · [04 §8](./04-jobs-and-cost.md#8-서버가-정해진-때-하는-일)) — `credit_refill_at` 이 지난 승인된 사람을 한 주 몫으로 다시 맞추고 `credit_refill_at` 을 7일 뒤로 옮긴다(ADR-189). 채움 기록이 곧 주기의 경계다.
 - **크레딧은 계정 패키지(`account`)가 다룬다** — 채움 · 씀 · 복구 모두 `users` 행을 잠그고 바꾼다. 다른 패키지는 계정 서비스를 부른다.
 
 **`credit_entries`** — 크레딧이 움직인 한 번(ADR-131).
@@ -246,12 +246,12 @@ PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md)
 |---|---|---|---|
 | `user_id` | bigint → `users` | 아니오 | |
 | `type` | text | 아니오 | 채움 · 씀 · 복구 — 값은 §8.7(ADR-166) |
-| `amount` | integer | 아니오 | `credit_balance` 가 바뀐 만큼 — 채움은 한 달 몫으로 다시 맞춘 만큼, 씀은 −(받을 때 · 다시 시도할 때), 복구는 +(실패 · 버리기 · 지우기) |
+| `amount` | integer | 아니오 | `credit_balance` 가 바뀐 만큼 — 채움은 한 주 몫으로 다시 맞춘 만큼(0 · 음수일 수 있다), 씀은 −(받을 때 · 다시 시도할 때), 복구는 +(실패 · 버리기 · 지우기) |
 | `job_id` | bigint → `generation_jobs` `ON DELETE SET NULL` | 예 | 씀 · 복구의 작업 — `generation_jobs` 를 만드는 마이그레이션이 더한다(§8 머리말) |
 
 - **`users.credit_balance` 는 그 사용자 `amount` 의 합과 늘 같다 — 어긋나면 기록이 맞다**(ADR-153). 둘은 같은 트랜잭션에서 바꾼다.
 - **성공은 기록하지 않는다** — 쓴 채로 두면 쓴 것이다. 확정됐는지는 작업의 상태로, 성공한 때는 작업의 `finished_at` 으로 안다(ADR-166).
-- **복구는 성공하지 않은 작업이고, 그 작업의 마지막 기록이 그 사람의 마지막 채움 기록 뒤의 씀일 때만 한다**(ADR-166 · ADR-175) — 성공한 작업의 결과를 지울 때 돌려주지 않고, 한 작업을 두 번 복구하지 않으며(실패한 뒤 버리기), 지난 주기에 쓴 몫은 채움이 이미 한 달 몫으로 메웠으므로 돌려주지 않는다.
+- **복구는 성공하지 않은 작업이고, 그 작업의 마지막 기록이 그 사람의 마지막 채움 기록 뒤의 씀일 때만 한다**(ADR-166 · ADR-175) — 성공한 작업의 결과를 지울 때 돌려주지 않고, 한 작업을 두 번 복구하지 않으며(실패한 뒤 버리기), 지난 주기에 쓴 몫은 채움이 이미 한 주 몫으로 메웠으므로 돌려주지 않는다.
 - 색인 — `(user_id, created_at)`.
 
 ### 8.3 배우는 것
@@ -417,7 +417,7 @@ PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md)
 
 | 값 | 이름 | 언제 |
 |---|---|---|
-| `REFILL` | 채움 | 신청할 때 · 다음에 채우는 때(`credit_refill_at`)가 지났을 때 — 한 달 몫으로 다시 맞춘다 |
+| `REFILL` | 채움 | 신청할 때 · 다음에 채우는 때(`credit_refill_at`)가 지났을 때 — 한 주 몫으로 다시 맞춘다. 금액이 0 이어도 남긴다 — 주기의 경계다 |
 | `CONSUME` | 씀 | 만들기를 받을 때 · 다시 시도할 때(−) |
 | `RESTORE` | 복구 | 성공하지 않은 작업이 실패 · 버리기 · 지우기로 끝날 때(+) — 조건은 §8.2 |
 

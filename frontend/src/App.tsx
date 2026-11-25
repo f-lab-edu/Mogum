@@ -8,7 +8,7 @@ import { redirectToLogin } from './lib/authNavigation'
 import LoginPage from './pages/LoginPage'
 import AccountPage from './pages/AccountPage'
 import PrivacyPage from './pages/PrivacyPage'
-import PlaceholderPage from './pages/PlaceholderPage'
+import ProfilePage from './pages/ProfilePage'
 import WaitingPage from './pages/WaitingPage'
 import NewLearningPage from './pages/NewLearningPage'
 import CoursePage from './pages/CoursePage'
@@ -35,7 +35,7 @@ function ApplicationRoutes() {
           <Route path="/courses" element={<AppLayout><CoursesPage /></AppLayout>} />
           <Route path="/roadmaps" element={<AppLayout><RoadmapsPage /></AppLayout>} />
           <Route path="/review" element={<AppLayout><ReviewPage key={pathname + search} /></AppLayout>} />
-          <Route path="/profile" element={<AppLayout><PlaceholderPage title="내 정보" /></AppLayout>} />
+          <Route path="/profile" element={<AppLayout><ProfilePage /></AppLayout>} />
           <Route path="/new" element={<AppLayout title="새로 배우기"><NewLearningPage /></AppLayout>} />
           <Route path="/jobs/:jobId" element={<AppLayout title="기다리는 화면"><WaitingPage key={pathname} /></AppLayout>} />
           <Route path="/courses/:courseId" element={<AppLayout title="코스"><CoursePage key={pathname} /></AppLayout>} />

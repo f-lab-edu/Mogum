@@ -107,8 +107,8 @@ class OperatorSqlIntegrationTest {
 	}
 
 	@ParameterizedTest(name = "승인 시각 {0} → 다음 채움 {1}")
-	@CsvSource({"2026-11-08T03:59:00+09:00, 2026-12-07T04:00:00+09:00",
-		"2026-11-08T04:00:00+09:00, 2026-12-08T04:00:00+09:00"})
+	@CsvSource({"2026-11-08T03:59:00+09:00, 2026-11-14T04:00:00+09:00",
+		"2026-11-08T04:00:00+09:00, 2026-11-15T04:00:00+09:00"})
 	@DisplayName("승인 파일의 now만 고정하면 서울 새벽 4시 양쪽의 채움 날짜가 하루 갈린다")
 	void calculatesRefillAcrossSeoulDayBoundary(String approval, String expected) throws Exception {
 		// given

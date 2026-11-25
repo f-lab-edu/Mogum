@@ -33,8 +33,8 @@ public class ApplyService {
 					.orElseGet(() -> {
 						var applied = userRepository.save(User.apply(
 							identity.provider(), identity.subject(), identity.email(),
-							identity.name(), creditProperties.monthlyAmount()));
-						creditEntryRepository.save(CreditEntry.refill(applied, creditProperties.monthlyAmount()));
+							identity.name(), creditProperties.weeklyAmount()));
+						creditEntryRepository.save(CreditEntry.refill(applied, creditProperties.weeklyAmount()));
 						return applied;
 					});
 			}

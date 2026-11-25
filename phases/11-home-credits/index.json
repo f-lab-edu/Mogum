@@ -1,0 +1,144 @@
+{
+  "project": "Mogum",
+  "phase": "11-home-credits",
+  "steps": [
+    {
+      "step": 0,
+      "name": "weekly-cycle",
+      "status": "completed",
+      "started_at": "2026-11-25T17:27:04+0900",
+      "summary": "app.credit.weekly-amount=25 · CreditProperties.weeklyAmount()로 전환: application.yml · CreditProperties.java · ApplyService.java · CreditEntryType.java · CreditPropertiesTest.java · ApplyServiceTest.java · ApplyControllerIntegrationTest.java · UserIdentityLockImplIntegrationTest.java · OperatorSqlIntegrationTest.java · deploy/sql/approve-account.sql · deploy/README.md 수정, 승인 다음 채움을 서울 04:00 경계 +7일로 변경; 서버 테스트 2624→2624개 전체 통과(AC 대상 542→542개), spotlessApply · build 통과, V9와 AccountSchemaMigrationTest 보존",
+      "completed_at": "2026-11-25T17:37:47+0900",
+      "review_notes": [
+        "backend/src/main/resources/db/migration/V9__migrate_account_schema.sql:53 — 주석 'do not read the current monthly amount from configuration' 때문에 검증 절차의 `grep -rn 'monthly' backend/src/main`이 비지 않는다. V9는 고치지 않는다는 금지사항이 우선이라 이 step의 결함은 아니다 → 다음 step의 검증 절차에서는 V9를 grep 대상에서 빼면 오탐이 사라진다."
+      ]
+    },
+    {
+      "step": 1,
+      "name": "credit-refill",
+      "status": "completed",
+      "started_at": "2026-11-25T17:37:47+0900",
+      "summary": "CreditRefillService.refillDue() · User.refillCredits() · UserRepository.findApprovedIdsDueForRefill() 구현: 사용자별 REQUIRES_NEW와 users 행 잠금 뒤 상태·시각 재확인, 0·음수 REFILL 기록과 밀린 주기 1회 채움; CreditRefillConfiguration의 서울 04시 cron(0 0 4 * * *) · ApplicationReadyEvent, app.credit.refill-enabled(운영 기본 true · 공용 시험 false); ERROR credit refill failed(userId · 첫 실패만 원문 없는 스택)와 정상 무로그 검증, 04 §8·§9.1·§10 및 07 §1 구현 근거 반영; 서버 테스트 2624→2648개(24개 추가) 전체 통과 · AC 대상 277개 통과 · spotlessApply · build 통과",
+      "completed_at": "2026-11-25T19:53:35+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/account/domain/UserTest.java:13 — `java.time.Instant` 를 import 하지 않고 전체 이름으로 두 번 쓴다 → 다음에 이 파일을 고칠 때 import 로 바꾸면 읽기 쉽다.",
+        "backend/src/test/java/com/mogum/account/service/CreditRefillServiceIntegrationTest.java:208 — `org.springframework.jdbc.datasource.SingleConnectionDataSource` 를 전체 이름으로 쓴다 → import 로 옮기면 깔끔하다(동작 영향 없음).",
+        "backend/src/test/java/com/mogum/account/repository/FakeCreditEntryRepository.java:20 — 빈 람다 한 줄 때문에 `@checkstyle:off/on` 주석을 둔다 → `entry -> { }` 대신 정적 no-op 메서드 참조 등으로 억제 주석 없이 쓸 수 있는지 다음에 보면 좋다."
+      ]
+    },
+    {
+      "step": 2,
+      "name": "me-credits",
+      "status": "completed",
+      "started_at": "2026-11-25T19:53:36+0900",
+      "summary": "GET /api/me의 data.credit={balance: 정수, nextRefillDate: Asia/Seoul yyyy-MM-dd 문자열}를 APPROVED일 때만 포함하고 그 밖 상태는 생략; MeReadService가 요청마다 DB에서 읽고 신청 응답도 같은 규칙 적용, SeoulClock.calendarDate를 크레딧 부족 문구와 공유; 서울 날짜 경계·사용 후 같은 세션 재조회·읽기 불변 검증 및 05 §3 구현 사실 반영; 서버 테스트 2648→2662개(14개 추가) 전체 통과 · AC 대상 397개 통과 · spotlessApply · build 통과",
+      "completed_at": "2026-11-25T20:02:57+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/account/service/MeReadService.java:27 — `NotApplied` 를 `instanceof` 로 거른 뒤 `(AccountPrincipal.Member)` 로 강제 형변환한다. 기존 컨트롤러처럼 sealed 타입의 `switch` 패턴으로 바꾸면, 나중에 principal 종류가 늘 때 컴파일러가 빠진 경우를 잡아 준다(동작 영향 없음).",
+        "backend/src/main/java/com/mogum/account/service/MeReadService.java:28 — `SessionUserFilter` 가 이미 같은 요청에서 `users` 를 읽었는데 서비스가 한 번 더 읽는다. 정원 10명이라 비용은 무시할 만하고, 크레딧을 principal 에 담지 않는 쪽이 금지 23 에 맞으므로 지금 모양을 유지해도 된다. 참고용이다."
+      ]
+    },
+    {
+      "step": 3,
+      "name": "home-review-streak",
+      "status": "completed",
+      "started_at": "2026-11-25T20:02:57+0900",
+      "summary": "홈의 영역별 실패·재시도를 나누도록 GET /api/home/reviews(data={remainingCount: 정수, 0 포함})와 GET /api/home/streak(data={days: 정수, filledToday: 불리언})를 별도 읽기로 구현; 화면의 오늘 복습 수는 /api/home/reviews의 remainingCount를 쓰고 TodayReviewService.count(userId, null)을 그대로 호출해 카드 본문·간격 계산 없이 전체 수만 읽음; 복습이 속한 card 패키지의 StreakReadService·StreakActivityRepository에서 course Java 타입 참조 없이 EntityManager 네이티브 SQL로 reviews.created_at·lessons.completed_at을 서울 04시 경계로 합쳐 스트릭 계산, 저장·캐시 없음; 정원 10명 범위로 색인 추가 없음; 경계·중복·소유권·삭제·인증·읽기 불변 검증과 05 §3 구현 줄 반영, 서버 테스트 2662→2696개(34개 추가) 전체 통과 · 카드/아키텍처 AC 350개 통과 · spotlessApply · build 통과",
+      "completed_at": "2026-11-25T20:13:03+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/card/service/StreakReadServiceIntegrationTest.java:212 — 이 파일에 `/api/home/reviews` 의 HTTP 시험과 인증 거절 시험(239~263)이 함께 있어 클래스 이름(스트릭 서비스)과 범위가 어긋납니다 → 다음에 고칠 때 `HomeReviewControllerIntegrationTest` 같은 이름으로 HTTP 시험을 나누면 찾기 쉽습니다. 동작 영향은 없습니다.",
+        "backend/src/main/java/com/mogum/card/repository/StreakActivityRepository.java:17 — 지난 모든 날짜를 읽은 뒤 서비스에서 끊긴 곳까지만 씁니다. 정원 10명이라 지금은 문제가 없습니다. 활동 기간이 길어지면 SQL 쪽에서 연속 구간만 세는 방식을 고려할 수 있습니다(참고용)."
+      ]
+    },
+    {
+      "step": 4,
+      "name": "home-course-todo",
+      "status": "completed",
+      "started_at": "2026-11-25T20:13:03+0900",
+      "summary": "GET /api/home/continue-learning의 data={course:{id,title,nextLesson:{id,title}}}(대상 없으면 course 생략)와 GET /api/home/todos의 data={items:[{type,targetId,title}]}(비면 []) 구현; 할 일 종류 COURSE_REVIEW는 코스 화면, ROADMAP_REVIEW·ROADMAP_NEXT_COURSE는 로드맵 화면으로 이동하며 targetId·title은 해당 코스·로드맵의 값; 할 일은 created_at 내림차순→targetId 내림차순→type 이름 오름차순으로 통합 정렬; ADR-099의 LEARNING·최근 강의 열기 우선·모두 미열기면 최근 시작·같은 시각 큰 ID 선택, CourseReadService.nextLesson을 코스 읽기와 공유하고 RoadmapReadService.read().nextCourse를 할 일에서 그대로 재사용; 소유권·인증·작업 상태·읽기 불변 및 응답 모양 검증, 05 §3·04 §2.2 구현 사실 반영; 서버 테스트 2696→2731개(35개 추가) 전체 통과·코스/아키텍처 AC 417개 통과·spotlessApply·build 통과",
+      "completed_at": "2026-11-25T20:24:17+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/course/dto/HomeContinueLearningResponse.java:8 — `CourseItem`에 `@JsonInclude(NON_NULL)`이 있어, 학습 중인데 모든 강의를 마친 코스(정상 흐름에서는 생기지 않는 상태)면 `nextLesson` 칸이 빠집니다. 05 §3 구현 줄은 `nextLesson`이 늘 있는 것처럼 적혀 있습니다 → step 6 화면이 `nextLesson` 없는 경우를 어떻게 다룰지 정하거나, 문서에 「다음 강의가 없으면 생략」을 한 줄 더하면 계약이 분명해집니다.",
+        "backend/src/main/java/com/mogum/course/service/HomeCourseReadService.java:70 — `ROADMAP_NEXT_COURSE`는 로드맵의 `created_at`으로 정렬됩니다. 그래서 오래된 로드맵이 방금 다음 코스를 만들 수 있게 되어도 목록 뒤쪽에 놓입니다. step이 허용한 재량이고 문서에도 적었으므로 동작 결함은 아닙니다 → 화면 시험(step 6)에서 이 순서가 어색하면 `updated_at` 기준을 다시 검토하면 됩니다.",
+        "backend/src/main/java/com/mogum/course/service/HomeCourseReadService.java:62 — 진행 중 로드맵마다 `roadmapReadService.read()`를 불러 로드맵 · 코스 · 작업을 다시 읽습니다(N+1). 정원 10명이라 지금은 무시할 만합니다. 판정을 한 곳에 둔다는 요구를 지키는 대가이므로 참고용입니다."
+      ]
+    },
+    {
+      "step": 5,
+      "name": "home-jobs",
+      "status": "completed",
+      "started_at": "2026-11-25T20:24:17+0900",
+      "summary": "기존 홈 칸 경로와 영역별 실패·재시도를 맞춰 GET /api/home/jobs(data={jobs:[JobResponse]}, 비면 jobs:[]) 구현; 본인의 QUEUED·RUNNING·FAILED만 created_at DESC, id DESC로 나눠 받지 않고 읽으며 JobReadService의 단건 변환을 공유해 subject·실패 error 두 묶음을 동일하게 반환; 소유권·성공 제외·동시각 정렬·여섯 종류 단건 비교·시스템 정보 제외·인증·상태/시각/크레딧 읽기 불변 검증과 05 §3 구현 줄 반영; 서버 테스트 2731→2764개(33개 추가) 전체 통과·작업/아키텍처 AC 623개 통과·spotlessApply·build 통과",
+      "completed_at": "2026-11-26T00:53:29+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/job/service/JobReadService.java:69 — 목록에서 대상 코스 · 로드맵 · 강의를 찾지 못하면 `NOT_FOUND`를 던져 홈 칸 전체가 404가 됩니다. 결과를 지울 때 작업도 함께 지우므로(ADR-140) 정상 흐름에서는 생기지 않습니다. 다만 그런 일이 생기면 칸 하나가 아니라 목록 전체가 실패한다는 점은 알아 두면 좋습니다(동작 영향 없음).",
+        "backend/src/test/java/com/mogum/job/service/JobReadServiceIntegrationTest.java:107 — 매개변수 시험 하나에 성공 제외 · 단일 읽기와 같음 · 읽기가 아무것도 바꾸지 않음이 함께 묶여 있습니다. 실패하면 원인을 찾기가 조금 어렵습니다 → 다음에 이 파일을 고칠 때 「바꾸지 않음」 단언을 따로 떼면 읽기 쉽습니다."
+      ]
+    },
+    {
+      "step": 6,
+      "name": "home-screen",
+      "status": "completed",
+      "started_at": "2026-11-26T00:53:30+0900",
+      "summary": "HomePage.tsx·HomePage.test.tsx 및 api/useHome.ts·useHome.test.tsx 추가: useHomeReviews·useHomeStreak·useHomeContinueLearning·useHomeTodos·useHomeJobs의 독립 쿼리와 페이지 내부 HomeSection(새 공통 컴포넌트 파일 없음)으로 스트릭·다섯 칸·빈 상태·영역별 오류/재시도·재진입 읽기 구현, 승인된 / 연결·PlaceholderPage 홈 분기 제거·UI_GUIDE §7·§16 등 구현 사실 반영; 화면 테스트 533→568개(36개 추가·자리 시험 1개 제거) 전체 통과, npm --prefix frontend run test·lint 및 TypeScript 검사 통과",
+      "completed_at": "2026-11-26T01:00:18+0900",
+      "review_notes": [
+        "frontend/src/App.test.tsx:217 — 시험 이름이 아직 '임시 홈의 입구에서 새로 배우기로 가고…'다. 홈이 실제 화면이 됐으니 → '홈의 새로 배우기 입구에서…'로 바꾸면 이름과 내용이 맞는다(동작 영향 없음).",
+        "docs/UI_GUIDE.md:138 — §6 의 미정 목록에서 '공통 카드'가 빠졌다. 그런데 이번 step 은 공통 카드 컴포넌트를 만들지 않았고, 페이지 안의 `HomeSection` 하나만 두었다 → '공통 카드는 처음 필요한 TASK 에서 정한다'를 남기면 다음 작업자가 공통 카드를 이미 정한 것으로 오해하지 않는다.",
+        "frontend/src/pages/HomePage.tsx:27 — `HomeSection` 이 `streak` · `emphasis` 두 플래그로 모양을 나눈다. 지금은 읽기 쉬운 범위다. 다만 칸이 늘거나 다른 화면이 같은 틀을 쓰면 → 그때 공통 컴포넌트로 빼면서 UI_GUIDE §3 에 적으면 된다(참고용).",
+        "실제 브라우저의 390px · 1280px 렌더링은 확인하지 않았다(UI_GUIDE §16 에도 그렇게 적혀 있다). 공개 전 점검이나 phase 리뷰에서 시안(`05-home-mobile.png`)과 나란히 한 번 보면 좋다."
+      ]
+    },
+    {
+      "step": 7,
+      "name": "profile-tab",
+      "status": "completed",
+      "started_at": "2026-11-26T01:00:18+0900",
+      "summary": "ProfilePage.tsx·ProfilePage.test.tsx 추가, /profile 내 정보 탭에 AccountIdentity·남은 크레딧·문자열 월/일의 다음 채움 날짜·로그아웃·/privacy 구현; RequireAuth outlet context와 진입/재진입 시 [me] 재읽기, 기존 계정 화면과 같은 로그아웃 요청·쿼리 취소·캐시 제거·/login 이동 및 잠금/실패 재시도 적용; Me.credit 선택 칸과 App 시험·UI_GUIDE §7·§17 반영, 고아 PlaceholderPage.tsx·PlaceholderPage.test.tsx 삭제; 화면 테스트 568→579개(12개 추가·자리 시험 1개 제거) 전체 통과, npm --prefix frontend run test·lint 및 TypeScript 검사 통과",
+      "completed_at": "2026-11-26T01:04:21+0900",
+      "review_notes": [
+        "frontend/src/pages/ProfilePage.tsx:38 — `AccountIdentity` 의 영역 이름이 「신청 계정」이라 승인된 사람의 내 정보 탭에서도 화면 읽기 프로그램이 「신청 계정」이라고 읽습니다 → 다음에 이 컴포넌트를 고칠 때 영역 이름을 prop 으로 받거나 「계정」처럼 중립 이름을 쓸지 검토하면 좋습니다(동작 영향 없음).",
+        "frontend/src/pages/ProfilePage.tsx:15 — 로그아웃 mutation 이 `AccountPage` 의 로그아웃 흐름과 같은 코드로 두 곳에 있습니다. step 이 허용한 재량입니다 → 세 번째로 쓰는 곳이 생기면 훅 하나로 모으면 됩니다.",
+        "frontend/src/App.test.tsx:203 — 시험 이름 '임시 홈의 입구에서…'가 아직 남아 있습니다(step 6 권고) → '홈의 새로 배우기 입구에서…'로 바꾸면 이름과 내용이 맞습니다."
+      ]
+    },
+    {
+      "step": 8,
+      "name": "creation-blocked-notice",
+      "status": "completed",
+      "summary": "CreationBlockedNotice·isCreationBlockedError와 짝 테스트 추가, NewLearningPage·LessonPage·CoursePage·RoadmapPage의 두 만들기 거절을 서버 문구 그대로·크레딧 부족만 /profile 링크·재시도 안내 없는 공통 안내로 전환하고 강의 돌아가기와 다른 오류 표시 보존; 기존 surface-soft·text 토큰 및 동작 직후 기다림 안내를 방해 없이 읽는 role=status 채택, UI_GUIDE §3과 관련 화면 구현 사실 반영; 화면 테스트 579→601개(22개 추가) 전체 통과, npm --prefix frontend run test·lint 및 TypeScript 검사 통과",
+      "started_at": "2026-11-26T01:04:21+0900",
+      "completed_at": "2026-11-26T01:08:51+0900",
+      "review_notes": [
+        "frontend/src/components/CreationBlockedNotice.tsx:5 — 판별 함수를 컴포넌트 파일에 함께 두느라 `react-refresh/only-export-components` 를 eslint-disable 로 끈다. step 이 '함께 둔다'고 지시했으므로 결함은 아니다 → 다른 곳에서도 이 판별이 필요해지면 `api/` 아래 작은 모듈로 옮기면 억제 주석 없이 쓸 수 있다.",
+        "frontend/src/pages/RoadmapPage.tsx:122 · CoursePage.tsx:164 · NewLearningPage.tsx:85 — 삼항식과 긴 JSX 가 한 줄에 붙어 읽기가 조금 어렵다. 동작 영향은 없다 → 다음에 이 줄을 고칠 때 분기를 여러 줄로 나누면 읽기 쉽다.",
+        "실제 브라우저에서 안내 모양(`surface-soft` 바탕 · `text` 제목)은 확인하지 않았다. phase 리뷰 때 기존 `FailureNotice` 와 나란히 한 번 보면 좋다."
+      ]
+    },
+    {
+      "step": 9,
+      "name": "identity-heading",
+      "status": "completed",
+      "summary": "AccountIdentity.tsx·AccountIdentity.test.tsx에 선택 title prop(기본 신청 계정)과 제목·영역 이름 시험 추가, ProfilePage.tsx·ProfilePage.test.tsx는 구글 계정 제목 적용 및 신청 계정 부재 검증; App.test.tsx의 임시 홈 시험 이름 수정·UI_GUIDE §3 구현 사실 반영; 화면 테스트 601→602개(1개 추가) 전체 통과, npm --prefix frontend run test·lint 통과",
+      "started_at": "2026-11-26T06:02:25+0900",
+      "completed_at": "2026-11-26T06:03:57+0900",
+      "review_notes": [
+        "frontend/src/components/AccountIdentity.tsx:4 — props 타입이 `Pick<Me, 'name' | 'email'> & { title?: string }` 로 한 줄에 길게 붙어 있다. 동작 영향은 없다 → 다음에 이 파일을 고칠 때 props 타입을 따로 빼면 읽기 쉽다."
+      ]
+    },
+    {
+      "step": 10,
+      "name": "me-refetch-keep",
+      "status": "completed",
+      "summary": "내 정보 탭 재진입의 연결·서버 재조회가 재시도까지 실패하면 전체 오류 화면으로 바뀌는 두 재현 시험을 수정 전 실패로 확인; RequireAuth의 me.isError 조건을 데이터 없음으로 바꿔 이전 값·화면을 유지하고 첫 조회 실패·UNAUTHORIZED·모르는 상태·성공 시 새 잔액 반영을 보존, 다시 시도 중복 방지 시험과 UI_GUIDE §17 반영; 화면 테스트 602→607개(5개 추가) 전체 통과, npm --prefix frontend run test·lint 및 TypeScript 검사 통과",
+      "started_at": "2026-11-26T06:40:48+0900",
+      "completed_at": "2026-11-26T06:44:36+0900",
+      "review_notes": [
+        "frontend/src/pages/ProfilePage.test.tsx:143 — 재시도 두 번의 실제 지연(약 3초)을 그대로 기다리는 시험이라 시간 제한을 10초로 늘렸다. 동작 영향은 없다 → 화면 시험이 느려지면 이 시험만 `retryDelay: 0` 인 QueryClient 를 쓰거나 가짜 타이머를 쓰는 방법을 검토하면 된다.",
+        "frontend/src/components/RequireAuth.tsx:35 — 데이터가 있을 때는 `isError` 와 관계없이 outlet 을 그리므로, 다시 읽기 실패의 `RATE_LIMITED` 같은 오류도 화면에 드러나지 않는다. 사용자 결정(이전 값 유지 · 안내 없음)과 맞으므로 결함은 아니다. phase 리뷰 때 참고용으로 알아 두면 된다."
+      ]
+    }
+  ],
+  "created_at": "2026-11-25T17:27:04+0900",
+  "completed_at": "2026-11-26T06:44:37+0900"
+}

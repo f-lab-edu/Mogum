@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
@@ -92,19 +92,43 @@ test('자료와 작업이 없으면 StrictMode에서도 받기를 한 번만 보
 test.each([
   ['CREDIT_INSUFFICIENT', '크레딧이 부족합니다. 2026-12-01에 다시 채워집니다'],
   ['TOO_MANY_IN_PROGRESS', '지금 만드는 것이 끝나면 다시 시도해 주세요'],
-  ['LESSON_NOT_OPEN', '코스를 시작하고 앞 강의를 학습 완료하면 열 수 있어요'],
-])('받기 거절 %s는 서버 문구와 코스로 돌아가는 길을 보인다', async (code, message) => {
+])('받기 거절 %s는 공통 안내와 코스로 돌아가는 길을 보인다', async (code, message) => {
   vi.stubGlobal('fetch', vi.fn().mockImplementation((_path, options) => Promise.resolve(options.method === 'GET'
     ? response({ ...lesson, material: undefined }) : failure(code, message))))
   const { router } = open()
+  await screen.findByText('지금은 만들 수 없어요')
   await waitFor(() => {
-    expect(screen.getByRole('alert')).toHaveTextContent(message)
+    const notice = screen.getByRole('status')
+    expect(notice).toHaveTextContent(message)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(notice).queryByRole('button')).not.toBeInTheDocument()
+    const link = within(notice).queryByRole('link', { name: '남은 크레딧 보기' })
+    if (code === 'CREDIT_INSUFFICIENT') expect(link).toHaveAttribute('href', '/profile')
+    else expect(link).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: '코스로 돌아가기' })).toHaveAttribute('href', '/courses/31')
     expect(screen.queryByText(code)).not.toBeInTheDocument()
     expect(vi.mocked(fetch).mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1)
   })
   fireEvent.click(screen.getByRole('link', { name: '코스로 돌아가기' }))
+  await screen.findByRole('heading', { name: '코스 자리' })
   await waitFor(() => expect(router.state.location.pathname).toBe('/courses/31'))
+})
+
+test.each(['LESSON_NOT_OPEN', 'network'])('받기 실패 %s는 기존 실패 안내와 돌아가기 링크를 유지한다', async (kind) => {
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((_path, options) => {
+    if (options.method === 'GET') return Promise.resolve(response({ ...lesson, material: undefined }))
+    return kind === 'network' ? Promise.reject(new Error('secret-network-detail'))
+      : Promise.resolve(failure(kind, '코스를 시작하고 앞 강의를 학습 완료하면 열 수 있어요'))
+  }))
+  open()
+  await screen.findByRole('alert')
+  await waitFor(() => {
+    expect(screen.getByRole('alert')).toHaveTextContent('강의 자료를 요청하지 못했어요.')
+    expect(screen.getByRole('alert')).toHaveTextContent(kind === 'network' ? '연결하지 못했어요. 다시 시도해 주세요.' : '코스를 시작하고 앞 강의를 학습 완료하면 열 수 있어요')
+    expect(screen.getByRole('link', { name: '코스로 돌아가기' })).toHaveAttribute('href', '/courses/31')
+    expect(screen.queryByText('지금은 만들 수 없어요')).not.toBeInTheDocument()
+    expect(screen.queryByText('secret-network-detail')).not.toBeInTheDocument()
+  })
 })
 
 test('읽기 거절은 서버 문구와 코스 링크를 보이고 받기를 하지 않는다', async () => {

@@ -1,6 +1,7 @@
 package com.mogum.job.repository;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.Query;
@@ -14,6 +15,8 @@ public interface GenerationJobRepository extends Repository<GenerationJob, Long>
 	<S extends GenerationJob> S save(S entity);
 
 	Optional<GenerationJob> findById(Long id);
+
+	List<GenerationJob> findByUserIdAndStatusInOrderByCreatedAtDescIdDesc(long userId, Collection<JobStatus> statuses);
 
 	@Query("""
 		select j from GenerationJob j where j.userId = :userId and j.type = :type

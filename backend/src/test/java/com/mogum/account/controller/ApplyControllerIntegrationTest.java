@@ -130,9 +130,11 @@ class ApplyControllerIntegrationTest {
 		var response = client.post().uri("/api/account/apply").exchange();
 
 		// then
+		String credit = status == UserStatus.APPROVED
+			? ",\"credit\":{\"balance\":100,\"nextRefillDate\":\"2026-12-08\"}" : "";
 		response.expectStatus().isOk().expectBody().json("""
-			{"data":{"status":"%s","email":"existing@example.com","name":"existing"}}
-			""".formatted(status), JsonCompareMode.STRICT);
+			{"data":{"status":"%s","email":"existing@example.com","name":"existing"%s}}
+			""".formatted(status, credit), JsonCompareMode.STRICT);
 		assertThat(jdbcTemplate.queryForMap("SELECT * FROM users")).isEqualTo(before);
 		assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries", Integer.class)).isZero();
 		assertThat(jdbcIndexedSessionRepository.findById(new TestSessions(jdbcIndexedSessionRepository).id(cookie)))
@@ -247,9 +249,9 @@ class ApplyControllerIntegrationTest {
 		assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries", Integer.class)).isEqualTo(1);
 		assertThat(jdbcTemplate.queryForMap("SELECT type, amount FROM credit_entries"))
 			.containsEntry("type", "REFILL")
-			.containsEntry("amount", creditProperties.monthlyAmount());
+			.containsEntry("amount", creditProperties.weeklyAmount());
 		assertThat(jdbcTemplate.queryForObject("SELECT credit_balance FROM users", Integer.class))
-			.isEqualTo(creditProperties.monthlyAmount());
+			.isEqualTo(creditProperties.weeklyAmount());
 		assertThat(jdbcTemplate.queryForObject(
 			"SELECT u.credit_balance = sum(e.amount) FROM users u "
 				+ "JOIN credit_entries e ON e.user_id = u.id GROUP BY u.id",

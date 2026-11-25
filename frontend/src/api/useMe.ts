@@ -6,6 +6,7 @@ export interface Me {
   email: string
   name: string
   status: 'NOT_APPLIED' | 'APPLIED' | 'APPROVED' | 'REJECTED' | (string & Record<never, never>)
+  credit?: { balance: number; nextRefillDate: string }
 }
 
 export function useMe() {

@@ -25,9 +25,9 @@ class ApplyServiceTest {
 		.withUserConfiguration(PropertiesConfiguration.class);
 
 	@Test
-	@DisplayName("신청 전 신원으로 신청하면 한 달 몫의 잔액과 채움 기록을 함께 만든다")
+	@DisplayName("신청 전 신원으로 신청하면 한 주 몫의 잔액과 채움 기록을 함께 만든다")
 	void createsAppliedUserAndInitialRefill() {
-		applicationContextRunner.withPropertyValues("app.credit.monthly-amount=37").run(context -> {
+		applicationContextRunner.withPropertyValues("app.credit.weekly-amount=37").run(context -> {
 			// given
 			var credit = context.getBean(CreditProperties.class);
 			var users = new FakeUserRepository();
@@ -47,7 +47,7 @@ class ApplyServiceTest {
 			assertThat(user.getEmail()).isEqualTo(identity.email());
 			assertThat(user.getName()).isEqualTo(identity.name());
 			assertThat(user.getStatus()).isEqualTo(UserStatus.APPLIED);
-			assertThat(user.getCreditBalance()).isEqualTo(credit.monthlyAmount());
+			assertThat(user.getCreditBalance()).isEqualTo(credit.weeklyAmount()).isEqualTo(37);
 			assertThat(user.getApprovedAt()).isNull();
 			assertThat(user.getCreditRefillAt()).isNull();
 			assertThat(result).isEqualTo(new AccountPrincipal.Member(
@@ -57,7 +57,7 @@ class ApplyServiceTest {
 				assertThat(entry.getId()).isPositive();
 				assertThat(entry.getUser()).isSameAs(user);
 				assertThat(entry.getType()).isEqualTo(CreditEntryType.REFILL);
-				assertThat(entry.getAmount()).isEqualTo(credit.monthlyAmount());
+				assertThat(entry.getAmount()).isEqualTo(credit.weeklyAmount()).isEqualTo(37);
 			});
 		});
 	}

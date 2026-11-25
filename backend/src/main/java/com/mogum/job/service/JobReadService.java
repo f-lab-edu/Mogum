@@ -1,5 +1,7 @@
 package com.mogum.job.service;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +34,17 @@ public class JobReadService {
 			.filter(value -> value.getUserId() == userId)
 			.orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
 
+		return response(job);
+	}
+
+	public List<JobResponse> unfinished(long userId) {
+		return generationJobRepository.findByUserIdAndStatusInOrderByCreatedAtDescIdDesc(userId,
+			List.of(JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.FAILED)).stream()
+			.map(this::response)
+			.toList();
+	}
+
+	private JobResponse response(GenerationJob job) {
 		var subject = subject(job);
 		var result = job.getStatus() == JobStatus.SUCCEEDED ? result(job) : null;
 		ApiError error = null;

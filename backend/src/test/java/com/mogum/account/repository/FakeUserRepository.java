@@ -1,11 +1,14 @@
 package com.mogum.account.repository;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import com.mogum.account.domain.User;
 import com.mogum.account.domain.UserFixtures;
+import com.mogum.account.domain.UserStatus;
 
 public final class FakeUserRepository implements UserRepository {
 	private final Map<Long, User> users = new LinkedHashMap<>();
@@ -45,6 +48,13 @@ public final class FakeUserRepository implements UserRepository {
 			.stream()
 			.filter(user -> user.getProvider().equals(provider) && user.getSubject().equals(subject))
 			.findFirst();
+	}
+
+	@Override
+	public List<Long> findApprovedIdsDueForRefill(Instant now) {
+		return users.values().stream()
+			.filter(user -> user.getStatus() == UserStatus.APPROVED && !user.getCreditRefillAt().isAfter(now))
+			.map(User::getId).sorted().toList();
 	}
 
 	public long count() {

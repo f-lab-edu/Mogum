@@ -6,6 +6,7 @@ import { ApiError, CONNECTION_ERROR_MESSAGE } from '../api/client'
 import { useCourse, useCourseAction } from '../api/useCourse'
 import { receiveJob } from '../api/useJob'
 import Button from '../components/Button'
+import CreationBlockedNotice, { isCreationBlockedError } from '../components/CreationBlockedNotice'
 import FailureNotice from '../components/FailureNotice'
 import Mogumi from '../components/Mogumi'
 import ProgressBar from '../components/ProgressBar'
@@ -160,9 +161,9 @@ export default function CoursePage() {
           <Button variant="secondary" disabled={busy} onClick={() => { setReplanOpen(false); replanButton.current?.focus() }}>다시 짜기 취소</Button>
         </div>
       </form>}
-      {replan.isError && <FailureNotice title="다시 짜기를 요청하지 못했어요." message={message(replan.error)}>
+      {replan.isError && (isCreationBlockedError(replan.error) ? <CreationBlockedNotice error={replan.error} /> : <FailureNotice title="다시 짜기를 요청하지 못했어요." message={message(replan.error)}>
         <p className="text-small">안내를 확인한 뒤 다시 짜기 요청을 다시 눌러 주세요.</p>
-      </FailureNotice>}
+      </FailureNotice>)}
     </section>}
 
     {nextLesson && <section aria-label="다음에 열 강의" className="space-y-3 rounded-panel bg-primary p-6 text-on-primary sm:p-8">

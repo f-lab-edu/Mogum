@@ -1,11 +1,11 @@
 import { useId } from 'react'
 import type { Me } from '../api/useMe'
 
-export default function AccountIdentity({ name, email }: Pick<Me, 'name' | 'email'>) {
+export default function AccountIdentity({ name, email, title = '신청 계정' }: Pick<Me, 'name' | 'email'> & { title?: string }) {
   const headingId = useId()
   return (
     <section aria-labelledby={headingId} className="rounded-control border border-border bg-surface-soft p-4 text-left">
-      <h2 id={headingId} className="text-small font-bold text-primary">신청 계정</h2>
+      <h2 id={headingId} className="text-small font-bold text-primary">{title}</h2>
       <dl className="mt-3 space-y-2">
         <div>
           <dt className="text-small text-text-secondary">이름</dt>

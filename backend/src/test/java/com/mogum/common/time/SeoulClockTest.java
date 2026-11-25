@@ -16,6 +16,21 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class SeoulClockTest {
+	@ParameterizedTest(name = "시각 {0}, 서울 달력 날짜 {1}")
+	@CsvSource({
+		"2026-12-07T19:00:00Z,2026-12-08",
+		"2026-12-31T18:59:59Z,2027-01-01",
+		"2026-12-07T14:59:59Z,2026-12-07"
+	})
+	@DisplayName("표시할 날짜는 새벽 4시 경계를 빼지 않은 서울 달력 날짜다")
+	void convertsInstantToSeoulCalendarDate(String instant, String expected) {
+		// when
+		var result = SeoulClock.calendarDate(Instant.parse(instant));
+
+		// then
+		assertThat(result).isEqualTo(LocalDate.parse(expected));
+	}
+
 	@Test
 	@DisplayName("한국 날짜 계산 시간대는 Asia/Seoul이다")
 	void definesSeoulZone() {

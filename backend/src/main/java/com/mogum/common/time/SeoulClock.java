@@ -13,6 +13,11 @@ public final class SeoulClock {
 
 	private final Clock clock;
 
+	/** 화면과 안내 문구에 표시하는 서울 달력 날짜. 학습일의 새벽 4시 경계와 구별한다. */
+	public static LocalDate calendarDate(Instant instant) {
+		return instant.atZone(ZONE).toLocalDate();
+	}
+
 	public Instant now() {
 		return clock.instant();
 	}
