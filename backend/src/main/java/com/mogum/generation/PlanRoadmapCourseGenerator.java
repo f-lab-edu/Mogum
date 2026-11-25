@@ -50,8 +50,9 @@ public final class PlanRoadmapCourseGenerator implements JobGenerator {
 	@Override
 	public ResultRef save(JobSnapshot job, GeneratedResult result) {
 		var course = courseRepository.findById(job.targetId()).orElseThrow();
-		course.planLessons();
-		var lessons = ((Result)result).plan().lessons();
+		var plan = ((Result)result).plan();
+		course.planLessons(plan.masteryReport());
+		var lessons = plan.lessons();
 		for (int index = 0; index < lessons.size(); index++) {
 			var lesson = lessons.get(index);
 			lessonRepository.save(Lesson.listed(course, index + 1, lesson.title(), lesson.description(),

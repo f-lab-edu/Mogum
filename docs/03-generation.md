@@ -184,6 +184,8 @@ LLM : 강의 자료 + 카드 — 호출 한 번
 - 검토 중인 코스 화면에 몇 개를 짧게 다뤘고 몇 개를 다시 짚었는지 보인다(ADR-090). 두 수가 모두 0이거나 내역이 없으면(이 기능 전에 만든 코스) 보이지 않는다([06 §7](./06-screens.md#7-코스-화면)).
 - 운영자가 이 기록과 결과를 DB 로 보고 프롬프트 등을 튜닝한다. 실제 배치와 다를 수 있다.
 
+- 구현 — 출력 키 `masteryReport.shortened` · `masteryReport.revisited`를 `CoursePlanFormat`이 읽고, 없거나 객체·문자열 목록 모양이 틀리면 내역만 빈 목록 둘로 둔다. `MasteryReport`를 `Course.single(long, LearningInput, String, MasteryReport)` · `Course.planLessons(MasteryReport)` · `Course.replanLessons(MasteryReport)`로 넣고 `courses.mastery_report`에 저장한다.
+
 ## 6. 호출 기록
 
 **LLM 을 부를 때마다 — 임베딩도 — 호출 기록을 한 줄 남긴다**(ADR-139) — 무슨 만들기였나 · 쓴 토큰 · 비용 · 걸린 시간 · 결과(성공 · 실패의 갈래)와 그 작업 · 사용자. **입력 · 출력 원문은 담지 않는다.**

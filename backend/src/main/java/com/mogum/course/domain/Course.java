@@ -63,6 +63,10 @@ public class Course extends AuditedEntity {
 	@Column(name = "plan_concepts", columnDefinition = "jsonb")
 	private List<PlannedConcept> planConcepts;
 
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(name = "mastery_report", columnDefinition = "jsonb")
+	private MasteryReport masteryReport;
+
 	@Column(name = "started_at")
 	private Instant startedAt;
 
@@ -72,11 +76,12 @@ public class Course extends AuditedEntity {
 	@Column(name = "completed_at")
 	private Instant completedAt;
 
-	public static Course single(long userId, LearningInput input, String title) {
+	public static Course single(long userId, LearningInput input, String title, MasteryReport masteryReport) {
 		var course = new Course();
 		course.userId = userId;
 		course.input = input;
 		course.title = title;
+		course.masteryReport = masteryReport;
 		course.status = CourseStatus.REVIEWING;
 		return course;
 	}
@@ -106,11 +111,19 @@ public class Course extends AuditedEntity {
 		this.title = title;
 	}
 
-	public void planLessons() {
+	public void planLessons(MasteryReport masteryReport) {
 		if (status != CourseStatus.NOT_PLANNED) {
 			throw new IllegalStateException("Course must be unplanned");
 		}
+		this.masteryReport = masteryReport;
 		status = CourseStatus.REVIEWING;
+	}
+
+	public void replanLessons(MasteryReport masteryReport) {
+		if (status != CourseStatus.REVIEWING) {
+			throw new IllegalStateException("Course must be reviewing");
+		}
+		this.masteryReport = masteryReport;
 	}
 
 	public void openLesson(Instant openedAt) {

@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -123,6 +124,9 @@ class NewCourseGeneratorIntegrationTest {
 		var course = jdbcTemplate.queryForMap("SELECT * FROM courses WHERE id = ?", job.get("course_id"));
 		assertThat(course).containsEntry("status", "REVIEWING").containsEntry("title", "자바 코스")
 			.containsEntry("user_id", job.get("user_id")).containsEntry("roadmap_id", null);
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT mastery_report = '{\"shortened\":[],\"revisited\":[]}'::jsonb FROM courses",
+			Boolean.class)).isTrue();
 		assertInput(course);
 		var lessons = jdbcTemplate.queryForList("SELECT * FROM lessons ORDER BY position");
 		assertThat(lessons).extracting(row -> row.get("position")).containsExactly(1, 2);
@@ -341,6 +345,31 @@ class NewCourseGeneratorIntegrationTest {
 			.hasSize(attempts).containsOnly("EMBEDDING");
 		assertThat(jdbcTemplate.queryForList("SELECT outcome FROM llm_calls ORDER BY id", String.class))
 			.containsOnly(TestEmbeddingProvider.failure(failure).outcome().name());
+	}
+
+	@ParameterizedTest(name = "내역={0}")
+	@ValueSource(strings = {"{\"shortened\":[\"없는 개념\",\"없는 개념\"],\"revisited\":[\"다시\"]}",
+		"null", "[]", "{\"shortened\":[1],\"revisited\":[]}"})
+	@DisplayName("새 코스는 반영 내역을 그대로 저장하고 잘못된 내역이면 목록만 비우고 재시도하지 않는다")
+	void storesMasteryReportWithoutRetry(String report) {
+		// given
+		long id = receive(JobType.NEW_COURSE);
+		String original = TestChatProvider.defaultText(JobType.NEW_COURSE);
+		String reply = original.substring(0, original.lastIndexOf('}')) + ",\"masteryReport\":" + report + "}";
+		testChatProvider.reply(id, TestChatProvider.success(reply));
+
+		// when
+		boolean processed = runner().runOnce();
+
+		// then
+		assertThat(processed).isTrue();
+		assertThat(status(id)).isEqualTo("SUCCEEDED");
+		assertThat(testChatProvider.requests(id)).hasSize(1);
+		String expected = report.startsWith("{\"shortened\":[\"") ? report
+			: "{\"shortened\":[],\"revisited\":[]}";
+		assertThat(jdbcTemplate.queryForObject("SELECT mastery_report = ?::jsonb FROM courses",
+			Boolean.class, expected)).isTrue();
+		assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM lessons", Integer.class)).isEqualTo(2);
 	}
 
 	private JobRunner runner() {

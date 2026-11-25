@@ -40,6 +40,7 @@ import com.mogum.course.domain.CourseStatus;
 import com.mogum.course.domain.LearningInput;
 import com.mogum.course.domain.LessonFixtures;
 import com.mogum.course.domain.Level;
+import com.mogum.course.domain.MasteryReport;
 import com.mogum.course.domain.PlannedConcept;
 import com.mogum.course.domain.Purpose;
 import com.mogum.course.domain.RoadmapFixtures;
@@ -108,6 +109,9 @@ class ReplanCourseGeneratorIntegrationTest {
 		testChatProvider.reset();
 		testEmbeddingProvider.reset();
 		var course = course(position);
+		new TransactionTemplate(platformTransactionManager)
+			.executeWithoutResult(tx -> courseRepository.findById(course.getId()).orElseThrow()
+				.replanLessons(new MasteryReport(List.of("이전 짧게"), List.of("이전 다시"))));
 		var before = jdbcTemplate.queryForMap("SELECT * FROM courses WHERE id = ?", course.getId());
 		var oldIds = jdbcTemplate.queryForList("SELECT id FROM lessons WHERE course_id = ?",
 			Long.class, course.getId());
@@ -120,7 +124,14 @@ class ReplanCourseGeneratorIntegrationTest {
 		assertThat(processed).isTrue();
 		assertThat(jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", id))
 			.containsEntry("status", "SUCCEEDED").containsEntry("course_id", course.getId());
-		assertThat(jdbcTemplate.queryForMap("SELECT * FROM courses WHERE id = ?", course.getId())).isEqualTo(before);
+		var saved = jdbcTemplate.queryForMap("SELECT * FROM courses WHERE id = ?", course.getId());
+		before.forEach((field, value) -> {
+			if (!field.equals("mastery_report") && !field.equals("updated_at")) {
+				assertThat(saved).containsEntry(field, value);
+			}
+		});
+		assertThat(courseRepository.findById(course.getId()).orElseThrow().getMasteryReport())
+			.isEqualTo(new MasteryReport(List.of(), List.of()));
 		var lessons = jdbcTemplate.queryForList("SELECT * FROM lessons WHERE course_id = ? ORDER BY position",
 			course.getId());
 		assertThat(lessons).extracting(row -> row.get("position")).containsExactly(1, 2);
@@ -167,6 +178,9 @@ class ReplanCourseGeneratorIntegrationTest {
 		testChatProvider.reset();
 		testEmbeddingProvider.reset();
 		var course = course(position);
+		new TransactionTemplate(platformTransactionManager)
+			.executeWithoutResult(tx -> courseRepository.findById(course.getId()).orElseThrow()
+				.replanLessons(new MasteryReport(List.of("이전 짧게"), List.of("이전 다시"))));
 		var before = content();
 		long id = jobIntakeService.receive(course.getUserId(), request(course)).id();
 		var replies = new ChatProvider.Reply[workerProperties.maxRetries() + 1];
@@ -219,7 +233,8 @@ class ReplanCourseGeneratorIntegrationTest {
 		var job = new JobSnapshot(1L, course.getUserId(), JobType.REPLAN_COURSE,
 			course.getId(), null, null, 1);
 		var result = new ReplanCourseGenerator.Result(new CoursePlan(null,
-			List.of(new LessonOutline("강의", "설명", List.of(new PlannedConcept("개념", "정의"))))));
+			List.of(new LessonOutline("강의", "설명", List.of(new PlannedConcept("개념", "정의")))),
+			new MasteryReport(List.of(), List.of())));
 
 		// when & then
 		assertThatThrownBy(() -> new TransactionTemplate(platformTransactionManager)
@@ -232,13 +247,17 @@ class ReplanCourseGeneratorIntegrationTest {
 	void rollsBackReplacementWhenInsertFails() {
 		// given
 		var course = course(0);
+		new TransactionTemplate(platformTransactionManager)
+			.executeWithoutResult(tx -> courseRepository.findById(course.getId()).orElseThrow()
+				.replanLessons(new MasteryReport(List.of("이전 짧게"), List.of("이전 다시"))));
 		var before = content();
 		var job = new JobSnapshot(1L, course.getUserId(), JobType.REPLAN_COURSE,
 			course.getId(), null, null, 1);
 		var lessons = IntStream.range(0, 11)
 			.mapToObj(index -> new LessonOutline("강의", "설명", List.of(new PlannedConcept("개념", "정의"))))
 			.toList();
-		var result = new ReplanCourseGenerator.Result(new CoursePlan(null, lessons));
+		var result = new ReplanCourseGenerator.Result(
+			new CoursePlan(null, lessons, new MasteryReport(List.of(), List.of())));
 
 		// when & then
 		assertThatThrownBy(() -> new TransactionTemplate(platformTransactionManager)
@@ -321,6 +340,37 @@ class ReplanCourseGeneratorIntegrationTest {
 			.containsOnly(TestEmbeddingProvider.failure(failure).outcome().name());
 	}
 
+	@ParameterizedTest(name = "코스 위치={0}")
+	@ValueSource(ints = {0, 1, 3})
+	@DisplayName("단일 코스와 로드맵 코스의 다시 짜기는 이전 반영 내역을 응답의 새 내역으로 바꾼다")
+	void replacesMasteryReport(int position) throws InterruptedException {
+		// given
+		testChatProvider.reset();
+		var course = course(position);
+		var oldReport = new MasteryReport(List.of("이전 짧게"), List.of("이전 다시"));
+		new TransactionTemplate(platformTransactionManager).executeWithoutResult(
+			tx -> courseRepository.findById(course.getId()).orElseThrow().replanLessons(oldReport));
+		long id = jobIntakeService.receive(course.getUserId(), request(course)).id();
+		String original = TestChatProvider.defaultText(JobType.REPLAN_COURSE);
+		String report = "{\"shortened\":[\"새 짧게\"],\"revisited\":[\"없는 개념\",\"없는 개념\"]}";
+		testChatProvider.reply(id, TestChatProvider.success(
+			original.substring(0, original.lastIndexOf('}')) + ",\"masteryReport\":" + report + "}"));
+		testClock.advance(Duration.ofSeconds(1));
+
+		// when
+		boolean processed = runOnce();
+
+		// then
+		assertThat(processed).isTrue();
+		assertThat(jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", id))
+			.containsEntry("status", "SUCCEEDED");
+		var actual = courseRepository.findById(course.getId()).orElseThrow();
+		assertThat(actual.getMasteryReport())
+			.isEqualTo(new MasteryReport(List.of("새 짧게"), List.of("없는 개념", "없는 개념")));
+		assertThat(actual.getUpdatedAt()).isEqualTo(testClock.instant());
+		assertThat(testChatProvider.requests(id)).hasSize(1);
+	}
+
 	private List<?> content() {
 		return List.of("roadmaps", "courses", "lessons").stream()
 			.map(table -> jdbcTemplate.queryForList("SELECT * FROM " + table + " ORDER BY id")).toList();
@@ -367,7 +417,8 @@ class ReplanCourseGeneratorIntegrationTest {
 			}
 			if (index == position) {
 				new TransactionTemplate(platformTransactionManager)
-					.executeWithoutResult(tx -> courseRepository.findById(course.getId()).orElseThrow().planLessons());
+					.executeWithoutResult(
+						tx -> courseRepository.findById(course.getId()).orElseThrow().planLessons(null));
 				jdbcTemplate.update("UPDATE courses SET title = ? WHERE id = ?", "사용자가 고친 제목", course.getId());
 				lessonRepository.save(LessonFixtures.lesson(course, 1, "이전 강의", "이전 설명",
 					List.of(new PlannedConcept("이전 개념", "이전 정의"))));

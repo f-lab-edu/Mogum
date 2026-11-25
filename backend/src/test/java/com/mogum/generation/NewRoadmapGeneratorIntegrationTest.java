@@ -135,7 +135,8 @@ class NewRoadmapGeneratorIntegrationTest {
 			assertThat(courses).extracting(row -> row.get("plan_description"))
 				.containsExactly("기초 설명", "응용 설명");
 			assertThat(courses).allSatisfy(row -> assertThat(row)
-				.containsEntry("status", "NOT_PLANNED").containsEntry("user_id", user.getId())
+				.containsEntry("mastery_report", null).containsEntry("status", "NOT_PLANNED")
+				.containsEntry("user_id", user.getId())
 				.containsEntry("roadmap_id", job.get("roadmap_id"))
 				.containsEntry("topic", null).containsEntry("level", null).containsEntry("level_other", null)
 				.containsEntry("purpose", null).containsEntry("purpose_other", null).containsEntry("memo", null));

@@ -400,7 +400,7 @@ public class IntegrationTestConfiguration {
 			String text = ((TestResult)result).text();
 			long id = switch (jobType) {
 				case NEW_COURSE -> {
-					var course = Course.single(job.userId(), input(job.input()), text);
+					var course = Course.single(job.userId(), input(job.input()), text, null);
 					entityManager.persist(course);
 					yield course.getId();
 				}

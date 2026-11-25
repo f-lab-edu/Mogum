@@ -37,6 +37,7 @@ import com.mogum.course.domain.CourseStatus;
 import com.mogum.course.domain.LearningInput;
 import com.mogum.course.domain.LessonFixtures;
 import com.mogum.course.domain.Level;
+import com.mogum.course.domain.MasteryReport;
 import com.mogum.course.domain.PlannedConcept;
 import com.mogum.course.domain.Purpose;
 import com.mogum.course.domain.RoadmapFixtures;
@@ -119,6 +120,8 @@ class PlanRoadmapCourseGeneratorIntegrationTest {
 			.containsEntry("status", "SUCCEEDED").containsEntry("course_id", course.getId());
 		var saved = jdbcTemplate.queryForMap("SELECT * FROM courses WHERE id = ?", course.getId());
 		assertThat(saved).containsEntry("status", "REVIEWING");
+		assertThat(courseRepository.findById(course.getId()).orElseThrow().getMasteryReport())
+			.isEqualTo(new MasteryReport(List.of(), List.of()));
 		for (String field : List.of("title", "plan_description", "plan_concepts", "roadmap_id", "position", "topic")) {
 			assertThat(saved.get(field)).isEqualTo(before.get(field));
 		}
@@ -206,11 +209,12 @@ class PlanRoadmapCourseGeneratorIntegrationTest {
 		// given
 		var course = course(1);
 		new TransactionTemplate(platformTransactionManager)
-			.executeWithoutResult(tx -> courseRepository.findById(course.getId()).orElseThrow().planLessons());
+			.executeWithoutResult(tx -> courseRepository.findById(course.getId()).orElseThrow().planLessons(null));
 		var job = new JobSnapshot(1L, course.getUserId(), JobType.PLAN_ROADMAP_COURSE,
 			course.getId(), null, null, 1);
 		var result = new PlanRoadmapCourseGenerator.Result(new CoursePlan(null,
-			List.of(new LessonOutline("강의", "설명", List.of(new PlannedConcept("개념", "정의"))))));
+			List.of(new LessonOutline("강의", "설명", List.of(new PlannedConcept("개념", "정의")))),
+			new MasteryReport(List.of(), List.of())));
 
 		// when & then
 		assertThatThrownBy(() -> new TransactionTemplate(platformTransactionManager)
@@ -290,6 +294,31 @@ class PlanRoadmapCourseGeneratorIntegrationTest {
 			.hasSize(attempts).containsOnly("EMBEDDING");
 		assertThat(jdbcTemplate.queryForList("SELECT outcome FROM llm_calls ORDER BY id", String.class))
 			.containsOnly(TestEmbeddingProvider.failure(failure).outcome().name());
+	}
+
+	@ParameterizedTest(name = "순서={0}")
+	@ValueSource(ints = {1, 3})
+	@DisplayName("로드맵의 첫 코스와 다음 코스는 응답의 반영 내역을 원래 코스에 저장한다")
+	void storesMasteryReport(int position) throws InterruptedException {
+		// given
+		testChatProvider.reset();
+		var course = course(position);
+		long id = jobIntakeService.receive(course.getUserId(), request(course)).id();
+		String original = TestChatProvider.defaultText(JobType.PLAN_ROADMAP_COURSE);
+		String report = "{\"shortened\":[\"없는 개념\"],\"revisited\":[\"다시\"]}";
+		testChatProvider.reply(id, TestChatProvider.success(
+			original.substring(0, original.lastIndexOf('}')) + ",\"masteryReport\":" + report + "}"));
+
+		// when
+		boolean processed = runOnce();
+
+		// then
+		assertThat(processed).isTrue();
+		assertThat(jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", id))
+			.containsEntry("status", "SUCCEEDED");
+		assertThat(courseRepository.findById(course.getId()).orElseThrow().getMasteryReport())
+			.isEqualTo(new MasteryReport(List.of("없는 개념"), List.of("다시")));
+		assertThat(testChatProvider.requests(id)).hasSize(1);
 	}
 
 	private boolean runOnce() throws InterruptedException {

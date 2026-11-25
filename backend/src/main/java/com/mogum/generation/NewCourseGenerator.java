@@ -60,7 +60,7 @@ public final class NewCourseGenerator implements JobGenerator {
 		var values = job.input();
 		var input = new LearningInput(values.topic(), values.level(), values.levelOther(),
 			values.purpose(), values.purposeOther(), values.memo());
-		var course = courseRepository.save(Course.single(job.userId(), input, plan.title()));
+		var course = courseRepository.save(Course.single(job.userId(), input, plan.title(), plan.masteryReport()));
 
 		for (int index = 0; index < plan.lessons().size(); index++) {
 			var lesson = plan.lessons().get(index);

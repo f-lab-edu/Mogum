@@ -669,14 +669,14 @@ class JobRunnerIntegrationTest {
 			Purpose.OTHER, "LEAKCHECK-purpose", "LEAKCHECK-memo");
 		Long target = switch (type) {
 			case NEW_COURSE, NEW_ROADMAP -> null;
-			case REPLAN_COURSE -> courseRepository.save(Course.single(userId, input, "코스")).getId();
+			case REPLAN_COURSE -> courseRepository.save(Course.single(userId, input, "코스", null)).getId();
 			case REPLAN_ROADMAP -> roadmapRepository.save(Roadmap.plan(userId, input, "로드맵", "설명")).getId();
 			case PLAN_ROADMAP_COURSE -> {
 				var roadmap = roadmapRepository.save(Roadmap.plan(userId, input, "로드맵", "설명"));
 				yield courseRepository.save(Course.inRoadmap(roadmap, 1, "코스", "설명", List.of())).getId();
 			}
 			case MATERIAL -> {
-				var course = courseRepository.save(Course.single(userId, input, "코스"));
+				var course = courseRepository.save(Course.single(userId, input, "코스", null));
 				yield lessonRepository.save(Lesson.listed(course, 1, "강의", "설명", List.of())).getId();
 			}
 		};

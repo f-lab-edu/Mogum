@@ -148,7 +148,8 @@ class ReplanRoadmapGeneratorIntegrationTest {
 		assertThat(courses).extracting(row -> row.get("id")).doesNotContainAnyElementsOf(oldIds);
 		assertThat(courses).allSatisfy(row -> assertThat(row)
 			.containsEntry("title", "새 코스").containsEntry("plan_description", "새 코스 설명")
-			.containsEntry("status", "NOT_PLANNED").containsEntry("roadmap_id", roadmap.getId())
+			.containsEntry("mastery_report", null).containsEntry("status", "NOT_PLANNED")
+			.containsEntry("roadmap_id", roadmap.getId())
 			.containsEntry("user_id", roadmap.getUserId()).containsEntry("topic", null));
 		assertThat(jdbcTemplate.queryForList("SELECT plan_concepts -> 0 ->> 'name' FROM courses", String.class))
 			.containsExactly("새 개념", "새 개념", "새 개념");

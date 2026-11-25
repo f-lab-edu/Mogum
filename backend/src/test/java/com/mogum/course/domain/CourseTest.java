@@ -65,8 +65,10 @@ class CourseTest {
 		// given
 		var input = new LearningInput("자바", Level.BASICS, null, Purpose.WORK, null, null);
 
+		var report = new MasteryReport(List.of("변수"), List.of("함수"));
+
 		// when
-		var course = Course.single(17L, input, "자바 기초");
+		var course = Course.single(17L, input, "자바 기초", report);
 
 		// then
 		assertThat(course.getId()).isNull();
@@ -76,6 +78,7 @@ class CourseTest {
 		assertThat(course.getUserId()).isEqualTo(17L);
 		assertThat(course.getInput()).isSameAs(input);
 		assertThat(course.getTitle()).isEqualTo("자바 기초");
+		assertThat(course.getMasteryReport()).isEqualTo(report);
 
 		assertThat(course.getStatus()).isEqualTo(CourseStatus.REVIEWING);
 		assertThat(course.getRoadmap()).isNull();
@@ -111,6 +114,7 @@ class CourseTest {
 		assertThat(course.getPlanConcepts()).containsExactlyElementsOf(concepts);
 
 		assertThat(course.getStatus()).isEqualTo(CourseStatus.NOT_PLANNED);
+		assertThat(course.getMasteryReport()).isNull();
 		assertThat(course.getInput()).isNull();
 
 		assertThat(course.getStartedAt()).isNull();
@@ -126,14 +130,48 @@ class CourseTest {
 			List.of(new PlannedConcept("개념", "정의")));
 
 		// when
-		course.planLessons();
+		course.planLessons(new MasteryReport(List.of("짧게"), List.of("다시")));
 
 		// then
 		assertThat(course.getStatus()).isEqualTo(CourseStatus.REVIEWING);
+		assertThat(course.getMasteryReport()).isEqualTo(new MasteryReport(List.of("짧게"), List.of("다시")));
 		assertThat(course.getTitle()).isEqualTo("계획 제목");
 		assertThat(course.getPlanDescription()).isEqualTo("계획 설명");
 		assertThat(course.getPlanConcepts()).containsExactly(new PlannedConcept("개념", "정의"));
-		assertThatThrownBy(course::planLessons).isInstanceOf(IllegalStateException.class);
+		assertThatThrownBy(() -> course.planLessons(new MasteryReport(List.of(), List.of())))
+			.isInstanceOf(IllegalStateException.class);
+	}
+
+	@Test
+	@DisplayName("다시 짠 강의 목록의 반영 내역은 이전 값을 대체한다")
+	void replacesMasteryReportOnReplan() {
+		// given
+		var course = CourseFixtures.single(1L);
+		var old = new MasteryReport(List.of("이전"), List.of());
+		course.replanLessons(old);
+		var report = new MasteryReport(List.of(), List.of("새 내역"));
+
+		// when
+		course.replanLessons(report);
+
+		// then
+		assertThat(course.getMasteryReport()).isEqualTo(report);
+		assertThat(course.getStatus()).isEqualTo(CourseStatus.REVIEWING);
+	}
+
+	@ParameterizedTest(name = "상태={0}")
+	@EnumSource(value = CourseStatus.class, names = {"NOT_PLANNED", "LEARNING", "COMPLETED"})
+	@DisplayName("검토 중이 아니면 다시 짜기의 반영 내역도 바꾸지 않는다")
+	void preservesMasteryReportOutsideReviewing(CourseStatus status) {
+		// given
+		var course = CourseFixtures.withStatus(CourseFixtures.inRoadmap(
+			RoadmapFixtures.roadmap(1L), 1, "코스", "계획", List.of()), status);
+		var before = course.getMasteryReport();
+
+		// when & then
+		assertThatThrownBy(() -> course.replanLessons(new MasteryReport(List.of("새 내역"), List.of())))
+			.isInstanceOf(IllegalStateException.class);
+		assertThat(course.getMasteryReport()).isEqualTo(before);
 	}
 
 	@Test
