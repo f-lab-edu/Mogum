@@ -1,0 +1,11 @@
+{
+  "project": "Mogum",
+  "phase": "12-delete-withdraw",
+  "steps": [
+    { "step": 0, "name": "course-delete", "status": "pending" },
+    { "step": 1, "name": "roadmap-delete", "status": "pending" },
+    { "step": 2, "name": "account-withdraw", "status": "pending" },
+    { "step": 3, "name": "delete-screens", "status": "pending" },
+    { "step": 4, "name": "withdraw-screen", "status": "pending" }
+  ]
+}
