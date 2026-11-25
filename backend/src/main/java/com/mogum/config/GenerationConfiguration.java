@@ -68,9 +68,10 @@ public class GenerationConfiguration {
 
 	@Bean
 	public NewRoadmapGenerator newRoadmapGenerator(ChatCall chatCall, LlmProperties llmProperties,
-		CourseRepository courseRepository, RoadmapRepository roadmapRepository) {
+		CourseRepository courseRepository, RoadmapRepository roadmapRepository,
+		RelatedConceptPreparer relatedConceptPreparer) {
 		return new NewRoadmapGenerator(chatCall, llmProperties.planning(), new RoadmapPlanFormat(),
-			courseRepository, roadmapRepository);
+			relatedConceptPreparer, courseRepository, roadmapRepository);
 	}
 
 	@Bean
@@ -100,9 +101,9 @@ public class GenerationConfiguration {
 	@Bean
 	public ReplanRoadmapGenerator replanRoadmapGenerator(ChatCall chatCall, LlmProperties llmProperties,
 		CourseRepository courseRepository, RoadmapRepository roadmapRepository, EntityManager entityManager,
-		PlatformTransactionManager platformTransactionManager) {
+		PlatformTransactionManager platformTransactionManager, RelatedConceptPreparer relatedConceptPreparer) {
 		return new ReplanRoadmapGenerator(chatCall, llmProperties.planning(), new RoadmapPlanFormat(),
-			courseRepository, roadmapRepository, entityManager, platformTransactionManager);
+			relatedConceptPreparer, courseRepository, roadmapRepository, entityManager, platformTransactionManager);
 	}
 
 	@Bean

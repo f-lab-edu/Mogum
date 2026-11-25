@@ -21,17 +21,20 @@ public final class ReplanRoadmapGenerator implements JobGenerator {
 	private final ChatCall chatCall;
 	private final ChatSettings chatSettings;
 	private final RoadmapPlanFormat roadmapPlanFormat;
+	private final RelatedConceptPreparer relatedConceptPreparer;
 	private final CourseRepository courseRepository;
 	private final RoadmapRepository roadmapRepository;
 	private final EntityManager entityManager;
 	private final TransactionTemplate transactionTemplate;
 
 	public ReplanRoadmapGenerator(ChatCall chatCall, ChatSettings chatSettings, RoadmapPlanFormat roadmapPlanFormat,
-		CourseRepository courseRepository, RoadmapRepository roadmapRepository, EntityManager entityManager,
+		RelatedConceptPreparer relatedConceptPreparer, CourseRepository courseRepository,
+		RoadmapRepository roadmapRepository, EntityManager entityManager,
 		PlatformTransactionManager platformTransactionManager) {
 		this.chatCall = chatCall;
 		this.chatSettings = chatSettings;
 		this.roadmapPlanFormat = roadmapPlanFormat;
+		this.relatedConceptPreparer = relatedConceptPreparer;
 		this.courseRepository = courseRepository;
 		this.roadmapRepository = roadmapRepository;
 		this.entityManager = entityManager;
@@ -59,7 +62,12 @@ public final class ReplanRoadmapGenerator implements JobGenerator {
 				var previous = new RoadmapPlan(roadmap.getTitle(), roadmap.getDescription(), courses);
 				return new RoadmapPlanInput.ReplanRoadmap(planning, previous, job.feedback());
 			});
-			var prompt = roadmapPlanFormat.prompt(input);
+			var related = relatedConceptPreparer.prepare(job, input.queryTexts());
+			if (related instanceof RelatedConceptPreparer.RelatedResult.Failed failed) {
+				return failed.failure();
+			}
+			var prompt = roadmapPlanFormat.prompt(input.withRelatedConcepts(
+				((RelatedConceptPreparer.RelatedResult.Success)related).concepts()));
 			var result = chatCall.call(job, chatSettings, prompt.system(), prompt.user(), roadmapPlanFormat::parse);
 			return switch (result) {
 				case ChatResult.Success<RoadmapPlan> success ->

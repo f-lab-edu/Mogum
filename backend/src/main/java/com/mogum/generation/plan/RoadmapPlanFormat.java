@@ -10,6 +10,7 @@ public final class RoadmapPlanFormat {
 			data.put("previousPlan", replan.previousPlan());
 			PlanPromptSupport.optionalText(data, "feedback", replan.feedback());
 		}
+		PlanPromptSupport.relatedConcepts(data, input.relatedConcepts());
 		return PlanPromptSupport.prompt("roadmap.txt", null, data);
 	}
 

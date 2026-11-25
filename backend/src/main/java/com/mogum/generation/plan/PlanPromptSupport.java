@@ -3,7 +3,10 @@ package com.mogum.generation.plan;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+
+import com.mogum.card.service.ConceptLookupService.RelatedConcept;
 
 import tools.jackson.databind.json.JsonMapper;
 
@@ -28,6 +31,22 @@ final class PlanPromptSupport {
 		}
 		optionalText(data, "memo", input.memo());
 		return data;
+	}
+
+	static void relatedConcepts(Map<String, Object> data, List<RelatedConcept> concepts) {
+		if (!concepts.isEmpty()) {
+			data.put("relatedConcepts", concepts.stream().map(concept -> {
+				var value = new LinkedHashMap<String, Object>();
+				value.put("name", concept.name());
+				value.put("definition", concept.definition());
+				value.put("instruction", PlanPromptSupport.resource(switch (concept.judgment()) {
+					case WELL_KNOWN -> "mastery-well-known.txt";
+					case SHAKY -> "mastery-shaky.txt";
+					case NO_RECORD -> "mastery-no-record.txt";
+				}));
+				return value;
+			}).toList());
+		}
 	}
 
 	static String topicPurposeQuery(PlanningInput input) {

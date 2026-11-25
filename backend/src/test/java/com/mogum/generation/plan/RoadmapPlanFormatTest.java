@@ -4,6 +4,7 @@ import static com.mogum.generation.plan.CoursePlanFormatTest.course;
 import static com.mogum.generation.plan.CoursePlanFormatTest.input;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
@@ -12,9 +13,15 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+
+import com.mogum.card.domain.Judgment;
+import com.mogum.card.service.ConceptLookupService.RelatedConcept;
+import com.mogum.course.domain.Level;
+import com.mogum.course.domain.Purpose;
 
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -56,6 +63,99 @@ class RoadmapPlanFormatTest {
 		assertThat(data.path("feedback").asString()).isEqualTo("  피드백\n원문  ");
 		assertThat(data.has("level")).isTrue();
 		assertThat(prompt.system()).contains("제목 · 설명 · 코스 계획을 모두 새로");
+	}
+
+	@ParameterizedTest(name = "다시 짜기={0}")
+	@ValueSource(booleans = {false, true})
+	@DisplayName("로드맵 관련 개념은 강의 목록과 같은 키와 판정 지시만 담고 원래 재료도 보존한다")
+	void suppliesSharedRelatedConcepts(boolean replan) {
+		// given
+		var related = List.of(new RelatedConcept("변수", "값을 담는 이름", Judgment.WELL_KNOWN),
+			new RelatedConcept("함수", "동작의 묶음", Judgment.SHAKY),
+			new RelatedConcept("타입", "값의 종류", Judgment.NO_RECORD));
+		RoadmapPlanInput original = roadmapInput(input(), replan);
+		var input = original.withRelatedConcepts(related);
+		var course = new CoursePlanFormat().prompt(new CoursePlanInput.NewCourse(input(), related));
+
+		// when
+		var prompt = roadmapPlanFormat.prompt(input);
+
+		// then
+		var data = jsonMapper.readTree(prompt.user().split("\n", 3)[1]);
+		var concepts = data.path("relatedConcepts");
+		assertThat(concepts).isEqualTo(jsonMapper.readTree(course.user().split("\n", 3)[1]).path("relatedConcepts"));
+		assertThat(concepts).hasSize(3);
+		assertThat(concepts.get(0).properties()).extracting(entry -> entry.getKey())
+			.containsExactly("name", "definition", "instruction");
+		assertThat(concepts.get(0).path("name").asString()).isEqualTo("변수");
+		assertThat(concepts.get(0).path("definition").asString()).isEqualTo("값을 담는 이름");
+		assertThat(concepts.get(0).path("instruction").asString()).isEqualTo("짧게 다룬다.");
+		assertThat(concepts.get(1).path("instruction").asString()).isEqualTo("자세히 다룬다.");
+		assertThat(concepts.get(2).path("instruction").asString()).isEqualTo("처음 배우는 것으로 보고 자세히 다룬다.");
+		assertThat(prompt.user()).doesNotContain("WELL_KNOWN", "SHAKY", "NO_RECORD", "judgment", "0.9", "21");
+		assertThat(data.path("topic").asString()).isEqualTo(input().topic());
+		assertThat(data.has("previousPlan")).isEqualTo(replan);
+		assertThat(data.has("feedback")).isEqualTo(replan);
+		assertThat(original.relatedConcepts()).isEmpty();
+	}
+
+	@ParameterizedTest(name = "다시 짜기={0}")
+	@ValueSource(booleans = {false, true})
+	@DisplayName("빈 관련 개념은 생략하고 로드맵 배분과 피드백 우선 규칙은 시스템에 둔다")
+	void omitsEmptyRelatedConceptsAndSuppliesRules(boolean replan) {
+		// given
+		var input = roadmapInput(input(), replan);
+
+		// when
+		var prompt = roadmapPlanFormat.prompt(input);
+
+		// then
+		assertThat(jsonMapper.readTree(prompt.user().split("\n", 3)[1]).has("relatedConcepts")).isFalse();
+		assertThat(prompt.system()).contains("relatedConcepts", "이름 · 한 줄 정의 · instruction", "다른 개념과 묶어 적은 자리를",
+			"「자세히 다룬다」인 개념에는 자리를 더", "판정으로 개념을 빼지 않는다", "주제와 관계없는 개념은 쓰지 않는다",
+			"피드백은 어떤 것이든 숙련도로 정한 배분보다 앞선다", "코스 2개 이상", "상한은 없다");
+		assertThat(prompt.system()).doesNotContain("mastery_report", "masteryReport");
+	}
+
+	@ParameterizedTest(name = "목적={0}, 다시 짜기={1}")
+	@CsvSource({"WORK,false", "INTERVIEW,false", "GENERAL,false", "OTHER,false",
+		"WORK,true", "INTERVIEW,true", "GENERAL,true", "OTHER,true"})
+	@DisplayName("새 로드맵과 다시 짜기의 질의는 새 코스와 같은 주제와 목적 문구 하나다")
+	void sharesTopicPurposeQuery(Purpose purpose, boolean replan) {
+		// given
+		var planning = new PlanningInput("주제", Level.OTHER, "수준 표식", purpose, "기타 목적", "메모 표식");
+		var input = roadmapInput(planning, replan);
+		var data = jsonMapper.readTree(roadmapPlanFormat.prompt(input).user().split("\n", 3)[1]);
+
+		// when
+		var queries = input.queryTexts();
+
+		// then
+		assertThat(queries).containsExactly("주제\n" + data.path("purpose").asString());
+		assertThat(queries).isEqualTo(new CoursePlanInput.NewCourse(planning).queryTexts());
+	}
+
+	@ParameterizedTest(name = "다시 짜기={0}")
+	@ValueSource(booleans = {false, true})
+	@DisplayName("로드맵 입력은 외부 관련 개념 목록을 복사한다")
+	void copiesRelatedConcepts(boolean replan) {
+		// given
+		var related = new ArrayList<>(List.of(new RelatedConcept("개념", "정의", Judgment.NO_RECORD)));
+		var input = roadmapInput(input(), replan);
+
+		// when
+		var enriched = input.withRelatedConcepts(related);
+
+		// then
+		related.clear();
+		assertThat(enriched.relatedConcepts()).hasSize(1);
+		assertThat(input.relatedConcepts()).isEmpty();
+	}
+
+	private RoadmapPlanInput roadmapInput(PlanningInput input, boolean replan) {
+		return replan ? new RoadmapPlanInput.ReplanRoadmap(input,
+			new RoadmapPlan("이전 제목", "이전 설명", List.of(course("코스 하나"), course("코스 둘"))), "피드백 원문")
+			: new RoadmapPlanInput.NewRoadmap(input);
 	}
 
 	@ParameterizedTest(name = "빈 피드백 [{0}]")

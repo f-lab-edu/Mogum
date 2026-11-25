@@ -8,7 +8,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import com.mogum.card.domain.Judgment;
+import com.mogum.card.service.ConceptLookupService.RelatedConcept;
 import com.mogum.course.domain.Level;
 import com.mogum.course.domain.Purpose;
 
@@ -71,6 +74,28 @@ class PlanPromptSupportTest {
 		// then
 		assertThat(query).isEqualTo("주제 원문\n" + expected);
 		assertThat(query).isEqualTo("주제 원문\n" + PlanPromptSupport.materials(input, false).get("purpose"));
+	}
+
+	@ParameterizedTest(name = "개념 있음={0}")
+	@ValueSource(booleans = {false, true})
+	@DisplayName("관련 개념 공통 변환은 값이 있을 때만 이름과 정의와 지시를 더한다")
+	void addsRelatedConceptsOnlyWhenPresent(boolean present) {
+		// given
+		var data = PlanPromptSupport.materials(CoursePlanFormatTest.input(), true);
+		var concepts = present ? List.of(new RelatedConcept("개념", "정의", Judgment.SHAKY))
+			: List.<RelatedConcept>of();
+
+		// when
+		PlanPromptSupport.relatedConcepts(data, concepts);
+
+		// then
+		assertThat(data.containsKey("relatedConcepts")).isEqualTo(present);
+		if (present) {
+			var value = jsonMapper.valueToTree(data).path("relatedConcepts").get(0);
+			assertThat(value.properties()).extracting(entry -> entry.getKey())
+				.containsExactly("name", "definition", "instruction");
+			assertThat(value.path("instruction").asString()).isEqualTo("자세히 다룬다.");
+		}
 	}
 
 	@Test
