@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.mogum.account.dto.MeResponse;
 import com.mogum.account.service.ApplyService;
+import com.mogum.account.service.MeReadService;
 import com.mogum.auth.AccountPrincipal;
 import com.mogum.common.api.ApiResponse;
 
@@ -19,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ApplyController {
 	private final ApplyService applyService;
+	private final MeReadService meReadService;
 
 	@PostMapping("/api/account/apply")
 	public ApiResponse<MeResponse> apply(
@@ -36,6 +38,6 @@ public class ApplyController {
 				Long.toString(member.userId()));
 		}
 
-		return ApiResponse.of(new MeResponse(member.status().name(), member.email(), member.name()));
+		return ApiResponse.of(meReadService.read(member));
 	}
 }

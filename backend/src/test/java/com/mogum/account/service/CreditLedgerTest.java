@@ -8,6 +8,7 @@ import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.mogum.account.domain.CreditEntry;
@@ -45,19 +46,20 @@ class CreditLedgerTest {
 		assertThat(creditEntryRepository.entries().stream().mapToInt(CreditEntry::getAmount).sum()).isZero();
 	}
 
-	@Test
+	@ParameterizedTest(name = "채움 시각 {0}, 서울 날짜 {1}")
+	@CsvSource({"2026-12-07T19:00:00Z,2026-12-08", "2026-12-31T19:00:00Z,2027-01-01"})
 	@DisplayName("잔액이 부족하면 변경 없이 한국 새벽 4시의 채움 날짜를 문구에 넣는다")
-	void rejectsInsufficientCreditWithSeoulRefillDate() {
+	void rejectsInsufficientCreditWithSeoulRefillDate(String refillAt, String date) {
 		// given
 		var user = userRepository.save(
-			UserFixtures.approved("me@example.com", 3, Instant.parse("2026-12-07T19:00:00Z")));
+			UserFixtures.approved("me@example.com", 3, Instant.parse(refillAt)));
 		creditEntryRepository.save(CreditEntry.refill(user, 3));
 
 		// when & then
 		assertThatThrownBy(() -> creditLedger.consume(user.getId(), 71L, 4))
 			.isInstanceOfSatisfying(ApiException.class, exception -> {
 				assertThat(exception.errorCode()).isEqualTo(ErrorCode.CREDIT_INSUFFICIENT);
-				assertThat(exception.responseMessage()).isEqualTo("크레딧이 부족합니다. 2026-12-08에 다시 채워집니다");
+				assertThat(exception.responseMessage()).isEqualTo("크레딧이 부족합니다. " + date + "에 다시 채워집니다");
 			});
 		assertThat(user.getCreditBalance()).isEqualTo(3);
 		assertThat(creditEntryRepository.entries()).hasSize(1);

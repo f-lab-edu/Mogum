@@ -126,7 +126,7 @@
 | 강의 하나 | 강의 자료 · 학습 완료 여부 · 강의 자료의 작업이 있으면 그 작업 | 강의 화면 |
 | 오늘 복습할 카드 | 카드들 — 질문 · 답 · 평가마다 다음 간격(ADR-170) · 몇 장 남았는지(ADR-014 · ADR-017). 코스를 주면 그 코스의 카드만(ADR-172). 화면은 받은 카드를 다 보면 다시 읽는다 — 같은 날 다시 보는 카드가 돌아온다(ADR-164) | 복습 탭 |
 
-- 계정 TASK 구현: 「나」는 `GET /api/me`이며, 성공 응답 `data`에 `status` · `email` · `name`을 싣는다.
+- 계정 TASK 구현: 「나」는 `GET /api/me`이며, 성공 응답 `data`에 `status` · `email` · `name`을 싣는다. 홈 · 크레딧 TASK(`11-home-credits` step 2)에서 `APPROVED`일 때만 `credit: {balance, nextRefillDate}`를 더했다 — `balance`는 DB의 남은 크레딧 정수, `nextRefillDate`는 다음에 채우는 때를 `Asia/Seoul`로 바꾼 `yyyy-MM-dd` 날짜 문자열이다. 그 밖 상태에서는 `credit` 칸을 생략한다.
 - 만드는 작업 TASK 구현: 「작업 하나」는 `GET /api/jobs/{id}`이며, `job.service.JobReadService.read(userId, jobId)`가 주인을 확인한 뒤 [§2](#2-만드는-작업--받기-하나--다시-읽기)의 응답을 만든다. 남의 작업과 없는 작업 모두 `NOT_FOUND`(404), 「찾을 수 없습니다」다. 조회는 상태 · Auditing 시각 · 크레딧을 바꾸지 않는다.
 - 강의 목록 TASK(`7-course-planning` step 6) 구현: 아래 읽기 넷은 모두 HTTP 200의 `ApiResponse`로 감싼다. 목록은 나눠 받지 않고 `created_at DESC, id DESC`로 정렬하며, 코스 · 강의의 내부 순서는 `position ASC`다. 없는 대상과 남의 대상은 `NOT_FOUND`(404)다. 읽기는 상태 · 시각 · 작업 · 크레딧을 바꾸지 않는다.
 
@@ -147,7 +147,7 @@
 - 복습 TASK(`9-card-review` step 1) 구현: 「오늘 복습할 카드」는 `GET /api/reviews/today`이며, 선택 쿼리 `courseId`를 주면 그 코스의 강의에 달린 카드만 읽는다. HTTP 200의 `ApiResponse<TodayReviewResponse>`로 감싸고 `data`에 `cards` · `remainingCount`를 싣는다. `cards`는 `[{id, question, answer, nextIntervalsSeconds: {AGAIN, HARD, GOOD, EASY}}]`이며, 네 등급의 간격은 이 요청에서 한 번 읽은 「지금」으로 `FsrsCalculator.preview`를 부른 **초 단위 정수**다. 문구로 바꾸는 것은 화면의 일이다. `remainingCount`는 이번 목록의 카드 수이며 현재 카드도 포함한다. 목록은 나눠 받지 않고 `due_at ASC, id ASC`로 정렬한다.
 - 복습 TASK 구현: 코스로 거르면 `courseTitle`도 싣고, 전체 복습에서는 생략한다. 없는 코스와 남의 코스는 `NOT_FOUND`(404), 「찾을 수 없습니다」다. 내 코스에 카드가 없거나 오늘 볼 것이 없으면 `cards: []` · `remainingCount: 0`과 코스 제목을 돌려준다. 카드의 FSRS 칸 · 다음 볼 때 · 강의 및 코스 출처 · 시스템 정보는 싣지 않는다. 읽기는 카드 · 복습 기록 · 시각을 바꾸지 않는다.
 - 복습 TASK 구현: `card.service.TodayReviewService.selectCards(userId, courseId, now)`가 [02 §3](./02-domain-data.md#3-학습과-복습)의 오늘 복습할 카드 선택과 코스별 앞당겨 보기를 한 곳에서 맡고, 목록과 `count(userId, courseId)`가 함께 쓴다. 코스 하나의 `todayReviewCount`는 이 코스로 거른 카드 수인 정수이며 0도 싣는다. 코스 시작 · 제목 고치기도 같은 칸을 채운다. 뒤 홈의 「오늘 복습」 수도 이 서비스를 쓴다.
-- 「나」의 크레딧(남은 크레딧 · 다음에 채워지는 날)은 내 정보 탭 TASK 에서 더한다 — 계정 TASK 의 「나」는 누구인지(이메일 · 이름)와 상태만 싣는다. 응답이 객체라 칸만 더하면 된다(§1 · 사용자 확인 2026-11-08).
+- 「나」의 크레딧은 `account.service.MeReadService.read`가 요청마다 `users`에서 읽는다 — 상태 · 잔액 · 시각 · 기록을 바꾸거나 세션에 크레딧을 담지 않는다. 신청 응답도 같은 읽기와 DTO를 쓰므로 신청 직후 `APPLIED`에서는 크레딧 칸이 없다. 날짜 변환은 크레딧 부족 문구와 같은 `SeoulClock.calendarDate`를 쓴다(`11-home-credits` step 2 구현).
 - 개인정보처리방침은 화면에 둔 글이라 읽기가 없다.
 
 ## 4. 보내는 동작

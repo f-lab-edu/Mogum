@@ -35,7 +35,7 @@ public class CreditLedger {
 
 		var user = lockedUser(userId);
 		if (user.getCreditBalance() < amount) {
-			var refillDate = user.getCreditRefillAt().atZone(SeoulClock.ZONE).toLocalDate();
+			var refillDate = SeoulClock.calendarDate(user.getCreditRefillAt());
 			throw ApiException.withMessage(ErrorCode.CREDIT_INSUFFICIENT,
 				"크레딧이 부족합니다. " + refillDate + "에 다시 채워집니다");
 		}
