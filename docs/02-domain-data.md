@@ -166,6 +166,7 @@ erDiagram
 - **한 번 들어간 개념은 카드가 모두 사라져도 지우지 않는다**(ADR-049) — 같은 개념이 다시 나오면 그 개념에 붙는다. 사전은 탈퇴할 때만 지운다.
 - **판정이 틀려도 바로잡는 방법은 두지 않는다**(ADR-050) — 기준을 잘 맞추는 것으로 대신한다.
 - 같은 사용자의 판정 · 넣기는 `LessonCardWriter.writeLessonCards`가 기존 `UserRepository.findByIdForUpdate`의 사용자 행 잠금을 먼저 얻어 호출자의 트랜잭션 끝까지 줄 세운다 — 사용자마다 행이 달라 다른 사용자의 저장은 기다리지 않으며, 크레딧 쓰기와 같은 잠금 경로를 쓴다.
+- 읽기 전용 조회는 `ConceptLookupService.hasConcepts(long userId)` · `findRelated(long userId, List<float[]> queries, int limit, Instant now)` · `judgeMatching(long userId, List<float[]> definitions, Instant now)`가 맡는다. 같은 개념 맞추기는 쓰기 경로 `findSameConcept`와 같은 거리 → 개념 ID 순서 및 기준값 이상(`>=`) 비교를 쓴다.
 
 ## 7. 지우기 · 탈퇴 — 함께 사라지는 범위
 
