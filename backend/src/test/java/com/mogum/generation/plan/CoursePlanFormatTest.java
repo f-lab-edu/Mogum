@@ -152,7 +152,7 @@ class CoursePlanFormatTest {
 		assertThat(concepts.get(0).path("name").asString()).isEqualTo("변수");
 		assertThat(concepts.get(0).path("definition").asString()).isEqualTo("값을 담는 이름");
 		assertThat(concepts.get(0).path("instruction").asString()).isEqualTo("짧게 다룬다.");
-		assertThat(concepts.get(1).path("instruction").asString()).isEqualTo("자세히 다룬다.");
+		assertThat(concepts.get(1).path("instruction").asString()).isEqualTo("전에 배웠지만 흔들린다. 자세히 다룬다.");
 		assertThat(concepts.get(2).path("instruction").asString()).isEqualTo("처음 배우는 것으로 보고 자세히 다룬다.");
 		assertThat(prompt.user()).doesNotContain("WELL_KNOWN", "SHAKY", "NO_RECORD", "judgment", "0.9", "21");
 	}
@@ -170,7 +170,9 @@ class CoursePlanFormatTest {
 		assertThat(data(prompt).has("relatedConcepts")).isFalse();
 		assertThat(prompt.system()).contains("10강 중 최대 2강", "주제와 관계없는 개념은 쓰지 않는다",
 			"피드백은 어떤 것이든 숙련도로 정한 배분보다 앞선다", "판정으로 개념을 빼지 않는다",
-			"다른 개념과 한 강의에 묶어", "강의를 따로", "로드맵 계획에 없는 개념이어도 된다");
+			"다른 개념과 한 강의에 묶어", "강의를 따로",
+			"지시가 「전에 배웠지만 흔들린다」로 시작하는 관련 개념을 다시 짚는 강의를 넣을 수 있다. 로드맵 계획에 없는 개념이어도 된다.",
+			"revisited는 지시가 「전에 배웠지만 흔들린다」로 시작하는 관련 개념 가운데 다시 짚는 강의에서 다룬 개념이다.");
 	}
 
 	@ParameterizedTest(name = "목적={0}")

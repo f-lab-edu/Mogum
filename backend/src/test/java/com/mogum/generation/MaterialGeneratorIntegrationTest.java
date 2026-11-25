@@ -448,10 +448,10 @@ class MaterialGeneratorIntegrationTest {
 			var concepts = data.path("lesson").path("concepts");
 			assertThat(concepts.size()).isEqualTo(5);
 			assertThat(concepts.get(0).path("instruction").asString())
-				.isEqualTo(elapsed ? "자세히 다룬다." : "짧게 다룬다.");
+				.isEqualTo(elapsed ? "전에 배웠지만 흔들린다. 자세히 다룬다." : "짧게 다룬다.");
 			assertThat(concepts.get(1).path("instruction").asString())
 				.isEqualTo(concepts.get(0).path("instruction").asString());
-			assertThat(concepts.get(2).path("instruction").asString()).isEqualTo("자세히 다룬다.");
+			assertThat(concepts.get(2).path("instruction").asString()).isEqualTo("전에 배웠지만 흔들린다. 자세히 다룬다.");
 			assertThat(concepts.get(3).path("instruction").asString()).isEqualTo("처음 배우는 것으로 보고 자세히 다룬다.");
 			assertThat(concepts.get(4).path("instruction").asString()).isEqualTo("처음 배우는 것으로 보고 자세히 다룬다.");
 			assertThat(request.messages().toString()).doesNotContain("WELL_KNOWN", "SHAKY", "NO_RECORD", "0.72", "0.9");

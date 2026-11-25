@@ -237,6 +237,23 @@ class MaterialFormatTest {
 	}
 
 	@Test
+	@DisplayName("직렬화한 강의 자료의 개념 키는 이름과 정의와 지시 순서다")
+	void serializesConceptKeysInStableOrder() {
+		// given
+		var input = new MaterialInput("코스", "주제", new MaterialInput.LessonLine(1, "강의", "설명",
+			List.of(new PlannedConcept("변수", "값을 담는 이름"), new PlannedConcept("함수", "동작의 묶음"))),
+			List.of(), Purpose.GENERAL, null, null);
+
+		// when
+		var prompt = materialFormat.prompt(input);
+
+		// then
+		assertThat(prompt.user()).contains(
+			"{\"name\":\"변수\",\"definition\":\"값을 담는 이름\",\"instruction\":\"처음 배우는 것으로 보고 자세히 다룬다.\"}",
+			"{\"name\":\"함수\",\"definition\":\"동작의 묶음\",\"instruction\":\"처음 배우는 것으로 보고 자세히 다룬다.\"}");
+	}
+
+	@Test
 	@DisplayName("모든 개념에 서로 다른 판정 지시를 붙이고 판정 이름이나 숙련도 숫자는 넘기지 않는다")
 	void rendersInstructionsForEveryConceptWithoutJudgmentData() {
 		// given
@@ -256,10 +273,10 @@ class MaterialFormatTest {
 		var concepts = data.path("lesson").path("concepts");
 		assertThat(concepts.size()).isEqualTo(3);
 		assertThat(concepts.get(0).path("instruction").asString()).isEqualTo("짧게 다룬다.");
-		assertThat(concepts.get(1).path("instruction").asString()).isEqualTo("자세히 다룬다.");
+		assertThat(concepts.get(1).path("instruction").asString()).isEqualTo("전에 배웠지만 흔들린다. 자세히 다룬다.");
 		assertThat(concepts.get(2).path("instruction").asString()).isEqualTo("처음 배우는 것으로 보고 자세히 다룬다.");
 		for (var concept : concepts) {
-			assertThat(concept.propertyNames()).containsExactlyInAnyOrder("name", "definition", "instruction");
+			assertThat(concept.propertyNames()).containsExactly("name", "definition", "instruction");
 			assertThat(concept.toString()).doesNotContainPattern("[0-9]");
 		}
 		assertThat(prompt.user() + prompt.system()).doesNotContain("WELL_KNOWN", "SHAKY", "NO_RECORD",

@@ -90,7 +90,7 @@ class RoadmapPlanFormatTest {
 		assertThat(concepts.get(0).path("name").asString()).isEqualTo("변수");
 		assertThat(concepts.get(0).path("definition").asString()).isEqualTo("값을 담는 이름");
 		assertThat(concepts.get(0).path("instruction").asString()).isEqualTo("짧게 다룬다.");
-		assertThat(concepts.get(1).path("instruction").asString()).isEqualTo("자세히 다룬다.");
+		assertThat(concepts.get(1).path("instruction").asString()).isEqualTo("전에 배웠지만 흔들린다. 자세히 다룬다.");
 		assertThat(concepts.get(2).path("instruction").asString()).isEqualTo("처음 배우는 것으로 보고 자세히 다룬다.");
 		assertThat(prompt.user()).doesNotContain("WELL_KNOWN", "SHAKY", "NO_RECORD", "judgment", "0.9", "21");
 		assertThat(data.path("topic").asString()).isEqualTo(input().topic());

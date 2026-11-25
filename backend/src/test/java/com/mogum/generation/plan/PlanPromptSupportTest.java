@@ -57,7 +57,7 @@ class PlanPromptSupportTest {
 			PlanPromptSupport.resource("mastery-shaky.txt"), PlanPromptSupport.resource("mastery-no-record.txt"));
 
 		// then
-		assertThat(instructions).containsExactly("짧게 다룬다.", "자세히 다룬다.", "처음 배우는 것으로 보고 자세히 다룬다.");
+		assertThat(instructions).containsExactly("짧게 다룬다.", "전에 배웠지만 흔들린다. 자세히 다룬다.", "처음 배우는 것으로 보고 자세히 다룬다.");
 	}
 
 	@ParameterizedTest(name = "목적 {0}: {1}")
@@ -94,7 +94,7 @@ class PlanPromptSupportTest {
 			var value = jsonMapper.valueToTree(data).path("relatedConcepts").get(0);
 			assertThat(value.properties()).extracting(entry -> entry.getKey())
 				.containsExactly("name", "definition", "instruction");
-			assertThat(value.path("instruction").asString()).isEqualTo("자세히 다룬다.");
+			assertThat(value.path("instruction").asString()).isEqualTo("전에 배웠지만 흔들린다. 자세히 다룬다.");
 		}
 	}
 

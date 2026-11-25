@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -40,7 +39,11 @@ public final class MaterialFormat {
 				case SHAKY -> "planning/mastery-shaky.txt";
 				case NO_RECORD -> "planning/mastery-no-record.txt";
 			});
-			return Map.of("name", concept.name(), "definition", concept.definition(), "instruction", instruction);
+			var value = new LinkedHashMap<String, Object>();
+			value.put("name", concept.name());
+			value.put("definition", concept.definition());
+			value.put("instruction", instruction);
+			return value;
 		}).toList());
 		data.put("lesson", lesson);
 		data.put("lessons", input.lessons());
