@@ -288,7 +288,7 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 
 ## 10. 아직 정하지 않은 값
 
-같은 개념 판정은 `app.concept.same-threshold`(`config.ConceptProperties.sameThreshold()`)로 설정한다. `0.72` — 2026-11-23 실측(ADR-187)으로 정함. 숙련도 고리 TASK 전에 실제 흐름으로 다시 잰다. 0 초과 1 이하가 아니면 기동을 거부한다.
+같은 개념 판정은 `app.concept.same-threshold`(`config.ConceptProperties.sameThreshold()`)로 설정한다. `0.72` — 2026-11-23 실측(ADR-187)으로 정함. 실제 흐름으로 다시 재는 것은 M2 1차 품질 점검으로 옮겼다(사용자 결정 2026-11-25). 강의 자료의 다룰 개념을 사전과 맞출 때도 이 값을 쓴다(03 §3). 0 초과 1 이하가 아니면 기동을 거부한다.
 
 | 값 | 근거 |
 |---|---|
@@ -305,7 +305,7 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 
 | 설정 키 | 읽는 메서드 | 임시 값 |
 |---|---|---|
-| `app.worker.lease-duration` | `leaseDuration()` | `16m` |
+| `app.worker.lease-duration` | `leaseDuration()` | `17m` |
 | `app.worker.renewal-interval` | `renewalInterval()` | `30s` |
 | `app.worker.max-retries` | `maxRetries()` | `2`(최대 호출 3번) |
 | `app.worker.retry-delay` | `retryDelay()` | `1s` |
@@ -313,14 +313,14 @@ MDC 키의 출력 순서는 정해지지 않았다. 시각 · 요청 ID · PID �
 | `app.worker.poll-interval` | `pollInterval()` | `1s` |
 | `app.worker.shutdown-wait` | `shutdownWait()` | `150s` |
 
-시한은 **한 번 꺼낸 시도의 최장 시간보다 길어야 한다**. `R`은 추가 자동 다시 시도 횟수, `C`는 호출마다 허용한 이어 쓰기 횟수, `T호출`은 채팅 호출 시간 제한, `T임베딩`은 한 시도에서 개념 정의를 한 번에 보내는 임베딩 호출 한 번의 시간 제한, `D다시시도`는 자동 다시 시도 사이 간격이다. 이어 쓰기 사이 간격은 0초다. `T_DB`는 재료 읽기 · 시한 처리 · 결과/실패 쓰기를 포함한 DB 처리의 여유다.
+시한은 **한 번 꺼낸 시도의 최장 시간보다 길어야 한다**. `R`은 추가 자동 다시 시도 횟수, `C`는 호출마다 허용한 이어 쓰기 횟수, `T호출`은 채팅 호출 시간 제한, `T임베딩`은 개념 정의를 한 번에 보내는 임베딩 호출 한 번의 시간 제한, `D다시시도`는 자동 다시 시도 사이 간격이다. 이어 쓰기 사이 간격은 0초다. `T_DB`는 재료 읽기 · 시한 처리 · 결과/실패 쓰기를 포함한 DB 처리의 여유다.
 
 ```text
-시한 > (R + 1) × (max_묶음((C + 1) × T호출) + T임베딩) + R × D다시시도 + T_DB
-현재: 960초 > 3 × (2 × 140초 + 20초) + 2 × 1초 + 10초 = 912초
+시한 > (R + 1) × (max_묶음((C + 1) × T호출) + 2 × T임베딩) + R × D다시시도 + T_DB
+현재: 1020초 > 3 × (2 × 140초 + 2 × 20초) + 2 × 1초 + 10초 = 972초
 ```
 
-`8-material-cards` step 0에서 강의 자료 채팅 `T호출=140초`, `C=1`과 임베딩 `T임베딩=20초`의 임시 값을 더했다(ADR-186 · ADR-187). 강의 목록 채팅은 50초 · 이어 쓰기 1번이며, 임베딩을 하지 않는 강의 목록에도 임베딩 시간을 더해 식 하나로 보수적으로 검사한다. `T_DB=10초`는 재료 읽기 · 호출 기록 · 시한 처리 · 결과/실패 쓰기에 남기는 예산이며 실측 상한은 아니다. 운영 프롬프트와 DB 부하로 다시 잰다. `config.LlmConfiguration`의 생성자는 모든 채팅 묶음 중 `(C + 1) × T호출`이 가장 큰 값에 임베딩 시간을 더해 엄격한 부등식을 검사하며, 각 채팅 호출 시간 제한보다 정상 종료 대기(150초)가 길어야 한다. 깨지면 빈 생성 실패로 기동을 거부한다.
+`8-material-cards` step 0에서 강의 자료 채팅 `T호출=140초`, `C=1`과 임베딩 `T임베딩=20초`의 임시 값을 더했다(ADR-186 · ADR-187). `10-mastery-loop` step 2에서 강의 자료 한 시도의 임베딩이 채팅 앞(다룰 개념) · 뒤(카드 개념) 두 번이 되어 시한을 17분으로 늘렸다. 강의 목록 · 로드맵 계획 채팅은 50초 · 이어 쓰기 1번이며, 한 시도의 임베딩이 한 번인 계획 생성도 두 번의 임베딩 시간을 더하는 식 하나로 보수적으로 검사한다. `T_DB=10초`는 재료 읽기 · 호출 기록 · 시한 처리 · 결과/실패 쓰기에 남기는 예산이며 실측 상한은 아니다. 운영 프롬프트와 DB 부하로 다시 잰다. `config.LlmConfiguration`의 생성자는 모든 채팅 묶음 중 `(C + 1) × T호출`이 가장 큰 값에 임베딩 두 번의 시간을 더해 엄격한 부등식을 검사하며, 각 채팅 호출 시간 제한보다 정상 종료 대기(150초)가 길어야 한다. 깨지면 빈 생성 실패로 기동을 거부한다.
 
 채팅 · 임베딩 설정은 `application.yml`의 `app.llm` 한 곳이고 `config.LlmProperties` record로 읽는다. 생성자는 `planning` · `material` · `embedding`의 누락, 채팅 설정의 유효성, 임베딩 모델이 빈 값인지와 시간 제한이 양수인지를 검사해 설정 바인딩 실패로 기동을 거부한다. `GenerationConfiguration`은 `LlmProperties.planning()`으로 계획 묶음을 받아 다섯 생성 처리기에 넘긴다. `8-material-cards` step 3의 `MaterialGenerator`는 `material()` 채팅 묶음과 `embedding()`의 모델 · 시간 제한을 `EmbeddingSettings`로 받아 쓴다. step 1의 임베딩 호출 경계에는 SDK 없는 `generation.EmbeddingSettings(model, timeout)`을 넘긴다. 임베딩 설정 바인딩은 별도 `LlmProperties.Embedding(model, timeout)` record이며 채팅의 출력 상한 · 이어 쓰기 설정은 쓰지 않는다.
 

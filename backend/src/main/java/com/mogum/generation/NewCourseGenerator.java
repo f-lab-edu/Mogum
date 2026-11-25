@@ -19,6 +19,7 @@ public final class NewCourseGenerator implements JobGenerator {
 	private final ChatCall chatCall;
 	private final ChatSettings chatSettings;
 	private final CoursePlanFormat coursePlanFormat;
+	private final RelatedConceptPreparer relatedConceptPreparer;
 	private final CourseRepository courseRepository;
 	private final LessonRepository lessonRepository;
 
@@ -33,7 +34,13 @@ public final class NewCourseGenerator implements JobGenerator {
 			var input = job.input();
 			var planning = new PlanningInput(input.topic(), input.level(), input.levelOther(),
 				input.purpose(), input.purposeOther(), input.memo());
-			var prompt = coursePlanFormat.prompt(new CoursePlanInput.NewCourse(planning));
+			var planInput = new CoursePlanInput.NewCourse(planning);
+			var related = relatedConceptPreparer.prepare(job, planInput.queryTexts());
+			if (related instanceof RelatedConceptPreparer.RelatedResult.Failed failed) {
+				return failed.failure();
+			}
+			var prompt = coursePlanFormat.prompt(planInput.withRelatedConcepts(
+				((RelatedConceptPreparer.RelatedResult.Success)related).concepts()));
 
 			var result = chatCall.call(job, chatSettings, prompt.system(), prompt.user(),
 				coursePlanFormat::parseNewCourse);
@@ -53,7 +60,7 @@ public final class NewCourseGenerator implements JobGenerator {
 		var values = job.input();
 		var input = new LearningInput(values.topic(), values.level(), values.levelOther(),
 			values.purpose(), values.purposeOther(), values.memo());
-		var course = courseRepository.save(Course.single(job.userId(), input, plan.title()));
+		var course = courseRepository.save(Course.single(job.userId(), input, plan.title(), plan.masteryReport()));
 
 		for (int index = 0; index < plan.lessons().size(); index++) {
 			var lesson = plan.lessons().get(index);

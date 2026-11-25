@@ -250,6 +250,65 @@ class FsrsCalculatorTest {
 			.isInstanceOf(NullPointerException.class);
 	}
 
+	@Test
+	@DisplayName("떠올릴 확률은 기본 라이브러리 계산과 같고 흔들기 설정과 무관하다")
+	void delegatesRetrievabilityRegardlessOfFuzz() {
+		// given
+		var card = reviewCard(1L);
+		var input = io.github.openspacedrepetition.Card.builder()
+			.cardId(0).state(io.github.openspacedrepetition.State.REVIEW).step(null)
+			.stability(card.getStability()).difficulty(card.getDifficulty())
+			.due(card.getDueAt()).lastReview(card.getLastReviewedAt()).build();
+		var defaults = io.github.openspacedrepetition.Scheduler.builder().build();
+		var withoutFuzz = io.github.openspacedrepetition.Scheduler.builder().enableFuzzing(false).build();
+
+		// when
+		var actual = fsrsCalculator.retrievability(card, NOW);
+
+		// then
+		assertThat(actual).isEqualTo(defaults.getCardRetrievability(input, NOW))
+			.isEqualTo(withoutFuzz.getCardRetrievability(input, NOW));
+	}
+
+	@Test
+	@DisplayName("복습 직후 떠올릴 확률은 1에 가깝다")
+	void recallsImmediatelyAfterReview() {
+		// given
+		var card = reviewCard(1L);
+		card.applyReview(fsrsCalculator.review(card, Rating.GOOD, NOW));
+
+		// when
+		var actual = fsrsCalculator.retrievability(card, NOW);
+
+		// then
+		assertThat(actual).isCloseTo(1.0, org.assertj.core.data.Offset.offset(1e-12));
+	}
+
+	@Test
+	@DisplayName("같은 카드도 마지막 복습 뒤 시간이 지나면 떠올릴 확률이 줄어든다")
+	void losesRetrievabilityOverTime() {
+		// given
+		var card = reviewCard(1L);
+		var current = fsrsCalculator.retrievability(card, NOW);
+
+		// when
+		var later = fsrsCalculator.retrievability(card, NOW.plus(Duration.ofDays(30)));
+
+		// then
+		assertThat(later).isLessThan(current);
+	}
+
+	@Test
+	@DisplayName("확률 계산 시각이 없으면 시스템 시계로 대체하지 않고 실패한다")
+	void rejectsMissingRetrievabilityInstant() {
+		// given
+		var card = reviewCard(1L);
+
+		// when & then
+		assertThatThrownBy(() -> fsrsCalculator.retrievability(card, null))
+			.isInstanceOf(NullPointerException.class);
+	}
+
 	private static Card reviewCard(long id) {
 		var card = CardFixtures.scheduled(id, NOW);
 		card.applyReview(new FsrsResult(FsrsState.REVIEW, null, 100.0, 5.0, NOW,

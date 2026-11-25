@@ -1,8 +1,11 @@
 package com.mogum.generation;
 
+import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.List;
 
+import com.mogum.card.domain.Judgment;
+import com.mogum.card.service.ConceptLookupService;
 import com.mogum.card.service.LessonCardWriter;
 import com.mogum.card.service.LessonCardWriter.NewCard;
 import com.mogum.card.service.LessonCardWriter.NewConcept;
@@ -27,6 +30,8 @@ public final class MaterialGenerator implements JobGenerator {
 	private final LessonRepository lessonRepository;
 	private final MaterialRepository materialRepository;
 	private final LessonCardWriter lessonCardWriter;
+	private final ConceptLookupService conceptLookupService;
+	private final Clock clock;
 
 	@Override
 	public JobType type() {
@@ -36,7 +41,26 @@ public final class MaterialGenerator implements JobGenerator {
 	@Override
 	public GenerationOutcome generate(JobSnapshot job) {
 		try {
-			var prompt = materialFormat.prompt(materialReader.read(job.targetId()));
+			var input = materialReader.read(job.targetId());
+			if (conceptLookupService.hasConcepts(job.userId())) {
+				var definitions = input.lesson().concepts().stream().map(concept -> concept.definition()).distinct()
+					.toList();
+				if (!definitions.isEmpty()) {
+					var embedding = embeddingCall.call(job, embeddingSettings, definitions);
+					if (embedding instanceof EmbeddingResult.Failed failed) {
+						return failed.failure();
+					}
+					var vectors = ((EmbeddingResult.Success)embedding).value().stream()
+						.map(MaterialGenerator::vector).toList();
+					var judgments = conceptLookupService.judgeMatching(job.userId(), vectors, clock.instant());
+					var byDefinition = new LinkedHashMap<String, Judgment>();
+					for (int index = 0; index < definitions.size(); index++) {
+						byDefinition.put(definitions.get(index), judgments.get(index));
+					}
+					input = input.withJudgments(byDefinition);
+				}
+			}
+			var prompt = materialFormat.prompt(input);
 			var chat = chatCall.call(job, chatSettings, prompt.system(), prompt.user(), materialFormat::parse);
 			if (chat instanceof ChatResult.Failed<MaterialContent> failed) {
 				return failed.failure();
@@ -51,12 +75,7 @@ public final class MaterialGenerator implements JobGenerator {
 			var vectors = ((EmbeddingResult.Success)embedding).value();
 			var byDefinition = new LinkedHashMap<String, float[]>();
 			for (int index = 0; index < definitions.size(); index++) {
-				var values = vectors.get(index);
-				var vector = new float[values.size()];
-				for (int dimension = 0; dimension < vector.length; dimension++) {
-					vector[dimension] = values.get(dimension);
-				}
-				byDefinition.put(definitions.get(index), vector);
+				byDefinition.put(definitions.get(index), vector(vectors.get(index)));
 			}
 			var cards = content.cards().stream().map(card -> new NewCard(card.question(), card.answer(),
 				card.concepts().stream().map(concept -> new NewConcept(concept.name(), concept.definition(),
@@ -66,6 +85,14 @@ public final class MaterialGenerator implements JobGenerator {
 		} catch (RuntimeException exception) {
 			return GenerationFailures.unavailable(exception);
 		}
+	}
+
+	private static float[] vector(List<Float> values) {
+		var vector = new float[values.size()];
+		for (int dimension = 0; dimension < vector.length; dimension++) {
+			vector[dimension] = values.get(dimension);
+		}
+		return vector;
 	}
 
 	@Override

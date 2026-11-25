@@ -8,7 +8,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import com.mogum.card.domain.Judgment;
+import com.mogum.card.service.ConceptLookupService.RelatedConcept;
 import com.mogum.course.domain.Level;
 import com.mogum.course.domain.Purpose;
 
@@ -44,6 +47,55 @@ class PlanPromptSupportTest {
 
 		// then
 		assertThat(data).containsEntry("purpose", expected).doesNotContainValue("쓰지 않을 기타");
+	}
+
+	@Test
+	@DisplayName("계획 프롬프트는 강의 자료와 같은 세 판정 지시 파일을 읽는다")
+	void readsSharedMasteryInstructions() {
+		// when
+		var instructions = List.of(PlanPromptSupport.resource("mastery-well-known.txt"),
+			PlanPromptSupport.resource("mastery-shaky.txt"), PlanPromptSupport.resource("mastery-no-record.txt"));
+
+		// then
+		assertThat(instructions).containsExactly("짧게 다룬다.", "전에 배웠지만 흔들린다. 자세히 다룬다.", "처음 배우는 것으로 보고 자세히 다룬다.");
+	}
+
+	@ParameterizedTest(name = "목적 {0}: {1}")
+	@CsvSource({"WORK,예제 · 실습 · 현업에서 주의할 점",
+		"INTERVIEW,왜 그런가 · 무엇과 비교해 어떤가 · 면접 질문형 카드", "GENERAL,비유 · 흐름", "OTHER,기타 원문"})
+	@DisplayName("관련 검색 질의는 프롬프트와 같은 목적 문구를 주제에 이어 붙인다")
+	void buildsTopicPurposeQuery(Purpose purpose, String expected) {
+		// given
+		var input = new PlanningInput("주제 원문", Level.OTHER, "수준 표식", purpose, "기타 원문", "메모 표식");
+
+		// when
+		var query = PlanPromptSupport.topicPurposeQuery(input);
+
+		// then
+		assertThat(query).isEqualTo("주제 원문\n" + expected);
+		assertThat(query).isEqualTo("주제 원문\n" + PlanPromptSupport.materials(input, false).get("purpose"));
+	}
+
+	@ParameterizedTest(name = "개념 있음={0}")
+	@ValueSource(booleans = {false, true})
+	@DisplayName("관련 개념 공통 변환은 값이 있을 때만 이름과 정의와 지시를 더한다")
+	void addsRelatedConceptsOnlyWhenPresent(boolean present) {
+		// given
+		var data = PlanPromptSupport.materials(CoursePlanFormatTest.input(), true);
+		var concepts = present ? List.of(new RelatedConcept("개념", "정의", Judgment.SHAKY))
+			: List.<RelatedConcept>of();
+
+		// when
+		PlanPromptSupport.relatedConcepts(data, concepts);
+
+		// then
+		assertThat(data.containsKey("relatedConcepts")).isEqualTo(present);
+		if (present) {
+			var value = jsonMapper.valueToTree(data).path("relatedConcepts").get(0);
+			assertThat(value.properties()).extracting(entry -> entry.getKey())
+				.containsExactly("name", "definition", "instruction");
+			assertThat(value.path("instruction").asString()).isEqualTo("전에 배웠지만 흔들린다. 자세히 다룬다.");
+		}
 	}
 
 	@Test

@@ -19,6 +19,7 @@ public final class NewRoadmapGenerator implements JobGenerator {
 	private final ChatCall chatCall;
 	private final ChatSettings chatSettings;
 	private final RoadmapPlanFormat roadmapPlanFormat;
+	private final RelatedConceptPreparer relatedConceptPreparer;
 	private final CourseRepository courseRepository;
 	private final RoadmapRepository roadmapRepository;
 
@@ -33,7 +34,13 @@ public final class NewRoadmapGenerator implements JobGenerator {
 			var input = job.input();
 			var planning = new PlanningInput(input.topic(), input.level(), input.levelOther(),
 				input.purpose(), input.purposeOther(), input.memo());
-			var prompt = roadmapPlanFormat.prompt(new RoadmapPlanInput.NewRoadmap(planning));
+			var planInput = new RoadmapPlanInput.NewRoadmap(planning);
+			var related = relatedConceptPreparer.prepare(job, planInput.queryTexts());
+			if (related instanceof RelatedConceptPreparer.RelatedResult.Failed failed) {
+				return failed.failure();
+			}
+			var prompt = roadmapPlanFormat.prompt(planInput.withRelatedConcepts(
+				((RelatedConceptPreparer.RelatedResult.Success)related).concepts()));
 
 			var result = chatCall.call(job, chatSettings, prompt.system(), prompt.user(),
 				roadmapPlanFormat::parse);

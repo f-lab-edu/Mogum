@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Map;
 
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import com.mogum.card.service.ConceptLookupService;
 import com.mogum.card.service.LessonCardWriter;
 import com.mogum.course.repository.CourseRepository;
 import com.mogum.course.repository.LessonRepository;
@@ -25,6 +29,7 @@ import com.mogum.generation.MaterialReader;
 import com.mogum.generation.NewCourseGenerator;
 import com.mogum.generation.NewRoadmapGenerator;
 import com.mogum.generation.PlanRoadmapCourseGenerator;
+import com.mogum.generation.RelatedConceptPreparer;
 import com.mogum.generation.ReplanCourseGenerator;
 import com.mogum.generation.ReplanRoadmapGenerator;
 import com.mogum.generation.RoadmapCoursePlanReader;
@@ -46,6 +51,8 @@ class GenerationConfigurationTest {
 			.withBean(LlmCallRepository.class, () -> mock(LlmCallRepository.class))
 			.withBean(ChatCall.class, () -> mock(ChatCall.class))
 			.withBean(EmbeddingCall.class, () -> mock(EmbeddingCall.class))
+			.withBean(ConceptLookupService.class, () -> mock(ConceptLookupService.class))
+			.withBean(Clock.class, () -> Clock.fixed(Instant.EPOCH, ZoneOffset.UTC))
 			.withBean(MaterialRepository.class, () -> mock(MaterialRepository.class))
 			.withBean(LessonCardWriter.class, () -> mock(LessonCardWriter.class))
 			.withBean(CourseRepository.class, () -> mock(CourseRepository.class))
@@ -64,7 +71,8 @@ class GenerationConfigurationTest {
 			assertThat(context).hasNotFailed().hasSingleBean(LlmCallWriter.class)
 				.hasSingleBean(NewCourseGenerator.class).hasSingleBean(NewRoadmapGenerator.class)
 				.hasSingleBean(ReplanCourseGenerator.class).hasSingleBean(ReplanRoadmapGenerator.class)
-				.hasSingleBean(MaterialReader.class).hasSingleBean(MaterialGenerator.class)
+				.hasSingleBean(RelatedConceptPreparer.class).hasSingleBean(MaterialReader.class)
+				.hasSingleBean(MaterialGenerator.class)
 				.hasSingleBean(PlanRoadmapCourseGenerator.class).hasSingleBean(RoadmapCoursePlanReader.class);
 		});
 	}

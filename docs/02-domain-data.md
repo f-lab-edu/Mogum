@@ -152,6 +152,8 @@ erDiagram
 - 개념마다 — 센 카드가 없으면 기록 없음. 떠올릴 확률의 평균이 **0.9 이상**이고 단단함의 평균이 **21일 이상**이면 잘 앎. 나머지는 흔들림.
 - 0.9 는 FSRS 가 다음 볼 날을 잡는 목표 확률이다 — 예정대로 복습해 왔으면 넘는다. 단단함 21일은 보통 첫날 학습 단계를 마친 뒤 다른 날 「좋음」을 두 번 더 눌러야(3주쯤) 닿는다 — 「충분히 여러 번」을 횟수 대신 단단함으로 본다.
 
+- 구현 — `MasteryJudgmentService.judge(long userId, Collection<Long> conceptIds, Instant now)`가 판정한다. 복습 기록 유무는 `reviews` 행의 존재로 본다(`CardCommandService.review`가 같은 트랜잭션에서 카드 상태와 기록을 함께 쓰며, 학습 완료는 `due_at`만 채운다). 기준값은 `MasteryJudgmentCalculator`의 `WELL_KNOWN_RETRIEVABILITY` · `WELL_KNOWN_STABILITY_DAYS`에 둔다.
+
 - 어떤 개념도 판정으로 빼지 않는다 — 얼마나 자세히 다룰지만 바꾼다. 판정을 생성에 쓰는 곳은 [03 §2 · §3](./03-generation.md#2-강의-목록--로드맵-계획).
 
 ## 6. 개념
@@ -164,6 +166,7 @@ erDiagram
 - **한 번 들어간 개념은 카드가 모두 사라져도 지우지 않는다**(ADR-049) — 같은 개념이 다시 나오면 그 개념에 붙는다. 사전은 탈퇴할 때만 지운다.
 - **판정이 틀려도 바로잡는 방법은 두지 않는다**(ADR-050) — 기준을 잘 맞추는 것으로 대신한다.
 - 같은 사용자의 판정 · 넣기는 `LessonCardWriter.writeLessonCards`가 기존 `UserRepository.findByIdForUpdate`의 사용자 행 잠금을 먼저 얻어 호출자의 트랜잭션 끝까지 줄 세운다 — 사용자마다 행이 달라 다른 사용자의 저장은 기다리지 않으며, 크레딧 쓰기와 같은 잠금 경로를 쓴다.
+- 읽기 전용 조회는 `ConceptLookupService.hasConcepts(long userId)` · `findRelated(long userId, List<float[]> queries, int limit, Instant now)` · `judgeMatching(long userId, List<float[]> definitions, Instant now)`가 맡는다. 같은 개념 맞추기는 쓰기 경로 `findSameConcept`와 같은 거리 → 개념 ID 순서 및 기준값 이상(`>=`) 비교를 쓴다.
 
 ## 7. 지우기 · 탈퇴 — 함께 사라지는 범위
 
@@ -277,7 +280,7 @@ PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md)
 | 입력 칸 묶음 | | 로드맵의 코스면 모두 비어 있다 | 단일 코스만(ADR-137) |
 | `plan_description` | text | 단일 코스면 비어 있다 | 로드맵 계획의 한두 줄 설명(ADR-132) |
 | `plan_concepts` | jsonb | 단일 코스면 비어 있다 | 계획의 다룰 개념 — `[{name, definition}]`(ADR-138) |
-| `mastery_report` | jsonb | 강의 목록 전에는 비어 있다 | 숙련도 반영 내역 — 짧게 다룬 개념 · 다시 짚은 개념의 이름 목록(ADR-121) |
+| `mastery_report` | jsonb | 강의 목록 전에는 비어 있다 | 숙련도 반영 내역 — 짧게 다룬 개념 · 다시 짚은 개념의 이름 목록 `{"shortened": [이름], "revisited": [이름]}`(ADR-121 · [03 §5](./03-generation.md#5-숙련도-반영-내역--llm-이-적고-서버는-확인하지-않는다)). 이 칸을 채우기 전에 만든 코스는 비어 있다 |
 | `started_at` | timestamptz | 시작 전에는 비어 있다 | 「이대로 시작」한 때 — 이어서 배우기(ADR-099). `LEARNING` · `COMPLETED` 일 때만 차도록 `CHECK` 로 묶는다(사용자 확인 2026-11-10) |
 | `last_lesson_opened_at` | timestamptz | 예 | 이 코스의 강의를 마지막으로 연 때 — 이어서 배우기(ADR-099) |
 | `completed_at` | timestamptz | 다 마침 전에는 비어 있다 | 다 마친 때 — 마지막 강의를 학습 완료할 때 상태와 함께 적는다(ADR-169). `COMPLETED` 일 때만 차도록 `CHECK` 로 묶는다 |
@@ -521,4 +524,4 @@ PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md)
 
 | 것 | 근거 |
 |---|---|
-| 같은 개념 판정의 기준값 — `app.concept.same-threshold`(`ConceptProperties.sameThreshold()`), `0.72` — 2026-11-23 실측(ADR-187)으로 정함. 임베딩 모델은 `text-embedding-3-large` 로 정했다. 숙련도 고리 TASK 전에 실제 흐름으로 다시 잰다 | ADR-030 · ADR-161 · ADR-187 |
+| 같은 개념 판정의 기준값 — `app.concept.same-threshold`(`ConceptProperties.sameThreshold()`), `0.72` — 2026-11-23 실측(ADR-187)으로 정함. 임베딩 모델은 `text-embedding-3-large` 로 정했다. 실제 흐름으로 다시 재는 것은 M2 1차 품질 점검으로 옮겼다(사용자 결정 2026-11-25 — 숙련도 고리 TASK 전에는 사전이 작아 표본이 모자란다). 강의 자료의 다룰 개념을 사전과 맞출 때도 이 값을 쓴다([03 §3](./03-generation.md#3-강의-자료와-카드)) | ADR-030 · ADR-161 · ADR-187 |

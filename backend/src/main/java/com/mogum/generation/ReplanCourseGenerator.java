@@ -3,7 +3,6 @@ package com.mogum.generation;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import com.mogum.course.domain.CourseStatus;
 import com.mogum.course.domain.Lesson;
 import com.mogum.course.repository.CourseRepository;
 import com.mogum.course.repository.LessonRepository;
@@ -21,6 +20,7 @@ public final class ReplanCourseGenerator implements JobGenerator {
 	private final ChatCall chatCall;
 	private final ChatSettings chatSettings;
 	private final CoursePlanFormat coursePlanFormat;
+	private final RelatedConceptPreparer relatedConceptPreparer;
 	private final RoadmapCoursePlanReader roadmapCoursePlanReader;
 	private final CourseRepository courseRepository;
 	private final LessonRepository lessonRepository;
@@ -28,12 +28,14 @@ public final class ReplanCourseGenerator implements JobGenerator {
 	private final TransactionTemplate transactionTemplate;
 
 	public ReplanCourseGenerator(ChatCall chatCall, ChatSettings chatSettings, CoursePlanFormat coursePlanFormat,
-		RoadmapCoursePlanReader roadmapCoursePlanReader, CourseRepository courseRepository,
+		RelatedConceptPreparer relatedConceptPreparer, RoadmapCoursePlanReader roadmapCoursePlanReader,
+		CourseRepository courseRepository,
 		LessonRepository lessonRepository, EntityManager entityManager,
 		PlatformTransactionManager platformTransactionManager) {
 		this.chatCall = chatCall;
 		this.chatSettings = chatSettings;
 		this.coursePlanFormat = coursePlanFormat;
+		this.relatedConceptPreparer = relatedConceptPreparer;
 		this.roadmapCoursePlanReader = roadmapCoursePlanReader;
 		this.courseRepository = courseRepository;
 		this.lessonRepository = lessonRepository;
@@ -66,7 +68,12 @@ public final class ReplanCourseGenerator implements JobGenerator {
 					values.getPurpose(), values.getPurposeOther(), values.getMemo());
 				return new CoursePlanInput.ReplanCourse(planning, null, previous, job.feedback());
 			});
-			var prompt = coursePlanFormat.prompt(input);
+			var related = relatedConceptPreparer.prepare(job, input.queryTexts());
+			if (related instanceof RelatedConceptPreparer.RelatedResult.Failed failed) {
+				return failed.failure();
+			}
+			var prompt = coursePlanFormat.prompt(input.withRelatedConcepts(
+				((RelatedConceptPreparer.RelatedResult.Success)related).concepts()));
 			var result = chatCall.call(job, chatSettings, prompt.system(), prompt.user(),
 				coursePlanFormat::parseLessons);
 			return switch (result) {
@@ -82,13 +89,12 @@ public final class ReplanCourseGenerator implements JobGenerator {
 	@Override
 	public ResultRef save(JobSnapshot job, GeneratedResult result) {
 		var course = courseRepository.findById(job.targetId()).orElseThrow();
-		if (course.getStatus() != CourseStatus.REVIEWING) {
-			throw new IllegalStateException("Course must be reviewing");
-		}
+		var plan = ((Result)result).plan();
+		course.replanLessons(plan.masteryReport());
 
 		lessonRepository.findByCourseIdOrderByPositionAsc(course.getId()).forEach(entityManager::remove);
 		entityManager.flush(); // 순서 unique와 부딪히지 않도록 DELETE를 INSERT보다 먼저 보낸다.
-		var lessons = ((Result)result).plan().lessons();
+		var lessons = plan.lessons();
 		for (int index = 0; index < lessons.size(); index++) {
 			var lesson = lessons.get(index);
 			lessonRepository.save(Lesson.listed(course, index + 1, lesson.title(), lesson.description(),

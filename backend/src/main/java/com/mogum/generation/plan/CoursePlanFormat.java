@@ -1,7 +1,12 @@
 package com.mogum.generation.plan;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+
+import com.mogum.course.domain.MasteryReport;
+
+import tools.jackson.databind.JsonNode;
 
 public final class CoursePlanFormat {
 	public PlanPrompt prompt(CoursePlanInput input) {
@@ -22,6 +27,7 @@ public final class CoursePlanFormat {
 			data.put("previousLessons", replan.previousLessons());
 			PlanPromptSupport.optionalText(data, "feedback", replan.feedback());
 		}
+		PlanPromptSupport.relatedConcepts(data, input.relatedConcepts());
 		return PlanPromptSupport.prompt("course.txt",
 			input instanceof CoursePlanInput.NewCourse ? "new-course-output.txt" : "lessons-output.txt", data);
 	}
@@ -54,7 +60,35 @@ public final class CoursePlanFormat {
 				result.add(new LessonOutline(lesson.path("title").asString(), lesson.path("description").asString(),
 					PlanJson.concepts(lesson)));
 			}
-			return Optional.of(new CoursePlan(newCourse ? root.path("title").asString() : null, result));
+			return Optional.of(new CoursePlan(newCourse ? root.path("title").asString() : null, result,
+				masteryReport(root.path("masteryReport"))));
 		});
+	}
+
+	private MasteryReport masteryReport(JsonNode report) {
+		if (!report.isObject() || !names(report.path("shortened")) || !names(report.path("revisited"))) {
+			return new MasteryReport(List.of(), List.of());
+		}
+		return new MasteryReport(readNames(report.path("shortened")), readNames(report.path("revisited")));
+	}
+
+	private boolean names(JsonNode node) {
+		if (!node.isArray()) {
+			return false;
+		}
+		for (var name : node) {
+			if (!name.isString()) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private List<String> readNames(JsonNode node) {
+		var result = new ArrayList<String>();
+		for (var name : node) {
+			result.add(name.asString());
+		}
+		return result;
 	}
 }

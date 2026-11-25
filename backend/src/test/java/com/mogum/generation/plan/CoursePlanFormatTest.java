@@ -15,7 +15,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import com.mogum.card.domain.Judgment;
+import com.mogum.card.service.ConceptLookupService.RelatedConcept;
 import com.mogum.course.domain.Level;
+import com.mogum.course.domain.MasteryReport;
 import com.mogum.course.domain.PlannedConcept;
 import com.mogum.course.domain.Purpose;
 
@@ -26,6 +29,90 @@ import tools.jackson.databind.node.ObjectNode;
 class CoursePlanFormatTest {
 	private final CoursePlanFormat coursePlanFormat = new CoursePlanFormat();
 	private final JsonMapper jsonMapper = new JsonMapper();
+
+	@ParameterizedTest(name = "새 코스={0}")
+	@ValueSource(booleans = {true, false})
+	@DisplayName("반영 내역의 이름은 강의 개념과 맞추거나 중복을 고치지 않고 그대로 읽는다")
+	void parsesMasteryReportWithoutMatchingNames(boolean newCourse) {
+		// given
+		var root = (ObjectNode)jsonMapper.readTree(json("코스 제목", 1));
+		root.set("masteryReport", jsonMapper.readTree(
+			"{\"shortened\":[\"없는 개념\",\"없는 개념\",\"\"],\"revisited\":[\"다시 짚음\"],\"future\":true}"));
+
+		// when
+		var result = newCourse ? coursePlanFormat.parseNewCourse(root.toString())
+			: coursePlanFormat.parseLessons(root.toString());
+
+		// then
+		assertThat(result.orElseThrow().masteryReport()).isEqualTo(
+			new MasteryReport(List.of("없는 개념", "없는 개념", ""), List.of("다시 짚음")));
+		assertThat(result.orElseThrow().lessons()).containsExactly(lesson("강의 제목"));
+	}
+
+	@ParameterizedTest(name = "새 코스={0}, 내역={1}")
+	@MethodSource("invalidMasteryReports")
+	@DisplayName("반영 내역이 없거나 모양이 틀리면 강의 목록을 받고 두 목록만 비운다")
+	void acceptsLessonsWithInvalidMasteryReport(boolean newCourse, String report) {
+		// given
+		var root = (ObjectNode)jsonMapper.readTree(json("코스 제목", 1));
+		root.remove("masteryReport");
+		if (report != null) {
+			root.set("masteryReport", jsonMapper.readTree(report));
+		}
+
+		// when
+		var result = newCourse ? coursePlanFormat.parseNewCourse(root.toString())
+			: coursePlanFormat.parseLessons(root.toString());
+
+		// then
+		assertThat(result.orElseThrow().masteryReport()).isEqualTo(new MasteryReport(List.of(), List.of()));
+		assertThat(result.orElseThrow().lessons()).containsExactly(lesson("강의 제목"));
+	}
+
+	static Stream<Arguments> invalidMasteryReports() {
+		return Stream.of(true, false).flatMap(newCourse -> Stream.of(
+			(String)null, "null", "[]", "1", "true", "\"내역\"", "{}",
+			"{\"shortened\":[]}", "{\"revisited\":[]}",
+			"{\"shortened\":[],\"revisited\":null}",
+			"{\"shortened\":[],\"revisited\":\"개념\"}",
+			"{\"shortened\":{},\"revisited\":[]}",
+			"{\"shortened\":[\"정상\",1],\"revisited\":[]}",
+			"{\"shortened\":[],\"revisited\":[null]}",
+			"{\"shortened\":[true],\"revisited\":[]}",
+			"{\"shortened\":[],\"revisited\":[{}]}",
+			"{\"shortened\":[[]],\"revisited\":[]}")
+			.map(report -> Arguments.of(newCourse, report)));
+	}
+
+	@ParameterizedTest(name = "새 코스={0}")
+	@ValueSource(booleans = {true, false})
+	@DisplayName("정상 반영 내역이 있어도 잘못된 강의 목록은 불합격이다")
+	void rejectsInvalidLessonsWithValidMasteryReport(boolean newCourse) {
+		// given
+		String text = "{\"title\":\"코스\",\"lessons\":[],"
+			+ "\"masteryReport\":{\"shortened\":[],\"revisited\":[]}}";
+
+		// when
+		var result = newCourse ? coursePlanFormat.parseNewCourse(text) : coursePlanFormat.parseLessons(text);
+
+		// then
+		assertThat(result).isEmpty();
+	}
+
+	@ParameterizedTest(name = "새 코스={0}")
+	@ValueSource(booleans = {true, false})
+	@DisplayName("강의 목록 프롬프트는 반영 내역의 뜻과 출력 모양 및 빈 목록 규칙을 지시한다")
+	void requestsMasteryReport(boolean newCourse) {
+		// given
+		CoursePlanInput input = newCourse ? new CoursePlanInput.NewCourse(input())
+			: new CoursePlanInput.ReplanCourse(input(), null, List.of(), null);
+
+		// when
+		var prompt = coursePlanFormat.prompt(input);
+
+		// then
+		assertThat(prompt.system()).contains("masteryReport", "shortened", "revisited", "빈 목록", "관련 개념");
+	}
 
 	@Test
 	@DisplayName("새 코스는 입력과 수준만 받고 제목을 포함한 출력을 요청한다")
@@ -43,6 +130,65 @@ class CoursePlanFormatTest {
 		assertThat(data.path("topic").asString()).isEqualTo("자료 주제");
 		assertThat(data.path("level").asString()).isEqualTo("기초부터");
 		assertThat(prompt.system()).contains("코스 제목", "최대 10강", "핵심으로 좁혀", "안내하지 않는다");
+	}
+
+	@Test
+	@DisplayName("관련 개념은 이름과 정의 및 공통 지시만 싣고 판정과 수치는 싣지 않는다")
+	void suppliesRelatedConceptInstructions() {
+		// given
+		var related = List.of(new RelatedConcept("변수", "값을 담는 이름", Judgment.WELL_KNOWN),
+			new RelatedConcept("함수", "동작의 묶음", Judgment.SHAKY),
+			new RelatedConcept("타입", "값의 종류", Judgment.NO_RECORD));
+		var input = new CoursePlanInput.NewCourse(input()).withRelatedConcepts(related);
+
+		// when
+		var prompt = coursePlanFormat.prompt(input);
+
+		// then
+		var concepts = data(prompt).path("relatedConcepts");
+		assertThat(concepts).hasSize(3);
+		assertThat(concepts.get(0).properties()).extracting(entry -> entry.getKey())
+			.containsExactly("name", "definition", "instruction");
+		assertThat(concepts.get(0).path("name").asString()).isEqualTo("변수");
+		assertThat(concepts.get(0).path("definition").asString()).isEqualTo("값을 담는 이름");
+		assertThat(concepts.get(0).path("instruction").asString()).isEqualTo("짧게 다룬다.");
+		assertThat(concepts.get(1).path("instruction").asString()).isEqualTo("전에 배웠지만 흔들린다. 자세히 다룬다.");
+		assertThat(concepts.get(2).path("instruction").asString()).isEqualTo("처음 배우는 것으로 보고 자세히 다룬다.");
+		assertThat(prompt.user()).doesNotContain("WELL_KNOWN", "SHAKY", "NO_RECORD", "judgment", "0.9", "21");
+	}
+
+	@Test
+	@DisplayName("빈 관련 개념 칸은 생략하고 배분과 다시 짚기 및 피드백 우선 규칙을 시스템에 둔다")
+	void suppliesMasteryRulesWithoutEmptyRelatedConcepts() {
+		// given
+		var input = new CoursePlanInput.NewCourse(input());
+
+		// when
+		var prompt = coursePlanFormat.prompt(input);
+
+		// then
+		assertThat(data(prompt).has("relatedConcepts")).isFalse();
+		assertThat(prompt.system()).contains("10강 중 최대 2강", "주제와 관계없는 개념은 쓰지 않는다",
+			"피드백은 어떤 것이든 숙련도로 정한 배분보다 앞선다", "판정으로 개념을 빼지 않는다",
+			"다른 개념과 한 강의에 묶어", "강의를 따로",
+			"지시가 「전에 배웠지만 흔들린다」로 시작하는 관련 개념을 다시 짚는 강의를 넣을 수 있다. 로드맵 계획에 없는 개념이어도 된다.",
+			"revisited는 지시가 「전에 배웠지만 흔들린다」로 시작하는 관련 개념 가운데 다시 짚는 강의에서 다룬 개념이다.");
+	}
+
+	@ParameterizedTest(name = "목적={0}")
+	@org.junit.jupiter.params.provider.EnumSource(Purpose.class)
+	@DisplayName("주제와 목적 질의는 프롬프트의 목적 문구와 같고 수준과 메모를 포함하지 않는다")
+	void buildsQueryWithPromptPurpose(Purpose purpose) {
+		// given
+		var planning = new PlanningInput("주제", Level.OTHER, "수준 표식", purpose, "기타 목적 원문", "메모 표식");
+		var input = new CoursePlanInput.NewCourse(planning);
+		var purposeText = data(coursePlanFormat.prompt(input)).path("purpose").asString();
+
+		// when
+		var queries = input.queryTexts();
+
+		// then
+		assertThat(queries).containsExactly("주제\n" + purposeText);
 	}
 
 	@ParameterizedTest(name = "코스 순서 {0}, 다시 짜기 {1}, 수준 포함 {2}")
@@ -126,7 +272,8 @@ class CoursePlanFormatTest {
 		var result = coursePlanFormat.parseNewCourse(text);
 
 		// then
-		assertThat(result).contains(new CoursePlan("코스 제목", List.of(lesson("강의 제목"))));
+		assertThat(result)
+			.contains(new CoursePlan("코스 제목", List.of(lesson("강의 제목")), new MasteryReport(List.of(), List.of())));
 	}
 
 	@Test
@@ -155,7 +302,8 @@ class CoursePlanFormatTest {
 		var result = coursePlanFormat.parseLessons(text);
 
 		// then
-		assertThat(result).contains(new CoursePlan(null, List.of(lesson("강의 제목"))));
+		assertThat(result)
+			.contains(new CoursePlan(null, List.of(lesson("강의 제목")), new MasteryReport(List.of(), List.of())));
 	}
 
 	@Test
@@ -297,7 +445,8 @@ class CoursePlanFormatTest {
 
 	static String json(String title, int count) {
 		var mapper = new JsonMapper();
-		return mapper.writeValueAsString(new CoursePlan(title, Collections.nCopies(count, lesson("강의 제목"))));
+		return mapper.writeValueAsString(new CoursePlan(title, Collections.nCopies(count, lesson("강의 제목")),
+			new MasteryReport(List.of(), List.of())));
 	}
 
 	private JsonNode data(PlanPrompt prompt) {

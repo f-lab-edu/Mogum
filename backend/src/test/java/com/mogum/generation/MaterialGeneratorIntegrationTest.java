@@ -26,6 +26,18 @@ import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.CreditEntryRepository;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.account.service.CreditLedger;
+import com.mogum.card.domain.CardConceptFixtures;
+import com.mogum.card.domain.CardFixtures;
+import com.mogum.card.domain.ConceptFixtures;
+import com.mogum.card.domain.FsrsResult;
+import com.mogum.card.domain.FsrsState;
+import com.mogum.card.domain.Rating;
+import com.mogum.card.domain.ReviewFixtures;
+import com.mogum.card.repository.CardConceptRepository;
+import com.mogum.card.repository.CardRepository;
+import com.mogum.card.repository.ConceptRepository;
+import com.mogum.card.repository.ReviewRepository;
+import com.mogum.card.service.ConceptLookupService;
 import com.mogum.card.service.LessonCardWriter;
 import com.mogum.card.service.LessonCardWriter.NewCard;
 import com.mogum.card.service.LessonCardWriter.NewConcept;
@@ -59,10 +71,21 @@ import com.mogum.support.TestClock;
 import com.mogum.worker.JobRunner;
 
 import jakarta.persistence.EntityManager;
+import tools.jackson.databind.json.JsonMapper;
 
 @IntegrationTest
 @ExtendWith(OutputCaptureExtension.class)
 class MaterialGeneratorIntegrationTest {
+	@Autowired
+	ConceptLookupService conceptLookupService;
+	@Autowired
+	CardRepository cardRepository;
+	@Autowired
+	CardConceptRepository cardConceptRepository;
+	@Autowired
+	ConceptRepository conceptRepository;
+	@Autowired
+	ReviewRepository reviewRepository;
 	@Autowired
 	MaterialGenerator materialGenerator;
 	@Autowired
@@ -163,7 +186,7 @@ class MaterialGeneratorIntegrationTest {
 			assertThat(request.settings()).isEqualTo(llmProperties.material());
 			assertThat(request.messages().get(1).text()).contains("코스 제목", "LEAKCHECK-topic", "LEAKCHECK-memo",
 				"이번 제목", "이번 설명", "이번 개념", "이번 정의", "前 제목", "後 제목", "\"current\":true",
-				"예제 · 실습 · 현업에서 주의할 점")
+				"예제 · 실습 · 현업에서 주의할 점", "처음 배우는 것으로 보고 자세히 다룬다.")
 				.doesNotContain("LEAKCHECK-level", "LEAKCHECK-feedback", "다른개념", "다른정의", "level", "feedback", "mastery",
 					"계획정의");
 		});
@@ -268,6 +291,7 @@ class MaterialGeneratorIntegrationTest {
 		long userId = owner();
 		long previous = lessonRepository.findByCourseIdOrderByPositionAsc(target.getCourse().getId()).getFirst()
 			.getId();
+		testEmbeddingProvider.vector("이번 정의", List.of(1f, 0f));
 		testEmbeddingProvider.vector("값을 담는 이름", List.of(1f, 0f));
 		testEmbeddingProvider.vector("동작의 묶음", List.of(0f, 1f));
 		new TransactionTemplate(platformTransactionManager)
@@ -282,7 +306,7 @@ class MaterialGeneratorIntegrationTest {
 		assertThat(jdbcTemplate.queryForList("SELECT name FROM concepts ORDER BY id", String.class))
 			.containsExactly("기존 변수", "기존 함수");
 		assertThat(count("card_concepts")).isEqualTo(6);
-		assertThat(testEmbeddingProvider.requests(id)).hasSize(1);
+		assertThat(testEmbeddingProvider.requests(id)).hasSize(2);
 	}
 
 	@Test
@@ -298,11 +322,17 @@ class MaterialGeneratorIntegrationTest {
 			"at com.mogum.generation.MaterialGenerator.generate");
 	}
 
-	@Test
+	@ParameterizedTest(name = "채팅 전={0}")
+	@ValueSource(booleans = {false, true})
 	@DisplayName("임베딩의 예상 밖 예외는 호출 기록을 남기고 원문 없는 생성 실패 로그로 전달한다")
-	void reportsUnexpectedEmbeddingFailure(CapturedOutput output) {
+	void reportsUnexpectedEmbeddingFailure(boolean beforeChat, CapturedOutput output) {
 		// given
 		var target = lesson(false);
+		if (beforeChat) {
+			dictionaryConcept(target, 1, 30, new float[] {1, 0});
+		}
+		var beforeConcepts = jdbcTemplate.queryForList("SELECT * FROM concepts ORDER BY id");
+		var beforeCards = jdbcTemplate.queryForList("SELECT * FROM cards ORDER BY id");
 		long id = receive(target);
 		String marker = "LEAKCHECK-embedding-exception";
 		var embeddingCall = new EmbeddingCall(request -> {
@@ -310,7 +340,8 @@ class MaterialGeneratorIntegrationTest {
 		}, llmCallWriter, llmProperties.prices());
 		var generator = new MaterialGenerator(chatCall, llmProperties.material(), embeddingCall,
 			new EmbeddingSettings(llmProperties.embedding().model(), llmProperties.embedding().timeout()),
-			new MaterialFormat(), materialReader, lessonRepository, materialRepository, lessonCardWriter);
+			new MaterialFormat(), materialReader, lessonRepository, materialRepository, lessonCardWriter,
+			conceptLookupService, testClock);
 		// when
 		var result = generator.generate(new JobSnapshot(id, owner(), JobType.MATERIAL, target.getId(), null, null, 1));
 		// then
@@ -319,10 +350,12 @@ class MaterialGeneratorIntegrationTest {
 			.contains("job generate failed", "at com.mogum.generation.MaterialGenerator.generate")
 			.doesNotContain(marker);
 		assertThat(jdbcTemplate.queryForList("SELECT outcome FROM llm_calls ORDER BY id", String.class))
-			.containsExactly("SUCCEEDED", "PROVIDER_ERROR");
+			.containsExactly(beforeChat ? new String[] {"PROVIDER_ERROR"}
+				: new String[] {"SUCCEEDED", "PROVIDER_ERROR"});
+		assertThat(testChatProvider.requests(id)).hasSize(beforeChat ? 0 : 1);
 		assertThat(count("materials")).isZero();
-		assertThat(count("cards")).isZero();
-		assertThat(count("concepts")).isZero();
+		assertThat(jdbcTemplate.queryForList("SELECT * FROM cards ORDER BY id")).isEqualTo(beforeCards);
+		assertThat(jdbcTemplate.queryForList("SELECT * FROM concepts ORDER BY id")).isEqualTo(beforeConcepts);
 	}
 
 	@ParameterizedTest(name = "소유권 상실={0}")
@@ -372,7 +405,124 @@ class MaterialGeneratorIntegrationTest {
 		}
 	}
 
+	@ParameterizedTest(name = "시간 경과={0}")
+	@ValueSource(booleans = {false, true})
+	@DisplayName("다룰 정의를 한 번에 맞춰 모든 개념의 판정 지시를 주입 시계의 현재로 계산한다")
+	void suppliesMatchingMasteryInstructions(boolean elapsed) throws InterruptedException {
+		// given
+		var target = lesson(false, List.of(new PlannedConcept("아는 개념", "아는 정의"),
+			new PlannedConcept("아는 개념 별명", "아는 정의"), new PlannedConcept("흔들리는 개념", "흔들리는 정의"),
+			new PlannedConcept("다른 개념", "다른 정의"), new PlannedConcept("미복습 개념", "미복습 정의")));
+		dictionaryConcept(target, 1, 30, new float[] {1, 0, 0, 0});
+		dictionaryConcept(target, 2, 10, new float[] {0, 1, 0, 0});
+		dictionaryConcept(target, 3, null, new float[] {0, 0, 0, 1});
+		testEmbeddingProvider.vector("아는 정의", List.of(1f, 0f, 0f, 0f));
+		testEmbeddingProvider.vector("흔들리는 정의", List.of(0f, 1f, 0f, 0f));
+		testEmbeddingProvider.vector("다른 정의", List.of(0f, 0f, 1f, 0f));
+		testEmbeddingProvider.vector("미복습 정의", List.of(0f, 0f, 0f, 1f));
+		testEmbeddingProvider.vector("값을 담는 이름", List.of(1f, 0f, 0f, 0f));
+		testEmbeddingProvider.vector("동작의 묶음", List.of(0f, 1f, 0f, 0f));
+		var beforeLessons = jdbcTemplate.queryForList("SELECT * FROM lessons ORDER BY id");
+		var beforeReviews = jdbcTemplate.queryForList("SELECT * FROM reviews ORDER BY id");
+		if (elapsed) {
+			testClock.advance(Duration.ofDays(365));
+		}
+		long id = receive(target);
+
+		// when
+		runOnce();
+
+		// then
+		assertThat(jdbcTemplate.queryForObject("SELECT status FROM generation_jobs WHERE id = ?", String.class, id))
+			.isEqualTo("SUCCEEDED");
+		assertThat(testEmbeddingProvider.requests(id)).hasSize(2);
+		assertThat(testEmbeddingProvider.requests(id).getFirst().definitions())
+			.containsExactly("아는 정의", "흔들리는 정의", "다른 정의", "미복습 정의");
+		assertThat(testEmbeddingProvider.requests(id).getLast().definitions())
+			.containsExactly("값을 담는 이름", "동작의 묶음");
+		assertThat(jdbcTemplate.queryForList("SELECT call_type FROM llm_calls ORDER BY id", String.class))
+			.containsExactly("EMBEDDING", "CHAT", "EMBEDDING");
+		assertThat(testChatProvider.requests(id)).singleElement().satisfies(request -> {
+			var data = JsonMapper.builder().build().readTree(request.messages().get(1)
+				.text().replace("자료 JSON 시작", "").replace("자료 JSON 끝", "").strip());
+			var concepts = data.path("lesson").path("concepts");
+			assertThat(concepts.size()).isEqualTo(5);
+			assertThat(concepts.get(0).path("instruction").asString())
+				.isEqualTo(elapsed ? "전에 배웠지만 흔들린다. 자세히 다룬다." : "짧게 다룬다.");
+			assertThat(concepts.get(1).path("instruction").asString())
+				.isEqualTo(concepts.get(0).path("instruction").asString());
+			assertThat(concepts.get(2).path("instruction").asString()).isEqualTo("전에 배웠지만 흔들린다. 자세히 다룬다.");
+			assertThat(concepts.get(3).path("instruction").asString()).isEqualTo("처음 배우는 것으로 보고 자세히 다룬다.");
+			assertThat(concepts.get(4).path("instruction").asString()).isEqualTo("처음 배우는 것으로 보고 자세히 다룬다.");
+			assertThat(request.messages().toString()).doesNotContain("WELL_KNOWN", "SHAKY", "NO_RECORD", "0.72", "0.9");
+		});
+		assertThat(testEmbeddingProvider.outsideTransaction(id)).isTrue();
+		assertThat(testChatProvider.outsideTransaction(id)).isTrue();
+		assertThat(jdbcTemplate.queryForList("SELECT * FROM lessons ORDER BY id")).isEqualTo(beforeLessons);
+		assertThat(jdbcTemplate.queryForList("SELECT * FROM reviews ORDER BY id")).isEqualTo(beforeReviews);
+		assertThat(count("concepts")).isEqualTo(3);
+	}
+
+	@ParameterizedTest(name = "실패={0}")
+	@EnumSource(GenerationOutcome.Failure.class)
+	@DisplayName("다룰 정의의 임베딩 실패는 채팅 없이 같은 실패로 끝나고 호출 기록과 크레딧 복구를 남긴다")
+	void failsPlannedConceptEmbeddingBeforeChat(GenerationOutcome.Failure failure) throws InterruptedException {
+		// given
+		var target = lesson(false);
+		dictionaryConcept(target, 1, 30, new float[] {1, 0});
+		long id = receive(target);
+		var replies = new EmbeddingProvider.Reply[workerProperties.maxRetries() + 1];
+		Arrays.fill(replies, TestEmbeddingProvider.failure(failure));
+		testEmbeddingProvider.reply(id, replies);
+		var beforeConcepts = jdbcTemplate.queryForList("SELECT * FROM concepts ORDER BY id");
+		var beforeCards = jdbcTemplate.queryForList("SELECT * FROM cards ORDER BY id");
+
+		// when
+		runOnce();
+
+		// then
+		int attempts = failure == GenerationOutcome.Failure.INVALID_OUTPUT
+			|| failure == GenerationOutcome.Failure.PROVIDER_UNAVAILABLE ? workerProperties.maxRetries() + 1 : 1;
+		assertThat(jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", id))
+			.containsEntry("status", "FAILED").containsEntry("error_type", failure.name());
+		assertThat(testChatProvider.requests(id)).isEmpty();
+		assertThat(testEmbeddingProvider.requests(id)).hasSize(attempts)
+			.allSatisfy(request -> assertThat(request.definitions()).containsExactly("이번 정의"));
+		assertThat(jdbcTemplate.queryForList("SELECT call_type FROM llm_calls ORDER BY id", String.class))
+			.hasSize(attempts).containsOnly("EMBEDDING");
+		assertThat(jdbcTemplate.queryForList("SELECT outcome FROM llm_calls ORDER BY id", String.class))
+			.containsOnly(TestEmbeddingProvider.failure(failure).outcome().name());
+		assertThat(testEmbeddingProvider.outsideTransaction(id)).isTrue();
+		assertThat(count("materials")).isZero();
+		assertThat(jdbcTemplate.queryForList("SELECT * FROM concepts ORDER BY id")).isEqualTo(beforeConcepts);
+		assertThat(jdbcTemplate.queryForList("SELECT * FROM cards ORDER BY id")).isEqualTo(beforeCards);
+		assertThat(userRepository.findById(owner()).orElseThrow().getCreditBalance()).isEqualTo(100);
+		assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries WHERE type = 'RESTORE'",
+			Integer.class)).isEqualTo(1);
+	}
+
+	private void dictionaryConcept(Lesson target, int position, Integer stability, float[] vector) {
+		long previous = lessonRepository.findByCourseIdOrderByPositionAsc(target.getCourse().getId()).getFirst()
+			.getId();
+		var concept = conceptRepository.save(ConceptFixtures.concept(owner(), "사전 개념 " + position,
+			"사전 정의 " + position, vector));
+		var card = CardFixtures.card(owner(), previous, position, "옛 질문", "옛 답");
+		if (stability != null) {
+			card.applyReview(new FsrsResult(FsrsState.REVIEW, null, stability.doubleValue(), 5.0,
+				testClock.instant().plus(Duration.ofDays(21)), testClock.instant()));
+		}
+		var saved = cardRepository.save(card);
+		cardConceptRepository.save(CardConceptFixtures.link(saved, concept));
+		if (stability != null) {
+			reviewRepository.save(ReviewFixtures.review(saved, Rating.GOOD));
+		}
+	}
+
 	private Lesson lesson(boolean inRoadmap) {
+		return lesson(inRoadmap, List.of(new PlannedConcept("이번 개념", "이번 정의")));
+	}
+
+	private Lesson lesson(boolean inRoadmap, List<PlannedConcept> concepts) {
 		testChatProvider.reset();
 		testEmbeddingProvider.reset();
 		var user = userRepository
@@ -388,7 +538,7 @@ class MaterialGeneratorIntegrationTest {
 		lessonRepository.save(LessonFixtures
 			.withCompletedAt(LessonFixtures.lesson(course, 1, "前 제목", "前 설명", List.of()), testClock.instant()));
 		var target = lessonRepository
-			.save(LessonFixtures.lesson(course, 2, "이번 제목", "이번 설명", List.of(new PlannedConcept("이번 개념", "이번 정의"))));
+			.save(LessonFixtures.lesson(course, 2, "이번 제목", "이번 설명", concepts));
 		lessonRepository
 			.save(LessonFixtures.lesson(course, 3, "後 제목", "後 설명", List.of(new PlannedConcept("다른개념", "다른정의"))));
 		return target;

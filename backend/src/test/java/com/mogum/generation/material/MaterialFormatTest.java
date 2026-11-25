@@ -3,6 +3,7 @@ package com.mogum.generation.material;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -13,8 +14,11 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import com.mogum.card.domain.Judgment;
 import com.mogum.course.domain.PlannedConcept;
 import com.mogum.course.domain.Purpose;
+
+import tools.jackson.databind.json.JsonMapper;
 
 class MaterialFormatTest {
 	private final MaterialFormat materialFormat = new MaterialFormat();
@@ -231,4 +235,54 @@ class MaterialFormatTest {
 		assertThat(prompt.system()).contains("이번 강의에서 배울 것", "개념 설명", "정리", "3~6", "1~3", "strict", "KaTeX",
 			"현업에서 주의할 점", "면접에서 이렇게 물어요", "과제", "<!-- MOGUM_CARDS -->");
 	}
+
+	@Test
+	@DisplayName("직렬화한 강의 자료의 개념 키는 이름과 정의와 지시 순서다")
+	void serializesConceptKeysInStableOrder() {
+		// given
+		var input = new MaterialInput("코스", "주제", new MaterialInput.LessonLine(1, "강의", "설명",
+			List.of(new PlannedConcept("변수", "값을 담는 이름"), new PlannedConcept("함수", "동작의 묶음"))),
+			List.of(), Purpose.GENERAL, null, null);
+
+		// when
+		var prompt = materialFormat.prompt(input);
+
+		// then
+		assertThat(prompt.user()).contains(
+			"{\"name\":\"변수\",\"definition\":\"값을 담는 이름\",\"instruction\":\"처음 배우는 것으로 보고 자세히 다룬다.\"}",
+			"{\"name\":\"함수\",\"definition\":\"동작의 묶음\",\"instruction\":\"처음 배우는 것으로 보고 자세히 다룬다.\"}");
+	}
+
+	@Test
+	@DisplayName("모든 개념에 서로 다른 판정 지시를 붙이고 판정 이름이나 숙련도 숫자는 넘기지 않는다")
+	void rendersInstructionsForEveryConceptWithoutJudgmentData() {
+		// given
+		var input = new MaterialInput("코스", "주제", new MaterialInput.LessonLine(1, "강의", "설명",
+			List.of(new PlannedConcept("아는 개념", "아는 정의"), new PlannedConcept("흔들리는 개념", "흔들리는 정의"),
+				new PlannedConcept("새 개념", "새 정의"))),
+			List.of(), Purpose.GENERAL, null, null)
+			.withJudgments(Map.of("아는 정의", Judgment.WELL_KNOWN, "흔들리는 정의", Judgment.SHAKY,
+				"새 정의", Judgment.NO_RECORD));
+
+		// when
+		var prompt = materialFormat.prompt(input);
+
+		// then
+		var data = JsonMapper.builder().build().readTree(prompt.user()
+			.replace("자료 JSON 시작", "").replace("자료 JSON 끝", "").strip());
+		var concepts = data.path("lesson").path("concepts");
+		assertThat(concepts.size()).isEqualTo(3);
+		assertThat(concepts.get(0).path("instruction").asString()).isEqualTo("짧게 다룬다.");
+		assertThat(concepts.get(1).path("instruction").asString()).isEqualTo("전에 배웠지만 흔들린다. 자세히 다룬다.");
+		assertThat(concepts.get(2).path("instruction").asString()).isEqualTo("처음 배우는 것으로 보고 자세히 다룬다.");
+		for (var concept : concepts) {
+			assertThat(concept.propertyNames()).containsExactly("name", "definition", "instruction");
+			assertThat(concept.toString()).doesNotContainPattern("[0-9]");
+		}
+		assertThat(prompt.user() + prompt.system()).doesNotContain("WELL_KNOWN", "SHAKY", "NO_RECORD",
+			"0.9", "21", "0.72", "stability", "retrievability", "similarity", "judgments");
+		assertThat(prompt.system()).contains("개념마다 받은 지시에 따라 짧게 또는 자세히", "어떤 개념도 판정으로 빼지 않는다")
+			.doesNotContain("모든 개념을 처음 배우는 것처럼");
+	}
+
 }

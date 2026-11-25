@@ -68,7 +68,7 @@ class RoadmapControllerIntegrationTest {
 			} else if (status.equals("FAILED")) {
 				GenerationJobFixtures.failed(jdbcTemplate, jobId, JobErrorType.INVALID_OUTPUT, testClock.instant());
 			} else if (status.equals("SUCCEEDED")) {
-				first.planLessons();
+				first.planLessons(null);
 				courseRepository.save(first);
 				GenerationJobFixtures.succeeded(jdbcTemplate, jobId, first.getId(), null, null, testClock.instant());
 			} else if (status.equals("DISCARDED")) {

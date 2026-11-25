@@ -29,7 +29,7 @@ public class LlmConfiguration {
 		}
 
 		// 이어 쓰기 간격은 0이다. R은 첫 시도 뒤 추가 다시 시도 횟수다.
-		var required = longest.plus(llmProperties.embedding().timeout())
+		var required = longest.plus(llmProperties.embedding().timeout().multipliedBy(2))
 			.multipliedBy((long)workerProperties.maxRetries() + 1)
 			.plus(workerProperties.retryDelay().multipliedBy(workerProperties.maxRetries()))
 			.plus(llmProperties.databaseAllowance());

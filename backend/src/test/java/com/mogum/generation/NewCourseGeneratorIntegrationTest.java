@@ -18,22 +18,34 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.mogum.account.domain.CreditEntry;
 import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.CreditEntryRepository;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.account.service.CreditLedger;
+import com.mogum.card.domain.CardConceptFixtures;
+import com.mogum.card.domain.CardFixtures;
+import com.mogum.card.domain.ConceptFixtures;
+import com.mogum.card.domain.FsrsResult;
+import com.mogum.card.domain.FsrsState;
+import com.mogum.card.domain.Rating;
+import com.mogum.card.domain.ReviewFixtures;
+import com.mogum.card.repository.ConceptRepository;
 import com.mogum.common.logging.RequestLogFilter;
 import com.mogum.config.CreditProperties;
 import com.mogum.config.WorkerProperties;
+import com.mogum.course.domain.CourseFixtures;
 import com.mogum.course.domain.LearningInput;
+import com.mogum.course.domain.LessonFixtures;
 import com.mogum.course.domain.Level;
 import com.mogum.course.domain.Purpose;
 import com.mogum.generation.call.domain.LlmCallOutcome;
@@ -42,10 +54,12 @@ import com.mogum.job.domain.JobType;
 import com.mogum.job.service.JobIntakeService;
 import com.mogum.support.IntegrationTest;
 import com.mogum.support.IntegrationTestConfiguration.TestChatProvider;
+import com.mogum.support.IntegrationTestConfiguration.TestEmbeddingProvider;
 import com.mogum.support.TestClock;
 import com.mogum.worker.JobRunner;
 
 import jakarta.persistence.EntityManager;
+import tools.jackson.databind.json.JsonMapper;
 
 @IntegrationTest
 @ExtendWith(OutputCaptureExtension.class)
@@ -67,6 +81,10 @@ class NewCourseGeneratorIntegrationTest {
 	@Autowired
 	TestChatProvider testChatProvider;
 	@Autowired
+	TestEmbeddingProvider testEmbeddingProvider;
+	@Autowired
+	ConceptRepository conceptRepository;
+	@Autowired
 	JobIntakeService jobIntakeService;
 	@Autowired
 	UserRepository userRepository;
@@ -79,6 +97,7 @@ class NewCourseGeneratorIntegrationTest {
 	@BeforeEach
 	void prepareAdapter() {
 		testChatProvider.reset();
+		testEmbeddingProvider.reset();
 		renewals = Executors.newSingleThreadScheduledExecutor();
 	}
 
@@ -105,6 +124,9 @@ class NewCourseGeneratorIntegrationTest {
 		var course = jdbcTemplate.queryForMap("SELECT * FROM courses WHERE id = ?", job.get("course_id"));
 		assertThat(course).containsEntry("status", "REVIEWING").containsEntry("title", "자바 코스")
 			.containsEntry("user_id", job.get("user_id")).containsEntry("roadmap_id", null);
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT mastery_report = '{\"shortened\":[],\"revisited\":[]}'::jsonb FROM courses",
+			Boolean.class)).isTrue();
 		assertInput(course);
 		var lessons = jdbcTemplate.queryForList("SELECT * FROM lessons ORDER BY position");
 		assertThat(lessons).extracting(row -> row.get("position")).containsExactly(1, 2);
@@ -124,6 +146,9 @@ class NewCourseGeneratorIntegrationTest {
 		assertThat(balance()).isEqualTo(100 - creditProperties.newCourse());
 		var request = testChatProvider.requests(id).getFirst();
 		assertThat(request.jobType()).isEqualTo(JobType.NEW_COURSE);
+		assertThat(testEmbeddingProvider.requests(id)).isEmpty();
+		assertThat(testChatProvider.requests(id).getFirst().messages().get(1).text())
+			.doesNotContain("relatedConcepts");
 		assertThat(testChatProvider.outsideTransaction(id)).isTrue();
 		assertThat(request.messages().get(1).text()).contains("LEAKCHECK-topic", "LEAKCHECK-level",
 			"LEAKCHECK-purpose", "LEAKCHECK-memo");
@@ -245,6 +270,106 @@ class NewCourseGeneratorIntegrationTest {
 			assertThat(output.getAll())
 				.contains("at com.mogum.generation." + generator.getClass().getSimpleName() + ".generate");
 		}
+	}
+
+	@Test
+	@DisplayName("새 코스는 주제와 목적만 질의하고 가까운 사전 개념을 판정 지시와 함께 넘긴다")
+	void suppliesRelatedConceptsBeforeChat() {
+		// given
+		long id = receive(JobType.NEW_COURSE);
+		long userId = owner(id);
+		var known = conceptRepository.save(ConceptFixtures.concept(userId, "가까운 개념", "가까운 정의", new float[] {1, 0}));
+		new TransactionTemplate(platformTransactionManager).executeWithoutResult(status -> {
+			var course = CourseFixtures.single(userId,
+				new LearningInput("이전 주제", Level.BEGINNER, null, Purpose.WORK, null, null), "이전 코스");
+			entityManager.persist(course);
+			var lesson = LessonFixtures.lesson(course, 1);
+			entityManager.persist(lesson);
+			var card = CardFixtures.card(userId, lesson.getId(), 1, "질문", "답");
+			card.applyReview(new FsrsResult(FsrsState.REVIEW, null, 30.0, 5.0,
+				testClock.instant().plus(Duration.ofDays(21)), testClock.instant()));
+			entityManager.persist(card);
+			entityManager.persist(CardConceptFixtures.link(card, known));
+			entityManager.persist(ReviewFixtures.review(card, Rating.GOOD));
+		});
+		conceptRepository.save(ConceptFixtures.concept(userId, "먼 개념", "먼 정의", new float[] {-1, 0}));
+		testEmbeddingProvider.vector("LEAKCHECK-topic\nLEAKCHECK-purpose", List.of(1f, 0f));
+
+		// when
+		runner().runOnce();
+
+		// then
+		assertThat(status(id)).isEqualTo("SUCCEEDED");
+		assertThat(testEmbeddingProvider.requests(id)).singleElement().satisfies(
+			request -> assertThat(request.definitions()).containsExactly("LEAKCHECK-topic\nLEAKCHECK-purpose"));
+		assertThat(testChatProvider.requests(id)).singleElement().satisfies(request -> {
+			var data = new JsonMapper().readTree(request.messages().get(1)
+				.text().split("\n", 3)[1]);
+			var related = data.path("relatedConcepts");
+			assertThat(related).hasSize(2);
+			assertThat(related.get(0).path("name").asString()).isEqualTo("가까운 개념");
+			assertThat(related.get(0).path("definition").asString()).isEqualTo("가까운 정의");
+			assertThat(related.get(0).path("instruction").asString()).isEqualTo("짧게 다룬다.");
+			assertThat(related.get(1).path("name").asString()).isEqualTo("먼 개념");
+		});
+		assertThat(testEmbeddingProvider.outsideTransaction(id)).isTrue();
+		assertThat(testChatProvider.outsideTransaction(id)).isTrue();
+		assertThat(jdbcTemplate.queryForList("SELECT call_type FROM llm_calls ORDER BY id", String.class))
+			.containsExactly("EMBEDDING", "CHAT");
+	}
+
+	@ParameterizedTest(name = "임베딩 실패 {index}")
+	@EnumSource(GenerationOutcome.Failure.class)
+	@DisplayName("관련 개념 임베딩 실패는 채팅 없이 같은 실패와 호출 기록을 남긴다")
+	void failsRelatedEmbeddingBeforeChat(GenerationOutcome.Failure failure) throws InterruptedException {
+		// given
+		long id = receive(JobType.NEW_COURSE);
+		long userId = owner(id);
+		conceptRepository.save(ConceptFixtures.concept(userId, "사전 개념", "사전 정의", new float[] {1, 0}));
+		var replies = new EmbeddingProvider.Reply[workerProperties.maxRetries() + 1];
+		Arrays.fill(replies, TestEmbeddingProvider.failure(failure));
+		testEmbeddingProvider.reply(id, replies);
+
+		// when
+		runner().runOnce();
+
+		// then
+		int attempts = failure == GenerationOutcome.Failure.INVALID_OUTPUT
+			|| failure == GenerationOutcome.Failure.PROVIDER_UNAVAILABLE ? workerProperties.maxRetries() + 1 : 1;
+		assertThat(jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", id))
+			.containsEntry("status", "FAILED").containsEntry("error_type", failure.name());
+		assertThat(testChatProvider.requests(id)).isEmpty();
+		assertThat(testEmbeddingProvider.requests(id)).hasSize(attempts);
+		assertThat(testEmbeddingProvider.outsideTransaction(id)).isTrue();
+		assertThat(jdbcTemplate.queryForList("SELECT call_type FROM llm_calls ORDER BY id", String.class))
+			.hasSize(attempts).containsOnly("EMBEDDING");
+		assertThat(jdbcTemplate.queryForList("SELECT outcome FROM llm_calls ORDER BY id", String.class))
+			.containsOnly(TestEmbeddingProvider.failure(failure).outcome().name());
+	}
+
+	@ParameterizedTest(name = "내역={0}")
+	@ValueSource(strings = {"{\"shortened\":[\"없는 개념\",\"없는 개념\"],\"revisited\":[\"다시\"]}",
+		"null", "[]", "{\"shortened\":[1],\"revisited\":[]}"})
+	@DisplayName("새 코스는 반영 내역을 그대로 저장하고 잘못된 내역이면 목록만 비우고 재시도하지 않는다")
+	void storesMasteryReportWithoutRetry(String report) {
+		// given
+		long id = receive(JobType.NEW_COURSE);
+		String original = TestChatProvider.defaultText(JobType.NEW_COURSE);
+		String reply = original.substring(0, original.lastIndexOf('}')) + ",\"masteryReport\":" + report + "}";
+		testChatProvider.reply(id, TestChatProvider.success(reply));
+
+		// when
+		boolean processed = runner().runOnce();
+
+		// then
+		assertThat(processed).isTrue();
+		assertThat(status(id)).isEqualTo("SUCCEEDED");
+		assertThat(testChatProvider.requests(id)).hasSize(1);
+		String expected = report.startsWith("{\"shortened\":[\"") ? report
+			: "{\"shortened\":[],\"revisited\":[]}";
+		assertThat(jdbcTemplate.queryForObject("SELECT mastery_report = ?::jsonb FROM courses",
+			Boolean.class, expected)).isTrue();
+		assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM lessons", Integer.class)).isEqualTo(2);
 	}
 
 	private JobRunner runner() {

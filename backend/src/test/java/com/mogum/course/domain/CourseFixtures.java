@@ -12,11 +12,11 @@ public final class CourseFixtures {
 
 	public static Course single(long userId) {
 		return Course.single(userId, new LearningInput("자바", Level.BEGINNER, null, Purpose.GENERAL, null, null),
-			"자바 기초");
+			"자바 기초", null);
 	}
 
 	public static Course single(long userId, LearningInput input, String title) {
-		return Course.single(userId, input, title);
+		return Course.single(userId, input, title, null);
 	}
 
 	public static Course inRoadmap(Roadmap roadmap, int position, String title, String planDescription,
@@ -26,7 +26,7 @@ public final class CourseFixtures {
 
 	public static Course withStatus(Course course, CourseStatus status) {
 		if (status != CourseStatus.NOT_PLANNED && course.getStatus() == CourseStatus.NOT_PLANNED) {
-			course.planLessons();
+			course.planLessons(null);
 		}
 		if ((status == CourseStatus.LEARNING || status == CourseStatus.COMPLETED)
 			&& course.getStatus() == CourseStatus.REVIEWING) {

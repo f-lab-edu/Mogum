@@ -34,7 +34,7 @@ class LlmConfigurationTest {
 			assertThat(context).hasNotFailed().hasSingleBean(ChatProvider.class).hasSingleBean(ChatCall.class)
 				.hasSingleBean(EmbeddingProvider.class).hasSingleBean(EmbeddingCall.class);
 			assertThat(context.getBean(WorkerProperties.class).leaseDuration())
-				.isEqualTo(Duration.ofSeconds(960)).isGreaterThan(Duration.ofSeconds(912));
+				.isEqualTo(Duration.ofSeconds(1020)).isGreaterThan(Duration.ofSeconds(972));
 			var llm = context.getBean(LlmProperties.class);
 			for (var settings : llm.chats().values()) {
 				assertThat(context.getBean(WorkerProperties.class).shutdownWait()).isGreaterThan(settings.timeout());
@@ -43,7 +43,7 @@ class LlmConfigurationTest {
 	}
 
 	@ParameterizedTest(name = "{0}")
-	@ValueSource(strings = {"app.worker.lease-duration=15m", "app.worker.lease-duration=912s",
+	@ValueSource(strings = {"app.worker.lease-duration=15m", "app.worker.lease-duration=972s",
 		"app.worker.max-retries=3", "app.worker.retry-delay=30s",
 		"app.llm.chats.planning.timeout=149s", "app.llm.chats.planning.max-continuations=5",
 		"app.llm.chats.material.timeout=149s", "app.llm.chats.material.max-continuations=2",
@@ -66,7 +66,7 @@ class LlmConfigurationTest {
 	@DisplayName("임베딩을 포함한 시한 하한보다 1초 길면 기동한다")
 	void acceptsLeaseJustAboveRequiredDuration() {
 		// given
-		var runner = applicationContextRunner.withPropertyValues("app.worker.lease-duration=913s");
+		var runner = applicationContextRunner.withPropertyValues("app.worker.lease-duration=973s");
 
 		// when
 		runner.run(context -> {
