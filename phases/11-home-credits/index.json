@@ -29,7 +29,14 @@
     {
       "step": 2,
       "name": "me-credits",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-25T19:53:36+0900",
+      "summary": "GET /api/me의 data.credit={balance: 정수, nextRefillDate: Asia/Seoul yyyy-MM-dd 문자열}를 APPROVED일 때만 포함하고 그 밖 상태는 생략; MeReadService가 요청마다 DB에서 읽고 신청 응답도 같은 규칙 적용, SeoulClock.calendarDate를 크레딧 부족 문구와 공유; 서울 날짜 경계·사용 후 같은 세션 재조회·읽기 불변 검증 및 05 §3 구현 사실 반영; 서버 테스트 2648→2662개(14개 추가) 전체 통과 · AC 대상 397개 통과 · spotlessApply · build 통과",
+      "completed_at": "2026-11-25T20:02:57+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/account/service/MeReadService.java:27 — `NotApplied` 를 `instanceof` 로 거른 뒤 `(AccountPrincipal.Member)` 로 강제 형변환한다. 기존 컨트롤러처럼 sealed 타입의 `switch` 패턴으로 바꾸면, 나중에 principal 종류가 늘 때 컴파일러가 빠진 경우를 잡아 준다(동작 영향 없음).",
+        "backend/src/main/java/com/mogum/account/service/MeReadService.java:28 — `SessionUserFilter` 가 이미 같은 요청에서 `users` 를 읽었는데 서비스가 한 번 더 읽는다. 정원 10명이라 비용은 무시할 만하고, 크레딧을 principal 에 담지 않는 쪽이 금지 23 에 맞으므로 지금 모양을 유지해도 된다. 참고용이다."
+      ]
     },
     {
       "step": 3,
