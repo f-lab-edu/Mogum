@@ -114,6 +114,11 @@
         "frontend/src/pages/RoadmapPage.tsx:122 · CoursePage.tsx:164 · NewLearningPage.tsx:85 — 삼항식과 긴 JSX 가 한 줄에 붙어 읽기가 조금 어렵다. 동작 영향은 없다 → 다음에 이 줄을 고칠 때 분기를 여러 줄로 나누면 읽기 쉽다.",
         "실제 브라우저에서 안내 모양(`surface-soft` 바탕 · `text` 제목)은 확인하지 않았다. phase 리뷰 때 기존 `FailureNotice` 와 나란히 한 번 보면 좋다."
       ]
+    },
+    {
+      "step": 9,
+      "name": "identity-heading",
+      "status": "pending"
     }
   ],
   "created_at": "2026-11-25T17:27:04+0900",
