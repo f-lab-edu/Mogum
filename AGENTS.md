@@ -93,7 +93,7 @@ AI 가 코스(강의 목록) · 강의 자료 · 플래시카드를 만들고, �
 - **백엔드 Java 를 고친 뒤 `./backend/gradlew -p backend spotlessApply` 로 포맷하고 커밋한다**([CODE_STYLE §1](docs/CODE_STYLE.md) · ADR-184) — 줄 배치를 손으로 맞추지 않는다. 포매터 결과가 기준이고, CI 가 `spotlessCheck` · Checkstyle 로 검사한다. 네이버 설정 파일(`backend/config/naver/`)은 고치지 않는다.
 - **Java enum 은 상수마다 한국어 Javadoc 한 줄(`/** … */`)로 그 값이 무엇인지 적는다** — 이름 · 뜻 · 언제는 문서의 값 표([02 §8](docs/02-domain-data.md#8-테이블) · [05 §1.2](docs/05-api.md#12-오류--묶음-이름과-서버가-정한-문구) · GLOSSARY)를 그대로 따르고, 표에 없는 값은 코드가 그 값을 쓰는 곳에서 확인한 사실만 적는다. → 코드 리뷰 · 다음 작업자가 값의 뜻을 찾으러 문서를 뒤지지 않는다. 지어낸 설명은 문서와 어긋난다.
 - 커밋 메시지는 conventional commits(`feat:` · `fix:` · `docs:` · `refactor:` · `test:`).
-- **`main` 은 PR 로만 바뀐다.** `main` 에서 커밋 · 병합하거나 `main` 으로 push 하지 않는다. GitHub 룰셋(PR 필수 · 강제 push/삭제 금지 · 예외 없음)이 서버에서 막고, `.githooks/` 가 로컬에서 먼저 막는다. PR 병합 뒤 로컬 `main` 은 `git pull --ff-only` 로만 따라간다.
+- **`main` 은 PR 로만 바뀐다.** `main` 에서 커밋 · 병합하거나 `main` 으로 push 하지 않는다. GitHub 룰셋(PR 필수 · 필수 검사 `ci-ok` · 강제 push/삭제 금지 · 예외 없음)이 서버에서 막고, `.githooks/` 가 로컬에서 먼저 막는다. PR 병합 뒤 로컬 `main` 은 `git pull --ff-only` 로만 따라간다.
 - 설계와 다르게 가야 하면 **코드보다 `docs/` 를 먼저 고친다.** 문서와 코드가 다르면 문서가 틀린 것으로 보고 묻는다. 결정이 바뀌면 ADR 을 먼저 고친다.
 - **구현으로 사실이 확정되거나 바뀌면 같은 step 에서 문서에 반영한다** — 버전 · 경로 · 명령어 · 디렉터리 구조 · 「아직 정하지 않은 값」에서 정한 값 · "구현 · 검증은 아직 수행하지 않았다" 표기 등. 이 step 의 변경이 만든 사실만 고치고, 관련 없는 문서 정리는 하지 않는다. → 문서가 낡으면 다음 작업자가 틀린 문서를 기준으로 설계한다.
 - 옛 설계로 쓴 이름 · 주석(커리큘럼 · 단계 · 허용 목록 등)은 그 코드를 고치는 TASK 에서 함께 고친다(ADR-146). 끝난 phase 의 step 파일(`phases/0-skeleton` ~ `3-curriculum-model`)은 옛 문서와 옛 ADR 번호를 가리킨다 — 지금 설계의 근거로 읽지 않는다.

@@ -530,11 +530,9 @@ docker logs --tail 50 mogum-postgres-1
 
 불변식은 `CiWorkflowFilesTest`가 SnakeYAML로 검사하며, 집계 스크립트도 두 결과의 성공 · 실패 · 취소 · 건너뜀 조합으로 실행해 확인한다. 워크플로 폴더와 `frontend/.nvmrc`를 Gradle `test`의 입력으로 등록해 이 파일만 바뀌어도 검사를 다시 실행한다.
 
-**아직 하지 않은 것**은 다음 셋이다.
+저장소 룰셋 **`main — PR 로만 병합`**에 `ci-ok`를 필수 상태 검사로 걸었다(2026-11-25). 검사를 올리는 쪽은 GitHub Actions 앱(`integration_id` 15368)으로 묶고, 「병합 전에 최신 `main` 을 반영해야 함」(strict)은 끈다. 룰셋에 예외 사용자가 없어 관리자도 `ci-ok` 가 통과해야 병합한다. 확인 명령은 `gh api repos/{저장소}/rules/branches/main --jq '.[] | select(.type=="required_status_checks")'` 다.
 
-1. 저장소 룰셋 **`main — PR 로만 병합`**에 `ci-ok`를 필수 상태 검사로 거는 일 — 사람이 첫 실행을 본 뒤 건다.
-2. 실제 GitHub Actions 실행.
-3. `frontend/.nvmrc`의 22가 Vercel 프로젝트의 Node.js 버전과 같은지 확인.
+**아직 하지 않은 것** — `frontend/.nvmrc`의 22가 Vercel 프로젝트의 Node.js 버전과 같은지 확인.
 
 ### SonarCloud · 백엔드 커버리지
 
