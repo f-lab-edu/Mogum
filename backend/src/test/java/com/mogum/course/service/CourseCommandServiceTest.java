@@ -24,7 +24,9 @@ import com.mogum.common.api.ApiException;
 import com.mogum.common.api.ErrorCode;
 import com.mogum.course.domain.CourseFixtures;
 import com.mogum.course.domain.CourseStatus;
+import com.mogum.course.domain.MasteryReport;
 import com.mogum.course.domain.RoadmapFixtures;
+import com.mogum.course.dto.CourseResponse;
 import com.mogum.course.repository.FakeCourseJobRepository;
 import com.mogum.course.repository.FakeCourseRepository;
 import com.mogum.course.repository.FakeLessonRepository;
@@ -48,13 +50,32 @@ class CourseCommandServiceTest {
 		// given
 		var user = userRepository.save(UserFixtures.user("me@example.com"));
 		var course = courseRepository.save(CourseFixtures.single(user.getId()));
+		course.replanLessons(new MasteryReport(List.of("짧게 다룬 개념"), List.of("다시 짚은 개념")));
 
 		// when
 		var result = courseCommandService.start(user.getId(), course.getId());
 
 		// then
 		assertThat(result.status()).isEqualTo(CourseStatus.LEARNING);
+		assertThat(result.masteryReport()).isNull();
 		assertThat(course.getStartedAt()).isEqualTo(clock.instant());
+	}
+
+	@Test
+	@DisplayName("검토 중 코스의 제목을 고친 응답도 저장된 반영 내역 수를 싣는다")
+	void renamesWithStoredReportCounts() {
+		// given
+		var course = CourseFixtures.single(1L);
+		course.replanLessons(new MasteryReport(List.of("하나", "둘"), List.of("셋")));
+		courseRepository.save(course);
+
+		// when
+		var result = courseCommandService.rename(1L, course.getId(), "새 제목");
+
+		// then
+		assertThat(result.title()).isEqualTo("새 제목");
+		assertThat(result.status()).isEqualTo(CourseStatus.REVIEWING);
+		assertThat(result.masteryReport()).isEqualTo(new CourseResponse.MasteryReportCounts(2, 1));
 	}
 
 	@ParameterizedTest(name = "상태={0}")

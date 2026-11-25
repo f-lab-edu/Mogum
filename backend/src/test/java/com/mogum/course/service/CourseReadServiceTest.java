@@ -22,7 +22,9 @@ import com.mogum.common.api.ErrorCode;
 import com.mogum.course.domain.CourseFixtures;
 import com.mogum.course.domain.CourseStatus;
 import com.mogum.course.domain.LessonFixtures;
+import com.mogum.course.domain.MasteryReport;
 import com.mogum.course.domain.RoadmapFixtures;
+import com.mogum.course.dto.CourseResponse;
 import com.mogum.course.repository.FakeCourseRepository;
 import com.mogum.course.repository.FakeLessonRepository;
 
@@ -54,11 +56,50 @@ class CourseReadServiceTest {
 		// then
 		assertThat(result.status()).isEqualTo(status);
 		assertThat(result.todayReviewCount()).isZero();
+		assertThat(result.masteryReport()).isNull();
 		assertThat(result.progress().completedLessons()).isEqualTo(status == CourseStatus.NOT_PLANNED ? 0 : 1);
 		assertThat(result.progress().totalLessons()).isEqualTo(status == CourseStatus.NOT_PLANNED ? 0 : 2);
 		assertThat(result.nextLessonId()).isEqualTo(status == CourseStatus.LEARNING ? 2L : null);
 		assertThat(result.completedAt()).isEqualTo(course.getCompletedAt());
 		assertThat(course.getStatus()).isEqualTo(status);
+	}
+
+	@ParameterizedTest(name = "빈 내역={0}")
+	@ValueSource(booleans = {true, false})
+	@DisplayName("검토 중에는 빈 내역도 포함하고 중복과 목록에 없는 이름도 그대로 센다")
+	void countsStoredReportWithoutValidation(boolean empty) {
+		// given
+		var report = empty ? new MasteryReport(List.of(), List.of())
+			: new MasteryReport(List.of("목록에 없는 개념", "목록에 없는 개념"), List.of("다시 짚은 개념"));
+		var course = CourseFixtures.single(1L);
+		course.replanLessons(report);
+		courseRepository.save(course);
+
+		// when
+		var result = courseReadService.read(1L, course.getId());
+
+		// then
+		assertThat(result.masteryReport()).isEqualTo(new CourseResponse.MasteryReportCounts(empty ? 0 : 2,
+			empty ? 0 : 1));
+		assertThat(course.getMasteryReport()).isSameAs(report);
+	}
+
+	@ParameterizedTest(name = "상태={0}")
+	@EnumSource(value = CourseStatus.class, names = "REVIEWING", mode = EnumSource.Mode.EXCLUDE)
+	@DisplayName("검토 중이 아니면 저장된 내역이 있어도 반영 내역 수를 싣지 않는다")
+	void omitsStoredReportOutsideReviewing(CourseStatus status) {
+		// given
+		var course = CourseFixtures.single(1L);
+		var report = new MasteryReport(List.of("짧게 다룬 개념"), List.of("다시 짚은 개념"));
+		course.replanLessons(report);
+		courseRepository.save(CourseFixtures.withStatus(course, status));
+
+		// when
+		var result = courseReadService.read(1L, course.getId());
+
+		// then
+		assertThat(result.masteryReport()).isNull();
+		assertThat(course.getMasteryReport()).isSameAs(report);
 	}
 
 	@ParameterizedTest(name = "남의 것={0}")

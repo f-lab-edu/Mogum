@@ -41,11 +41,16 @@ public class CourseReadService {
 				.orElse(null)
 			: null;
 
+		var report = course.getMasteryReport();
+		var masteryReport = course.getStatus() == CourseStatus.REVIEWING && report != null
+			? new CourseResponse.MasteryReportCounts(report.shortened().size(), report.revisited().size())
+			: null;
+
 		return new CourseResponse(courseId, course.getStatus(), course.getTitle(),
 			course.getRoadmap() == null ? null : course.getRoadmap().getId(), lessons,
 			new CourseResponse.Progress(completed, lessons.size()), nextLessonId,
 			course.getStatus() == CourseStatus.COMPLETED ? course.getCompletedAt() : null,
-			todayReviewService.count(userId, courseId));
+			todayReviewService.count(userId, courseId), masteryReport);
 	}
 
 	public CourseListResponse list(long userId) {

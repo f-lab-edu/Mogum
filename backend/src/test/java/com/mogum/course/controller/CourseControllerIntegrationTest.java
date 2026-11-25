@@ -29,6 +29,7 @@ import com.mogum.auth.AccountPrincipal;
 import com.mogum.course.domain.CourseFixtures;
 import com.mogum.course.domain.CourseStatus;
 import com.mogum.course.domain.LessonFixtures;
+import com.mogum.course.domain.MasteryReport;
 import com.mogum.course.domain.RoadmapFixtures;
 import com.mogum.course.repository.CourseRepository;
 import com.mogum.course.repository.LessonRepository;
@@ -183,6 +184,56 @@ class CourseControllerIntegrationTest {
 		assertThat(saved.getCreatedAt()).isEqualTo(course.getCreatedAt());
 		assertThat(jdbcTemplate.queryForMap("SELECT * FROM courses WHERE id = ?", course.getId()))
 			.usingRecursiveComparison().ignoringFields("title", "updated_at").isEqualTo(before);
+	}
+
+	@ParameterizedTest(name = "동작={0}")
+	@ValueSource(strings = {"course", "rename", "start"})
+	@DisplayName("저장된 반영 내역은 읽기와 제목 고치기에 수만 싣고 시작 응답에서는 생략한다")
+	void returnsReportCountsByResultingStatus(String action) {
+		// given
+		long userId = approved("me@example.com");
+		var course = CourseFixtures.single(userId);
+		var report = new MasteryReport(List.of("REPORT-ONLY-짧게", "REPORT-ONLY-짧게"),
+			List.of("REPORT-ONLY-다시"));
+		course.replanLessons(report);
+		courseRepository.save(course);
+		var client = testRequests.asUser(userId);
+
+		// when
+		var result = operation(client, action, course.getId());
+
+		// then
+		var body = result.expectStatus().isOk().expectBody();
+		if (action.equals("start")) {
+			body.jsonPath("$.data.status").isEqualTo("LEARNING")
+				.jsonPath("$.data.masteryReport").doesNotExist();
+		} else {
+			body.jsonPath("$.data.status").isEqualTo("REVIEWING")
+				.jsonPath("$.data.masteryReport").isEqualTo(Map.of("shortened", 2, "revisited", 1));
+		}
+		assertThat(body.returnResult().getResponseBody()).asString().doesNotContain("REPORT-ONLY");
+		assertThat(courseRepository.findById(course.getId()).orElseThrow().getMasteryReport()).isEqualTo(report);
+	}
+
+	@ParameterizedTest(name = "읽기={0}")
+	@ValueSource(strings = {"courses", "roadmaps", "roadmap"})
+	@DisplayName("코스와 로드맵 목록 및 로드맵 하나에는 저장된 숙련도 반영 내역을 싣지 않는다")
+	void omitsReportFromListsAndRoadmaps(String action) {
+		// given
+		long userId = approved("me@example.com");
+		var roadmap = roadmapRepository.save(RoadmapFixtures.roadmap(userId));
+		var course = CourseFixtures.inRoadmap(roadmap, 1, "코스", "설명", List.of());
+		course.planLessons(new MasteryReport(List.of("REPORT-ONLY-짧게"), List.of("REPORT-ONLY-다시")));
+		courseRepository.save(course);
+		var client = testRequests.asUser(userId);
+
+		// when
+		var result = operation(client, action, roadmap.getId());
+
+		// then
+		var body = result.expectStatus().isOk().expectBody();
+		body.jsonPath("$..masteryReport").isEmpty();
+		assertThat(body.returnResult().getResponseBody()).asString().doesNotContain("REPORT-ONLY");
 	}
 
 	@ParameterizedTest(name = "제목={0}")

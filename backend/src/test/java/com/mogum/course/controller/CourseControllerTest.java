@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -75,6 +76,26 @@ class CourseControllerTest {
 			"concepts":[{"name":"개념","definition":"정의"}],"completed":false}],
 			"progress":{"completedLessons":0,"totalLessons":1},"nextLessonId":3,"todayReviewCount":2}}
 			""");
+	}
+
+	@ParameterizedTest(name = "짧게={0}, 다시={1}")
+	@CsvSource({"2,1", "0,0"})
+	@DisplayName("반영 내역은 이름 목록이나 판정 없이 두 정수만 싣고 영도 생략하지 않는다")
+	void serializesOnlyReportCounts(int shortened, int revisited) {
+		// given
+		given(courseReadService.read(7L, 1L)).willReturn(new CourseResponse(1L, CourseStatus.REVIEWING,
+			"코스", null, List.of(), new CourseResponse.Progress(0, 0), null, null, 0,
+			new CourseResponse.MasteryReportCounts(shortened, revisited)));
+
+		// when
+		var result = mockMvcTester.get().uri("/api/courses/1").exchange();
+
+		// then
+		assertThat(result).hasStatusOk().bodyJson().isStrictlyEqualTo("""
+			{"data":{"id":1,"status":"REVIEWING","title":"코스","lessons":[],
+			"progress":{"completedLessons":0,"totalLessons":0},"todayReviewCount":0,
+			"masteryReport":{"shortened":%d,"revisited":%d}}}
+			""".formatted(shortened, revisited));
 	}
 
 	@Test
@@ -160,6 +181,6 @@ class CourseControllerTest {
 		return new CourseResponse(1L, CourseStatus.LEARNING, "코스", 9L,
 			List.of(new CourseResponse.LessonItem(3L, 1, "강의", "설명",
 				List.of(new PlannedConcept("개념", "정의")), false)),
-			new CourseResponse.Progress(0, 1), 3L, null, 2);
+			new CourseResponse.Progress(0, 1), 3L, null, 2, null);
 	}
 }
