@@ -44,7 +44,16 @@
     {
       "step": 3,
       "name": "course-plan-mastery",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-25T09:47:53+0900",
+      "summary": "RelatedConceptPreparer.prepare(JobSnapshot, List<String>): RelatedResult.Success(List<RelatedConcept> concepts) 또는 Failed(GenerationOutcome.Failure failure) 구현; CoursePlanInput의 relatedConcepts·withRelatedConcepts·queryTexts와 user 데이터 relatedConcepts(name·definition·instruction) 추가, 세 생성기의 읽기 트랜잭션 뒤 일괄 임베딩→최대 20개 검색→채팅 연결 및 빈 사전 생략·실패/호출 기록·트랜잭션 밖 호출 검증; AC test/build·Spotless·Checkstyle 통과, 서버 테스트 2,487→2,527개(40개 추가).",
+      "completed_at": "2026-11-25T14:14:59+0900",
+      "review_notes": [
+        "backend/src/main/resources/prompts/planning/course.txt:318 — 「주제와 관련된 흔들리는 개념을 다시 짚는 강의」는 LLM 이 받는 user 데이터에 「흔들리는」이라는 표식이 없다. 지시 문구는 「자세히 다룬다.」 · 「처음 배우는 것으로 보고 자세히 다룬다.」뿐이라, 어느 개념이 다시 짚을 대상인지 LLM 이 추론해야 한다. step 이 정한 문장을 그대로 따랐으므로 반려 사유는 아니다 → 공개 전 품질 점검에서 「지시가 정확히 「자세히 다룬다.」인 개념」처럼 지시 문구와 잇는 표현을 검토할 만하다.",
+        "backend/src/test/java/com/mogum/generation/PlanRoadmapCourseGeneratorIntegrationTest.java:569 — `@ValueSource(ints = {1, 3})` 인데 576줄에 `position == 0 ? ...` 갈래가 있고, DisplayName 도 「단일 코스의 주제와 목적 또는 …」이다. ReplanCourseGeneratorIntegrationTest 에서 복사한 흔적으로, 로드맵의 코스만 도는 시험이라 0 갈래는 실행되지 않는다 → 갈래를 지우고 DisplayName 을 「로드맵 코스의 계획 정의들로 찾는다」로 좁히면 읽기 쉽다.",
+        "backend/src/test/java/com/mogum/generation/plan/CoursePlanFormatTest.java:866 — `@org.junit.jupiter.params.provider.EnumSource` 를 전체 이름으로 썼다 → 같은 파일의 다른 provider 처럼 import 로 맞춰도 된다(취향).",
+        "backend/src/main/java/com/mogum/generation/RelatedConceptPreparer.java:34 — `vector(List<Float>)` 변환이 MaterialGenerator 의 같은 메서드와 똑같다. step 4 에서도 쓰게 되면 한 곳으로 모을 수 있다(동작 영향 없음)."
+      ]
     },
     {
       "step": 4,
