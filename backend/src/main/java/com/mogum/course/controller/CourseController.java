@@ -1,6 +1,8 @@
 package com.mogum.course.controller;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,6 +16,7 @@ import com.mogum.course.dto.CourseListResponse;
 import com.mogum.course.dto.CourseResponse;
 import com.mogum.course.dto.CourseTitleRequest;
 import com.mogum.course.service.CourseCommandService;
+import com.mogum.course.service.CourseDeletionService;
 import com.mogum.course.service.CourseReadService;
 
 import jakarta.validation.Valid;
@@ -24,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 public class CourseController {
 	private final CourseReadService courseReadService;
 	private final CourseCommandService courseCommandService;
+	private final CourseDeletionService courseDeletionService;
 
 	@GetMapping("/api/courses")
 	public ApiResponse<CourseListResponse> list(
@@ -61,4 +65,15 @@ public class CourseController {
 		CourseTitleRequest request) {
 		return ApiResponse.of(courseCommandService.rename(member.userId(), id, request.title()));
 	}
+
+	@DeleteMapping("/api/courses/{id}")
+	public ResponseEntity<Void> delete(
+		@AuthenticationPrincipal
+		AccountPrincipal.Member member,
+		@PathVariable
+		long id) {
+		courseDeletionService.delete(member.userId(), id);
+		return ResponseEntity.noContent().build();
+	}
+
 }

@@ -3,6 +3,7 @@ package com.mogum.course.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import com.mogum.course.domain.PlannedConcept;
 import com.mogum.course.dto.CourseListResponse;
 import com.mogum.course.dto.CourseResponse;
 import com.mogum.course.service.CourseCommandService;
+import com.mogum.course.service.CourseDeletionService;
 import com.mogum.course.service.CourseReadService;
 
 import tools.jackson.databind.json.JsonMapper;
@@ -45,6 +47,8 @@ class CourseControllerTest {
 	CourseReadService courseReadService;
 	@MockitoBean
 	CourseCommandService courseCommandService;
+	@MockitoBean
+	CourseDeletionService courseDeletionService;
 	private final JsonMapper jsonMapper = JsonMapper.builder().build();
 
 	@BeforeEach
@@ -175,6 +179,30 @@ class CourseControllerTest {
 		// then
 		assertThat(result).hasStatus(404).bodyJson().isStrictlyEqualTo(
 			"{\"code\":\"NOT_FOUND\",\"message\":\"찾을 수 없습니다\"}");
+	}
+
+	@Test
+	@DisplayName("코스 지우기는 로그인한 주인과 경로 ID를 넘기고 본문 없는 204로 답한다")
+	void deletesWithoutBody() {
+		// when
+		var result = mockMvcTester.delete().uri("/api/courses/1").exchange();
+		// then
+		assertThat(result).hasStatus(204).body().isEmpty();
+		then(courseDeletionService).should().delete(7L, 1L);
+	}
+
+	@ParameterizedTest(name = "오류={0}, 상태={1}")
+	@CsvSource({"NOT_FOUND,404,찾을 수 없습니다",
+		"COURSE_DELETE_NOT_ALLOWED,409,로드맵의 코스는 로드맵을 지워야 해요"})
+	@DisplayName("없는 코스와 로드맵 코스 지우기는 공통 code와 문구로 답한다")
+	void returnsDeletionErrors(ErrorCode code, int status, String message) {
+		// given
+		willThrow(new ApiException(code)).given(courseDeletionService).delete(7L, 1L);
+		// when
+		var result = mockMvcTester.delete().uri("/api/courses/1").exchange();
+		// then
+		assertThat(result).hasStatus(status).bodyJson().isStrictlyEqualTo(
+			"{\"code\":\"%s\",\"message\":\"%s\"}".formatted(code, message));
 	}
 
 	private CourseResponse response() {
