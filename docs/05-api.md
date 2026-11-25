@@ -126,6 +126,8 @@
 | 강의 하나 | 강의 자료 · 학습 완료 여부 · 강의 자료의 작업이 있으면 그 작업 | 강의 화면 |
 | 오늘 복습할 카드 | 카드들 — 질문 · 답 · 평가마다 다음 간격(ADR-170) · 몇 장 남았는지(ADR-014 · ADR-017). 코스를 주면 그 코스의 카드만(ADR-172). 화면은 받은 카드를 다 보면 다시 읽는다 — 같은 날 다시 보는 카드가 돌아온다(ADR-164) | 복습 탭 |
 
+- 홈 · 크레딧 TASK(`11-home-credits` step 3) 구현: 홈의 「오늘 복습」은 `GET /api/home/reviews`의 `data: {remainingCount: 정수}`를 쓴다 — `TodayReviewService.count(userId, null)`로 코스 거르기 없이 세며 0도 싣는다. 스트릭은 별도 `GET /api/home/streak`의 `data: {days: 정수, filledToday: 불리언}`으로 읽는다. 둘 다 HTTP 200의 `ApiResponse`로 감싸며, 서로 다른 경로라 화면이 각 영역의 실패와 다시 시도를 나눌 수 있다. 카드 본문과 간격 계산이 필요 없는 홈을 위해 복습 목록 대신 수만 읽는다.
+- 홈 스트릭 구현: `card.service.StreakReadService`가 `Clock` 빈과 `SeoulClock.today()`로 오늘을 정하고 `card.repository.StreakActivityRepository`의 날짜들을 계산한다. 네이티브 SQL로 `reviews` · `cards`와 `lessons` · `courses`에서 본인의 활동을 읽어 `AT TIME ZONE 'Asia/Seoul'`과 4시간 빼기로 날짜를 합친다 — `course` Java 타입 의존은 없다. 스트릭을 저장하거나 사용자 ID · 날짜별 기록을 반환하지 않고, 읽기로 데이터와 시각을 바꾸지 않는다. 정원 10명인 현재 범위에서는 색인을 추가하지 않았다.
 - 계정 TASK 구현: 「나」는 `GET /api/me`이며, 성공 응답 `data`에 `status` · `email` · `name`을 싣는다. 홈 · 크레딧 TASK(`11-home-credits` step 2)에서 `APPROVED`일 때만 `credit: {balance, nextRefillDate}`를 더했다 — `balance`는 DB의 남은 크레딧 정수, `nextRefillDate`는 다음에 채우는 때를 `Asia/Seoul`로 바꾼 `yyyy-MM-dd` 날짜 문자열이다. 그 밖 상태에서는 `credit` 칸을 생략한다.
 - 만드는 작업 TASK 구현: 「작업 하나」는 `GET /api/jobs/{id}`이며, `job.service.JobReadService.read(userId, jobId)`가 주인을 확인한 뒤 [§2](#2-만드는-작업--받기-하나--다시-읽기)의 응답을 만든다. 남의 작업과 없는 작업 모두 `NOT_FOUND`(404), 「찾을 수 없습니다」다. 조회는 상태 · Auditing 시각 · 크레딧을 바꾸지 않는다.
 - 강의 목록 TASK(`7-course-planning` step 6) 구현: 아래 읽기 넷은 모두 HTTP 200의 `ApiResponse`로 감싼다. 목록은 나눠 받지 않고 `created_at DESC, id DESC`로 정렬하며, 코스 · 강의의 내부 순서는 `position ASC`다. 없는 대상과 남의 대상은 `NOT_FOUND`(404)다. 읽기는 상태 · 시각 · 작업 · 크레딧을 바꾸지 않는다.
