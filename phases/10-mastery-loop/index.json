@@ -104,6 +104,11 @@
         "frontend/src/pages/CoursePage.tsx:139 — 보이는 조건 `data.masteryReport && (data.masteryReport.shortened > 0 || data.masteryReport.revisited > 0)` 이 JSX 한 줄에 길게 들어가 있다. 동작에는 영향이 없다 → 위쪽 `reviewing` 계산 옆에 `const report = …` 같은 지역 변수로 빼면 읽기 쉽다(취향).",
         "frontend/src/pages/CoursePage.test.tsx:90 — 「내역 없음」 시험은 `region` 에 `/복습|숙련도|반영|0개/` 가 없다고 단언한다. 나중에 검토 영역 안내 문구에 「복습」 같은 낱말이 들어가면 이 기능과 상관없이 시험이 깨진다 → 그때는 정규식을 숙련도 반영 문구에 맞게 좁히면 된다."
       ]
+    },
+    {
+      "step": 8,
+      "name": "mastery-prompt-fixes",
+      "status": "pending"
     }
   ],
   "created_at": "2026-11-25T09:01:03+0900",
