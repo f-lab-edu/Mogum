@@ -590,6 +590,7 @@ public class IntegrationTestConfiguration {
 		public void initialize(ConfigurableApplicationContext context) {
 			TestPropertyValues.of(
 				"app.worker.count=0",
+				"app.credit.refill-enabled=false",
 				"spring.security.oauth2.client.provider.google.authorization-uri="
 					+ FakeGoogle.ORIGIN + "/authorize",
 				"spring.security.oauth2.client.provider.google.token-uri=" + FakeGoogle.ORIGIN + "/token",

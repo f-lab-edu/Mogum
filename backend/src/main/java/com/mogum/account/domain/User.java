@@ -52,6 +52,11 @@ public class User extends AuditedEntity {
 	@Column(name = "credit_refill_at")
 	private Instant creditRefillAt;
 
+	public void refillCredits(int weeklyAmount, Instant nextRefillAt) {
+		creditBalance = weeklyAmount;
+		creditRefillAt = nextRefillAt;
+	}
+
 	public void consumeCredits(int amount) {
 		if (amount <= 0 || creditBalance < amount) {
 			throw new IllegalArgumentException("invalid credit consumption");

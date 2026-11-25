@@ -7,6 +7,21 @@ import org.junit.jupiter.api.Test;
 
 class UserTest {
 	@Test
+	@DisplayName("채움은 잔액과 다음 시각을 함께 바꾼다")
+	void refillsCreditsAndMovesNextDate() {
+		// given
+		var user = UserFixtures.approved("me@example.com", 40, java.time.Instant.parse("2026-11-07T19:00:00Z"));
+		var next = java.time.Instant.parse("2026-11-14T19:00:00Z");
+
+		// when
+		user.refillCredits(25, next);
+
+		// then
+		assertThat(user.getCreditBalance()).isEqualTo(25);
+		assertThat(user.getCreditRefillAt()).isEqualTo(next);
+	}
+
+	@Test
 	@DisplayName("신청은 신원과 이름과 크레딧을 보존하고 APPLIED로 시작하며 승인 시각은 비어 있다")
 	void createsAppliedUserWithProvidedIdentityAndCredit() {
 		// when
