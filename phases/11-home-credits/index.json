@@ -129,7 +129,14 @@
     {
       "step": 10,
       "name": "me-refetch-keep",
-      "status": "pending"
+      "status": "completed",
+      "summary": "내 정보 탭 재진입의 연결·서버 재조회가 재시도까지 실패하면 전체 오류 화면으로 바뀌는 두 재현 시험을 수정 전 실패로 확인; RequireAuth의 me.isError 조건을 데이터 없음으로 바꿔 이전 값·화면을 유지하고 첫 조회 실패·UNAUTHORIZED·모르는 상태·성공 시 새 잔액 반영을 보존, 다시 시도 중복 방지 시험과 UI_GUIDE §17 반영; 화면 테스트 602→607개(5개 추가) 전체 통과, npm --prefix frontend run test·lint 및 TypeScript 검사 통과",
+      "started_at": "2026-11-26T06:40:48+0900",
+      "completed_at": "2026-11-26T06:44:36+0900",
+      "review_notes": [
+        "frontend/src/pages/ProfilePage.test.tsx:143 — 재시도 두 번의 실제 지연(약 3초)을 그대로 기다리는 시험이라 시간 제한을 10초로 늘렸다. 동작 영향은 없다 → 화면 시험이 느려지면 이 시험만 `retryDelay: 0` 인 QueryClient 를 쓰거나 가짜 타이머를 쓰는 방법을 검토하면 된다.",
+        "frontend/src/components/RequireAuth.tsx:35 — 데이터가 있을 때는 `isError` 와 관계없이 outlet 을 그리므로, 다시 읽기 실패의 `RATE_LIMITED` 같은 오류도 화면에 드러나지 않는다. 사용자 결정(이전 값 유지 · 안내 없음)과 맞으므로 결함은 아니다. phase 리뷰 때 참고용으로 알아 두면 된다."
+      ]
     }
   ],
   "created_at": "2026-11-25T17:27:04+0900",
