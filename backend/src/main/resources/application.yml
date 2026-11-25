@@ -101,7 +101,7 @@ app:
     # 2026-11-23 실측으로 정함(ADR-187) — 숙련도 고리 TASK 전에 실제 흐름으로 다시 잰다.
     same-threshold: 0.72
   credit:
-    monthly-amount: 100
+    weekly-amount: 25
     new-course: 1
     new-roadmap: 1
     plan-roadmap-course: 1

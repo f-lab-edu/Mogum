@@ -247,9 +247,9 @@ class ApplyControllerIntegrationTest {
 		assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM credit_entries", Integer.class)).isEqualTo(1);
 		assertThat(jdbcTemplate.queryForMap("SELECT type, amount FROM credit_entries"))
 			.containsEntry("type", "REFILL")
-			.containsEntry("amount", creditProperties.monthlyAmount());
+			.containsEntry("amount", creditProperties.weeklyAmount());
 		assertThat(jdbcTemplate.queryForObject("SELECT credit_balance FROM users", Integer.class))
-			.isEqualTo(creditProperties.monthlyAmount());
+			.isEqualTo(creditProperties.weeklyAmount());
 		assertThat(jdbcTemplate.queryForObject(
 			"SELECT u.credit_balance = sum(e.amount) FROM users u "
 				+ "JOIN credit_entries e ON e.user_id = u.id GROUP BY u.id",
