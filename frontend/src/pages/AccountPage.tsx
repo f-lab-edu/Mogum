@@ -9,7 +9,7 @@ import AppLayout from '../components/AppLayout'
 import Button from '../components/Button'
 import Mogumi from '../components/Mogumi'
 import { openGoogleLogin } from '../lib/authNavigation'
-import PlaceholderPage from './PlaceholderPage'
+import HomePage from './HomePage'
 
 const screens: Record<string, { path: string; title: string }> = {
   NOT_APPLIED: { path: '/apply', title: '머금 이용 신청' },
@@ -51,7 +51,7 @@ export default function AccountPage() {
   }, [me.status, screen.title, pathname])
 
   if (pathname !== screen.path) return <Navigate to={screen.path} replace />
-  if (me.status === 'APPROVED') return <AppLayout><PlaceholderPage /></AppLayout>
+  if (me.status === 'APPROVED') return <AppLayout><HomePage /></AppLayout>
 
   const submit = (action: Action) => {
     if (!mutation.isPending) mutation.mutate(action)

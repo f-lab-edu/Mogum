@@ -101,7 +101,7 @@ Google 링크는 기존 Roboto 500·44px 높이·흰 바탕·1px 테두리·4px 
 | `/apply` | 신청 · `NOT_APPLIED` |
 | `/waiting-approval` | 승인 대기 · `APPLIED` |
 | `/rejected` | 거절됨 · `REJECTED` |
-| `/` | `APPROVED`의 홈 자리(`PlaceholderPage`, 제목 「머금」). 처음 열리는 탭. 「새로 배우기」 링크 하나로 `/new`에 진입 |
+| `/` | `APPROVED`의 홈(`HomePage`, 제목 「머금」). 처음 열리는 탭. 스트릭과 홈 다섯 칸(§16) |
 | `/new` | `APPROVED`의 새로 배우기(`NewLearningPage`). 위 바 제목 「새로 배우기」·뒤로 가기. 받기 성공 시 `/jobs/{id}`로 이동 |
 | `/courses` | `APPROVED`의 코스 탭(`CoursesPage`). 제목·상태의 목록 행에서 코스 화면으로 이동(§11) |
 | `/roadmaps` | `APPROVED`의 로드맵 탭(`RoadmapsPage`). 제목·설명·진행 한 줄의 목록 행에서 로드맵 화면으로 이동(§11) |
@@ -135,11 +135,11 @@ sips -Z 384 docs/design/assets/mogumi-reading.png --out frontend/src/assets/mogu
 
 ## 6. 아직 정하지 않은 것 — 처음 쓰는 TASK가 정한다
 
-홈 배치·공통 카드·추가 버튼 모양·애니메이션은 처음 필요한 TASK에서 정한다. 확인 펼침은 `9-card-review` step 3에서 §3·§15의 `InlineConfirmation`으로 정했다. 상태 표시·진도 막대는 `7-course-planning` step 8에서 §3의 공통 컴포넌트로 정했다. 글 입력·여러 줄 입력·선택 버튼 묶음·체크·칸 오류는 `7-course-planning` step 7에서 §3의 공통 컴포넌트로 정했다. 지금의 중앙 면과 안내 문단을 미리 카드 컴포넌트로 만들지 않는다. 다크 모드는 미정 항목이 아니라 MVP에서 제외한 기능이다(ADR-064).
+추가 버튼 모양·애니메이션은 처음 필요한 TASK에서 정한다. 홈 배치·페이지 내부 영역 틀은 `11-home-credits` step 6에서 §16으로 정했다. 확인 펼침은 `9-card-review` step 3에서 §3·§15의 `InlineConfirmation`으로 정했다. 상태 표시·진도 막대는 `7-course-planning` step 8에서 §3의 공통 컴포넌트로 정했다. 글 입력·여러 줄 입력·선택 버튼 묶음·체크·칸 오류는 `7-course-planning` step 7에서 §3의 공통 컴포넌트로 정했다. 지금의 중앙 면과 안내 문단을 미리 카드 컴포넌트로 만들지 않는다. 다크 모드는 미정 항목이 아니라 MVP에서 제외한 기능이다(ADR-064).
 
 ## 7. 승인 뒤 화면의 틀
 
-`6-job-worker` step 6에서 정한다. 주소는 §4.1, 화면 구분과 탭 순서는 [06 §2.1~2.3](./06-screens.md#21-형태와-모양의-원칙)을 따른다. 홈·내 정보는 제목 한 줄의 자리이며, 홈에는 `7-course-planning` step 7에서 새로 배우기 입구 하나를 더했다. 코스·로드맵 탭은 같은 TASK의 step 9에서 §11의 목록으로 채웠다. 나머지 내용은 해당 TASK에서 채운다.
+`6-job-worker` step 6에서 정한다. 주소는 §4.1, 화면 구분과 탭 순서는 [06 §2.1~2.3](./06-screens.md#21-형태와-모양의-원칙)을 따른다. 홈은 `11-home-credits` step 6에서 §16의 화면으로 채웠고, 내 정보는 제목 한 줄의 자리다. 코스·로드맵 탭은 같은 TASK의 step 9에서 §11의 목록으로 채웠다. 나머지 내용은 해당 TASK에서 채운다.
 
 | 이름 · 경로 | 모양 · 동작 · 상태 |
 |---|---|
@@ -150,7 +150,7 @@ sips -Z 384 docs/design/assets/mogumi-reading.png --out frontend/src/assets/mogu
 | 위 바 · `AppLayout` 안 | 높이 56px·흰 면·아래 테두리·스크롤 위에 붙는 바. 기본(탭 첫 화면)은 40px 모구미와 「머금」 로고. 1024px 부터 로고는 사이드바에만 둔다. 화면이 `title`을 넘기면 뒤로 가기 버튼과 해당 제목(`h1`)을 보인다. 뒤로 가기는 `navigate(-1)`로 브라우저의 이전 화면으로 간다. 버튼은 최소 44×44px·공통 포커스 outline. 제목은 진입 시 포커스를 받고 문서 제목을 `제목 · 머금`으로 바꾼다. |
 | 탭 아이콘 · `AppLayout` 안 | [guide §3](./design/guide.md#3-표준-내비게이션-5대-탭-아이콘-navigation-icons)의 홈·학사모·경로 노드·카드 덱·프로필 인라인 SVG를 그대로 사용한다. 24×24px·`currentColor`·선 두께 2, `aria-hidden`·`focusable="false"`로 장식 처리하며 접근 가능한 이름은 링크의 글자다. 아이콘 라이브러리는 없다. |
 | `Mogumi` · [components/Mogumi.tsx](../frontend/src/components/Mogumi.tsx) | 기본 `size="page"`는 기존 128px·가운데 정렬. `size="logo"`는 위 바·사이드바의 40px 표시다. 같은 로컬 사본·대체 글·원래 비율을 유지한다. |
-| `PlaceholderPage` · [pages/PlaceholderPage.tsx](../frontend/src/pages/PlaceholderPage.tsx) | `main`을 중복하지 않는다. 기본 홈 제목은 「머금」·문서 제목은 「홈 · 머금」, 제목 아래 24px 간격으로 「새로 배우기」 링크 하나를 둔다. 링크는 기본 Button과 같은 토큰·모양·포커스·눌림 효과를 쓴다. 다른 탭은 `title`을 받고 제목만 보인다. 제목 진입·변경 시 포커스와 문서 제목을 갱신한다. |
+| `PlaceholderPage` · [pages/PlaceholderPage.tsx](../frontend/src/pages/PlaceholderPage.tsx) | `main`을 중복하지 않는다. 현재 내 정보 탭에서 `title="내 정보"`를 받아 제목만 보인다. 제목 진입·변경 시 포커스와 문서 제목을 갱신한다. 홈은 §16의 `HomePage`를 쓴다. |
 
 뒤 TASK의 탭에서 들어간 화면은 `RequireAuth` 아래에서 `<AppLayout title="기다리는 화면">…본문…</AppLayout>`처럼 사용한다. 탭 첫 화면은 `title` 없이 감싸고 본문에서 제목을 제공한다. 승인 전 화면과 처리방침은 기존 `AccountLayout`을 유지한다.
 
@@ -287,3 +287,17 @@ step 5에서 로컬 Vite의 컴포넌트를 실제 Chromium으로 390px·1280px�
 [api/useReview.ts](../frontend/src/api/useReview.ts)의 `useTodayReview`는 공통 `apiFetch`로 `['reviews', 'today', courseId]`를 읽으며 전체 복습의 `courseId`는 `null`이다. 목록은 `gcTime: 0`으로 화면을 떠나면 캐시에서 제거하고, 매 진입에 서버에서 다시 읽는다. 읽는 중에는 캐시된 카드를 먼저 표시하지 않는다. `App`은 `pathname + search`를 키로 써 `/review?courseId={id}`의 쿼리가 바뀌어도 목록·답 펼침·동작 상태를 새로 시작한다. 아래 복습 탭은 `/review`로 가므로 거르기가 없어진다. `useReviewAction`은 평가·지우기를 보내고, 성공하면 진행 중인 `['courses']` 읽기를 취소한 뒤 목록·상세 캐시를 모두 무효화한다. `refetchType: 'none'`으로 해당 화면을 열 때 새 수를 읽으며 즉시 다시 읽지 않는다. 읽기·쓰기는 자동 재시도하지 않고 창 포커스·재연결에 따른 별도 읽기도 없다.
 
 짝 테스트는 `fetch` 대역으로 질문·답·평가 본문·남은 수·목록 끝 재조회·다시 돌아온 카드·요청 잠금·동시 제출 한 번·실패 보존·일정 밖/사라진 카드 재조회·확인 취소/삭제·코스 거르기·재진입·읽기 재시도·금지 정보 부재를 확인한다. 공통 확인의 포커스·간격 함수 경계·진행 중 코스 읽기 취소와 지연 응답 차단도 시험한다. `App.test.tsx`는 실제 라우터로 탭 진입·재진입·거른 복습에서 탭으로 전체 복습 전환을 확인한다. 390px의 2열 버튼은 클래스와 최소 크기를 검사했으며 실제 브라우저의 너비별 렌더링을 검증한 것으로 보지는 않는다.
+
+## 16. 홈
+
+`11-home-credits` step 6의 [HomePage.tsx](../frontend/src/pages/HomePage.tsx)는 승인된 사람의 `/`에서 `AccountPage`가 제목 없는 §7의 `AppLayout` 안에 표시한다. 본문 제목 「머금」은 진입 시 포커스를 받고 문서 제목은 「홈 · 머금」이다. 내용·문구·이동의 계약은 [06 §4](./06-screens.md#4-홈), 응답은 [05 §3](./05-api.md#3-읽기--화면마다-한-번)을 따른다.
+
+모바일·데스크톱 모두 제목 → 스트릭 → 오늘 복습 → 이어서 배우기 → 할 일 → 만드는 중 · 실패 → 새로 배우기 순서의 한 열이다. 영역 사이 간격은 24px이며 새 토큰·공통 컴포넌트 파일은 없다. 페이지 내부 `HomeSection`이 읽기 상태와 영역 틀을 공유한다. 스트릭은 별도 제목 없이 안내 바탕·16px 모서리·16px 여백에 굵은 보라 문구로 표시한다. 나머지 읽기 영역은 흰 면·24px 모서리·옅은 테두리·24px 여백(640px부터 32px)이며 오늘 복습만 보라 테두리·24px의 굵은 제목과 카드 수로 강조한다. 복습 시작과 새로 배우기 링크는 기존 홈 입구의 기본 `Button` 토큰·모양·포커스·눌림 효과를 유지하고, 복습 시작은 모바일에서 전체 폭이다.
+
+이어서 배우기는 코스 제목·다음 강의 제목을 한 링크에 표시한다. 서버가 다음 강의를 생략한 경우에도 이동 주소를 만들지 않고 칸을 숨긴다. 할 일·작업은 서버 순서의 이름 있는 `ul`이며 각 행 전체가 링크다. 행은 16px 모서리·옅은 테두리·16px 여백·16px 행 간격·보라 hover 테두리와 공통 포커스를 쓴다. 제목 뒤에 할 일은 기다리는 동작 한 줄, 작업은 §3의 `StatusBadge`로 기다리는 화면과 같은 대기·생성 문구 또는 「만들지 못했어요」를 표시한다. 만들기 실패의 이유·동작은 기다리는 화면에서 다룬다. 모르는 종류·상태는 원래 값을 노출하지 않고 해당 항목을 생략한다.
+
+오늘 복습은 0장이어도 카드 없음 문구와 함께 보이며 복습 시작은 없다. 이어서 배우기·할 일·작업은 비면 제목과 칸을 함께 숨긴다. 스트릭과 새로 배우기는 항상 남는다. 각 영역은 읽는 중 상태 한 줄, 읽기 실패는 `FailureNotice`의 실패한 것·서버 문구(연결 실패는 공통 안내)와 `Button`의 「다시 시도」를 표시한다. 실패한 영역만 다시 읽고 나머지 영역은 유지한다.
+
+[api/useHome.ts](../frontend/src/api/useHome.ts)의 `useHomeReviews`·`useHomeStreak`·`useHomeContinueLearning`·`useHomeTodos`·`useHomeJobs`는 공통 `apiFetch`로 각 홈 경로를 읽는다. 키는 `['home', 'reviews' | 'streak' | 'continue-learning' | 'todos' | 'jobs']`로 나뉜다. `gcTime: 0`·`staleTime: 0`·`refetchOnMount: 'always'`로 떠나면 캐시를 지우고 재진입에 새로 읽는다. 자동 재시도·폴링·창 포커스·재연결 읽기는 없다. 기존 작업 하나·코스·복습 목록 쿼리와도 키를 공유하지 않는다.
+
+짝 테스트는 스트릭 세 문구·0장/3장·첫 승인 홈·칸 순서·대상 링크·항목 순서·각 영역의 서버/연결 오류와 해당 영역만 다시 읽기·개별 로딩·모르는 값 생략·금지 정보 부재를 API 대역으로 확인한다. 훅 시험은 독립 경로·키·자동 재시도 없음·간격/포커스/재연결 읽기 없음·재진입 읽기를 확인한다. `App.test.tsx`·`AccountPage.test.tsx`는 승인된 `/`에서 실제 홈과 틀·제목 포커스·문서 제목을 확인하고, 다른 탭에는 스트릭이 없는지 검사한다. 응답 뒤 화면 단언은 `findBy…` 뒤 `waitFor` 안에서 수행한다. 실제 브라우저의 너비별 렌더링을 검증한 것으로 보지는 않는다.

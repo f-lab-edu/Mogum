@@ -8,13 +8,18 @@ vi.mock('../lib/authNavigation', async (importOriginal) => ({
   openGoogleLogin: vi.fn(),
 }))
 
+const homeResponses: Record<string, unknown> = {
+  '/api/home/streak': { days: 0, filledToday: false }, '/api/home/reviews': { remainingCount: 0 },
+  '/api/home/continue-learning': {}, '/api/home/todos': { items: [] }, '/api/home/jobs': { jobs: [] },
+}
 const identity = { name: '김민서', email: 'minseo@example.com' }
 const response = (status: string) => new Response(JSON.stringify({ data: { status, ...identity } }))
 const serverFailure = () => new Response(JSON.stringify({ code: 'INTERNAL_ERROR', message: '지금은 신청을 받지 못했어요. 잠시 뒤 다시 시도해 주세요.' }), { status: 500 })
 
 function open(status = 'NOT_APPLIED', path = '/apply') {
   window.history.replaceState(null, '', path)
-  vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(response(status))))
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(path in homeResponses
+    ? new Response(JSON.stringify({ data: homeResponses[path] })) : response(status))))
   return render(<App />)
 }
 
@@ -24,13 +29,20 @@ afterEach(() => {
   sessionStorage.clear()
 })
 
-test('승인된 계정의 홈은 계정 면 대신 앱 틀 안에 머금 자리 화면을 보인다', async () => {
+test('승인된 계정의 홈은 앱 틀 안에 스트릭과 오늘 복습·새로 배우기를 보인다', async () => {
   open('APPROVED', '/')
   const heading = await screen.findByRole('heading', { name: '머금' })
-  expect(screen.getByRole('main')).toContainElement(heading)
-  expect(screen.getAllByRole('navigation')).toHaveLength(2)
-  expect(screen.queryByText(identity.email)).not.toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeInTheDocument()
+  await screen.findByText('오늘 복습할 카드가 없어요')
+  await waitFor(() => {
+    expect(screen.getByRole('main')).toContainElement(heading)
+    expect(screen.getAllByRole('navigation')).toHaveLength(2)
+    expect(screen.getByText('오늘 복습 1장이나 강의 하나로 시작해요')).toBeVisible()
+    expect(screen.getByRole('link', { name: '새로 배우기' })).toHaveAttribute('href', '/new')
+    expect(screen.queryByText(identity.email)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeInTheDocument()
+    expect(heading).toHaveFocus()
+    expect(document.title).toBe('홈 · 머금')
+  })
 })
 
 test.each([
@@ -94,7 +106,8 @@ test('신청은 본문 없이 한 번만 보내고 요청 중 버튼과 계정 �
 test.each(['APPROVED', 'REJECTED'])('신청 성공이 기존 회원의 %s 상태를 반환하면 그 상태를 따른다', async (status) => {
   open()
   const button = await screen.findByRole('button', { name: '신청' })
-  vi.mocked(fetch).mockImplementation(() => Promise.resolve(response(status)))
+  vi.mocked(fetch).mockImplementation((path) => Promise.resolve(String(path) in homeResponses
+    ? new Response(JSON.stringify({ data: homeResponses[String(path)] })) : response(status)))
   fireEvent.click(button)
   expect(await screen.findByRole('heading', { name: status === 'APPROVED' ? '머금' : '이번에는 함께하지 못하게 되었어요' })).toBeVisible()
   expect(window.location.pathname).toBe(status === 'APPROVED' ? '/' : '/rejected')

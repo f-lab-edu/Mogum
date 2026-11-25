@@ -2,9 +2,21 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, expect, test, vi } from 'vitest'
 import App from './App'
 
+const homeResponses: Record<string, unknown> = {
+  '/api/home/streak': { days: 0, filledToday: false },
+  '/api/home/reviews': { remainingCount: 0 },
+  '/api/home/continue-learning': {},
+  '/api/home/todos': { items: [] },
+  '/api/home/jobs': { jobs: [] },
+}
+function stubFetch(mock: (path: string, options?: RequestInit) => Promise<Response>) {
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((path, options) => path in homeResponses
+    ? Promise.resolve(new Response(JSON.stringify({ data: homeResponses[path] }))) : mock(path, options)))
+}
+
 test('작업 주소를 직접 열면 승인 뒤 작업을 읽고 기다리는 화면을 표시한다', async () => {
   window.history.replaceState(null, '', '/jobs/12')
-  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+  stubFetch(vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
     ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
     : { id: 12, type: 'MATERIAL', status: 'RUNNING', subject: { title: '자료를 만들 강의' } } })))))
   render(<App />)
@@ -15,7 +27,7 @@ test('작업 주소를 직접 열면 승인 뒤 작업을 읽고 기다리는 �
 
 test('강의 주소는 승인 뒤 실제 강의와 본문을 표시한다', async () => {
   window.history.replaceState(null, '', '/courses/31/lessons/51')
-  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+  stubFetch(vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
     ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
     : { id: 51, courseId: 31, courseTitle: '자바 기초', position: 1, title: '변수', completed: false, material: { body: '값을 담아요.' } } })))))
   render(<App />)
@@ -28,7 +40,7 @@ test('강의 주소는 승인 뒤 실제 강의와 본문을 표시한다', asyn
 
 test('축하 주소는 승인 뒤 코스 제목과 홈으로를 표시한다', async () => {
   window.history.replaceState(null, '', '/courses/31/done')
-  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+  stubFetch(vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
     ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
     : { id: 31, title: '자바 기초', status: 'COMPLETED' } })))))
   render(<App />)
@@ -40,7 +52,7 @@ test('축하 주소는 승인 뒤 코스 제목과 홈으로를 표시한다', a
 
 test.each(['/new', '/jobs/12', '/courses/31', '/roadmaps/41', '/courses/31/lessons/51', '/courses/31/done'])('승인 전에는 %s에서 작업이나 결과를 읽지 않는다', async (path) => {
   window.history.replaceState(null, '', path)
-  vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: { status: 'APPLIED', name: '민서', email: 'minseo@example.com' } })))))
+  stubFetch(vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: { status: 'APPLIED', name: '민서', email: 'minseo@example.com' } })))))
   render(<App />)
   expect(await screen.findByRole('heading', { name: '가입 승인을 기다리고 있어요' })).toBeVisible()
   expect(fetch).toHaveBeenCalledTimes(1)
@@ -51,19 +63,25 @@ afterEach(() => {
   sessionStorage.clear()
 })
 
-test('/에서 실제 앱의 라우터와 QueryClientProvider를 거쳐 로그인 확인 뒤 머금 제목을 표시한다', async () => {
+test('/에서 로그인 확인 뒤 홈의 스트릭과 오늘 복습·새로 배우기를 표시한다', async () => {
   window.history.replaceState(null, '', '/')
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { email: 'admin@example.com', status: 'APPROVED', name: '민서' } }))))
+  stubFetch(vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { email: 'admin@example.com', status: 'APPROVED', name: '민서' } }))))
 
   render(<App />)
 
-  expect(await screen.findByRole('heading', { level: 1, name: '머금' })).toBeVisible()
+  await screen.findByText('오늘 복습할 카드가 없어요')
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { level: 1, name: '머금' })).toHaveFocus()
+    expect(screen.getByText('오늘 복습 1장이나 강의 하나로 시작해요')).toBeVisible()
+    expect(screen.getByRole('link', { name: '새로 배우기' })).toHaveAttribute('href', '/new')
+    expect(document.title).toBe('홈 · 머금')
+  })
   expect(fetch).toHaveBeenCalledWith('/api/me', expect.objectContaining({ credentials: 'include' }))
 })
 
 test('/의 401은 실제 앱에서도 U1으로 보내고 처음 온 사람에게 만료 문구를 보이지 않는다', async () => {
   window.history.replaceState(null, '', '/?tab=1#home')
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'UNAUTHORIZED', message: '서버 문구' }), { status: 401 })))
+  stubFetch(vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'UNAUTHORIZED', message: '서버 문구' }), { status: 401 })))
   render(<App />)
   expect(await screen.findByRole('link', { name: 'Google 계정으로 계속하기' })).toBeVisible()
   expect(window.location.pathname).toBe('/login')
@@ -73,7 +91,7 @@ test('/의 401은 실제 앱에서도 U1으로 보내고 처음 온 사람에게
 
 test('/login은 로그인 확인을 거치지 않는다', () => {
   window.history.replaceState(null, '', '/login')
-  vi.stubGlobal('fetch', vi.fn())
+  stubFetch(vi.fn())
   render(<App />)
   expect(screen.getByRole('link', { name: 'Google 계정으로 계속하기' })).toBeVisible()
   expect(fetch).not.toHaveBeenCalled()
@@ -89,20 +107,20 @@ const states = [
 test.each(states.flatMap((state) => ['/', '/apply', '/waiting-approval', '/rejected'].map((entry) => ({ ...state, entry }))))(
   '$status 사용자가 $entry 주소를 열면 $path 주소로 간다', async ({ status, path, heading, entry }) => {
     window.history.replaceState(null, '', entry)
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
+    stubFetch(vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
       data: { status, email: 'minseo@example.com', name: '민서', futureField: '무시할 칸' },
     })))))
     render(<App />)
     expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeVisible()
     await waitFor(() => expect(window.location.pathname).toBe(path))
     expect(screen.queryByText('무시할 칸')).not.toBeInTheDocument()
-    expect(fetch).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(status === 'APPROVED' ? 6 : 1))
   },
 )
 
 test('모르는 상태는 승인 화면이나 원래 값을 표시하지 않고 기존 불러오기 실패로 처리한다', async () => {
   window.history.replaceState(null, '', '/')
-  vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
+  stubFetch(vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
     data: { status: 'FUTURE_STATUS', email: 'minseo@example.com', name: '민서' },
   })))))
   render(<App />)
@@ -122,7 +140,7 @@ const tabPages = [
 
 test.each(tabPages)('승인된 사람은 $entry 주소에서 틀 안의 $label 화면을 본다', async ({ entry, title, label }) => {
   window.history.replaceState(null, '', entry)
-  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/courses' ? { courses: [] } : path === '/api/roadmaps' ? { roadmaps: [] } : path === '/api/reviews/today' ? { cards: [], remainingCount: 0 } : { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
+  stubFetch(vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/courses' ? { courses: [] } : path === '/api/roadmaps' ? { roadmaps: [] } : path === '/api/reviews/today' ? { cards: [], remainingCount: 0 } : { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
   render(<App />)
   const heading = await screen.findByRole('heading', { level: 1, name: title })
   expect(screen.getByRole('main')).toContainElement(heading)
@@ -130,7 +148,14 @@ test.each(tabPages)('승인된 사람은 $entry 주소에서 틀 안의 $label �
     expect(await screen.findByText(entry === '/courses' ? '아직 만든 코스가 없어요' : '아직 만든 로드맵이 없어요')).toBeVisible()
   } else if (entry === '/review') {
     expect(await screen.findByText('오늘 복습할 카드가 없어요')).toBeVisible()
-  } else expect(screen.getByRole('main').textContent).toBe(entry === '/' ? `${title}새로 배우기` : title)
+  } else if (entry === '/') {
+    await screen.findByText('오늘 복습할 카드가 없어요')
+    await waitFor(() => {
+      expect(screen.getByText('오늘 복습 1장이나 강의 하나로 시작해요')).toBeVisible()
+      expect(screen.getByRole('link', { name: '새로 배우기' })).toHaveAttribute('href', '/new')
+    })
+  } else expect(screen.getByRole('main').textContent).toBe(title)
+  if (entry !== '/') expect(screen.queryByRole('region', { name: '스트릭' })).not.toBeInTheDocument()
   expect(screen.getByRole('banner')).toBeVisible()
   for (const navigation of screen.getAllByRole('navigation')) {
     expect(within(navigation).getByRole('link', { name: label })).toHaveAttribute('aria-current', 'page')
@@ -145,7 +170,7 @@ test.each(tabPages)('승인된 사람은 $entry 주소에서 틀 안의 $label �
 test.each(states.filter((state) => state.status !== 'APPROVED').flatMap((state) => tabPages.map((tab) => ({ ...state, entry: tab.entry }))))(
   '승인 전 $status 사용자가 $entry 주소를 열어도 계정 화면으로 보내고 틀을 보이지 않는다', async ({ status, path, heading, entry }) => {
     window.history.replaceState(null, '', entry)
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: { status, name: '민서', email: 'minseo@example.com' } })))))
+    stubFetch(vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: { status, name: '민서', email: 'minseo@example.com' } })))))
     render(<App />)
     expect(await screen.findByRole('heading', { name: heading })).toBeVisible()
     await waitFor(() => expect(window.location.pathname).toBe(path))
@@ -156,7 +181,7 @@ test.each(states.filter((state) => state.status !== 'APPROVED').flatMap((state) 
 
 test('홈에서 탭 링크로 다른 자리 화면을 열어도 계정 화면으로 되돌리지 않는다', async () => {
   window.history.replaceState(null, '', '/')
-  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/courses' ? { courses: [] } : path === '/api/roadmaps' ? { roadmaps: [] } : path === '/api/reviews/today' ? { cards: [], remainingCount: 0 } : { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
+  stubFetch(vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/courses' ? { courses: [] } : path === '/api/roadmaps' ? { roadmaps: [] } : path === '/api/reviews/today' ? { cards: [], remainingCount: 0 } : { status: 'APPROVED', name: '민서', email: 'minseo@example.com' } })))))
   render(<App />)
   await screen.findByRole('heading', { name: '머금' })
   for (const tab of tabPages.slice(1)) {
@@ -168,7 +193,7 @@ test('홈에서 탭 링크로 다른 자리 화면을 열어도 계정 화면으
 
 test('임시 홈의 입구에서 새로 배우기로 가고 받기 뒤 실제 기다리는 화면을 연다', async () => {
   window.history.replaceState(null, '', '/')
-  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+  stubFetch(vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
     ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
     : { id: 42, type: 'NEW_COURSE', status: 'QUEUED', subject: { topic: '자바', level: 'BEGINNER', purpose: 'WORK' } } })))))
   render(<App />)
@@ -189,7 +214,7 @@ test('임시 홈의 입구에서 새로 배우기로 가고 받기 뒤 실제 �
 
 test('코스 주소를 직접 열면 승인 뒤 실제 코스를 읽고 같은 주소에 표시한다', async () => {
   window.history.replaceState(null, '', '/courses/31')
-  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+  stubFetch(vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
     ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
     : { id: 31, status: 'REVIEWING', title: '자바 기초', lessons: [], progress: { completedLessons: 0, totalLessons: 0 } } })))))
   render(<App />)
@@ -203,7 +228,7 @@ test('코스 주소를 직접 열면 승인 뒤 실제 코스를 읽고 같은 �
 
 test('로드맵 주소를 직접 열면 승인 뒤 실제 계획을 읽는다', async () => {
   window.history.replaceState(null, '', '/roadmaps/41')
-  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+  stubFetch(vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
     ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
     : { id: 41, status: 'REVIEWING', title: '자바 로드맵', description: '기초부터 실무까지', courses: [] } })))))
   render(<App />)
@@ -220,7 +245,7 @@ test.each([false, true])('코스에서 처음 연 강의를 만들고 읽은 뒤
     { id: 51, position: 1, title: '변수', description: '값을 담아요', concepts: [], completed: false },
     ...(!lastLesson ? [{ id: 52, position: 2, title: '반복문', description: '여러 번 실행해요', concepts: [], completed: false }] : []),
   ]
-  vi.stubGlobal('fetch', vi.fn().mockImplementation((path, options) => {
+  stubFetch(vi.fn().mockImplementation((path, options) => {
     let data: unknown
     if (path === '/api/me') data = { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
     else if (path === '/api/courses/31') data = {
@@ -266,7 +291,7 @@ test.each([false, true])('코스에서 처음 연 강의를 만들고 읽은 뒤
 test('실제 탭 바에서 복습을 열면 첫 질문을 바로 보이고 떠났다 돌아오면 답을 닫고 새로 읽는다', async () => {
   window.history.replaceState(null, '', '/')
   let reads = 0
-  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+  stubFetch(vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
     ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
     : { cards: [{ id: ++reads, question: `질문 ${reads}`, answer: '답이에요', nextIntervalsSeconds: { AGAIN: 60, HARD: 600, GOOD: 86400, EASY: 259200 } }], remainingCount: 1 } })))))
   render(<App />)
@@ -286,7 +311,7 @@ test('실제 탭 바에서 복습을 열면 첫 질문을 바로 보이고 떠�
 
 test.each(['LEARNING', 'COMPLETED'])('%s 코스의 복습 링크를 누르면 실제 복습 화면이 그 코스로 거른 카드를 읽는다', async (status) => {
   window.history.replaceState(null, '', '/courses/31')
-  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => {
+  stubFetch(vi.fn().mockImplementation((path) => {
     let data: unknown
     if (path === '/api/me') data = { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
     else if (path === '/api/courses/31') data = {
@@ -311,7 +336,7 @@ test.each(['LEARNING', 'COMPLETED'])('%s 코스의 복습 링크를 누르면 �
 
 test('거른 복습에서 복습 탭을 누르면 쿼리를 지우고 같은 경로에서도 질문·답·남은 수를 새로 시작한다', async () => {
   window.history.replaceState(null, '', '/review?courseId=31')
-  vi.stubGlobal('fetch', vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+  stubFetch(vi.fn().mockImplementation((path) => Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
     ? { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
     : { cards: [{ id: 1, question: path.includes('?') ? '거른 질문' : '전체 질문', answer: '거른 답', nextIntervalsSeconds: { AGAIN: 60, HARD: 600, GOOD: 86400, EASY: 259200 } }], remainingCount: 1, ...(path.includes('?') ? { courseTitle: '자바 기초' } : {}) } })))))
   render(<App />)
