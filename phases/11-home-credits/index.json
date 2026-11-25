@@ -53,7 +53,15 @@
     {
       "step": 4,
       "name": "home-course-todo",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-25T20:13:03+0900",
+      "summary": "GET /api/home/continue-learning의 data={course:{id,title,nextLesson:{id,title}}}(대상 없으면 course 생략)와 GET /api/home/todos의 data={items:[{type,targetId,title}]}(비면 []) 구현; 할 일 종류 COURSE_REVIEW는 코스 화면, ROADMAP_REVIEW·ROADMAP_NEXT_COURSE는 로드맵 화면으로 이동하며 targetId·title은 해당 코스·로드맵의 값; 할 일은 created_at 내림차순→targetId 내림차순→type 이름 오름차순으로 통합 정렬; ADR-099의 LEARNING·최근 강의 열기 우선·모두 미열기면 최근 시작·같은 시각 큰 ID 선택, CourseReadService.nextLesson을 코스 읽기와 공유하고 RoadmapReadService.read().nextCourse를 할 일에서 그대로 재사용; 소유권·인증·작업 상태·읽기 불변 및 응답 모양 검증, 05 §3·04 §2.2 구현 사실 반영; 서버 테스트 2696→2731개(35개 추가) 전체 통과·코스/아키텍처 AC 417개 통과·spotlessApply·build 통과",
+      "completed_at": "2026-11-25T20:24:17+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/course/dto/HomeContinueLearningResponse.java:8 — `CourseItem`에 `@JsonInclude(NON_NULL)`이 있어, 학습 중인데 모든 강의를 마친 코스(정상 흐름에서는 생기지 않는 상태)면 `nextLesson` 칸이 빠집니다. 05 §3 구현 줄은 `nextLesson`이 늘 있는 것처럼 적혀 있습니다 → step 6 화면이 `nextLesson` 없는 경우를 어떻게 다룰지 정하거나, 문서에 「다음 강의가 없으면 생략」을 한 줄 더하면 계약이 분명해집니다.",
+        "backend/src/main/java/com/mogum/course/service/HomeCourseReadService.java:70 — `ROADMAP_NEXT_COURSE`는 로드맵의 `created_at`으로 정렬됩니다. 그래서 오래된 로드맵이 방금 다음 코스를 만들 수 있게 되어도 목록 뒤쪽에 놓입니다. step이 허용한 재량이고 문서에도 적었으므로 동작 결함은 아닙니다 → 화면 시험(step 6)에서 이 순서가 어색하면 `updated_at` 기준을 다시 검토하면 됩니다.",
+        "backend/src/main/java/com/mogum/course/service/HomeCourseReadService.java:62 — 진행 중 로드맵마다 `roadmapReadService.read()`를 불러 로드맵 · 코스 · 작업을 다시 읽습니다(N+1). 정원 10명이라 지금은 무시할 만합니다. 판정을 한 곳에 둔다는 요구를 지키는 대가이므로 참고용입니다."
+      ]
     },
     {
       "step": 5,
