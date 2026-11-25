@@ -54,6 +54,8 @@
 
 `7-course-planning` step 6 구현: `course.controller` · `course.service` · `course.dto`가 코스 · 로드맵 읽기와 코스 시작 · 제목 고치기를 담당한다. `job`이 이미 `course`를 참조하므로 역방향 Java 의존은 ArchUnit으로 막았다. `course.repository.JpaCourseJobRepository`는 `EntityManager` 네이티브 SQL로 `generation_jobs`에서 성공하지 않은 강의 목록 작업의 ID · 실패 여부와 코스 다시 짜기의 존재 여부만 읽는다. 진행과 다음 코스는 읽기 서비스에서 계산하고 저장하지 않는다. 코스 시작은 받기와 같은 `CreditLedger.lock`의 사용자 행 잠금 뒤에 상태와 다시 짜기를 확인한다. API 계약은 [05 §3 · §4](./05-api.md#3-읽기--화면마다-한-번)에 있다.
 
+`11-home-credits` step 4 구현: `course.service.CourseReadService.nextLesson(Course, List<Lesson>)`의 순서대로 읽은 강의 중 다음 강의 판정을 코스 읽기와 `HomeCourseReadService.continueLearning`이 함께 쓰고, `HomeCourseReadService.todos`는 기존 `RoadmapReadService.read()`의 `nextCourse`를 그대로 사용한다 — 다음 코스 상태 · 앞 코스 완료 · 성공하지 않은 강의 목록 작업의 판정은 기존 읽기 한 곳에 있다.
+
 ### 2.3 기존 구현 — 그대로 · 바꾼다 · 버린다
 
 이미 구현한 TASK(`0-skeleton` ~ `3a-test-conventions`)를 새 설계와 맞댄 결과다. 바꾸는 방법은 각 TASK 에서 정한다.
