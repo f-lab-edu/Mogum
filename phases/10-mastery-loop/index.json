@@ -108,7 +108,14 @@
     {
       "step": 8,
       "name": "mastery-prompt-fixes",
-      "status": "pending"
+      "status": "completed",
+      "summary": "MaterialFormat.java의 개념 키를 name→definition→instruction 순서로 고정하고 mastery-shaky.txt를 「전에 배웠지만 흔들린다. 자세히 다룬다.」로 변경, course.txt 두 규칙과 MaterialFormatTest·CoursePlanFormatTest·RoadmapPlanFormatTest·PlanPromptSupportTest·MaterialGeneratorIntegrationTest의 단언 갱신; AC test/build·Spotless·Checkstyle 통과, 서버 테스트 2,623→2,624개(1개 추가).",
+      "started_at": "2026-11-25T15:23:20+0900",
+      "completed_at": "2026-11-25T15:32:41+0900",
+      "review_notes": [
+        "backend/src/main/resources/prompts/planning/course.txt:15 · roadmap.txt:10 — 배분 규칙은 아직 「「자세히 다룬다」인 개념」이라고 쓴다. 이제 흔들림 지시는 `전에 배웠지만 흔들린다. 자세히 다룬다.` 라 그 문구와 정확히 같지 않다. 기록 없음 지시도 「자세히 다룬다」로 끝난다. LLM 은 흔들림 · 기록 없음 모두 「자세히 다룬다」로 끝나는 것으로 읽을 수 있어 동작은 의도대로일 가능성이 크다. step 금지사항대로 바꾸지 않은 것이 맞다 → 공개 전 품질 점검에서 「「자세히 다룬다」로 끝나는」처럼 표현을 맞출지 볼 만하다.",
+        "backend/src/test/java/com/mogum/generation/material/MaterialFormatTest.java:240 — 새 키 순서 시험은 두 개념 모두 기록 없음 지시만 쓴다. 바로 아래 시험(`containsExactly(\"name\", \"definition\", \"instruction\")`)이 세 판정 모두의 순서를 확인하므로 빈틈은 없다(취향)."
+      ]
     }
   ],
   "created_at": "2026-11-25T09:01:03+0900",
