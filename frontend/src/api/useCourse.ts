@@ -20,6 +20,7 @@ export interface CourseResponse {
   nextLessonId?: number
   completedAt?: string
   todayReviewCount: number
+  masteryReport?: { shortened: number; revisited: number }
 }
 
 export const courseKey = (courseId: string) => ['courses', courseId] as const

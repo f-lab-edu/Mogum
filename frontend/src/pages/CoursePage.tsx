@@ -136,6 +136,9 @@ export default function CoursePage() {
     </FailureNotice>}
 
     {reviewing && <section className="space-y-4 rounded-panel border border-border bg-surface p-6 sm:p-8" aria-label="코스 검토">
+      {data.masteryReport && (data.masteryReport.shortened > 0 || data.masteryReport.revisited > 0) && <p className="rounded-control bg-surface-soft p-4 text-small text-text-secondary">
+        이전 복습 기록을 바탕으로 {data.masteryReport.shortened}개 개념을 짧게 다뤘고 {data.masteryReport.revisited}개 개념을 다시 짚었어요.
+      </p>}
       <p className="text-text-secondary">강의는 아직 열 수 없어요. 목록을 살펴보고 시작해 주세요.</p>
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
         <Button ref={replanButton} variant="secondary" disabled={busy} aria-expanded={replanOpen} aria-controls={replanOpen ? 'course-replan' : undefined} onClick={() => {

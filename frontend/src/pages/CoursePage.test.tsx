@@ -72,18 +72,66 @@ test('검토 중은 제목·모구미·안내·동작·순서 있는 강의 목�
   })
 })
 
+test.each([
+  { shortened: 2, revisited: 1 },
+  { shortened: 0, revisited: 3 },
+  { shortened: 3, revisited: 0 },
+])('검토 중 · 짧게 다룬 $shortened · 다시 짚은 $revisited 개념을 검토 영역의 한 줄로 보인다', async (masteryReport) => {
+  open({ ...review, masteryReport })
+  await screen.findByRole('heading', { name: review.title })
+  await waitFor(() => {
+    const region = screen.getByRole('region', { name: '코스 검토' })
+    expect(within(region).getByText(`이전 복습 기록을 바탕으로 ${masteryReport.shortened}개 개념을 짧게 다뤘고 ${masteryReport.revisited}개 개념을 다시 짚었어요.`)).toBeVisible()
+    expect(screen.getByRole('main')).not.toHaveTextContent(/잘 앎|흔들림|기록 없음|%|핵심 복습 반영|메모 목표 연계|맞춤형 커리큘럼 반영 완료/)
+  })
+})
+
+test.each([
+  { name: '두 수가 모두 0', data: { ...review, masteryReport: { shortened: 0, revisited: 0 } } },
+  { name: '내역 없음', data: review },
+])('검토 중 · $name · 숙련도 반영 줄과 대체 안내를 두지 않는다', async ({ data }) => {
+  open(data)
+  await screen.findByRole('heading', { name: review.title })
+  await waitFor(() => {
+    const region = screen.getByRole('region', { name: '코스 검토' })
+    expect(screen.queryByText(/이전 복습 기록을 바탕으로/)).not.toBeInTheDocument()
+    expect(region).not.toHaveTextContent(/복습|숙련도|반영|0개/)
+    expect(within(region).queryByRole('img')).not.toBeInTheDocument()
+    expect(within(region).getByRole('button', { name: '이대로 시작' })).toBeEnabled()
+  })
+})
+
+test.each([learning, done].flatMap((data) => [
+  { ...data, masteryReport: undefined },
+  { ...data, masteryReport: { shortened: 2, revisited: 1 } },
+]))('$status · 숙련도 반영 내역 $masteryReport · 반영 줄을 보이지 않는다', async (data) => {
+  open(data)
+  await screen.findByRole('heading', { name: data.title })
+  await waitFor(() => {
+    expect(screen.queryByText(/이전 복습 기록을 바탕으로/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: '코스 검토' })).not.toBeInTheDocument()
+    expect(screen.getByRole('main')).not.toHaveTextContent(/잘 앎|흔들림|기록 없음|%/)
+  })
+})
+
 test('이대로 시작은 응답으로 같은 코스 화면을 학습 중으로 바꾸고 1강을 열지 않는다', async () => {
   const started = { ...review, status: 'LEARNING', nextLessonId: 51 }
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response(review)).mockResolvedValueOnce(response(started)))
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response({ ...review, masteryReport: { shortened: 2, revisited: 1 } })).mockResolvedValueOnce(response(started)))
   const { router, client } = open()
+  await screen.findByRole('heading', { name: review.title })
+  await waitFor(() => expect(screen.getByText('이전 복습 기록을 바탕으로 2개 개념을 짧게 다뤘고 1개 개념을 다시 짚었어요.')).toBeVisible())
   fireEvent.click(await screen.findByRole('button', { name: '이대로 시작' }))
-  expect(await screen.findByText('학습 중')).toBeVisible()
-  expect(screen.getByText('0 / 2')).toBeVisible()
-  expect(screen.getByRole('region', { name: '다음에 열 강의' })).toHaveTextContent('1강 · 변수')
-  expect(router.state.location.pathname).toBe('/courses/31')
-  expect(client.getQueryData(['courses', '31'])).toEqual(started)
-  expect(fetch).toHaveBeenCalledTimes(2)
-  expect(screen.queryByRole('button', { name: '이대로 시작' })).not.toBeInTheDocument()
+  await screen.findByText('학습 중')
+  await waitFor(() => {
+    expect(screen.getByText('학습 중')).toBeVisible()
+    expect(screen.getByText('0 / 2')).toBeVisible()
+    expect(screen.getByRole('region', { name: '다음에 열 강의' })).toHaveTextContent('1강 · 변수')
+    expect(router.state.location.pathname).toBe('/courses/31')
+    expect(client.getQueryData(['courses', '31'])).toEqual(started)
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('button', { name: '이대로 시작' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/이전 복습 기록을 바탕으로/)).not.toBeInTheDocument()
+  })
 })
 
 test('끝나지 않은 다시 짜기로 시작이 거절되면 서버 문구와 검토 중을 유지한다', async () => {
@@ -386,7 +434,9 @@ test('동작 연결 실패는 기술 상세를 숨기고 재시도할 수 있게
 })
 
 test.each([review, learning, done])('$status에서 미구현 동작·시스템 정보·시안 전용 정보를 보이지 않는다', async (data) => {
-  open({ ...data, model: 'secret-model', credits: 999, masteryReport: 'secret-mastery', memo: 'secret-memo' })
+  open({ ...data, model: 'secret-model', credits: 999, masteryReport: { shortened: 2, revisited: 1 }, memo: 'secret-memo' })
   await screen.findByRole('heading', { name: review.title })
-  expect(screen.getByRole('main')).not.toHaveTextContent(/secret-|999|토큰|비용|모델|크레딧|수료|배지|퀴즈|예상|소요|핵심 복습 반영|메모|지우기|복습하기|처음부터|순서 바꾸기|첫 강의가 열/)
+  await waitFor(() => {
+    expect(screen.getByRole('main')).not.toHaveTextContent(/secret-|999|토큰|비용|모델|크레딧|수료|배지|퀴즈|예상|소요|핵심 복습 반영|메모|지우기|복습하기|처음부터|순서 바꾸기|첫 강의가 열|잘 앎|흔들림|기록 없음|%/)
+  })
 })
