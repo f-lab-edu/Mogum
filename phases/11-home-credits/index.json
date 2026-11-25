@@ -78,7 +78,16 @@
     {
       "step": 6,
       "name": "home-screen",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-26T00:53:30+0900",
+      "summary": "HomePage.tsx·HomePage.test.tsx 및 api/useHome.ts·useHome.test.tsx 추가: useHomeReviews·useHomeStreak·useHomeContinueLearning·useHomeTodos·useHomeJobs의 독립 쿼리와 페이지 내부 HomeSection(새 공통 컴포넌트 파일 없음)으로 스트릭·다섯 칸·빈 상태·영역별 오류/재시도·재진입 읽기 구현, 승인된 / 연결·PlaceholderPage 홈 분기 제거·UI_GUIDE §7·§16 등 구현 사실 반영; 화면 테스트 533→568개(36개 추가·자리 시험 1개 제거) 전체 통과, npm --prefix frontend run test·lint 및 TypeScript 검사 통과",
+      "completed_at": "2026-11-26T01:00:18+0900",
+      "review_notes": [
+        "frontend/src/App.test.tsx:217 — 시험 이름이 아직 '임시 홈의 입구에서 새로 배우기로 가고…'다. 홈이 실제 화면이 됐으니 → '홈의 새로 배우기 입구에서…'로 바꾸면 이름과 내용이 맞는다(동작 영향 없음).",
+        "docs/UI_GUIDE.md:138 — §6 의 미정 목록에서 '공통 카드'가 빠졌다. 그런데 이번 step 은 공통 카드 컴포넌트를 만들지 않았고, 페이지 안의 `HomeSection` 하나만 두었다 → '공통 카드는 처음 필요한 TASK 에서 정한다'를 남기면 다음 작업자가 공통 카드를 이미 정한 것으로 오해하지 않는다.",
+        "frontend/src/pages/HomePage.tsx:27 — `HomeSection` 이 `streak` · `emphasis` 두 플래그로 모양을 나눈다. 지금은 읽기 쉬운 범위다. 다만 칸이 늘거나 다른 화면이 같은 틀을 쓰면 → 그때 공통 컴포넌트로 빼면서 UI_GUIDE §3 에 적으면 된다(참고용).",
+        "실제 브라우저의 390px · 1280px 렌더링은 확인하지 않았다(UI_GUIDE §16 에도 그렇게 적혀 있다). 공개 전 점검이나 phase 리뷰에서 시안(`05-home-mobile.png`)과 나란히 한 번 보면 좋다."
+      ]
     },
     {
       "step": 7,
