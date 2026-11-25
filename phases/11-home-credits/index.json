@@ -66,7 +66,14 @@
     {
       "step": 5,
       "name": "home-jobs",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-25T20:24:17+0900",
+      "summary": "기존 홈 칸 경로와 영역별 실패·재시도를 맞춰 GET /api/home/jobs(data={jobs:[JobResponse]}, 비면 jobs:[]) 구현; 본인의 QUEUED·RUNNING·FAILED만 created_at DESC, id DESC로 나눠 받지 않고 읽으며 JobReadService의 단건 변환을 공유해 subject·실패 error 두 묶음을 동일하게 반환; 소유권·성공 제외·동시각 정렬·여섯 종류 단건 비교·시스템 정보 제외·인증·상태/시각/크레딧 읽기 불변 검증과 05 §3 구현 줄 반영; 서버 테스트 2731→2764개(33개 추가) 전체 통과·작업/아키텍처 AC 623개 통과·spotlessApply·build 통과",
+      "completed_at": "2026-11-26T00:53:29+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/job/service/JobReadService.java:69 — 목록에서 대상 코스 · 로드맵 · 강의를 찾지 못하면 `NOT_FOUND`를 던져 홈 칸 전체가 404가 됩니다. 결과를 지울 때 작업도 함께 지우므로(ADR-140) 정상 흐름에서는 생기지 않습니다. 다만 그런 일이 생기면 칸 하나가 아니라 목록 전체가 실패한다는 점은 알아 두면 좋습니다(동작 영향 없음).",
+        "backend/src/test/java/com/mogum/job/service/JobReadServiceIntegrationTest.java:107 — 매개변수 시험 하나에 성공 제외 · 단일 읽기와 같음 · 읽기가 아무것도 바꾸지 않음이 함께 묶여 있습니다. 실패하면 원인을 찾기가 조금 어렵습니다 → 다음에 이 파일을 고칠 때 「바꾸지 않음」 단언을 따로 떼면 읽기 쉽습니다."
+      ]
     },
     {
       "step": 6,
