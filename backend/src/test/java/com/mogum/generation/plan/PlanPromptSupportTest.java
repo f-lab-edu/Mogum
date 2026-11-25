@@ -47,6 +47,33 @@ class PlanPromptSupportTest {
 	}
 
 	@Test
+	@DisplayName("계획 프롬프트는 강의 자료와 같은 세 판정 지시 파일을 읽는다")
+	void readsSharedMasteryInstructions() {
+		// when
+		var instructions = List.of(PlanPromptSupport.resource("mastery-well-known.txt"),
+			PlanPromptSupport.resource("mastery-shaky.txt"), PlanPromptSupport.resource("mastery-no-record.txt"));
+
+		// then
+		assertThat(instructions).containsExactly("짧게 다룬다.", "자세히 다룬다.", "처음 배우는 것으로 보고 자세히 다룬다.");
+	}
+
+	@ParameterizedTest(name = "목적 {0}: {1}")
+	@CsvSource({"WORK,예제 · 실습 · 현업에서 주의할 점",
+		"INTERVIEW,왜 그런가 · 무엇과 비교해 어떤가 · 면접 질문형 카드", "GENERAL,비유 · 흐름", "OTHER,기타 원문"})
+	@DisplayName("관련 검색 질의는 프롬프트와 같은 목적 문구를 주제에 이어 붙인다")
+	void buildsTopicPurposeQuery(Purpose purpose, String expected) {
+		// given
+		var input = new PlanningInput("주제 원문", Level.OTHER, "수준 표식", purpose, "기타 원문", "메모 표식");
+
+		// when
+		var query = PlanPromptSupport.topicPurposeQuery(input);
+
+		// then
+		assertThat(query).isEqualTo("주제 원문\n" + expected);
+		assertThat(query).isEqualTo("주제 원문\n" + PlanPromptSupport.materials(input, false).get("purpose"));
+	}
+
+	@Test
 	@DisplayName("기타와 메모 및 주제는 공백과 줄바꿈 및 경계 문자열까지 자료로 보존한다")
 	void preservesUserTextAsData() {
 		// given

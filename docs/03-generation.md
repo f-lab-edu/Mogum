@@ -88,6 +88,8 @@
 | 사전이 비었을 때 | 임베딩을 부르지 않고 관련 개념 없이 짠다 |
 | 다시 짚는 강의의 몫 | 프롬프트로 「10강 중 최대 2강」만 지시한다 — 서버는 검사하지 않는다(ADR-121 과 같은 결) |
 
+- 구현 — `generation.RelatedConceptPreparer.prepare(JobSnapshot, List<String>)`가 관련 개념을 준비하고 최대 개수는 `RELATED_CONCEPT_LIMIT`에 둔다. `NewCourseGenerator` · `PlanRoadmapCourseGenerator` · `ReplanCourseGenerator`의 `generate`는 재료를 값으로 준비한 뒤, 읽기 트랜잭션 밖·채팅 전에 호출한다.
+
 **로드맵 계획의 개념과 강의의 개념**(ADR-035)
 
 - 계획에서 코스마다 정한 개념은 그 코스에서 모두 다룬다. 강의에서는 더 잘게 나눌 수 있다 — 예: 계획의 「트랜잭션」을 강의에서는 「격리 수준」 · 「전파」로.

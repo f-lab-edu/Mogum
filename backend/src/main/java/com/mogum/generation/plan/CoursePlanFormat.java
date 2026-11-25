@@ -1,6 +1,7 @@
 package com.mogum.generation.plan;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.Optional;
 
 public final class CoursePlanFormat {
@@ -21,6 +22,19 @@ public final class CoursePlanFormat {
 		if (input instanceof CoursePlanInput.ReplanCourse replan) {
 			data.put("previousLessons", replan.previousLessons());
 			PlanPromptSupport.optionalText(data, "feedback", replan.feedback());
+		}
+		if (!input.relatedConcepts().isEmpty()) {
+			data.put("relatedConcepts", input.relatedConcepts().stream().map(concept -> {
+				var value = new LinkedHashMap<String, Object>();
+				value.put("name", concept.name());
+				value.put("definition", concept.definition());
+				value.put("instruction", PlanPromptSupport.resource(switch (concept.judgment()) {
+					case WELL_KNOWN -> "mastery-well-known.txt";
+					case SHAKY -> "mastery-shaky.txt";
+					case NO_RECORD -> "mastery-no-record.txt";
+				}));
+				return value;
+			}).toList());
 		}
 		return PlanPromptSupport.prompt("course.txt",
 			input instanceof CoursePlanInput.NewCourse ? "new-course-output.txt" : "lessons-output.txt", data);

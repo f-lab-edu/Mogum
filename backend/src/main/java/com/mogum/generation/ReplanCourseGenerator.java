@@ -21,6 +21,7 @@ public final class ReplanCourseGenerator implements JobGenerator {
 	private final ChatCall chatCall;
 	private final ChatSettings chatSettings;
 	private final CoursePlanFormat coursePlanFormat;
+	private final RelatedConceptPreparer relatedConceptPreparer;
 	private final RoadmapCoursePlanReader roadmapCoursePlanReader;
 	private final CourseRepository courseRepository;
 	private final LessonRepository lessonRepository;
@@ -28,12 +29,14 @@ public final class ReplanCourseGenerator implements JobGenerator {
 	private final TransactionTemplate transactionTemplate;
 
 	public ReplanCourseGenerator(ChatCall chatCall, ChatSettings chatSettings, CoursePlanFormat coursePlanFormat,
-		RoadmapCoursePlanReader roadmapCoursePlanReader, CourseRepository courseRepository,
+		RelatedConceptPreparer relatedConceptPreparer, RoadmapCoursePlanReader roadmapCoursePlanReader,
+		CourseRepository courseRepository,
 		LessonRepository lessonRepository, EntityManager entityManager,
 		PlatformTransactionManager platformTransactionManager) {
 		this.chatCall = chatCall;
 		this.chatSettings = chatSettings;
 		this.coursePlanFormat = coursePlanFormat;
+		this.relatedConceptPreparer = relatedConceptPreparer;
 		this.roadmapCoursePlanReader = roadmapCoursePlanReader;
 		this.courseRepository = courseRepository;
 		this.lessonRepository = lessonRepository;
@@ -66,7 +69,12 @@ public final class ReplanCourseGenerator implements JobGenerator {
 					values.getPurpose(), values.getPurposeOther(), values.getMemo());
 				return new CoursePlanInput.ReplanCourse(planning, null, previous, job.feedback());
 			});
-			var prompt = coursePlanFormat.prompt(input);
+			var related = relatedConceptPreparer.prepare(job, input.queryTexts());
+			if (related instanceof RelatedConceptPreparer.RelatedResult.Failed failed) {
+				return failed.failure();
+			}
+			var prompt = coursePlanFormat.prompt(input.withRelatedConcepts(
+				((RelatedConceptPreparer.RelatedResult.Success)related).concepts()));
 			var result = chatCall.call(job, chatSettings, prompt.system(), prompt.user(),
 				coursePlanFormat::parseLessons);
 			return switch (result) {

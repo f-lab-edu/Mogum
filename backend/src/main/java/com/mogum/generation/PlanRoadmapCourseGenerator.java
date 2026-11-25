@@ -15,6 +15,7 @@ public final class PlanRoadmapCourseGenerator implements JobGenerator {
 	private final ChatCall chatCall;
 	private final ChatSettings chatSettings;
 	private final CoursePlanFormat coursePlanFormat;
+	private final RelatedConceptPreparer relatedConceptPreparer;
 	private final RoadmapCoursePlanReader roadmapCoursePlanReader;
 	private final CourseRepository courseRepository;
 	private final LessonRepository lessonRepository;
@@ -28,7 +29,12 @@ public final class PlanRoadmapCourseGenerator implements JobGenerator {
 	public GenerationOutcome generate(JobSnapshot job) {
 		try {
 			var input = roadmapCoursePlanReader.read(job.targetId());
-			var prompt = coursePlanFormat.prompt(input);
+			var related = relatedConceptPreparer.prepare(job, input.queryTexts());
+			if (related instanceof RelatedConceptPreparer.RelatedResult.Failed failed) {
+				return failed.failure();
+			}
+			var prompt = coursePlanFormat.prompt(input.withRelatedConcepts(
+				((RelatedConceptPreparer.RelatedResult.Success)related).concepts()));
 			var result = chatCall.call(job, chatSettings, prompt.system(), prompt.user(),
 				coursePlanFormat::parseLessons);
 			return switch (result) {

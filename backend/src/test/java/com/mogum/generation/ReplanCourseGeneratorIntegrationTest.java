@@ -30,6 +30,8 @@ import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.CreditEntryRepository;
 import com.mogum.account.repository.UserRepository;
 import com.mogum.account.service.CreditLedger;
+import com.mogum.card.domain.ConceptFixtures;
+import com.mogum.card.repository.ConceptRepository;
 import com.mogum.config.CreditProperties;
 import com.mogum.config.WorkerProperties;
 import com.mogum.course.domain.Course;
@@ -51,10 +53,12 @@ import com.mogum.job.domain.JobType;
 import com.mogum.job.service.JobIntakeService;
 import com.mogum.support.IntegrationTest;
 import com.mogum.support.IntegrationTestConfiguration.TestChatProvider;
+import com.mogum.support.IntegrationTestConfiguration.TestEmbeddingProvider;
 import com.mogum.support.TestClock;
 import com.mogum.worker.JobRunner;
 
 import jakarta.persistence.EntityManager;
+import tools.jackson.databind.json.JsonMapper;
 
 @IntegrationTest
 @ExtendWith(OutputCaptureExtension.class)
@@ -78,6 +82,10 @@ class ReplanCourseGeneratorIntegrationTest {
 	@Autowired
 	TestChatProvider testChatProvider;
 	@Autowired
+	TestEmbeddingProvider testEmbeddingProvider;
+	@Autowired
+	ConceptRepository conceptRepository;
+	@Autowired
 	JobIntakeService jobIntakeService;
 	@Autowired
 	UserRepository userRepository;
@@ -98,6 +106,7 @@ class ReplanCourseGeneratorIntegrationTest {
 	void replacesLessonsAndPreservesEditedTitle(int position, CapturedOutput output) throws InterruptedException {
 		// given
 		testChatProvider.reset();
+		testEmbeddingProvider.reset();
 		var course = course(position);
 		var before = jdbcTemplate.queryForMap("SELECT * FROM courses WHERE id = ?", course.getId());
 		var oldIds = jdbcTemplate.queryForList("SELECT id FROM lessons WHERE course_id = ?",
@@ -122,6 +131,9 @@ class ReplanCourseGeneratorIntegrationTest {
 			"SELECT concepts -> 0 ->> 'name' FROM lessons WHERE course_id = ? ORDER BY position",
 			String.class, course.getId())).containsExactly("변수", "함수");
 		assertThat(testChatProvider.outsideTransaction(id)).isTrue();
+		assertThat(testEmbeddingProvider.requests(id)).isEmpty();
+		assertThat(testChatProvider.requests(id).getFirst().messages().get(1).text())
+			.doesNotContain("relatedConcepts");
 		String materials = testChatProvider.requests(id).getFirst().messages().get(1).text();
 		assertThat(materials).contains("LEAKCHECK-topic", "LEAKCHECK-purpose", "LEAKCHECK-memo",
 			"previousLessons", "이전 강의", "이전 설명", "이전 개념", "이전 정의", "LEAKCHECK-feedback");
@@ -153,6 +165,7 @@ class ReplanCourseGeneratorIntegrationTest {
 		throws InterruptedException {
 		// given
 		testChatProvider.reset();
+		testEmbeddingProvider.reset();
 		var course = course(position);
 		var before = content();
 		long id = jobIntakeService.receive(course.getUserId(), request(course)).id();
@@ -234,6 +247,80 @@ class ReplanCourseGeneratorIntegrationTest {
 		assertThat(content()).isEqualTo(before);
 	}
 
+	@ParameterizedTest(name = "위치={0}")
+	@ValueSource(ints = {0, 1, 3})
+	@DisplayName("코스의 관련 개념은 단일 코스의 주제와 목적 또는 로드맵 코스의 계획 정의들로 찾는다")
+	void suppliesRelatedConceptsBeforeChat(int position) throws InterruptedException {
+		// given
+		testChatProvider.reset();
+		testEmbeddingProvider.reset();
+		var course = course(position);
+		long id = jobIntakeService.receive(course.getUserId(), request(course)).id();
+		var queries = position == 0 ? List.of("LEAKCHECK-topic\nLEAKCHECK-purpose")
+			: List.of("계획정의-" + position, "추가 계획정의-" + position);
+		for (String query : queries) {
+			testEmbeddingProvider.vector(query, List.of(1f, 0f));
+		}
+		conceptRepository.save(ConceptFixtures.concept(course.getUserId(), "가까운 개념", "가까운 정의", new float[] {1, 0}));
+		conceptRepository.save(ConceptFixtures.concept(course.getUserId(), "먼 개념", "먼 정의", new float[] {-1, 0}));
+
+		// when
+		runOnce();
+
+		// then
+		assertThat(jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", id))
+			.containsEntry("status", "SUCCEEDED");
+		assertThat(testEmbeddingProvider.requests(id)).singleElement()
+			.satisfies(request -> assertThat(request.definitions()).containsExactlyElementsOf(queries));
+		assertThat(testChatProvider.requests(id)).singleElement().satisfies(request -> {
+			var data = new JsonMapper().readTree(request.messages().get(1)
+				.text().split("\n", 3)[1]);
+			var related = data.path("relatedConcepts");
+			assertThat(related).hasSize(2);
+			assertThat(related.get(0).path("name").asString()).isEqualTo("가까운 개념");
+			assertThat(related.get(0).path("definition").asString()).isEqualTo("가까운 정의");
+			assertThat(related.get(0).path("instruction").asString()).isEqualTo("처음 배우는 것으로 보고 자세히 다룬다.");
+			assertThat(related.get(1).path("name").asString()).isEqualTo("먼 개념");
+		});
+		assertThat(testEmbeddingProvider.outsideTransaction(id)).isTrue();
+		assertThat(testChatProvider.outsideTransaction(id)).isTrue();
+		assertThat(jdbcTemplate.queryForList("SELECT call_type FROM llm_calls ORDER BY id", String.class))
+			.containsExactly("EMBEDDING", "CHAT");
+	}
+
+	@ParameterizedTest(name = "임베딩 실패 {index}")
+	@CsvSource({"0,PROVIDER_UNAVAILABLE", "0,INVALID_OUTPUT", "0,PROVIDER_REJECTED", "0,INPUT_TOO_LARGE",
+		"3,PROVIDER_UNAVAILABLE", "3,INVALID_OUTPUT", "3,PROVIDER_REJECTED", "3,INPUT_TOO_LARGE"})
+	@DisplayName("관련 개념 임베딩 실패는 채팅 없이 같은 실패와 호출 기록을 남긴다")
+	void failsRelatedEmbeddingBeforeChat(int position, GenerationOutcome.Failure failure) throws InterruptedException {
+		// given
+		testChatProvider.reset();
+		testEmbeddingProvider.reset();
+		var course = course(position);
+		long userId = course.getUserId();
+		long id = jobIntakeService.receive(userId, request(course)).id();
+		conceptRepository.save(ConceptFixtures.concept(userId, "사전 개념", "사전 정의", new float[] {1, 0}));
+		var replies = new EmbeddingProvider.Reply[workerProperties.maxRetries() + 1];
+		Arrays.fill(replies, TestEmbeddingProvider.failure(failure));
+		testEmbeddingProvider.reply(id, replies);
+
+		// when
+		runOnce();
+
+		// then
+		int attempts = failure == GenerationOutcome.Failure.INVALID_OUTPUT
+			|| failure == GenerationOutcome.Failure.PROVIDER_UNAVAILABLE ? workerProperties.maxRetries() + 1 : 1;
+		assertThat(jdbcTemplate.queryForMap("SELECT * FROM generation_jobs WHERE id = ?", id))
+			.containsEntry("status", "FAILED").containsEntry("error_type", failure.name());
+		assertThat(testChatProvider.requests(id)).isEmpty();
+		assertThat(testEmbeddingProvider.requests(id)).hasSize(attempts);
+		assertThat(testEmbeddingProvider.outsideTransaction(id)).isTrue();
+		assertThat(jdbcTemplate.queryForList("SELECT call_type FROM llm_calls ORDER BY id", String.class))
+			.hasSize(attempts).containsOnly("EMBEDDING");
+		assertThat(jdbcTemplate.queryForList("SELECT outcome FROM llm_calls ORDER BY id", String.class))
+			.containsOnly(TestEmbeddingProvider.failure(failure).outcome().name());
+	}
+
 	private List<?> content() {
 		return List.of("roadmaps", "courses", "lessons").stream()
 			.map(table -> jdbcTemplate.queryForList("SELECT * FROM " + table + " ORDER BY id")).toList();
@@ -268,7 +355,8 @@ class ReplanCourseGeneratorIntegrationTest {
 		Course target = null;
 		for (int index = 1; index <= 4; index++) {
 			var course = CourseFixtures.inRoadmap(roadmap, index, "계획-" + index, "계획설명-" + index,
-				List.of(new PlannedConcept("계획개념-" + index, "계획정의-" + index)));
+				List.of(new PlannedConcept("계획개념-" + index, "계획정의-" + index),
+					new PlannedConcept("추가 계획개념-" + index, "추가 계획정의-" + index)));
 			if (index < position) {
 				CourseFixtures.withStatus(course, CourseStatus.COMPLETED);
 			}

@@ -17,12 +17,7 @@ final class PlanPromptSupport {
 	static Map<String, Object> materials(PlanningInput input, boolean includeLevel) {
 		var data = new LinkedHashMap<String, Object>();
 		data.put("topic", input.topic());
-		data.put("purpose", switch (input.purpose()) {
-			case WORK -> resource("purpose-work.txt");
-			case INTERVIEW -> resource("purpose-interview.txt");
-			case GENERAL -> resource("purpose-general.txt");
-			case OTHER -> input.purposeOther();
-		});
+		data.put("purpose", purposeText(input));
 		if (includeLevel) {
 			data.put("level", switch (input.level()) {
 				case BEGINNER -> resource("level-beginner.txt");
@@ -33,6 +28,19 @@ final class PlanPromptSupport {
 		}
 		optionalText(data, "memo", input.memo());
 		return data;
+	}
+
+	static String topicPurposeQuery(PlanningInput input) {
+		return input.topic() + "\n" + purposeText(input);
+	}
+
+	private static String purposeText(PlanningInput input) {
+		return switch (input.purpose()) {
+			case WORK -> resource("purpose-work.txt");
+			case INTERVIEW -> resource("purpose-interview.txt");
+			case GENERAL -> resource("purpose-general.txt");
+			case OTHER -> input.purposeOther();
+		};
 	}
 
 	static void optionalText(Map<String, Object> data, String key, String text) {
@@ -50,7 +58,7 @@ final class PlanPromptSupport {
 		return new PlanPrompt(system, user);
 	}
 
-	private static String resource(String name) {
+	static String resource(String name) {
 		try (var stream = PlanPromptSupport.class.getResourceAsStream("/prompts/planning/" + name)) {
 			if (stream == null) {
 				throw new IllegalStateException("Planning prompt resource is missing");

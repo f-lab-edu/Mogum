@@ -29,6 +29,7 @@ import com.mogum.generation.MaterialReader;
 import com.mogum.generation.NewCourseGenerator;
 import com.mogum.generation.NewRoadmapGenerator;
 import com.mogum.generation.PlanRoadmapCourseGenerator;
+import com.mogum.generation.RelatedConceptPreparer;
 import com.mogum.generation.ReplanCourseGenerator;
 import com.mogum.generation.ReplanRoadmapGenerator;
 import com.mogum.generation.RoadmapCoursePlanReader;
@@ -70,7 +71,8 @@ class GenerationConfigurationTest {
 			assertThat(context).hasNotFailed().hasSingleBean(LlmCallWriter.class)
 				.hasSingleBean(NewCourseGenerator.class).hasSingleBean(NewRoadmapGenerator.class)
 				.hasSingleBean(ReplanCourseGenerator.class).hasSingleBean(ReplanRoadmapGenerator.class)
-				.hasSingleBean(MaterialReader.class).hasSingleBean(MaterialGenerator.class)
+				.hasSingleBean(RelatedConceptPreparer.class).hasSingleBean(MaterialReader.class)
+				.hasSingleBean(MaterialGenerator.class)
 				.hasSingleBean(PlanRoadmapCourseGenerator.class).hasSingleBean(RoadmapCoursePlanReader.class);
 		});
 	}

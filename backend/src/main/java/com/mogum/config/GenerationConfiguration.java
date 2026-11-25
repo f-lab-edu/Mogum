@@ -20,6 +20,7 @@ import com.mogum.generation.MaterialReader;
 import com.mogum.generation.NewCourseGenerator;
 import com.mogum.generation.NewRoadmapGenerator;
 import com.mogum.generation.PlanRoadmapCourseGenerator;
+import com.mogum.generation.RelatedConceptPreparer;
 import com.mogum.generation.ReplanCourseGenerator;
 import com.mogum.generation.ReplanRoadmapGenerator;
 import com.mogum.generation.RoadmapCoursePlanReader;
@@ -51,10 +52,18 @@ public class GenerationConfiguration {
 	}
 
 	@Bean
+	public RelatedConceptPreparer relatedConceptPreparer(ConceptLookupService conceptLookupService,
+		EmbeddingCall embeddingCall, LlmProperties llmProperties, Clock clock) {
+		return new RelatedConceptPreparer(conceptLookupService, embeddingCall,
+			new EmbeddingSettings(llmProperties.embedding().model(), llmProperties.embedding().timeout()), clock);
+	}
+
+	@Bean
 	public NewCourseGenerator newCourseGenerator(ChatCall chatCall, LlmProperties llmProperties,
-		CourseRepository courseRepository, LessonRepository lessonRepository) {
+		CourseRepository courseRepository, LessonRepository lessonRepository,
+		RelatedConceptPreparer relatedConceptPreparer) {
 		return new NewCourseGenerator(chatCall, llmProperties.planning(), new CoursePlanFormat(),
-			courseRepository, lessonRepository);
+			relatedConceptPreparer, courseRepository, lessonRepository);
 	}
 
 	@Bean
@@ -73,18 +82,19 @@ public class GenerationConfiguration {
 	@Bean
 	public PlanRoadmapCourseGenerator planRoadmapCourseGenerator(ChatCall chatCall, LlmProperties llmProperties,
 		RoadmapCoursePlanReader roadmapCoursePlanReader, CourseRepository courseRepository,
-		LessonRepository lessonRepository) {
+		LessonRepository lessonRepository, RelatedConceptPreparer relatedConceptPreparer) {
 		return new PlanRoadmapCourseGenerator(chatCall, llmProperties.planning(), new CoursePlanFormat(),
-			roadmapCoursePlanReader, courseRepository, lessonRepository);
+			relatedConceptPreparer, roadmapCoursePlanReader, courseRepository, lessonRepository);
 	}
 
 	@Bean
 	public ReplanCourseGenerator replanCourseGenerator(ChatCall chatCall, LlmProperties llmProperties,
 		RoadmapCoursePlanReader roadmapCoursePlanReader, CourseRepository courseRepository,
 		LessonRepository lessonRepository, EntityManager entityManager,
-		PlatformTransactionManager platformTransactionManager) {
+		PlatformTransactionManager platformTransactionManager, RelatedConceptPreparer relatedConceptPreparer) {
 		return new ReplanCourseGenerator(chatCall, llmProperties.planning(), new CoursePlanFormat(),
-			roadmapCoursePlanReader, courseRepository, lessonRepository, entityManager, platformTransactionManager);
+			relatedConceptPreparer, roadmapCoursePlanReader, courseRepository, lessonRepository, entityManager,
+			platformTransactionManager);
 	}
 
 	@Bean
