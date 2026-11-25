@@ -88,7 +88,8 @@
     },
     {
       "dir": "10-mastery-loop",
-      "status": "pending"
+      "status": "completed",
+      "completed_at": "2026-11-25T15:00:56+0900"
     }
   ]
 }
