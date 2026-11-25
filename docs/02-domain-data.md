@@ -396,7 +396,7 @@ PostgreSQL 기준이다(ADR-152). 한 장으로 보는 그림은 [ERD](./ERD.md)
 
 - **코스** — 그 코스 · 강의를 대상으로 한 `generation_jobs` → `cards` 의 상태를 `COURSE_DELETED` 로(지우지 않는다 — `lesson_id` 는 강의를 지울 때 저절로 빈다) → `materials` → `lessons` → `courses`. 성공하지 않은 작업에 쓴 크레딧은 작업을 지우기 전에 복구한다(§8.2 의 조건).
 - **로드맵** — 로드맵과 그 코스들의 `generation_jobs` → 코스마다 위 순서 → `roadmaps`.
-- 지우기 TASK 가 볼 것(`6-job-worker` 리뷰) — ① 대상의 작업을 찾는 조회(성공한 `NEW_COURSE` · `NEW_ROADMAP` 포함)는 `V11` 의 색인을 타지 못한다. `course_id` · `roadmap_id` · `lesson_id` 색인이 필요한지 그 TASK 에서 본다. ② 작업 읽기는 대상(코스 · 로드맵 · 강의)이 없으면 `NOT_FOUND` 다 — 대상과 그 작업을 한 트랜잭션에서 함께 지우는지 테스트로 묶는다(기다리는 화면이 404 로 빠지지 않게). ③ 강의 자료의 결과 저장은 작업 행(소유권 확인 UPDATE) → 사용자 행(`LessonCardWriter` 의 `FOR UPDATE`) 순서로 잠근다(`8-material-cards` step 2 리뷰). 지우기 · 탈퇴가 사용자 행을 먼저 잡고 만드는 중인 작업 행을 지우면 서로 기다리다 교착이 날 수 있다 — 같은 순서로 잡거나 교착 때의 처리를 정해 시험한다.
+- 지우기 TASK 에서 정한 것(`12-delete-withdraw` 설계 — README 2026-11-26) — ① 대상의 작업을 찾는 색인(`course_id` · `roadmap_id` · `lesson_id`)은 더하지 않는다 — 정원 10명이라 행이 적다. ② 대상과 그 작업은 한 트랜잭션에서 함께 지운다 — 지운 뒤 작업 읽기는 `NOT_FOUND` 다. ③ **지우기 · 탈퇴는 워커의 결과 저장 · 실패 기록과 같은 순서로 잠근다 — 작업 행 먼저, 사용자 행 나중.** 워커는 작업 행(소유권 확인 UPDATE) → 사용자 행(`LessonCardWriter` · `CreditLedger.restoreIfOwed` 의 `FOR UPDATE`) 순서로 잡는다. 사용자 행을 먼저 잡으면 둘이 서로를 기다린다. 작업 받기와 지우기가 같은 순간에 오는 경합은 넘어간다(ADR-102). 탈퇴는 크레딧 · 기록을 함께 지우므로 복구하지 않는다.
 - **탈퇴** — `generation_jobs` → `reviews` → `card_concepts` → `cards` → `materials` → `lessons` → `courses` → `roadmaps` → `concepts` → `credit_entries` → 로그인 세션 → `users`.
 - **사용자가 카드를 지울 때**(ADR-155) — `reviews` → `card_concepts` → `cards`.
 - **운영자가 신청 중 · 거절됨인 계정을 지울 때**(ADR-059) — `credit_entries` → 로그인 세션 → `users`. 신청할 때 채움 기록이 생긴다(ADR-173).
