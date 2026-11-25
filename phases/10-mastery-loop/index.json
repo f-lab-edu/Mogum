@@ -18,7 +18,15 @@
     {
       "step": 1,
       "name": "concept-lookup",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-25T09:09:54+0900",
+      "summary": "ConceptLookupService.hasConcepts(long userId): boolean · findRelated(long userId, List<float[]> queries, int limit, Instant now): List<RelatedConcept> · judgeMatching(long userId, List<float[]> definitions, Instant now): List<Judgment> 구현; RelatedConcept(String name, String definition, Judgment judgment), pgvector 일괄 읽기 검색·사용자 격리·최대 유사도 정렬·쓰기 경로와 같은 순서 및 기준값 이상 비교·일괄 숙련도 판정·무변경 검증, AC test/build 통과, 서버 테스트 2,456→2,479개(23개 추가).",
+      "completed_at": "2026-11-25T09:20:39+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/card/repository/ConceptLookupRepository.java:31 — `queries.isEmpty() || limit <= 0` 검사가 `ConceptLookupService.findRelated:34` 와 겹친다. 동작에는 영향이 없다 → 한쪽만 남겨도 된다(취향).",
+        "backend/src/test/java/com/mogum/card/service/ConceptLookupServiceIntegrationTest.java:330 — 불변 확인 스냅숏에 `users` 가 빠져 있다. 지금 조회는 사용자 행을 건드리지 않아 문제는 없다 → 나중에 조회가 잠금이나 사용자 읽기를 더하면 스냅숏에 넣으면 좋다.",
+        "backend/src/test/java/com/mogum/card/repository/ConceptLookupRepositoryTest.java:39 — 「기준값과 같으면 맞춘다」는 레포지토리 수준에서만 정확한 경계(0.80)로 확인한다. 서비스 수준은 설정값 0.72 아래 경우만 본다. 두 수준이 같은 쿼리를 쓰므로 충분하지만, 03 §3 의 「넘으면」이라는 표현과 코드의 「이상」(`>=`)이 같은 뜻이라는 점은 phase 리뷰에서 문서 표현을 맞춰 볼 만하다(계약 문서는 이 step 에서 고치지 않는 것이 맞다)."
+      ]
     },
     {
       "step": 2,
