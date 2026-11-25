@@ -132,7 +132,7 @@ class JobRunnerIntegrationTest {
 
 		// then
 		assertThat(values).isEqualTo(new WorkerProperties(
-			Duration.ofMinutes(16), Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
+			Duration.ofMinutes(17), Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
 			0, Duration.ofSeconds(1), Duration.ofSeconds(150)));
 	}
 

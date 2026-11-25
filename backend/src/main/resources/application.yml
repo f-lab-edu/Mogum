@@ -91,7 +91,7 @@ app:
     count: 2
     poll-interval: 1s
     shutdown-wait: 150s
-    lease-duration: 16m
+    lease-duration: 17m
     renewal-interval: 30s
     max-retries: 2
     retry-delay: 1s

@@ -4,9 +4,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
+import com.mogum.card.domain.Judgment;
 import com.mogum.course.domain.PlannedConcept;
 import com.mogum.generation.plan.PlanPrompt;
 
@@ -27,7 +29,20 @@ public final class MaterialFormat {
 		var data = new LinkedHashMap<String, Object>();
 		data.put("courseTitle", input.courseTitle());
 		data.put("topic", input.topic());
-		data.put("lesson", input.lesson());
+		var lesson = new LinkedHashMap<String, Object>();
+		lesson.put("position", input.lesson().position());
+		lesson.put("title", input.lesson().title());
+		lesson.put("description", input.lesson().description());
+		lesson.put("concepts", input.lesson().concepts().stream().map(concept -> {
+			var judgment = input.judgments().getOrDefault(concept.definition(), Judgment.NO_RECORD);
+			var instruction = resource(switch (judgment) {
+				case WELL_KNOWN -> "planning/mastery-well-known.txt";
+				case SHAKY -> "planning/mastery-shaky.txt";
+				case NO_RECORD -> "planning/mastery-no-record.txt";
+			});
+			return Map.of("name", concept.name(), "definition", concept.definition(), "instruction", instruction);
+		}).toList());
+		data.put("lesson", lesson);
 		data.put("lessons", input.lessons());
 		data.put("purpose", switch (input.purpose()) {
 			case WORK -> resource("planning/purpose-work.txt");

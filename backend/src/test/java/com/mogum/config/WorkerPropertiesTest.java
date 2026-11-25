@@ -27,7 +27,7 @@ class WorkerPropertiesTest {
 			// then
 			assertThat(context).hasNotFailed();
 			assertThat(context.getBean(WorkerProperties.class)).isEqualTo(new WorkerProperties(
-				Duration.ofMinutes(16), Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
+				Duration.ofMinutes(17), Duration.ofSeconds(30), 2, Duration.ofSeconds(1),
 				2, Duration.ofSeconds(1), Duration.ofSeconds(150)));
 			assertThat(Binder.get(context.getEnvironment())
 				.bind("spring.lifecycle.timeout-per-shutdown-phase", Duration.class)
@@ -41,7 +41,7 @@ class WorkerPropertiesTest {
 	@ParameterizedTest(name = "{0}")
 	@ValueSource(strings = {"app.worker.count=-1", "app.worker.poll-interval=0s",
 		"app.worker.poll-interval=-1s", "app.worker.lease-duration=0s",
-		"app.worker.renewal-interval=0s", "app.worker.renewal-interval=16m",
+		"app.worker.renewal-interval=0s", "app.worker.renewal-interval=18m",
 		"app.worker.renewal-interval=17m", "app.worker.max-retries=-1",
 		"app.worker.retry-delay=-1s", "app.worker.shutdown-wait=0s",
 		"app.worker.shutdown-wait=170s", "app.worker.shutdown-wait=180s",

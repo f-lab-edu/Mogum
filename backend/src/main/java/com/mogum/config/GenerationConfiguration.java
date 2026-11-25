@@ -1,9 +1,12 @@
 package com.mogum.config;
 
+import java.time.Clock;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import com.mogum.card.service.ConceptLookupService;
 import com.mogum.card.service.LessonCardWriter;
 import com.mogum.course.repository.CourseRepository;
 import com.mogum.course.repository.LessonRepository;
@@ -40,10 +43,11 @@ public class GenerationConfiguration {
 	public MaterialGenerator materialGenerator(ChatCall chatCall, EmbeddingCall embeddingCall,
 		LlmProperties llmProperties,
 		MaterialReader materialReader, LessonRepository lessonRepository, MaterialRepository materialRepository,
-		LessonCardWriter lessonCardWriter) {
+		LessonCardWriter lessonCardWriter, ConceptLookupService conceptLookupService, Clock clock) {
 		return new MaterialGenerator(chatCall, llmProperties.material(), embeddingCall,
 			new EmbeddingSettings(llmProperties.embedding().model(), llmProperties.embedding().timeout()),
-			new MaterialFormat(), materialReader, lessonRepository, materialRepository, lessonCardWriter);
+			new MaterialFormat(), materialReader, lessonRepository, materialRepository, lessonCardWriter,
+			conceptLookupService, clock);
 	}
 
 	@Bean
