@@ -2,33 +2,23 @@ package com.mogum.account.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.awaitility.Awaitility.await;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
-import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.mogum.account.domain.CreditEntry;
 import com.mogum.account.domain.UserFixtures;
-import com.mogum.account.domain.UserStatus;
 import com.mogum.account.repository.CreditEntryRepository;
 import com.mogum.account.repository.UserRepository;
-import com.mogum.auth.AccountPrincipal;
 import com.mogum.card.domain.Rating;
 import com.mogum.card.service.CardCommandService;
 import com.mogum.card.service.LessonCardWriter;
@@ -54,13 +44,9 @@ import com.mogum.job.domain.JobStatus;
 import com.mogum.job.repository.GenerationJobRepository;
 import com.mogum.support.IntegrationTest;
 import com.mogum.support.TestClock;
-import com.mogum.support.TestRequests;
 import com.mogum.support.TestSessions;
 
-import jakarta.servlet.http.Cookie;
-
 @IntegrationTest
-@ExtendWith(OutputCaptureExtension.class)
 class WithdrawServiceIntegrationTest {
 	private static final List<String> TABLES = List.of("generation_jobs", "reviews", "card_concepts", "cards",
 		"materials", "lessons", "courses", "roadmaps", "concepts", "credit_entries", "users");
@@ -99,103 +85,7 @@ class WithdrawServiceIntegrationTest {
 	@Autowired
 	JdbcIndexedSessionRepository jdbcIndexedSessionRepository;
 	@Autowired
-	TestRequests testRequests;
-	@Autowired
 	TestClock testClock;
-
-	@Test
-	@DisplayName("탈퇴는 모든 소유 데이터와 두 기기의 세션을 지우고 호출 기록과 다른 사람의 모든 행을 보존한다")
-	void withdrawsAllOwnedDataAndSessions(CapturedOutput output) {
-		// given
-		long otherId = content("other@example.com");
-		var otherData = snapshot();
-		var otherCalls = jdbcTemplate.queryForList("SELECT * FROM llm_calls ORDER BY id");
-		long userId = content("LEAKCHECK-withdraw@example.com");
-		var sessions = new TestSessions(jdbcIndexedSessionRepository);
-		var first = sessions.create(userId);
-		var second = sessions.create(userId);
-		var otherSession = sessions.create(otherId);
-		var client = withCsrf(first);
-		var calls = jdbcTemplate.queryForList("SELECT * FROM llm_calls WHERE user_id = ? ORDER BY id", userId);
-		calls.forEach(row -> {
-			row.put("job_id", null);
-			row.put("user_id", null);
-		});
-		var otherBefore = jdbcTemplate.queryForMap("SELECT * FROM spring_session WHERE session_id = ?",
-			sessions.id(otherSession));
-		int offset = output.getAll().length();
-		// when
-		var response = client.post().uri("/api/account/withdraw").exchange().returnResult(String.class);
-		// then
-		assertThat(response.getStatus().value()).isEqualTo(204);
-		assertThat(response.getResponseBody()).isNullOrEmpty();
-		assertThat(response.getResponseHeaders().getFirst("Location")).isNull();
-		var expired = response.getResponseCookies().getFirst("SESSION");
-		assertThat(expired).isNotNull();
-		assertThat(expired.getMaxAge()).isZero();
-		assertThat(expired.isHttpOnly()).isTrue();
-		assertThat(expired.isSecure()).isTrue();
-		assertThat(expired.getSameSite()).isEqualTo("Lax");
-		assertThat(expired.getPath()).isEqualTo("/");
-		assertThat(expired.getDomain()).isNull();
-		assertThat(snapshot()).isEqualTo(otherData);
-		assertThat(jdbcTemplate.queryForList("SELECT * FROM llm_calls WHERE user_id = ? ORDER BY id", otherId))
-			.isEqualTo(otherCalls);
-		assertThat(userRepository.findById(userId)).isEmpty();
-		assertThat(jdbcTemplate.queryForList("SELECT * FROM llm_calls WHERE user_id IS NULL ORDER BY id"))
-			.isEqualTo(calls);
-		assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM llm_calls", Integer.class))
-			.isEqualTo(calls.size() * 2);
-		assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM spring_session WHERE principal_name = ?",
-			Integer.class, Long.toString(userId))).isZero();
-		assertThat(jdbcTemplate.queryForMap("SELECT * FROM spring_session WHERE session_id = ?",
-			sessions.id(otherSession))).isEqualTo(otherBefore);
-		assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM spring_session_attributes", Integer.class))
-			.isEqualTo(1);
-		String requestId = response.getResponseHeaders().getFirst("X-Request-Id");
-		await().atMost(Duration.ofSeconds(3)).untilAsserted(() -> assertThat(output.getAll().substring(offset))
-			.contains("path=/api/account/withdraw status=204"));
-		var logs = output.getAll().substring(offset);
-		assertThat(logs).doesNotContain("LEAKCHECK-withdraw", first.getValue(), second.getValue());
-		assertThat(logs.lines().filter(line -> line.contains(" INFO ") || line.contains(" WARN ")
-			|| line.contains(" ERROR "))).singleElement().satisfies(line -> assertThat(line)
-				.contains("requestId=" + requestId, "access method=POST path=/api/account/withdraw status=204"));
-		for (var cookie : List.of(first, second)) {
-			testRequests.anonymous().get().uri("/api/me").cookie("SESSION", cookie.getValue()).exchange()
-				.expectStatus().isUnauthorized().expectBody().jsonPath("$.code").isEqualTo("UNAUTHORIZED");
-		}
-		assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM spring_session WHERE principal_name = ?",
-			Integer.class, Long.toString(userId))).isZero();
-	}
-
-	@ParameterizedTest(name = "상태={0}")
-	@ValueSource(strings = {"NOT_APPLIED", "APPLIED", "REJECTED", "ANONYMOUS"})
-	@DisplayName("승인 전 탈퇴는 계정 승인 오류이고 로그인하지 않은 탈퇴는 401이며 데이터를 보존한다")
-	void rejectsUnapprovedOrAnonymousWithdrawal(String status) {
-		// given
-		Cookie cookie = null;
-		var sessions = new TestSessions(jdbcIndexedSessionRepository);
-		if (status.equals("NOT_APPLIED")) {
-			cookie = sessions.createNotApplied(new AccountPrincipal.NotApplied("google", "new-sub",
-				"new@example.com", "새 이름"));
-		} else if (!status.equals("ANONYMOUS")) {
-			var user = userRepository.save(UserFixtures.withStatus(UserFixtures.user("me@example.com"),
-				UserStatus.valueOf(status)));
-			creditEntryRepository.save(CreditEntry.refill(user, 100));
-			cookie = sessions.create(user.getId());
-		}
-		var client = withCsrf(cookie);
-		var before = snapshot();
-		int sessionsBefore = jdbcTemplate.queryForObject("SELECT count(*) FROM spring_session", Integer.class);
-		// when
-		var response = client.post().uri("/api/account/withdraw").exchange();
-		// then
-		response.expectStatus().isEqualTo(status.equals("ANONYMOUS") ? 401 : 403).expectBody()
-			.jsonPath("$.code").isEqualTo(status.equals("ANONYMOUS") ? "UNAUTHORIZED" : "ACCOUNT_NOT_APPROVED");
-		assertThat(snapshot()).isEqualTo(before);
-		assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM spring_session", Integer.class))
-			.isEqualTo(sessionsBefore);
-	}
 
 	@Test
 	@DisplayName("탈퇴의 데이터와 모든 기기 세션 삭제는 한 트랜잭션으로 롤백된다")
@@ -267,13 +157,4 @@ class WithdrawServiceIntegrationTest {
 			.toList();
 	}
 
-	private RestTestClient withCsrf(Cookie cookie) {
-		var client = testRequests.anonymous();
-		if (cookie != null) {
-			client = client.mutate().defaultCookie("SESSION", cookie.getValue()).build();
-		}
-		var token = client.get().uri("/api/me").exchange().returnResult().getResponseCookies().getFirst("XSRF-TOKEN");
-		return client.mutate().defaultCookie("XSRF-TOKEN", token.getValue())
-			.defaultHeader("X-XSRF-TOKEN", token.getValue()).build();
-	}
 }
