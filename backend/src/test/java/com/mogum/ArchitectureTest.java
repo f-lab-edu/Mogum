@@ -38,6 +38,7 @@ import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.dto.MeResponse;
 import com.mogum.account.repository.FakeUserRepository;
 import com.mogum.archfixture.account.AccountToGeneration;
+import com.mogum.archfixture.account.AccountToLearningDomains;
 import com.mogum.archfixture.account.AccountToWorker;
 import com.mogum.archfixture.card.CardToCourse;
 import com.mogum.archfixture.card.FsrsOutsideCalculator;
@@ -404,6 +405,34 @@ class ArchitectureTest {
 	void rejectsCardToCourseDependency() {
 		// when & then
 		assertViolation(CARD_DOES_NOT_DEPEND_ON_COURSE, CardToCourse.class);
+	}
+
+	private static final ArchRule ACCOUNT_DOES_NOT_DEPEND_ON_LEARNING_DOMAINS = noClasses()
+		.that().resideInAPackage("..account..")
+		.should().dependOnClassesThat()
+		.resideInAnyPackage("..course..", "..card..", "..job..", "..generation..", "..worker..");
+
+	@Test
+	@DisplayName("계정은 코스 카드 작업 생성 워커의 Java 타입을 참조하지 않는다")
+	void prohibitsAccountDependencyOnLearningDomains() {
+		// when
+		var result = ACCOUNT_DOES_NOT_DEPEND_ON_LEARNING_DOMAINS.evaluate(CLASSES);
+		// then
+		assertThat(result.hasViolation()).as(result.getFailureReport().toString()).isFalse();
+	}
+
+	@ParameterizedTest(name = "위반 클래스 {0}")
+	@ValueSource(classes = {AccountToLearningDomains.class, AccountToGeneration.class, AccountToWorker.class})
+	@DisplayName("다른 학습 도메인 생성 워커를 참조한 계정 위반 픽스처를 거부한다")
+	void rejectsAccountToLearningDomainsDependency(Class<?> fixture) {
+		// when & then
+		assertViolation(ACCOUNT_DOES_NOT_DEPEND_ON_LEARNING_DOMAINS, fixture);
+		if (fixture == AccountToLearningDomains.class) {
+			var classes = new ClassFileImporter().importClasses(fixture);
+			assertThat(ACCOUNT_DOES_NOT_DEPEND_ON_LEARNING_DOMAINS.evaluate(classes).getFailureReport().toString())
+				.contains("com.mogum.course.domain.Course", "com.mogum.card.domain.Card",
+					"com.mogum.job.domain.GenerationJob");
+		}
 	}
 
 	private static final ArchRule COURSE_DOES_NOT_DEPEND_ON_JOB = noClasses()
