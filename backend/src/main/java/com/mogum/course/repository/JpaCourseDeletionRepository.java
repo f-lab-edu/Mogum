@@ -37,6 +37,29 @@ public class JpaCourseDeletionRepository {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
+	public List<DeletionJob> lockRoadmapJobs(long roadmapId) {
+		// @checkstyle:off — 텍스트 블록의 공백 들여쓰기를 보존한다.
+		List<Object[]> rows = entityManager.createNativeQuery("""
+			SELECT j.id, j.status <> 'SUCCEEDED'
+			FROM generation_jobs j
+			WHERE j.roadmap_id = :roadmapId
+			   OR j.course_id IN (SELECT id FROM courses WHERE roadmap_id = :roadmapId)
+			   OR j.lesson_id IN (
+			       SELECT l.id FROM lessons l JOIN courses c ON c.id = l.course_id
+			       WHERE c.roadmap_id = :roadmapId)
+			ORDER BY j.id FOR UPDATE OF j
+			""", Object[].class)
+			// @checkstyle:on
+			.setParameter("roadmapId", roadmapId).getResultList();
+		return rows.stream().map(row -> new DeletionJob(((Number)row[0]).longValue(), (Boolean)row[1])).toList();
+	}
+
+	public void deleteRoadmap(long roadmapId) {
+		entityManager.createNativeQuery("DELETE FROM roadmaps WHERE id = :roadmapId")
+			.setParameter("roadmapId", roadmapId).executeUpdate();
+	}
+
 	public void deleteMaterials(long courseId) {
 		entityManager.createNativeQuery(
 			"DELETE FROM materials WHERE lesson_id IN (SELECT id FROM lessons WHERE course_id = :courseId)")

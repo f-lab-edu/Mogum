@@ -1,6 +1,8 @@
 package com.mogum.course.controller;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
@@ -9,6 +11,7 @@ import com.mogum.auth.AccountPrincipal;
 import com.mogum.common.api.ApiResponse;
 import com.mogum.course.dto.RoadmapListResponse;
 import com.mogum.course.dto.RoadmapResponse;
+import com.mogum.course.service.RoadmapDeletionService;
 import com.mogum.course.service.RoadmapReadService;
 
 import lombok.RequiredArgsConstructor;
@@ -17,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RoadmapController {
 	private final RoadmapReadService roadmapReadService;
+	private final RoadmapDeletionService roadmapDeletionService;
 
 	@GetMapping("/api/roadmaps")
 	public ApiResponse<RoadmapListResponse> list(
@@ -32,5 +36,15 @@ public class RoadmapController {
 		@PathVariable
 		long id) {
 		return ApiResponse.of(roadmapReadService.read(member.userId(), id));
+	}
+
+	@DeleteMapping("/api/roadmaps/{id}")
+	public ResponseEntity<Void> delete(
+		@AuthenticationPrincipal
+		AccountPrincipal.Member member,
+		@PathVariable
+		long id) {
+		roadmapDeletionService.delete(member.userId(), id);
+		return ResponseEntity.noContent().build();
 	}
 }

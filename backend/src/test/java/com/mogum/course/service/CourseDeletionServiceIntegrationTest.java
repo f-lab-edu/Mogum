@@ -193,6 +193,23 @@ class CourseDeletionServiceIntegrationTest {
 		assertThat(snapshot()).isEqualTo(before);
 	}
 
+	@Test
+	@DisplayName("작업 처리가 끝난 로드맵의 짜기 전 코스도 공통 내용 지우기로 지운다")
+	void deletesUnplannedContentAfterJobsWereRemoved() {
+		// given
+		long userId = user();
+		var roadmap = roadmapRepository.save(RoadmapFixtures.roadmap(userId));
+		var course = courseRepository.save(CourseFixtures.inRoadmap(roadmap, 1, "코스", "계획", List.of()));
+		// when
+		new TransactionTemplate(platformTransactionManager).executeWithoutResult(tx -> {
+			creditLedger.lock(userId);
+			courseDeletionService.deleteContentAfterJobs(userId, course.getId());
+		});
+		// then
+		assertThat(courseRepository.findById(course.getId())).isEmpty();
+		assertThat(roadmapRepository.findById(roadmap.getId())).isPresent();
+	}
+
 	private long user() {
 		var user = userRepository.save(UserFixtures.approved("me@example.com"));
 		creditEntryRepository.save(CreditEntry.refill(user, 100));
