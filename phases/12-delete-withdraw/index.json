@@ -80,7 +80,10 @@
     {
       "step": 6,
       "name": "query-keys",
-      "status": "pending"
+      "status": "completed",
+      "summary": "api/queryKeys.ts·queryKeys.test.ts 추가로 네 키의 기존 값 검증; useCourse.ts·useRoadmap.ts·useLesson.ts·useReview.ts와 useCourse.test.tsx·useRoadmap.test.tsx·useLesson.test.tsx의 키 import를 queryKeys로 변경해 값 순환 참조 제거, 캐시 정리 순서 유지; 화면 테스트 639→643개(기존 639개 유지 + 키 검증 4개), test·lint·build AC 통과.",
+      "started_at": "2026-11-26T15:48:30+0900",
+      "completed_at": "2026-11-26T15:50:47+0900"
     }
   ],
   "created_at": "2026-11-26T08:39:40+0900"
