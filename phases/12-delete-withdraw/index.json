@@ -68,7 +68,14 @@
     {
       "step": 5,
       "name": "test-names",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-26T15:40:41+0900",
+      "summary": "코스 삭제 HTTP 시험 deletesCourseContentWhilePreservingMemoryAndAccounting을 CourseControllerDeletionIntegrationTest로, 탈퇴 HTTP 시험 withdrawsAllOwnedDataAndSessions·rejectsUnapprovedOrAnonymousWithdrawal과 전용 도우미를 WithdrawControllerIntegrationTest로 이동; 잠금·롤백 시험 유지, CardRepositoryTest import와 07 §1 근거 정리, 서버 테스트 2,848→2,848개, 지정 AC 927개·전체 build·spotlessApply 통과.",
+      "completed_at": "2026-11-26T15:48:30+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/course/repository/JpaCourseDeletionRepositoryIntegrationTest.java:87 · backend/src/test/java/com/mogum/account/service/WithdrawServiceIntegrationTest.java:159 — 시험을 옮기면서 클래스 닫는 `}` 앞에 빈 줄이 하나 남았다. spotlessCheck 는 통과하므로 동작에는 영향이 없다 → 다음에 이 파일을 고칠 때 지워도 된다.",
+        "phases/12-delete-withdraw/index.json — 파일 끝 줄바꿈이 빠졌다(`\\ No newline at end of file`). 하네스 메타데이터라 리뷰 범위 밖이다. 하네스가 쓰는 형식과 맞는지 phase /review 에서 볼 수 있다."
+      ]
     },
     {
       "step": 6,
