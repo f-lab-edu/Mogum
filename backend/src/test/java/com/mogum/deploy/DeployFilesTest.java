@@ -117,13 +117,14 @@ class DeployFilesTest {
 	}
 
 	@Test
-	@DisplayName("DB는 비공개이고 앱은 루프백 프록시는 TCP 80과 443만 연다")
+	@DisplayName("DB와 앱은 루프백에만 열고 프록시는 TCP 80과 443만 연다")
 	void exposesOnlyLoopbackBackendAndHttpProxy() throws Exception {
 		// when
 		var databasePorts = ports("postgres");
 
 		// then
-		assertThat(databasePorts).isEmpty();
+		// 운영자가 SSM 포트 포워딩으로 접속하는 서버 내부 주소다.
+		assertThat(databasePorts).isEqualTo(List.of("127.0.0.1:5432:5432"));
 
 		for (var port : ports("backend")) {
 			assertThat(port.toString()).matches("127\\.0\\.0\\.1:[0-9]+:8080(?:/tcp)?");

@@ -253,6 +253,27 @@ docker exec -i "$postgres" sh -c \
 
 `OperatorSqlIntegrationTest`가 이 파일들을 읽어 Testcontainers Postgres 안의 psql로 그대로 실행한다. 시각 경계 시험에서만 읽은 승인 파일의 `now()`를 고정 시각으로 바꿔 서울 03:59와 04:00을 확인한다. 서버에서 실제 계정을 변경하는 운영 검증은 아직 수행하지 않았다.
 
+## 로컬 DB 도구로 접속(DBeaver 등)
+
+조회 · 확인은 운영자 컴퓨터의 DB 도구로 한다(ADR-191). Postgres는 서버의 `127.0.0.1:5432`에만 열려 있고 보안 그룹은 5432를 열지 않으므로, SSM 포트 포워딩으로 운영자 컴퓨터의 포트를 서버의 그 주소에 잇는다. SSH · 키 페어는 쓰지 않는다. 위 [운영자 SQL](#운영자-sql)의 승인 · 거절 · 거절 풀기 · 계정 지우기는 DB 도구에서 손으로 쓰지 않고 그 절의 파일로 실행한다.
+
+준비 — 처음 한 번:
+
+- 운영자 컴퓨터에 AWS CLI v2와 [Session Manager 플러그인](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html)을 설치한다(macOS: `brew install --cask session-manager-plugin`). 운영자 자격에는 이 인스턴스와 `AWS-StartPortForwardingSession` 문서에 대한 `ssm:StartSession`이 필요하다.
+- DB 사용자 · 비밀번호는 SSM 셸에서 root로 `/etc/mogum/mogum.env`의 `DB_USERNAME` · `DB_PASSWORD`를 보고 DB 도구의 비밀 저장소에만 넣는다. 저장소 · 채팅 · 문서에 붙이지 않는다.
+
+접속할 때마다 운영자 컴퓨터에서 포워딩을 열어 둔다. 창을 닫으면 연결이 끊긴다. 로컬 개발 DB(`5432`)와 겹치지 않게 로컬 포트는 `15432`를 쓴다.
+
+```bash
+aws ssm start-session --region ap-northeast-2 --target <INSTANCE_ID> \
+  --document-name AWS-StartPortForwardingSession \
+  --parameters '{"portNumber":["5432"],"localPortNumber":["15432"]}'
+```
+
+DB 도구 연결은 PostgreSQL · Host `localhost` · Port `15432` · Database `mogum` · 위 사용자 · 비밀번호다. DBeaver는 연결 설정 General에서 **Connection type을 `Production`**(자동 커밋 끔 · 실행 확인)으로 두고, 조회만 할 때는 **Read-only connection**을 켠다. 손으로 고치기 전에는 `sudo systemctl start mogum-backup.service`로 백업을 하나 받는다([백업 · 복원](#백업--복원)).
+
+이 포트를 더한 배포에서 Postgres 정의가 바뀌어 컨테이너가 한 번 다시 만들어진다 — 데이터는 볼륨에 남고 앱은 몇 초 DB 연결을 잃었다가 다시 잇는다. 실제 서버에서의 포워딩 · 접속은 아직 확인하지 않았다.
+
 ## 첫 배포 때 확인
 
 이전 step에서 남긴 **외부 환경 미검증 항목 18개**를 아래로 모았다. 공식 문서의 형식 대조와 실제 계정/서버 실행은 구분한다. 아직 수행하지 않은 항목은 체크하지 않으며, 실행 결과는 비공개 운영 기록에 남긴다. 파일 결함을 발견하면 이 문서 step에서 동작을 바꾸지 않고 별도 수정 작업으로 넘긴다.
@@ -308,7 +329,7 @@ docker exec -i "$postgres" sh -c \
 | 서비스 | 이미지 | 호스트 포트 | 메모리 상한(잠정) | 영속 볼륨 |
 |---|---|---|---|---|
 | `backend` | `APP_IMAGE` 지문 | `127.0.0.1:8080`만 | 1024MiB | 없음 |
-| `postgres` | `pgvector/pgvector:pg17` | 없음 | 512MiB | `mogum_postgres_data` |
+| `postgres` | `pgvector/pgvector:pg17` | `127.0.0.1:5432`만(운영자 SSM 포트 포워딩용 — [로컬 DB 도구로 접속](#로컬-db-도구로-접속dbeaver-등)) | 512MiB | `mogum_postgres_data` |
 | `caddy` | 공식 `caddy:2` | 80 · 443(TCP) | 128MiB | `mogum_caddy_data`(인증서) · `mogum_caddy_config` |
 
 합계는 1664MiB이고 나머지 약 380MiB는 OS · Docker · SSM 에이전트 몫이다. 스왑 없이 측정하며 `16-capacity`가 같은 [compose.yaml](./compose.yaml)로 재서 상한을 확정한다. 앱 힙은 이미지의 `-XX:MaxRAMPercentage=75`로 컨테이너 상한의 75%를 사용한다. `backend`는 Postgres 준비 확인 후 `aws` 프로필로 기동하며, 종료 대기는 **220초**로 Spring의 단계별 180초보다 길다. 세 서비스 모두 `restart: always`로 재부팅과 비정상 종료에 대응한다.

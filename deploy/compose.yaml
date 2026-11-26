@@ -48,6 +48,8 @@ services:
       driver: journald
     command: ["postgres", "-c", "log_error_verbosity=terse", "-c", "log_timezone=Asia/Seoul"]
     mem_limit: 512m
+    ports:
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB: mogum
       POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME is required}
