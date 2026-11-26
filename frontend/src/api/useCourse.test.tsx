@@ -3,7 +3,8 @@ import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
-import { useCourseDeletion, coursesKey, useCourses, courseKey, readCourse, startCourse, updateCourseTitle, useCourse, useCourseAction } from './useCourse'
+import { courseKey, coursesKey } from './queryKeys'
+import { useCourseDeletion, useCourses, readCourse, startCourse, updateCourseTitle, useCourse, useCourseAction } from './useCourse'
 
 const course = { id: 31, title: '자바', status: 'REVIEWING', lessons: [], progress: { completedLessons: 0, totalLessons: 0 } }
 const clients: QueryClient[] = []

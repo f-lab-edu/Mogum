@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client'
-import { courseKey, coursesKey } from './useCourse'
+import { courseKey, coursesKey, roadmapKey, roadmapsKey } from './queryKeys'
 import type { CourseResponse } from './useCourse'
 
 type RoadmapStatus = 'REVIEWING' | 'IN_PROGRESS' | 'COMPLETED' | (string & Record<never, never>)
@@ -33,9 +33,6 @@ export interface RoadmapsResponse {
     totalCourses: number
   }[]
 }
-
-export const roadmapKey = (roadmapId: string) => ['roadmaps', roadmapId] as const
-export const roadmapsKey = ['roadmaps'] as const
 
 export function readRoadmap(roadmapId: string, signal?: AbortSignal) {
   return apiFetch<RoadmapResponse>(`/roadmaps/${encodeURIComponent(roadmapId)}`, { signal })

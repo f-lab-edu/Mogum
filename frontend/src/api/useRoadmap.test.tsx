@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
-import { useRoadmapDeletion, readRoadmap, readRoadmaps, roadmapKey, roadmapsKey, useRoadmap, useRoadmaps } from './useRoadmap'
+import { roadmapKey, roadmapsKey } from './queryKeys'
+import { useRoadmapDeletion, readRoadmap, readRoadmaps, useRoadmap, useRoadmaps } from './useRoadmap'
 
 const roadmap = { id: 41, title: '자바 로드맵', description: '기초부터 실무까지', status: 'REVIEWING', courses: [] }
 const clients: QueryClient[] = []

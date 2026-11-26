@@ -3,8 +3,8 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { lessonKey, readLesson, useLesson, useLessonCompletion } from './useLesson'
-import { courseKey, coursesKey } from './useCourse'
-import { roadmapKey, roadmapsKey, useRoadmap, useRoadmaps } from './useRoadmap'
+import { courseKey, coursesKey, roadmapKey, roadmapsKey } from './queryKeys'
+import { useRoadmap, useRoadmaps } from './useRoadmap'
 
 const lesson = { id: 51, courseId: 31, courseTitle: '자바', position: 1, title: '변수', completed: false, material: { body: '자료' } }
 const clients: QueryClient[] = []

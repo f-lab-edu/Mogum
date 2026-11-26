@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client'
-import { roadmapKey } from './useRoadmap'
+import { courseKey, coursesKey, roadmapKey } from './queryKeys'
 import type { RoadmapResponse } from './useRoadmap'
 
 export interface CourseResponse {
@@ -22,9 +22,6 @@ export interface CourseResponse {
   todayReviewCount: number
   masteryReport?: { shortened: number; revisited: number }
 }
-
-export const courseKey = (courseId: string) => ['courses', courseId] as const
-export const coursesKey = ['courses'] as const
 
 export interface CoursesResponse {
   courses: { id: number; title: string; status: CourseResponse['status'] }[]
