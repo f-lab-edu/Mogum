@@ -45,7 +45,14 @@
     {
       "step": 3,
       "name": "delete-screens",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-26T11:19:46+0900",
+      "summary": "CoursePage.tsx·RoadmapPage.tsx와 각 짝 테스트, api/useCourse.ts·useRoadmap.ts와 각 짝 테스트, App.test.tsx, UI_GUIDE §9·§10 변경; useCourseDeletion·useRoadmapDeletion 추가, 공통 InlineConfirmation의 상태별 안내·요청 잠금·실패 보존·재시도 구현; 성공 뒤 상세·목록·홈 읽기 취소, 해당 상세와 로드맵 소속 코스 상세 캐시 제거, 코스/로드맵 목록·홈 무효화 후 목록 탭으로 replace 이동; 화면 테스트 607→632개, test·lint·build AC 통과.",
+      "completed_at": "2026-11-26T11:26:26+0900",
+      "review_notes": [
+        "frontend/src/api/useRoadmap.ts:3 — `useRoadmap.ts` 가 `useCourse.ts` 의 `courseKey` · `coursesKey` 를 import 한다. `useCourse.ts` 는 이미 `useRoadmap.ts` 의 `roadmapKey` 를 import 하고 있어(85행 부근) 두 모듈이 서로를 참조하게 됐다. 두 값은 모두 함수 안(onSuccess)에서만 읽히므로 지금 동작에는 문제가 없고 build · test 도 통과한다. 다만 나중에 모듈 최상위에서 이 값을 쓰면 초기화 순서 문제가 날 수 있다 → 키 상수를 한 파일(예: `queryKeys.ts`)로 모을지 phase /review 에서 판단한다.",
+        "frontend/src/pages/CoursePage.tsx:213 · frontend/src/pages/RoadmapPage.tsx:198 — 지우기 실패 `FailureNotice` 가 확인 펼침 아래에 놓이고, 오류가 남은 상태로 취소해 펼침을 닫아도 실패 안내는 계속 보인다. 지우기를 다시 열 때 `deletion.reset()` 으로 이전 실패를 지울지는 취향 차이라 반려 사유가 아니다."
+      ]
     },
     {
       "step": 4,
