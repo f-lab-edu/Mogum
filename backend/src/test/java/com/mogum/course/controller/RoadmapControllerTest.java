@@ -2,6 +2,8 @@ package com.mogum.course.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 
 import java.util.List;
 
@@ -26,6 +28,7 @@ import com.mogum.course.domain.RoadmapStatus;
 import com.mogum.course.dto.CourseProgress;
 import com.mogum.course.dto.RoadmapListResponse;
 import com.mogum.course.dto.RoadmapResponse;
+import com.mogum.course.service.RoadmapDeletionService;
 import com.mogum.course.service.RoadmapReadService;
 
 @WebMvcTest(RoadmapController.class)
@@ -35,6 +38,8 @@ class RoadmapControllerTest {
 	MockMvcTester mockMvcTester;
 	@MockitoBean
 	RoadmapReadService roadmapReadService;
+	@MockitoBean
+	RoadmapDeletionService roadmapDeletionService;
 
 	@BeforeEach
 	void authenticate() {
@@ -95,6 +100,28 @@ class RoadmapControllerTest {
 		// when
 		var result = mockMvcTester.get().uri("/api/roadmaps/1").exchange();
 
+		// then
+		assertThat(result).hasStatus(404).bodyJson().isStrictlyEqualTo(
+			"{\"code\":\"NOT_FOUND\",\"message\":\"찾을 수 없습니다\"}");
+	}
+
+	@Test
+	@DisplayName("로드맵 지우기는 로그인한 주인과 경로 ID를 넘기고 본문 없는 204로 답한다")
+	void deletesWithoutBody() {
+		// when
+		var result = mockMvcTester.delete().uri("/api/roadmaps/1").exchange();
+		// then
+		assertThat(result).hasStatus(204).body().isEmpty();
+		then(roadmapDeletionService).should().delete(7L, 1L);
+	}
+
+	@Test
+	@DisplayName("로드맵 지우기의 NOT_FOUND는 공통 404 모양으로 답한다")
+	void returnsDeletionNotFound() {
+		// given
+		willThrow(new ApiException(ErrorCode.NOT_FOUND)).given(roadmapDeletionService).delete(7L, 1L);
+		// when
+		var result = mockMvcTester.delete().uri("/api/roadmaps/1").exchange();
 		// then
 		assertThat(result).hasStatus(404).bodyJson().isStrictlyEqualTo(
 			"{\"code\":\"NOT_FOUND\",\"message\":\"찾을 수 없습니다\"}");

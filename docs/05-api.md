@@ -49,6 +49,7 @@
 - 강의 자료 TASK(`8-material-cards` step 3) 구현: 강의를 열 수 없으면 — 코스가 학습 중 · 다 마침이 아니거나 앞 순서 강의 가운데 학습 완료하지 않은 것이 있으면 — `LESSON_NOT_OPEN`(409), 「코스를 시작하고 앞 강의를 학습 완료하면 열 수 있어요」로 거절한다. 강의 자료 받기(`MATERIAL`) · 강의 읽기 · 학습 완료가 같은 code 를 쓴다.
 - 강의 자료 TASK(`8-material-cards` step 4) 구현: 강의 자료가 없는 강의의 학습 완료는 `LESSON_MATERIAL_REQUIRED`(409), 「강의 자료가 만들어진 뒤 학습 완료할 수 있어요」로 거절한다. 화면은 강의를 다시 읽어 자료 또는 작업을 확인한다.
 - 복습 TASK(`9-card-review` step 2) 구현: 보이는 카드라도 지금 볼 수 있는 일정이 아니면 평가는 `CARD_REVIEW_NOT_ALLOWED`(409), 「지금은 이 카드를 복습할 수 없어요. 목록을 다시 확인해 주세요」로 거절한다. 화면은 문구를 보이고 오늘 복습 목록을 다시 읽는다.
+- 지우기 TASK(`12-delete-withdraw` step 0) 구현: 로드맵의 코스 하나 지우기는 `COURSE_DELETE_NOT_ALLOWED`(409), 「로드맵의 코스는 로드맵을 지워야 해요」로 거절한다. 없는 코스 · 남의 코스 · 두 번째 지우기는 `NOT_FOUND`(404)다.
 - 기술적인 원인(응답이 잘림 · 서버 응답 없음 등)은 싣지 않는다(ADR-088).
 - 만들기 실패도 작업을 읽을 때 같은 모양으로 싣는다.
 
@@ -164,7 +165,7 @@
 | 이대로 시작 | 코스(검토 중 → 학습 중). 로드맵은 첫 코스의 받기(§2) | 코스 화면 | ADR-007 · ADR-078 |
 | 코스 제목 고치기 | 코스 · 로드맵 계획의 코스 | 코스 화면 · 로드맵 화면 | ADR-007 · ADR-009 |
 | 코스 지우기 | 단일 코스 | 코스 화면 | ADR-026 · ADR-100 |
-| 로드맵 지우기 | 로드맵 | 로드맵 화면 | ADR-027 |
+| 로드맵 지우기 | 로드맵 — 상태와 상관없이(ADR-190) | 로드맵 화면 | ADR-027 · ADR-190 |
 | 학습 완료 | 강의 — 응답에 코스가 다 마침이 됐는지를 싣는다(축하 화면 — ADR-081) | 강의 화면 | ADR-012 |
 | 평가 보내기 | 카드 — 4단계 | 복습 탭 | ADR-015 |
 | 카드 지우기 | 카드 | 복습 탭 | ADR-065 |
@@ -194,13 +195,16 @@
 - `card.service.CardCommandService`는 한 트랜잭션에서 카드 ID와 사용자 ID로 카드 행을 `PESSIMISTIC_WRITE`로 먼저 잠그고 조건을 확인한다. 평가는 잠금 뒤 `Clock`에서 한 번 받은 지금으로 `FsrsCalculator.review`를 계산하고, 여섯 FSRS 칸을 그대로 반영한 뒤 `Review.record(card, rating)`를 저장한다. 복습 기록의 평가한 때는 같은 `Clock`을 쓰는 JPA Auditing의 `created_at`이고, 카드의 `updated_at`도 Auditing이 채운다.
 - 같은 카드의 동시 평가는 앞 트랜잭션의 커밋을 기다린 뒤 바뀐 상태로 조건과 FSRS를 다시 계산한다. 앞 평가로 허용 범위를 벗어나면 뒤 평가는 거절한다. 요청 ID나 서버 메모리 잠금은 두지 않는다. 카드 지우기도 같은 행 잠금을 먼저 잡고 `reviews` → `card_concepts` → `cards` 순서로 지우며, 개념 사전은 남긴다. 오늘 예정이 아닌 카드도 지울 수 있다. 지운 뒤의 평가와 두 번째 지우기는 `NOT_FOUND`다.
 - **신청은 한 사람에 한 번이다** — 이미 신청한 사람이 다시 신청하면 새로 만들지 않고 같은 결과(신청 상태)를 성공으로 돌려준다. 같은 구글 계정의 두 세션이 동시에 신청해도 사용자 · 채움 기록은 하나다. 세션 하나로 동시에 보낸 두 요청 가운데 늦은 쪽의 응답은 정하지 않는다 — 신청할 때 세션 ID 를 바꾸기 때문이고, 화면은 요청 중 버튼을 막는다(ADR-102 · 사용자 확인 2026-11-08).
+- 지우기 TASK(`12-delete-withdraw` step 0) 구현: 코스 지우기는 본문 없는 `DELETE /api/courses/{id}`이며 성공은 `ResponseEntity<Void>`의 204 · 본문 없음이다(카드 지우기와 같은 공통 응답 경로). 단일 코스는 모든 상태에서 지우고 로드맵의 코스는 §1.2의 오류로 거절한다. 한 트랜잭션에서 작업 행 → 사용자 행 순서로 잠근다.
+- 지우기 TASK(`12-delete-withdraw` step 1) 구현: 로드맵 지우기는 본문 없는 `DELETE /api/roadmaps/{id}`이며 성공은 `ResponseEntity<Void>`의 204 · 본문 없음이다. 검토 중 · 진행 중 · 다 마침 모두 지우고, 없는 로드맵 · 남의 로드맵 · 두 번째 지우기는 `NOT_FOUND`(404)다. 한 트랜잭션에서 로드맵과 그 모든 코스 · 강의의 작업 행을 먼저 함께 잠그고 사용자 행을 잡아, 성공하지 않은 작업의 크레딧을 복구한 뒤 작업을 지운다. 코스 내용은 `CourseDeletionService.deleteContentAfterJobs(long userId, long courseId)`를 단일 코스와 함께 쓰며, 짜기 전 코스까지 모두 지운 뒤 로드맵을 지운다. 기존 `deleteContent(long userId, long courseId)`는 작업 처리 뒤 이 공통 경로를 부른다.
+- 지우기 TASK(`12-delete-withdraw` step 2) 구현: 탈퇴는 본문 없는 `POST /api/account/withdraw`이며 성공은 `ResponseEntity<Void>`의 204 · 본문 없음이다. 승인된 사람만 쓰며, 기존 보안 예외 목록은 넓히지 않아 신청 전 · 신청 · 거절됨은 `ACCOUNT_NOT_APPROVED`(403), 로그인하지 않은 요청은 `UNAUTHORIZED`(401)다. 삭제 트랜잭션이 커밋된 뒤 현재 요청의 세션을 `invalidate()`해 끝내고 `SESSION` 만료 쿠키(`Max-Age=0` · Secure · HttpOnly · SameSite=Lax · Path=/ · Domain 없음)를 반환한다. DB에서는 사용자 ID를 주인으로 둔 다른 기기 세션도 모두 지우며, 응답 뒤 같은 쿠키로 「나」를 읽으면 두 기기 모두 401이다. 같은 순간에 두 번 탈퇴하면 뒤쪽은 사용자 행이 없어 `NOT_FOUND`(404)이며 되돌려질 뿐이다.
 - 지우기의 범위는 [02 §7](./02-domain-data.md#7-지우기--탈퇴--함께-사라지는-범위)(ADR-140).
 
 ## 5. 아직 정하지 않은 값
 
 | 것 | 근거 |
 |---|---|
-| 경로 · 칸 이름 · 오류 묶음의 목록과 문구 — 만드는 작업 부분은 `6-job-worker` step 3, 코스 · 로드맵 읽기 넷과 코스 시작 · 제목 고치기는 `7-course-planning` step 6, 강의 읽기와 학습 완료는 `8-material-cards` step 4, 오늘 복습할 카드 읽기와 코스 응답의 `todayReviewCount`는 `9-card-review` step 1, 평가 보내기와 카드 지우기는 step 2에서 정했다(§1.2 ~ §4). 나머지는 각 TASK에서 정한다 | ADR-143 · ADR-145 |
+| 경로 · 칸 이름 · 오류 묶음의 목록과 문구 — 만드는 작업 부분은 `6-job-worker` step 3, 코스 · 로드맵 읽기 넷과 코스 시작 · 제목 고치기는 `7-course-planning` step 6, 강의 읽기와 학습 완료는 `8-material-cards` step 4, 오늘 복습할 카드 읽기와 코스 응답의 `todayReviewCount`는 `9-card-review` step 1, 평가 보내기와 카드 지우기는 step 2, 코스 지우기는 `12-delete-withdraw` step 0, 로드맵 지우기는 step 1, 탈퇴는 step 2에서 정했다(§1.2 ~ §4). 나머지는 각 TASK에서 정한다 | ADR-143 · ADR-145 |
 | 쿠키 설정 · 요청 위조 막기 | ADR-142 |
 | 기다리는 화면의 다시 읽는 간격은 `6-job-worker` step 7에서 정했다(§2). 대상이 없는 새로 배우기를 두 번 눌렀을 때는 화면이 요청 중 버튼을 막는 것만 하고 서버 장치는 두지 않는다 — 두 탭 · 재전송이면 둘이 생기는 것은 ADR-157 이 감수한 그대로다(README 2026-11-17) | ADR-143 · ADR-157 |
 | 목록을 나눠 받을지 — 정원 10명이라 MVP 에서 나눌 만큼 길지 않다 | ADR-061 |

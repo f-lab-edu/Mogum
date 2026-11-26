@@ -1,6 +1,8 @@
 package com.mogum.card.service;
 
 import java.time.Clock;
+import java.time.Instant;
+import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +52,12 @@ public class CardCommandService {
 		reviewRepository.deleteByCardId(cardId);
 		cardConceptRepository.deleteByCardId(cardId);
 		cardRepository.delete(card);
+	}
+
+	public void hideLessonCards(List<Long> lessonIds, Instant now) {
+		if (!lessonIds.isEmpty()) {
+			cardRepository.hideLessonCards(lessonIds, now);
+		}
 	}
 
 	private Card lockVisibleCard(long userId, long cardId) {

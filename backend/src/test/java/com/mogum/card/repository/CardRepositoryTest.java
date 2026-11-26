@@ -2,13 +2,17 @@ package com.mogum.card.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.repository.UserRepository;
@@ -35,6 +39,32 @@ class CardRepositoryTest {
 	private CardRepository cardRepository;
 	@Autowired
 	private TestClock testClock;
+
+	@Autowired
+	private PlatformTransactionManager platformTransactionManager;
+
+	@Test
+	@DisplayName("강의 카드 벌크 숨기기는 대상 강의만 바꾸고 수정 시각을 직접 채운다")
+	void hidesSelectedLessonCardsWithTimestamp() {
+		// given
+		var user = userRepository.save(UserFixtures.user("me@example.com"));
+		var course = courseRepository.save(CourseFixtures.single(user.getId()));
+		var lesson = lessonRepository.save(LessonFixtures.lesson(course, 1));
+		var other = lessonRepository.save(LessonFixtures.lesson(course, 2));
+		var target = cardRepository.save(CardFixtures.card(user.getId(), lesson.getId(), 1, "질문", "답"));
+		var untouched = cardRepository.save(CardFixtures.card(user.getId(), other.getId(), 1, "다른 질문", "다른 답"));
+		testClock.advance(Duration.ofSeconds(5));
+		// when
+		int count = new TransactionTemplate(platformTransactionManager)
+			.execute(tx -> cardRepository.hideLessonCards(List.of(lesson.getId()), testClock.instant()));
+		// then
+		assertThat(count).isEqualTo(1);
+		var saved = cardRepository.findById(target.getId()).orElseThrow();
+		assertThat(saved.getStatus()).isEqualTo(CardStatus.COURSE_DELETED);
+		assertThat(saved.getUpdatedAt()).isEqualTo(testClock.instant());
+		assertThat(cardRepository.findById(untouched.getId()).orElseThrow()).usingRecursiveComparison()
+			.isEqualTo(untouched);
+	}
 
 	@Test
 	@DisplayName("처음 만든 카드는 DB 상태 검사를 통과하고 빈 FSRS 값과 공용 시계의 시각을 보존한다")

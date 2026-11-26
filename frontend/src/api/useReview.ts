@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client'
-import { coursesKey } from './useCourse'
+import { coursesKey } from './queryKeys'
 
 export type Rating = 'AGAIN' | 'HARD' | 'GOOD' | 'EASY'
 

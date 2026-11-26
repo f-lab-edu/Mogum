@@ -24,6 +24,7 @@ function open(data: unknown = review) {
     element: <Outlet context={{ status: 'APPROVED' }} />,
     children: [
       { path: '/', element: <h1>홈 자리</h1> },
+      { path: '/courses', element: <h1>목록 자리</h1> },
       { path: '/courses/:courseId', element: <AppLayout title="코스"><CoursePage key={31} /></AppLayout> },
       { path: '/jobs/:jobId', element: <h1>기다리는 화면 자리</h1> },
       { path: '/roadmaps/:roadmapId', element: <h1>로드맵 자리</h1> },
@@ -465,6 +466,98 @@ test.each([review, learning, done])('$status에서 미구현 동작·시스템 �
   open({ ...data, model: 'secret-model', credits: 999, masteryReport: { shortened: 2, revisited: 1 }, memo: 'secret-memo' })
   await screen.findByRole('heading', { name: review.title })
   await waitFor(() => {
-    expect(screen.getByRole('main')).not.toHaveTextContent(/secret-|999|토큰|비용|모델|크레딧|수료|배지|퀴즈|예상|소요|핵심 복습 반영|메모|지우기|복습하기|처음부터|순서 바꾸기|첫 강의가 열|잘 앎|흔들림|기록 없음|%/)
+    expect(screen.getByRole('main')).not.toHaveTextContent(/secret-|999|토큰|비용|모델|크레딧|수료|배지|퀴즈|예상|소요|핵심 복습 반영|메모|복습하기|처음부터|순서 바꾸기|첫 강의가 열|잘 앎|흔들림|기록 없음|%/)
   })
+})
+
+const learnedDeleteMessage = '강의는 사라지고 카드는 복습에 나오지 않아요. 그동안의 카드와 복습 기록은 다음 강의를 내 수준에 맞추는 데 계속 쓰여요.'
+test.each(['REVIEWING', 'LEARNING', 'COMPLETED'])('단일 코스 %s는 목록·복습 뒤에 지우기를 두고 계약 문구로 확인한다', async (status) => {
+  open({ ...review, status, todayReviewCount: 2 })
+  const trigger = await screen.findByRole('button', { name: '코스 지우기' })
+  expect(screen.getByRole('list', { name: '강의 목록' }).compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  if (status !== 'REVIEWING') expect(screen.getByRole('link', { name: '이 코스 복습하기 · 2장' }).compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  fireEvent.click(trigger)
+  await waitFor(() => {
+    const region = screen.getByRole('region', { name: '코스를 지울까요?' })
+    expect(region).toHaveAccessibleDescription(status === 'REVIEWING' ? '이 코스의 강의 목록이 사라져요. 되돌릴 수 없어요.' : learnedDeleteMessage)
+    expect(screen.getByRole('button', { name: '취소' })).toHaveFocus()
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  })
+  fireEvent.click(screen.getByRole('button', { name: '취소' }))
+  await waitFor(() => {
+    expect(trigger).toHaveFocus()
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('button', { name: '지우기' })).not.toBeInTheDocument()
+  })
+  expect(fetch).toHaveBeenCalledTimes(1)
+})
+
+test.each(['NOT_PLANNED', 'REVIEWING', 'LEARNING', 'COMPLETED'])('로드맵의 %s 코스는 지우기를 두지 않는다', async (status) => {
+  open({ ...review, status, roadmapId: 41 })
+  if (status === 'NOT_PLANNED') await screen.findByRole('link', { name: '로드맵 화면으로 가기' })
+  else await screen.findByRole('heading', { name: review.title })
+  expect(screen.queryByRole('button', { name: '코스 지우기' })).not.toBeInTheDocument()
+})
+
+test('단일 코스라도 짜기 전에는 지우기를 두지 않는다', async () => {
+  open({ ...review, status: 'NOT_PLANNED' })
+  await screen.findByRole('link', { name: '홈으로' })
+  expect(screen.queryByRole('button', { name: '코스 지우기' })).not.toBeInTheDocument()
+})
+
+test('지우기 연타는 DELETE 한 번이며 요청 중 모든 동작을 잠그고 성공 뒤 캐시 정리·replace 이동한다', async () => {
+  let finish!: (value: Response) => void
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response(review)).mockImplementation(() => new Promise<Response>((resolve) => { finish = resolve })))
+  const { client, router } = open()
+  await screen.findByRole('heading', { name: review.title })
+  client.setQueryData(['courses'], { courses: [review] })
+  client.setQueryData(['courses', '32'], { ...review, id: 32 })
+  client.setQueryData(['home', 'todos'], { items: [] })
+  fireEvent.click(screen.getByRole('button', { name: '코스 제목 고치기' }))
+  await replan()
+  fireEvent.click(screen.getByRole('button', { name: '코스 지우기' }))
+  const confirm = screen.getByRole('button', { name: '지우기' })
+  act(() => { fireEvent.click(confirm); fireEvent.click(confirm) })
+  await waitFor(() => {
+    for (const button of within(screen.getByRole('main')).getAllByRole('button')) expect(button).toBeDisabled()
+    for (const input of screen.getAllByRole('textbox')) expect(input).toBeDisabled()
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+  expect(fetch).toHaveBeenLastCalledWith('/api/courses/31', expect.objectContaining({ method: 'DELETE' }))
+  expect(vi.mocked(fetch).mock.calls.at(-1)?.[1]?.body).toBeUndefined()
+  await act(async () => { finish(new Response(null, { status: 204 })) })
+  await waitFor(() => {
+    expect(router.state.location.pathname).toBe('/courses')
+    expect(router.state.historyAction).toBe('REPLACE')
+    expect(client.getQueryState(['courses', '31'])).toBeUndefined()
+    expect(client.getQueryState(['courses'])?.isInvalidated).toBe(true)
+    expect(client.getQueryState(['home', 'todos'])?.isInvalidated).toBe(true)
+    expect(client.getQueryData(['courses', '32'])).toBeDefined()
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+  await act(async () => { await router.navigate(-1) })
+  expect(router.state.location.pathname).toBe('/')
+})
+
+test.each(['server', 'network'])('지우기 %s 실패는 문구·확인 펼침·캐시를 보존하고 다시 누를 수 있다', async (kind) => {
+  const fetcher = vi.fn().mockResolvedValueOnce(response(review))
+  if (kind === 'server') fetcher.mockResolvedValueOnce(failure('COURSE_DELETE_NOT_ALLOWED', '로드맵의 코스는 로드맵을 지워야 해요'))
+  else fetcher.mockRejectedValueOnce(new Error('secret-network'))
+  vi.stubGlobal('fetch', fetcher.mockResolvedValue(new Response(null, { status: 204 })))
+  const { client, router } = open()
+  fireEvent.click(await screen.findByRole('button', { name: '코스 지우기' }))
+  fireEvent.click(screen.getByRole('button', { name: '지우기' }))
+  await screen.findByRole('alert')
+  await waitFor(() => {
+    expect(screen.getByRole('alert')).toHaveTextContent(kind === 'server' ? '로드맵의 코스는 로드맵을 지워야 해요' : '연결하지 못했어요. 다시 시도해 주세요.')
+    expect(screen.getByRole('region', { name: '코스를 지울까요?' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '지우기' })).toBeEnabled()
+    expect(client.getQueryData(['courses', '31'])).toEqual(review)
+    expect(router.state.location.pathname).toBe('/courses/31')
+    expect(screen.getByRole('main')).not.toHaveTextContent(/COURSE_DELETE_NOT_ALLOWED|secret-network/)
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+  fireEvent.click(screen.getByRole('button', { name: '지우기' }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/courses'))
+  expect(fetch).toHaveBeenCalledTimes(3)
 })

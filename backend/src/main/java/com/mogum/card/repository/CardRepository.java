@@ -1,6 +1,7 @@
 package com.mogum.card.repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.Lock;
@@ -27,4 +28,10 @@ public interface CardRepository extends Repository<Card, Long> {
 	@Query("update Card c set c.dueAt = :completedAt, c.updatedAt = :completedAt "
 		+ "where c.lessonId = :lessonId and c.status = com.mogum.card.domain.CardStatus.ACTIVE and c.dueAt is null")
 	int activateLessonCards(long lessonId, Instant completedAt);
+
+	@Modifying(flushAutomatically = true)
+	@Query("update Card c set c.status = com.mogum.card.domain.CardStatus.COURSE_DELETED, c.updatedAt = :now "
+		+ "where c.lessonId in :lessonIds and c.status = com.mogum.card.domain.CardStatus.ACTIVE")
+	int hideLessonCards(List<Long> lessonIds, Instant now);
+
 }

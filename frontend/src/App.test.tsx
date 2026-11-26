@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import App from './App'
 
@@ -59,8 +59,62 @@ test.each(['/new', '/jobs/12', '/courses/31', '/roadmaps/41', '/courses/31/lesso
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
   sessionStorage.clear()
+})
+
+test.each(['뒤로 가기', '내 정보 재진입'])('내 정보에서 탈퇴하면 로그인으로 replace 이동하고 %s에도 이전 사람의 화면을 보이지 않는다', async (entry) => {
+  window.history.replaceState(null, '', '/courses')
+  let withdrawn = false
+  let finishMe!: (value: Response) => void
+  stubFetch(vi.fn().mockImplementation((path, options) => {
+    if (path === '/api/account/withdraw' && options?.method === 'POST') {
+      withdrawn = true
+      return Promise.resolve(new Response(null, { status: 204 }))
+    }
+    if (path === '/api/me' && withdrawn) return new Promise((resolve) => { finishMe = resolve })
+    return Promise.resolve(new Response(JSON.stringify({ data: path === '/api/me'
+      ? { status: 'APPROVED', name: '탈퇴 전 이름', email: 'former@example.com', credit: { balance: 18, nextRefillDate: '2026-12-02' } }
+      : { courses: [{ id: 31, title: '탈퇴 전 코스', status: 'REVIEWING', progress: { completedLessons: 0, totalLessons: 1 } }] } })))
+  }))
+  render(<App />)
+  await screen.findByRole('link', { name: /탈퇴 전 코스/ })
+  fireEvent.click(within(screen.getByRole('navigation', { name: '주요 화면 (모바일)' })).getByRole('link', { name: '내 정보' }))
+  await screen.findByRole('button', { name: '탈퇴' })
+  const replace = vi.spyOn(window.history, 'replaceState')
+  fireEvent.click(screen.getByRole('button', { name: '탈퇴' }))
+  fireEvent.click(screen.getByRole('button', { name: '탈퇴하기' }))
+  await waitFor(() => {
+    expect(window.location.pathname).toBe('/login')
+    expect(replace).toHaveBeenCalledWith(expect.anything(), '', '/login')
+    expect(screen.getByRole('link', { name: 'Google 계정으로 계속하기' })).toBeVisible()
+    expect(screen.queryByText(/탈퇴했어요|탈퇴 완료|탈퇴 전 이름|탈퇴 전 코스|남은 크레딧/)).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toBeEmptyDOMElement()
+  })
+  const readsBefore = vi.mocked(fetch).mock.calls.filter(([path]) => path === '/api/me').length
+  if (entry === '뒤로 가기') {
+    act(() => window.history.back())
+  } else {
+    act(() => {
+      window.history.pushState(null, '', '/profile')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+  }
+  await waitFor(() => {
+    expect(window.location.pathname).toBe(entry === '뒤로 가기' ? '/courses' : '/profile')
+    expect(vi.mocked(fetch).mock.calls.filter(([path]) => path === '/api/me')).toHaveLength(readsBefore + 1)
+    expect(screen.getByRole('status', { name: '로그인 확인 중' })).toBeVisible()
+    expect(screen.queryByText(/탈퇴 전 이름|탈퇴 전 코스|남은 크레딧/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+  })
+  await act(async () => finishMe(new Response(JSON.stringify({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다' }), { status: 401 })))
+  await waitFor(() => {
+    expect(window.location.pathname).toBe('/login')
+    expect(screen.getByRole('link', { name: 'Google 계정으로 계속하기' })).toBeVisible()
+    expect(screen.queryByText(/탈퇴 전 이름|탈퇴 전 코스|남은 크레딧/)).not.toBeInTheDocument()
+    expect(vi.mocked(fetch).mock.calls.filter(([path]) => path === '/api/courses')).toHaveLength(1)
+  })
 })
 
 test('/에서 로그인 확인 뒤 홈의 스트릭과 오늘 복습·새로 배우기를 표시한다', async () => {
@@ -358,4 +412,41 @@ test('거른 복습에서 복습 탭을 누르면 쿼리를 지우고 같은 경
   expect(screen.queryByText('거른 답')).not.toBeInTheDocument()
   expect(screen.queryByText('자바 기초')).not.toBeInTheDocument()
   expect(screen.getByText('1장 남음')).toBeVisible()
+})
+
+test.each([
+  { detail: '/courses/31', list: '/courses', tab: '코스', trigger: '코스 지우기', empty: '아직 만든 코스가 없어요' },
+  { detail: '/roadmaps/41', list: '/roadmaps', tab: '로드맵', trigger: '로드맵 지우기', empty: '아직 만든 로드맵이 없어요' },
+])('실제 라우터에서 $trigger 성공은 $tab 탭으로 가고 지운 결과를 다시 읽지 않는다', async ({ detail, list, tab, trigger, empty }) => {
+  window.history.replaceState(null, '', list)
+  let deleted = false
+  const course = { id: 31, title: '지울 코스', status: 'REVIEWING', lessons: [], todayReviewCount: 0, progress: { completedLessons: 0, totalLessons: 0 } }
+  const roadmap = { id: 41, title: '지울 로드맵', description: '계획', status: 'REVIEWING', courses: [], completedCourses: 0, totalCourses: 2 }
+  const item = tab === '코스' ? course : roadmap
+  stubFetch(vi.fn().mockImplementation((path, options) => {
+    if (options?.method === 'DELETE') {
+      deleted = true
+      return Promise.resolve(new Response(null, { status: 204 }))
+    }
+    let data: unknown
+    if (path === '/api/me') data = { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
+    else if (path === `/api${list}`) data = { [tab === '코스' ? 'courses' : 'roadmaps']: deleted ? [] : [item] }
+    else if (path === `/api${detail}` && !deleted) data = item
+    else throw new Error(`Unexpected test request: ${path}`)
+    return Promise.resolve(new Response(JSON.stringify({ data })))
+  }))
+  render(<App />)
+  fireEvent.click(await screen.findByRole('link', { name: new RegExp(item.title) }))
+  fireEvent.click(await screen.findByRole('button', { name: trigger }))
+  fireEvent.click(screen.getByRole('button', { name: '지우기' }))
+  await screen.findByText(empty)
+  await waitFor(() => {
+    expect(window.location.pathname).toBe(list)
+    for (const nav of screen.getAllByRole('navigation')) expect(within(nav).getByRole('link', { name: tab })).toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByRole('link', { name: new RegExp(item.title) })).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(vi.mocked(fetch).mock.calls.filter(([path, options]) => path === `/api${detail}` && options?.method === 'GET')).toHaveLength(1)
+    expect(vi.mocked(fetch).mock.calls.filter(([path, options]) => path === `/api${detail}` && options?.method === 'DELETE')).toHaveLength(1)
+    expect(vi.mocked(fetch).mock.calls.filter(([path]) => path === `/api${list}`)).toHaveLength(2)
+  })
 })

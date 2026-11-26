@@ -49,6 +49,9 @@ public enum ErrorCode {
 	/** 코스가 학습 중·다 마침이 아니거나 앞 강의를 모두 완료하지 않았으면 강의 열기를 409로 거절한다. */
 	LESSON_NOT_OPEN(HttpStatus.CONFLICT, "코스를 시작하고 앞 강의를 학습 완료하면 열 수 있어요"),
 
+	/** 로드맵의 코스 하나 지우기를 409로 거절한다. */
+	COURSE_DELETE_NOT_ALLOWED(HttpStatus.CONFLICT, "로드맵의 코스는 로드맵을 지워야 해요"),
+
 	/** 강의 자료가 없는 강의의 학습 완료를 거절한다. */
 	LESSON_MATERIAL_REQUIRED(HttpStatus.CONFLICT, "강의 자료가 만들어진 뒤 학습 완료할 수 있어요"),
 

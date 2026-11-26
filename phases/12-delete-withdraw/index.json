@@ -1,0 +1,91 @@
+{
+  "project": "Mogum",
+  "phase": "12-delete-withdraw",
+  "steps": [
+    {
+      "step": 0,
+      "name": "course-delete",
+      "status": "completed",
+      "started_at": "2026-11-26T08:39:40+0900",
+      "summary": "DELETE /api/courses/{id} → 204·본문 없음, 로드맵 코스는 COURSE_DELETE_NOT_ALLOWED(409, 「로드맵의 코스는 로드맵을 지워야 해요」); 재사용 CourseDeletionService.deleteContent(long userId, long courseId), 작업 행 잠금 JpaCourseDeletionRepository.lockCourseJobs(long courseId), 카드 상태 변경 CardCommandService.hideLessonCards(List<Long> lessonIds, Instant now); 작업→사용자 잠금·삭제 전 크레딧 복구·기록 보존·늦은 결과 차단·두 순서 동시성 검증, 서버 테스트 2,764→2,801개, 지정 AC 테스트 794개 및 전체 build 통과.",
+      "completed_at": "2026-11-26T08:52:24+0900",
+      "review_notes": [
+        "backend/src/main/java/com/mogum/job/service/JobIntakeService.java:85,99 — 확인할 위험(이 step 의 결함 아님). `retry` · `discard` 는 사용자 행(`creditLedger.lock`)을 먼저 잡고 작업 행을 UPDATE · DELETE 한다. 그래서 같은 코스의 작업에 대한 다시 시도 · 버리기가 코스 지우기와 같은 순간에 오면 PostgreSQL 이 교착을 감지해 한쪽을 500 으로 끝낸다. 지우기는 작업 행 → 사용자 행 순서이기 때문이다. 02 §8.6 ③ 은 워커와 같은 순서를 고르고 받기 쪽 경합은 넘어간다(ADR-102)고 했으므로 계약 위반은 아니다. 다만 '받기와 지우기' 에 retry · discard 가 들어가는지 문서에서 한 줄 짚어 두면 탈퇴 step 설계 때 헷갈리지 않는다 → phase `/review` 에서 02 §8.6 ③ 에 적을지 판단한다.",
+        "backend/src/main/java/com/mogum/course/service/CourseDeletionService.java:39 — 코스 행은 잠그지 않고 읽는다. 그래서 같은 코스를 동시에 두 번 지우면 둘 다 204 다. 뒤쪽은 0행을 지우고 끝나며 데이터 피해는 없다. 순차 두 번째 지우기의 `NOT_FOUND` 는 테스트로 확인했다. MVP 에서는 그대로 둬도 된다.",
+        "backend/src/test/java/com/mogum/card/repository/CardRepositoryTest.java:39,52,54 — `org.springframework.transaction.PlatformTransactionManager` · `java.time.Duration` · `java.util.List` · `TransactionTemplate` 을 import 하지 않고 완전한 이름으로 썼다. 같은 파일의 다른 테스트처럼 import 로 바꾸면 읽기 쉽다.",
+        "backend/src/test/java/com/mogum/course/repository/JpaCourseDeletionRepositoryIntegrationTest.java:85 — 이 시험은 리포지토리가 아니라 HTTP → 서비스 전체 흐름(지우기 범위)을 확인한다. 테스트 이름과 위치가 대상과 어긋난다. 다음 step 에서 `CourseDeletionServiceIntegrationTest` 쪽으로 옮기는 것을 고려한다. 07 §1 의 근거 칸도 함께 맞춘다."
+      ]
+    },
+    {
+      "step": 1,
+      "name": "roadmap-delete",
+      "status": "completed",
+      "started_at": "2026-11-26T08:52:24+0900",
+      "summary": "DELETE /api/roadmaps/{id} → 상태와 상관없이 204·본문 없음, 없는·남의·두 번째 지우기는 NOT_FOUND(404); 로드맵·모든 코스·강의의 작업을 함께 잠근 뒤 사용자 잠금·크레딧 복구·삭제, 공통 CourseDeletionService.deleteContentAfterJobs(long userId, long courseId) 분리(기존 deleteContent(long userId, long courseId) 유지); 짜기 전 코스 포함 삭제·카드/복습/개념/호출·크레딧 기록 보존·늦은 결과 차단·두 순서 동시성 검증, 서버 테스트 2,801→2,830개, 지정 AC 823개 및 전체 build 통과.",
+      "completed_at": "2026-11-26T09:03:11+0900",
+      "review_notes": [
+        "docs/02-domain-data.md:400 — step 0 구현 줄에는 아직 `CourseDeletionService.deleteContent(long userId, long courseId)` 가 코스 하나의 내용 지우기를 맡는다고 적혀 있다. 이번 step 에서 내용 지우기는 `deleteContentAfterJobs` 로 옮겨졌다. → 05 §4 처럼 02 §8.6 구현 줄도 「작업 처리는 deleteContent · lockRoadmapJobs, 내용 지우기는 deleteContentAfterJobs」로 맞춘다. 계약 문장이 아니라 구현 기록 줄이라 phase /review 에서 Claude 가 고쳐도 된다.",
+        "backend/src/main/java/com/mogum/course/service/CourseDeletionService.java:53 — `deleteContentAfterJobs` 는 public 이지만, 호출자가 작업을 먼저 지우고 사용자 행을 잡았을 때만 안전하다. 이 전제는 Javadoc 에 적혀 있다. 탈퇴 step 에서 다시 쓸 때 이 전제를 지키는지 확인한다.",
+        "backend/src/main/java/com/mogum/course/repository/JpaCourseDeletionRepository.java:41 — lockRoadmapJobs 의 하위 질의는 문장을 시작할 때의 스냅샷으로 평가된다. 그래서 잠금을 기다리는 사이에 새로 들어온 작업은 잡히지 않고, 뒤의 deleteCourse 가 FK 오류로 500 이 될 수 있다. 02 §8.6 ③ 이 받기와 지우기의 경합은 넘어간다(ADR-102)고 했으므로 계약 위반은 아니다. 탈퇴 step 을 설계할 때 같은 성질임을 알아 둔다."
+      ]
+    },
+    {
+      "step": 2,
+      "name": "account-withdraw",
+      "status": "completed",
+      "started_at": "2026-11-26T09:03:11+0900",
+      "summary": "POST /api/account/withdraw → 승인된 사람만 204·본문 없음·SESSION 만료 쿠키(Max-Age=0, Secure, HttpOnly, SameSite=Lax, Path=/, Domain 없음), 승인 전 ACCOUNT_NOT_APPROVED(403)·비로그인 401; 작업→사용자 잠금 뒤 네이티브 SQL로 전체 탈퇴 범위와 principal_name=사용자 ID인 모든 기기 세션 삭제·커밋 뒤 현재 세션 invalidate(), 크레딧 복구 없이 호출 기록 연결만 해제; 새 ArchUnit ACCOUNT_DOES_NOT_DEPEND_ON_LEARNING_DOMAINS, 재로그인·새 신청·늦은 워커 성공/실패·호출 기록 보존·두 순서 경합 검증, 서버 테스트 2,830→2,848개, 지정 AC 467개 및 전체 build 통과.",
+      "completed_at": "2026-11-26T11:19:46+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/account/service/WithdrawServiceIntegrationTest.java:107 — 이 클래스의 주 시험은 서비스가 아니라 실제 HTTP → 보안 필터 → 컨트롤러 → 서비스 전체 흐름(지우기 범위 · 세션 · 쿠키)을 확인한다. step 0 의 JpaCourseDeletionRepositoryIntegrationTest 와 같은 성질이다. 이름 · 위치(예: `WithdrawControllerIntegrationTest`)와 07 §1 근거 칸을 phase /review 에서 맞출지 판단한다.",
+        "backend/src/main/java/com/mogum/account/service/WithdrawService.java:23 — 사용자 행이 없으면 `NOT_FOUND`(404)다. 동시에 두 번 탈퇴하면 뒤쪽 요청이 SessionUserFilter 를 지난 뒤 이 경로에 닿을 수 있다. 그러면 트랜잭션이 되돌려지고, 세션은 이미 지워졌으므로 데이터 피해는 없다. 05 §4 구현 줄에 이 응답은 적혀 있지 않다. MVP 에서는 그대로 둬도 된다.",
+        "backend/src/main/java/com/mogum/account/service/WithdrawService.java:22 — 탈퇴도 작업 행 → 사용자 행 순서로 잠근다. 그래서 같은 사람의 retry · discard(사용자 행 → 작업 행)가 같은 순간에 오면 step 0 권고와 같은 교착(500)이 날 수 있다. ADR-102 범위라 계약 위반은 아니다. phase /review 에서 02 §8.6 ③ 에 함께 적을지 판단한다."
+      ]
+    },
+    {
+      "step": 3,
+      "name": "delete-screens",
+      "status": "completed",
+      "started_at": "2026-11-26T11:19:46+0900",
+      "summary": "CoursePage.tsx·RoadmapPage.tsx와 각 짝 테스트, api/useCourse.ts·useRoadmap.ts와 각 짝 테스트, App.test.tsx, UI_GUIDE §9·§10 변경; useCourseDeletion·useRoadmapDeletion 추가, 공통 InlineConfirmation의 상태별 안내·요청 잠금·실패 보존·재시도 구현; 성공 뒤 상세·목록·홈 읽기 취소, 해당 상세와 로드맵 소속 코스 상세 캐시 제거, 코스/로드맵 목록·홈 무효화 후 목록 탭으로 replace 이동; 화면 테스트 607→632개, test·lint·build AC 통과.",
+      "completed_at": "2026-11-26T11:26:26+0900",
+      "review_notes": [
+        "frontend/src/api/useRoadmap.ts:3 — `useRoadmap.ts` 가 `useCourse.ts` 의 `courseKey` · `coursesKey` 를 import 한다. `useCourse.ts` 는 이미 `useRoadmap.ts` 의 `roadmapKey` 를 import 하고 있어(85행 부근) 두 모듈이 서로를 참조하게 됐다. 두 값은 모두 함수 안(onSuccess)에서만 읽히므로 지금 동작에는 문제가 없고 build · test 도 통과한다. 다만 나중에 모듈 최상위에서 이 값을 쓰면 초기화 순서 문제가 날 수 있다 → 키 상수를 한 파일(예: `queryKeys.ts`)로 모을지 phase /review 에서 판단한다.",
+        "frontend/src/pages/CoursePage.tsx:213 · frontend/src/pages/RoadmapPage.tsx:198 — 지우기 실패 `FailureNotice` 가 확인 펼침 아래에 놓이고, 오류가 남은 상태로 취소해 펼침을 닫아도 실패 안내는 계속 보인다. 지우기를 다시 열 때 `deletion.reset()` 으로 이전 실패를 지울지는 취향 차이라 반려 사유가 아니다."
+      ]
+    },
+    {
+      "step": 4,
+      "name": "withdraw-screen",
+      "status": "completed",
+      "started_at": "2026-11-26T11:26:26+0900",
+      "summary": "ProfilePage.tsx·ProfilePage.test.tsx·App.test.tsx·UI_GUIDE §17 변경; 로그아웃→탈퇴→처리방침 순서의 공통 InlineConfirmation과 계약 문구·요청 잠금·동시/교차 제출 한 번·실패 보존/재시도 구현; POST /api/account/withdraw 204 성공 뒤 cancelQueries()로 모든 읽기 취소→removeQueries()로 전체 쿼리 캐시 제거→/login replace 이동, 늦은 읽기 결과 차단·뒤로 가기/재진입의 401 로그인 흐름 검증; 화면 테스트 632→639개, test·lint·build AC 통과.",
+      "completed_at": "2026-11-26T11:31:16+0900",
+      "review_notes": [
+        "frontend/src/pages/ProfilePage.tsx:22,36 — 로그아웃 성공은 `['me']` 만 지우고, 탈퇴 성공은 전체 캐시를 지운다. 계약대로다. 다만 로그아웃 뒤에도 앞 사람의 코스 · 카드 캐시가 남을 수 있는 성질은 이번 step 과 무관하게 그대로 있다. 다른 사람이 같은 브라우저로 로그인하는 경우를 phase `/review` 에서 짚을지 판단한다."
+      ]
+    },
+    {
+      "step": 5,
+      "name": "test-names",
+      "status": "completed",
+      "started_at": "2026-11-26T15:40:41+0900",
+      "summary": "코스 삭제 HTTP 시험 deletesCourseContentWhilePreservingMemoryAndAccounting을 CourseControllerDeletionIntegrationTest로, 탈퇴 HTTP 시험 withdrawsAllOwnedDataAndSessions·rejectsUnapprovedOrAnonymousWithdrawal과 전용 도우미를 WithdrawControllerIntegrationTest로 이동; 잠금·롤백 시험 유지, CardRepositoryTest import와 07 §1 근거 정리, 서버 테스트 2,848→2,848개, 지정 AC 927개·전체 build·spotlessApply 통과.",
+      "completed_at": "2026-11-26T15:48:30+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/course/repository/JpaCourseDeletionRepositoryIntegrationTest.java:87 · backend/src/test/java/com/mogum/account/service/WithdrawServiceIntegrationTest.java:159 — 시험을 옮기면서 클래스 닫는 `}` 앞에 빈 줄이 하나 남았다. spotlessCheck 는 통과하므로 동작에는 영향이 없다 → 다음에 이 파일을 고칠 때 지워도 된다.",
+        "phases/12-delete-withdraw/index.json — 파일 끝 줄바꿈이 빠졌다(`\\ No newline at end of file`). 하네스 메타데이터라 리뷰 범위 밖이다. 하네스가 쓰는 형식과 맞는지 phase /review 에서 볼 수 있다."
+      ]
+    },
+    {
+      "step": 6,
+      "name": "query-keys",
+      "status": "completed",
+      "summary": "api/queryKeys.ts·queryKeys.test.ts 추가로 네 키의 기존 값 검증; useCourse.ts·useRoadmap.ts·useLesson.ts·useReview.ts와 useCourse.test.tsx·useRoadmap.test.tsx·useLesson.test.tsx의 키 import를 queryKeys로 변경해 값 순환 참조 제거, 캐시 정리 순서 유지; 화면 테스트 639→643개(기존 639개 유지 + 키 검증 4개), test·lint·build AC 통과.",
+      "started_at": "2026-11-26T15:48:30+0900",
+      "completed_at": "2026-11-26T15:50:47+0900"
+    }
+  ],
+  "created_at": "2026-11-26T08:39:40+0900",
+  "completed_at": "2026-11-26T15:50:47+0900"
+}

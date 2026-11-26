@@ -5,10 +5,11 @@ import { ApiError, CONNECTION_ERROR_MESSAGE } from '../api/client'
 import { useCourseAction } from '../api/useCourse'
 import { receiveJob } from '../api/useJob'
 import type { PlanRoadmapCourseRequest, ReplanRoadmapRequest } from '../api/useJob'
-import { useRoadmap } from '../api/useRoadmap'
+import { useRoadmap, useRoadmapDeletion } from '../api/useRoadmap'
 import Button from '../components/Button'
 import CreationBlockedNotice, { isCreationBlockedError } from '../components/CreationBlockedNotice'
 import FailureNotice from '../components/FailureNotice'
+import InlineConfirmation from '../components/InlineConfirmation'
 import Mogumi from '../components/Mogumi'
 import ProgressBar from '../components/ProgressBar'
 import StatusBadge from '../components/StatusBadge'
@@ -32,6 +33,8 @@ export default function RoadmapPage() {
   const { roadmapId = '' } = useParams()
   const navigate = useNavigate()
   const roadmap = useRoadmap(roadmapId)
+  const deletion = useRoadmapDeletion(roadmapId)
+  const [confirming, setConfirming] = useState(false)
   const [editing, setEditing] = useState<{ courseId: number; title: string } | null>(null)
   const titleAction = useCourseAction(editing ? String(editing.courseId) : '')
   const titleForm = useRef<HTMLFormElement>(null)
@@ -47,7 +50,7 @@ export default function RoadmapPage() {
     onSuccess: (job) => { void navigate(`/jobs/${job.id}`) },
     onSettled: () => { submitting.current = false },
   })
-  const busy = titleAction.isPending || jobAction.isPending
+  const busy = titleAction.isPending || jobAction.isPending || deletion.isPending
   const data = roadmap.data
   const status = data && statuses.get(data.status)
   const editingId = editing?.courseId
@@ -180,5 +183,20 @@ export default function RoadmapPage() {
         })}
       </ol>
     </section>
+
+    <InlineConfirmation open={confirming} onOpenChange={setConfirming} disabled={busy}
+      triggerLabel="로드맵 지우기" title="로드맵을 지울까요?" confirmLabel="지우기"
+      message={reviewing ? '로드맵 계획이 사라져요. 되돌릴 수 없어요.' : '로드맵과 그 안의 코스 · 강의가 모두 사라지고, 카드는 복습에 나오지 않아요. 그동안의 카드와 복습 기록은 다음 강의를 내 수준에 맞추는 데 계속 쓰여요.'}
+      onConfirm={() => {
+        if (submitting.current) return
+        submitting.current = true
+        deletion.mutate(data.courses.map((course) => course.id), {
+          onSuccess: () => { void navigate('/roadmaps', { replace: true }) },
+          onSettled: () => { submitting.current = false },
+        })
+      }} />
+    {deletion.isError && <FailureNotice title="로드맵을 지우지 못했어요." message={message(deletion.error)}>
+      <p className="text-small">안내를 확인한 뒤 지우기를 다시 눌러 주세요.</p>
+    </FailureNotice>}
   </div>
 }

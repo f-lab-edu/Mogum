@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client'
-import { roadmapKey } from './useRoadmap'
+import { courseKey, coursesKey, roadmapKey } from './queryKeys'
 import type { RoadmapResponse } from './useRoadmap'
 
 export interface CourseResponse {
@@ -22,9 +22,6 @@ export interface CourseResponse {
   todayReviewCount: number
   masteryReport?: { shortened: number; revisited: number }
 }
-
-export const courseKey = (courseId: string) => ['courses', courseId] as const
-export const coursesKey = ['courses'] as const
 
 export interface CoursesResponse {
   courses: { id: number; title: string; status: CourseResponse['status'] }[]
@@ -95,6 +92,22 @@ export function useCourseAction(courseId: string) {
         courses: previous.courses.map((course) => course.id === result.id
           ? { ...course, title: result.title, status: result.status } : course),
       }))
+    },
+  })
+}
+
+export function useCourseDeletion(courseId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: () => apiFetch<void>(`/courses/${encodeURIComponent(courseId)}`, { method: 'DELETE' }),
+    retry: false,
+    onSuccess: async () => {
+      await client.cancelQueries({ queryKey: courseKey(courseId), exact: true })
+      await client.cancelQueries({ queryKey: coursesKey, exact: true })
+      await client.cancelQueries({ queryKey: ['home'] })
+      client.removeQueries({ queryKey: courseKey(courseId), exact: true })
+      await client.invalidateQueries({ queryKey: coursesKey, exact: true, refetchType: 'none' })
+      await client.invalidateQueries({ queryKey: ['home'], refetchType: 'none' })
     },
   })
 }

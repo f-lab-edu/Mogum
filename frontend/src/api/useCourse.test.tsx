@@ -1,9 +1,10 @@
 import { useRoadmap } from './useRoadmap'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
-import { coursesKey, useCourses, courseKey, readCourse, startCourse, updateCourseTitle, useCourse, useCourseAction } from './useCourse'
+import { courseKey, coursesKey } from './queryKeys'
+import { useCourseDeletion, useCourses, readCourse, startCourse, updateCourseTitle, useCourse, useCourseAction } from './useCourse'
 
 const course = { id: 31, title: '자바', status: 'REVIEWING', lessons: [], progress: { completedLessons: 0, totalLessons: 0 } }
 const clients: QueryClient[] = []
@@ -109,4 +110,48 @@ test('늦은 로드맵 읽기는 저장한 코스 제목을 덮어쓰지 않는�
   await act(async () => { await action.result.current.mutateAsync({ type: 'title', title: updated.title }) })
   await act(async () => { finish(response(old)) })
   await waitFor(() => expect(read.result.current.data?.courses[0].title).toBe(updated.title))
+})
+
+test('코스 지우기는 인코딩·CSRF·본문 없는 DELETE로 204를 받고 읽기 취소 뒤 상세만 제거·목록과 홈을 무효화한다', async () => {
+  const { client, wrapper } = setup()
+  const keys = [courseKey('31/a'), coursesKey, ['home', 'todos'], ['home', 'jobs']] as const
+  for (const key of keys) client.setQueryData(key, { old: true })
+  client.setQueryData(courseKey('32'), { preserved: true })
+  const pending: { signal: AbortSignal; finish: (data: unknown) => void }[] = []
+  const reads = keys.map((queryKey) => client.fetchQuery({ queryKey, queryFn: ({ signal }) => new Promise((finish) => { pending.push({ signal, finish }) }) }).catch(() => undefined))
+  const reread = vi.fn()
+  const subscriptions = keys.slice(1).map((queryKey) => new QueryObserver(client, { queryKey, queryFn: reread, staleTime: Infinity }).subscribe(() => {}))
+  document.cookie = 'XSRF-TOKEN=delete-csrf; path=/'
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
+  const { result } = renderHook(() => useCourseDeletion('31/a'), { wrapper })
+  await act(async () => { await result.current.mutateAsync() })
+  const [path, options] = vi.mocked(fetch).mock.calls[0]
+  expect(path).toBe('/api/courses/31%2Fa')
+  expect(options).toMatchObject({ method: 'DELETE', credentials: 'include' })
+  expect(options?.body).toBeUndefined()
+  expect(new Headers(options?.headers).get('X-XSRF-TOKEN')).toBe('delete-csrf')
+  for (const read of pending) expect(read.signal.aborted).toBe(true)
+  expect(reread).not.toHaveBeenCalled()
+  subscriptions.forEach((unsubscribe) => unsubscribe())
+  await act(async () => { pending.forEach((read) => read.finish({ late: true })); await Promise.all(reads) })
+  expect(client.getQueryState(courseKey('31/a'))).toBeUndefined()
+  for (const key of keys.slice(1)) {
+    expect(client.getQueryState(key)?.isInvalidated).toBe(true)
+    expect(client.getQueryData(key)).toEqual({ old: true })
+  }
+  expect(client.getQueryData(courseKey('32'))).toEqual({ preserved: true })
+  expect(fetch).toHaveBeenCalledTimes(1)
+})
+
+test('코스 지우기 실패는 자동 재시도·캐시 제거·무효화를 하지 않는다', async () => {
+  const { client, wrapper } = setup()
+  for (const key of [courseKey('31'), coursesKey, ['home', 'todos']]) client.setQueryData(key, { preserved: true })
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'COURSE_DELETE_NOT_ALLOWED', message: '로드맵의 코스는 로드맵을 지워야 해요' }), { status: 409 })))
+  const { result } = renderHook(() => useCourseDeletion('31'), { wrapper })
+  await act(async () => { await expect(result.current.mutateAsync()).rejects.toThrow('로드맵의 코스는 로드맵을 지워야 해요') })
+  for (const key of [courseKey('31'), coursesKey, ['home', 'todos']]) {
+    expect(client.getQueryData(key)).toEqual({ preserved: true })
+    expect(client.getQueryState(key)?.isInvalidated).toBe(false)
+  }
+  expect(fetch).toHaveBeenCalledTimes(1)
 })

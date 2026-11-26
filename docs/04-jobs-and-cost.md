@@ -50,6 +50,8 @@
 - LLM 호출 중에는 DB 연결을 쥐지 않는다(ADR-149).
 - 프로세스 메모리에 함께 지킬 상태(카운터 · 캐시 · 잠금)를 두지 않는다 — DB 에 둔다(ADR-133).
 
+`12-delete-withdraw` step 2 구현: ArchUnit의 `ACCOUNT_DOES_NOT_DEPEND_ON_LEARNING_DOMAINS`가 `account`의 `course` · `card` · `job` · `generation` · `worker` Java 타입 참조를 막고 위반 픽스처로 검증한다. 탈퇴의 도메인 간 데이터 삭제는 `account.repository.JpaAccountWithdrawalRepository`의 `EntityManager` 네이티브 SQL로 수행한다.
+
 `9-card-review` step 0 구현: FSRS 1.0.0의 운영 타입은 `card.service.FsrsCalculator` 안에서만 쓰며, ArchUnit의 `FSRS_ONLY_IN_CALCULATOR`가 이 경계를 검사한다. `review(Card, Rating, Instant): FsrsResult` · `preview(Card, Instant): Map<Rating, Duration>`가 계산하고, `card.domain.FsrsResult`의 여섯 칸은 `Card.applyReview(FsrsResult)`가 반영한다. 씨앗 규칙은 [02 §8.4](./02-domain-data.md#84-기억--개념)에 있다. `SeoulClock.today()`는 한국 시간 새벽 4시 전이면 전날을, `startOfToday()` · `startOfTomorrow()`는 그날과 다음 날 새벽 4시의 Instant를 반환한다. Boot 4.1.1의 HTTP JSON은 Jackson 3.1.5다 — `JacksonHttpMessageConvertersConfiguration`이 기본으로 Jackson 3를 선택하며, 실제 MVC의 읽기·쓰기 변환기(`JacksonJsonHttpMessageConverter`)를 `HttpJsonIntegrationTest`에서 확인했다. 별도 HTTP 매퍼 설정은 필요하지 않았다. Hibernate JSON은 기존 `spring.jpa.properties.hibernate.type.json_format_mapper: jackson3`를 유지하고 `LessonRepositoryTest`에서 확인한다.
 
 `7-course-planning` step 6 구현: `course.controller` · `course.service` · `course.dto`가 코스 · 로드맵 읽기와 코스 시작 · 제목 고치기를 담당한다. `job`이 이미 `course`를 참조하므로 역방향 Java 의존은 ArchUnit으로 막았다. `course.repository.JpaCourseJobRepository`는 `EntityManager` 네이티브 SQL로 `generation_jobs`에서 성공하지 않은 강의 목록 작업의 ID · 실패 여부와 코스 다시 짜기의 존재 여부만 읽는다. 진행과 다음 코스는 읽기 서비스에서 계산하고 저장하지 않는다. 코스 시작은 받기와 같은 `CreditLedger.lock`의 사용자 행 잠금 뒤에 상태와 다시 짜기를 확인한다. API 계약은 [05 §3 · §4](./05-api.md#3-읽기--화면마다-한-번)에 있다.

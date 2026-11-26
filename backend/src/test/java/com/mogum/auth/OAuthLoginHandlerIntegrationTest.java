@@ -21,6 +21,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.session.Session;
@@ -30,6 +31,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import com.mogum.account.domain.UserFixtures;
 import com.mogum.account.domain.UserStatus;
+import com.mogum.config.CreditProperties;
 import com.mogum.support.IntegrationTest;
 
 import tools.jackson.databind.ObjectMapper;
@@ -37,6 +39,9 @@ import tools.jackson.databind.ObjectMapper;
 @IntegrationTest
 @ExtendWith(OutputCaptureExtension.class)
 class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
+	@Autowired
+	CreditProperties creditProperties;
+
 	@Test
 	@DisplayName("시작은 이메일과 프로필 범위와 계정 선택과 로컬 콜백과 짧은 쿠키를 쓰고 세션을 만들지 않는다")
 	void startsAuthorizationWithMinimalScopeAndShortCookie() throws Exception {
@@ -319,6 +324,52 @@ class OAuthLoginHandlerIntegrationTest extends OAuthScenario {
 
 		assertThat(loginLine(response, output)).endsWith("login result=not_applied").doesNotContain("userId=");
 		assertPrivate(output, sub, email, name);
+	}
+
+	@Test
+	@DisplayName("탈퇴한 구글 계정은 실제 재로그인과 신청 뒤 새 회원과 새 채움 기록으로 시작한다")
+	void reappliesAsNewAccountAfterWithdrawal(CapturedOutput output) throws Exception {
+		// given
+		email = "LEAKCHECK-returning@example.com";
+		sub = email;
+		name = "LEAKCHECK-returning-name";
+		var old = userRepository.save(UserFixtures.approved(email, 17, testClock.instant().plus(Duration.ofDays(7))));
+		jdbcTemplate.update("INSERT INTO credit_entries (user_id, type, amount, created_at, updated_at) "
+			+ "VALUES (?, 'REFILL', 17, now(), now())", old.getId());
+		long oldEntryId = jdbcTemplate.queryForObject("SELECT id FROM credit_entries", Long.class);
+		testRequests.asUser(old.getId()).post().uri("/api/account/withdraw").exchange()
+			.expectStatus().isNoContent();
+		var login = callback(start(null), "ok", null);
+		var cookie = cookiePair(cookieHeader(login, "SESSION"));
+		assertNotAppliedOnly(cookie);
+		assertThat(get("/api/me", cookie).getResponseBody()).contains("\"status\":\"NOT_APPLIED\"");
+		assertThat(count("users")).isZero();
+		assertThat(count("credit_entries")).isZero();
+		var csrf = get("/api/me", cookie).getResponseCookies().getFirst("XSRF-TOKEN");
+		// when
+		var response = testRequests.anonymous().post().uri("/api/account/apply")
+			.header("Cookie", cookie + "; XSRF-TOKEN=" + csrf.getValue())
+			.header("X-XSRF-TOKEN", csrf.getValue()).exchange().returnResult(String.class);
+		// then
+		assertThat(response.getStatus().value()).isEqualTo(200);
+		assertThat(response.getResponseBody()).contains("\"status\":\"APPLIED\"");
+		var applied = userRepository.findByProviderAndSubject("google", sub).orElseThrow();
+		assertThat(applied.getId()).isNotEqualTo(old.getId());
+		assertThat(applied.getStatus()).isEqualTo(UserStatus.APPLIED);
+		assertThat(applied.getCreditBalance()).isEqualTo(creditProperties.weeklyAmount());
+		assertThat(applied.getApprovedAt()).isNull();
+		assertThat(applied.getCreditRefillAt()).isNull();
+		var entries = jdbcTemplate.queryForList("SELECT * FROM credit_entries");
+		assertThat(entries).singleElement().satisfies(entry -> {
+			assertThat(entry.get("id")).isNotEqualTo(oldEntryId);
+			assertThat(entry.get("user_id")).isEqualTo(applied.getId());
+			assertThat(entry.get("type")).isEqualTo("REFILL");
+			assertThat(entry.get("amount")).isEqualTo(applied.getCreditBalance());
+			assertThat(entry.get("job_id")).isNull();
+		});
+		assertThat(userRepository.findById(old.getId())).isEmpty();
+		assertIdOnly(cookiePair(cookieHeader(response, "SESSION")), applied.getId().toString());
+		assertPrivate(output, email, name, sub);
 	}
 
 	private void assertNotAppliedOnly(String cookie) {

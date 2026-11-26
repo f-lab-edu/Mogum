@@ -312,6 +312,27 @@ class CardCommandServiceIntegrationTest {
 		assertThat(output.getAll()).doesNotContain(marker, "private-card-question", "private-card-answer");
 	}
 
+	@ParameterizedTest(name = "빈 강의 목록={0}")
+	@ValueSource(booleans = {true, false})
+	@DisplayName("강의 카드 숨기기는 대상의 쓰는 중인 카드만 상태와 수정 시각을 바꾼다")
+	void hidesOnlyActiveLessonCards(boolean empty) {
+		// given
+		var lesson = lesson();
+		var active = card(lesson, 1, FsrsState.LEARNING, testClock.instant());
+		var hidden = card(lesson, 2, FsrsState.LEARNING, null);
+		jdbcTemplate.update("UPDATE cards SET status = 'COURSE_DELETED' WHERE id = ?", hidden.getId());
+		var before = jdbcTemplate.queryForMap("SELECT * FROM cards WHERE id = ?", hidden.getId());
+		testClock.advance(Duration.ofSeconds(5));
+		// when
+		cardCommandService.hideLessonCards(empty ? List.of() : List.of(lesson.getId()), testClock.instant());
+		// then
+		var saved = cardRepository.findById(active.getId()).orElseThrow();
+		assertThat(saved.getStatus().name()).isEqualTo(empty ? "ACTIVE" : "COURSE_DELETED");
+		assertThat(saved.getUpdatedAt()).isEqualTo(empty ? active.getUpdatedAt() : testClock.instant());
+		assertThat(saved).usingRecursiveComparison().ignoringFields("status", "updatedAt").isEqualTo(active);
+		assertThat(jdbcTemplate.queryForMap("SELECT * FROM cards WHERE id = ?", hidden.getId())).isEqualTo(before);
+	}
+
 	private Lesson lesson() {
 		var user = userRepository.save(UserFixtures.approved("me@example.com"));
 		var course = courseRepository.save(CourseFixtures.single(user.getId()));

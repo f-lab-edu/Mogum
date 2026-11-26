@@ -17,14 +17,14 @@
 | 동시에 꺼내기 | 워커 여럿이 — 같은 서버든 다른 서버든 — 동시에 꺼내도 같은 작업을 집지 않는다 | ADR-129 |
 | 시한 · 되찾기 | 시한이 지난 「만드는 중」 작업을 다른 워커가 가져가 처음부터 만든다 · 정상 종료 때 진행 중인 시도가 끝나 결과를 저장하고, 한도를 넘기면 기다림으로 돌려놓는다 | ADR-126 |
 | 늦게 끝난 옛 워커 | 다른 워커가 되찾아 간 뒤 끝난 옛 워커는 결과를 쓰지 않는다 — 저장할 때 아직 자기 작업인지 확인한다 | ADR-126 |
-| 지운 뒤의 늦은 결과 | 코스 · 로드맵을 지우거나 탈퇴한 뒤 끝난 워커가 결과를 되살리지 않는다 · 성공하지 않은 작업에 쓴 크레딧을 복구한다 | ADR-140 |
+| 지운 뒤의 늦은 결과 | 코스 · 로드맵을 지우거나 탈퇴한 뒤 끝난 워커가 결과를 되살리지 않는다 · 성공하지 않은 작업에 쓴 크레딧을 복구한다 | ADR-140 · `JobRunnerCourseDeletionIntegrationTest` · `CourseDeletionServiceIntegrationTest` · `JobRunnerRoadmapDeletionIntegrationTest` · `RoadmapDeletionServiceIntegrationTest` · `JobRunnerWithdrawalIntegrationTest` |
 | 결과는 성공할 때 | 실패 · 버리기 뒤에 빈 코스 · 빈 강의가 남지 않는다 · 다시 짜기가 실패하면 이전 것이 그대로다 | ADR-130 · ADR-085 |
 | 한 사람이 건 수 | 같은 순간의 두 요청이 함께 상한을 넘지 않는다 — 서버가 여럿이어도 | ADR-104 · ADR-133 |
 | 크레딧 | 받을 때 쓰고 · 실패하면 복구하고 · 성공하면 그대로 둔다 · 성공한 작업의 코스를 지워도 · 실패한 뒤 버려도 복구가 한 번뿐이다 · 지난 주기에 쓴 몫은 복구하지 않는다 · 남은 양과 기록이 맞는다 | ADR-112 · ADR-131 · ADR-166 |
 | 크레딧 채우기 | 신청할 때 한 주 몫 · 승인 전에는 쓰지 못한다 · 승인한 날부터 7일마다 새벽 4시(한국 시간)에 한 주 몫으로 · 서버가 여럿이어도 한 번만 · 서버가 꺼져 있던 때를 따라잡는다 | ADR-110 · ADR-133 · ADR-173 · ADR-189 · `CreditRefillServiceIntegrationTest`(DB 잠금 경합 · 따라잡기 · 차액 0/음수 · 복구 경계 · 실패 롤백/로그) · `CreditRefillServiceTest`(시각/트랜잭션 순서 · 목록 실패) · `CreditRefillConfigurationTest`(cron/시간대 · 기동 · 끄기) |
 | 상태 전환 | 코스 · 로드맵의 상태가 바뀌는 동작에서만 앞으로 간다 · 마지막 코스를 다 마치면 로드맵도 다 마침이 되고, 그 전 코스를 다 마쳐서는 바뀌지 않는다 · 로드맵의 「이대로 시작」을 못 받으면 아무것도 바뀌지 않는다 | ADR-136 · ADR-143 · ADR-176 |
 | 숙련도 판정 | 같은 복습 기록이면 언제나 같은 판정 — 「이 숙련도면 짧게」를 시험으로 확인한다 | ADR-031 |
-| 지우기 범위 | [02 §7](./02-domain-data.md#7-지우기--탈퇴--함께-사라지는-범위) 의 표대로 지우고 남긴다 — 지운 코스의 카드 · 개념 사전 · 크레딧 · 호출 기록 | ADR-140 |
+| 지우기 범위 | [02 §7](./02-domain-data.md#7-지우기--탈퇴--함께-사라지는-범위) 의 표대로 지우고 남긴다 — 지운 코스의 카드 · 개념 사전 · 크레딧 · 호출 기록 | ADR-140 · `CourseControllerDeletionIntegrationTest` · `CourseDeletionServiceIntegrationTest` · `RoadmapDeletionServiceIntegrationTest` · `JpaAccountWithdrawalRepositoryIntegrationTest` · `WithdrawControllerIntegrationTest` · `OAuthLoginHandlerIntegrationTest`(탈퇴 뒤 재로그인 · 새 신청) |
 | 하루의 경계 | 「오늘 복습할 카드」가 한국 시간 새벽 4시로 바뀐다 | ADR-017 |
 | 스트릭 | 복습 1장 · 학습 완료 하나가 그날을 채운다 · 새벽 4시 경계로 센다(새벽 1시는 전날) · 오늘을 아직 채우지 않으면 어제까지의 수 · 하루를 건너뛰면 0일 | ADR-016 · ADR-017 · ADR-178 |
 | 같은 날 다시 보기 | 복습 중에 「다시」를 누른 카드가 10분 뒤에(처음 배우는 카드의 「다시」는 첫 단계 1분 뒤) · 볼 카드가 그것만 남으면 바로 다시 나온다 · 학습 단계를 마치면 날 단위로 넘어간다 | ADR-164 |

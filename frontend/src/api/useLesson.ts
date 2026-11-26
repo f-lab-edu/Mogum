@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client'
-import { coursesKey } from './useCourse'
+import { coursesKey, roadmapsKey } from './queryKeys'
 import type { JobResponse } from './useJob'
-import { roadmapsKey } from './useRoadmap'
 
 export interface LessonResponse {
   id: number

@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
+import { Link, MemoryRouter, Route, Routes, useNavigationType } from 'react-router-dom'
 import { afterEach, expect, test, vi } from 'vitest'
 import { createAuthQueryClient } from '../api/queryClient'
 import type { Me } from '../api/useMe'
@@ -15,6 +15,12 @@ const me: Me = {
 }
 const response = (data: Me) => new Response(JSON.stringify({ data }))
 const clients: ReturnType<typeof createAuthQueryClient>[] = []
+const withdrawalMessage = '코스 · 로드맵 · 카드 · 복습 기록 · 크레딧이 모두 지워지고 되돌릴 수 없어요. 다시 쓰려면 새로 신청하고 승인을 받아야 해요.'
+
+function LoginDestination() {
+  const navigationType = useNavigationType()
+  return <><LoginPage /><output aria-label="이동 방식">{navigationType}</output></>
+}
 
 function open(data: Me = me) {
   const client = createAuthQueryClient(vi.fn())
@@ -29,7 +35,7 @@ function open(data: Me = me) {
         <Route path="/profile" element={<AppLayout><ProfilePage /></AppLayout>} />
         <Route path="/courses" element={<Link to="/profile">내 정보로</Link>} />
       </Route>
-      <Route path="/login" element={<LoginPage />} />
+      <Route path="/login" element={<LoginDestination />} />
     </Routes>
   </MemoryRouter></QueryClientProvider>)
   return client
@@ -41,6 +47,125 @@ afterEach(() => {
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
   sessionStorage.clear()
+})
+
+test('로그아웃·탈퇴·처리방침 순서로 두고 탈퇴 확인은 계약 문구와 취소 포커스를 지킨다', async () => {
+  const client = open()
+  await waitFor(() => expect(client.isFetching()).toBe(0))
+  const logout = screen.getByRole('button', { name: '로그아웃' })
+  const trigger = screen.getByRole('button', { name: '탈퇴' })
+  const privacy = screen.getByRole('link', { name: '처리방침 보기' })
+  expect(logout.compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(trigger.compareDocumentPosition(privacy) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(trigger).toHaveClass('bg-surface-soft')
+  expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  fireEvent.click(trigger)
+  await waitFor(() => {
+    expect(screen.getByRole('region', { name: '탈퇴할까요?' })).toHaveTextContent(withdrawalMessage)
+    expect(screen.getByText(withdrawalMessage).textContent).toBe(withdrawalMessage)
+    expect(screen.getByRole('button', { name: '취소' })).toHaveFocus()
+  })
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: '취소' }))
+  await waitFor(() => {
+    expect(trigger).toHaveFocus()
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('button', { name: '탈퇴하기' })).not.toBeInTheDocument()
+  })
+  expect(vi.mocked(fetch).mock.calls.every(([, options]) => options?.method === 'GET')).toBe(true)
+})
+
+test('탈퇴는 동시 제출 한 번만 보내고 확인·취소·로그아웃을 잠근 뒤 모든 읽기 취소·캐시 제거·replace 이동을 한다', async () => {
+  const client = open()
+  await waitFor(() => expect(client.isFetching()).toBe(0))
+  client.setQueryData(['courses', '31'], { title: '이전 코스' })
+  client.setQueryData(['reviews', 'today', null], { cards: ['이전 카드'] })
+  let finishRead!: (value: unknown) => void
+  let cachedAtCancel: unknown
+  const aborted = vi.fn(() => {
+    // 취소할 때는 아직 캐시가 있고, 취소가 끝난 뒤에 제거해야 한다.
+    cachedAtCancel = client.getQueryData(['me'])
+  })
+  const reading = client.fetchQuery({ queryKey: ['home', 'jobs'], queryFn: ({ signal }) => {
+    signal.addEventListener('abort', aborted)
+    return new Promise((resolve) => { finishRead = resolve })
+  } }).catch(() => undefined)
+  let finishWithdraw!: (value: Response) => void
+  vi.mocked(fetch).mockImplementation(() => new Promise((resolve) => { finishWithdraw = resolve }))
+  fireEvent.click(screen.getByRole('button', { name: '탈퇴' }))
+  const confirm = screen.getByRole('button', { name: '탈퇴하기' })
+  const logout = screen.getByRole('button', { name: '로그아웃' })
+  act(() => {
+    confirm.click()
+    confirm.click()
+    logout.click()
+  })
+  await waitFor(() => {
+    for (const label of ['탈퇴', '탈퇴하기', '취소', '로그아웃']) expect(screen.getByRole('button', { name: label })).toBeDisabled()
+    expect(vi.mocked(fetch).mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1)
+  })
+  expect(fetch).toHaveBeenLastCalledWith('/api/account/withdraw', expect.objectContaining({ method: 'POST', credentials: 'include' }))
+  expect(vi.mocked(fetch).mock.calls.at(-1)?.[1]?.body).toBeUndefined()
+  await act(async () => finishWithdraw(new Response(null, { status: 204 })))
+  await waitFor(() => {
+    expect(screen.getByRole('link', { name: 'Google 계정으로 계속하기' })).toBeVisible()
+    expect(screen.getByLabelText('이동 방식')).toHaveTextContent('REPLACE')
+    expect(aborted).toHaveBeenCalledOnce()
+    expect(cachedAtCancel).toEqual(me)
+    expect(client.getQueryCache().getAll()).toHaveLength(0)
+    expect(screen.queryByText(/탈퇴했어요|탈퇴 완료/)).not.toBeInTheDocument()
+  })
+  await act(async () => { finishRead({ jobs: ['늦은 결과'] }); await reading })
+  expect(client.getQueryCache().getAll()).toHaveLength(0)
+})
+
+test.each(['서버', '연결'])('%s 탈퇴 실패는 확인과 캐시를 보존하고 다시 확인하면 재시도한다', async (failure) => {
+  const client = open()
+  await waitFor(() => expect(client.isFetching()).toBe(0))
+  client.setQueryData(['courses'], { courses: ['이전 코스'] })
+  if (failure === '서버') vi.mocked(fetch).mockImplementation(() => Promise.resolve(new Response(JSON.stringify({
+    code: 'FUTURE_ERROR', message: '잠시 뒤 다시 탈퇴해 주세요.',
+  }), { status: 503 })))
+  else vi.mocked(fetch).mockRejectedValue(new TypeError('PRIVATE_NETWORK_DETAILS'))
+  fireEvent.click(screen.getByRole('button', { name: '탈퇴' }))
+  fireEvent.click(screen.getByRole('button', { name: '탈퇴하기' }))
+  await waitFor(() => {
+    expect(screen.getByRole('alert')).toHaveTextContent('탈퇴하지 못했어요.')
+    expect(screen.getByRole('alert')).toHaveTextContent(failure === '서버' ? '잠시 뒤 다시 탈퇴해 주세요.' : '연결하지 못했어요. 다시 시도해 주세요.')
+    expect(screen.getByRole('region', { name: '탈퇴할까요?' })).toBeVisible()
+    for (const label of ['탈퇴하기', '취소', '로그아웃']) expect(screen.getByRole('button', { name: label })).toBeEnabled()
+  })
+  expect(screen.queryByText(/FUTURE_ERROR|PRIVATE_NETWORK_DETAILS/)).not.toBeInTheDocument()
+  expect(client.getQueryData(['me'])).toEqual(me)
+  expect(client.getQueryData(['courses'])).toEqual({ courses: ['이전 코스'] })
+  expect(vi.mocked(fetch).mock.calls.filter(([path]) => path === '/api/account/withdraw')).toHaveLength(1)
+  vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 204 }))
+  fireEvent.click(screen.getByRole('button', { name: '탈퇴하기' }))
+  await waitFor(() => {
+    expect(screen.getByRole('link', { name: 'Google 계정으로 계속하기' })).toBeVisible()
+    expect(client.getQueryCache().getAll()).toHaveLength(0)
+    expect(vi.mocked(fetch).mock.calls.filter(([path]) => path === '/api/account/withdraw')).toHaveLength(2)
+  })
+})
+
+test('로그아웃과 탈퇴를 동시에 누르면 로그아웃만 보내고 탈퇴 동작도 잠근다', async () => {
+  const client = open()
+  await waitFor(() => expect(client.isFetching()).toBe(0))
+  let finishLogout!: (value: Response) => void
+  vi.mocked(fetch).mockImplementation(() => new Promise((resolve) => { finishLogout = resolve }))
+  fireEvent.click(screen.getByRole('button', { name: '탈퇴' }))
+  act(() => {
+    screen.getByRole('button', { name: '로그아웃' }).click()
+    screen.getByRole('button', { name: '탈퇴하기' }).click()
+  })
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: '탈퇴하기' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '취소' })).toBeDisabled()
+    expect(vi.mocked(fetch).mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1)
+  })
+  expect(fetch).toHaveBeenLastCalledWith('/api/auth/logout', expect.objectContaining({ method: 'POST' }))
+  await act(async () => finishLogout(new Response(null, { status: 204 })))
 })
 
 test('내 정보는 계정·남은 크레딧·다음 채움 순서로 보이고 제목에 포커스를 둔다', async () => {
@@ -81,11 +206,11 @@ test('처리방침 보기는 privacy 주소를 가리킨다', async () => {
   expect(await screen.findByRole('link', { name: '처리방침 보기' })).toHaveAttribute('href', '/privacy')
 })
 
-test('계정 동작만 두고 스트릭·통계·탈퇴·기기·크레딧 기록이나 종류별 값은 두지 않는다', async () => {
+test('계정 동작만 두고 스트릭·통계·기기·크레딧 기록이나 종류별 값은 두지 않는다', async () => {
   open()
   await waitFor(() => expect(fetch).toHaveBeenCalled())
-  expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['로그아웃'])
-  expect(screen.queryByText(/스트릭|연속|학습 통계|탈퇴|로그인 기기|원격 로그아웃|크레딧 기록|한 주 몫|지금은 만들 수/)).not.toBeInTheDocument()
+  expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['로그아웃', '탈퇴'])
+  expect(screen.queryByText(/스트릭|연속|학습 통계|로그인 기기|원격 로그아웃|크레딧 기록|한 주 몫|지금은 만들 수/)).not.toBeInTheDocument()
   expect(screen.queryByRole('region', { name: '스트릭' })).not.toBeInTheDocument()
 })
 
