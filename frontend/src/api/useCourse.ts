@@ -98,3 +98,19 @@ export function useCourseAction(courseId: string) {
     },
   })
 }
+
+export function useCourseDeletion(courseId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: () => apiFetch<void>(`/courses/${encodeURIComponent(courseId)}`, { method: 'DELETE' }),
+    retry: false,
+    onSuccess: async () => {
+      await client.cancelQueries({ queryKey: courseKey(courseId), exact: true })
+      await client.cancelQueries({ queryKey: coursesKey, exact: true })
+      await client.cancelQueries({ queryKey: ['home'] })
+      client.removeQueries({ queryKey: courseKey(courseId), exact: true })
+      await client.invalidateQueries({ queryKey: coursesKey, exact: true, refetchType: 'none' })
+      await client.invalidateQueries({ queryKey: ['home'], refetchType: 'none' })
+    },
+  })
+}

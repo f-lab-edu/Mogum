@@ -23,6 +23,7 @@ function open(data: unknown = review) {
     element: <Outlet context={{ status: 'APPROVED' }} />,
     children: [
       { path: '/', element: <h1>홈 자리</h1> },
+      { path: '/roadmaps', element: <h1>목록 자리</h1> },
       { path: '/roadmaps/:roadmapId', element: <AppLayout title="로드맵"><RoadmapPage /></AppLayout> },
       { path: '/courses/:courseId', element: <h1>코스 자리</h1> },
       { path: '/jobs/:jobId', element: <h1>기다리는 화면 자리</h1> },
@@ -320,5 +321,82 @@ test.each(['NOT_FOUND', 'network', 'FUTURE_STATUS'])('%s 읽기 실패는 안내
 test.each([review, running, { ...running, status: 'COMPLETED' }])('$status에서 시안 전용·금지 정보와 기능은 없다', async (data) => {
   open({ ...data, model: 'secret-model', credits: 999, memo: 'secret-memo' })
   await screen.findByRole('heading', { name: review.title })
-  expect(screen.getByRole('main')).not.toHaveTextContent(/secret-|999|토큰|비용|모델|수료증|퀴즈|광고|진도율|메모|지우기|저절로|ADR-/)
+  expect(screen.getByRole('main')).not.toHaveTextContent(/secret-|999|토큰|비용|모델|수료증|퀴즈|광고|진도율|메모|저절로|ADR-/)
+})
+
+test.each(['REVIEWING', 'IN_PROGRESS', 'COMPLETED'])('%s 로드맵도 계획 뒤에서 지우기를 확인하고 취소한다', async (status) => {
+  open({ ...review, status })
+  const trigger = await screen.findByRole('button', { name: '로드맵 지우기' })
+  expect(screen.getByRole('list', { name: '로드맵 계획' }).compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  fireEvent.click(trigger)
+  await waitFor(() => {
+    expect(screen.getByRole('region', { name: '로드맵을 지울까요?' })).toHaveAccessibleDescription(status === 'REVIEWING'
+      ? '로드맵 계획이 사라져요. 되돌릴 수 없어요.'
+      : '로드맵과 그 안의 코스 · 강의가 모두 사라지고, 카드는 복습에 나오지 않아요. 그동안의 카드와 복습 기록은 다음 강의를 내 수준에 맞추는 데 계속 쓰여요.')
+    expect(screen.getByRole('button', { name: '취소' })).toHaveFocus()
+  })
+  fireEvent.click(screen.getByRole('button', { name: '취소' }))
+  await waitFor(() => {
+    expect(trigger).toHaveFocus()
+    expect(screen.queryByRole('button', { name: '지우기' })).not.toBeInTheDocument()
+  })
+  expect(fetch).toHaveBeenCalledTimes(1)
+})
+
+test.each(['REVIEWING', 'IN_PROGRESS', 'COMPLETED'])('%s 로드맵 지우기는 요청을 잠그고 한 번만 보내며 모든 소속 코스 캐시를 지운 뒤 replace 이동한다', async (status) => {
+  const data = { ...running, status, nextCourse: { courseId: 32, enabled: true } }
+  let finish!: (value: Response) => void
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response(data)).mockImplementation(() => new Promise<Response>((resolve) => { finish = resolve })))
+  const { client, router } = open()
+  await screen.findByRole('heading', { name: review.title })
+  for (const key of [['roadmaps'], ['courses'], ['home', 'todos'], ['courses', '31'], ['courses', '32'], ['courses', '33'], ['roadmaps', '42']]) client.setQueryData(key, { preserved: true })
+  if (status === 'REVIEWING') {
+    fireEvent.click(screen.getAllByRole('button', { name: '코스 제목 고치기' })[0])
+    await replan()
+  }
+  fireEvent.click(screen.getByRole('button', { name: '로드맵 지우기' }))
+  const confirm = screen.getByRole('button', { name: '지우기' })
+  act(() => { fireEvent.click(confirm); fireEvent.click(confirm) })
+  await waitFor(() => {
+    for (const button of within(screen.getByRole('main')).getAllByRole('button')) expect(button).toBeDisabled()
+    for (const input of screen.queryAllByRole('textbox')) expect(input).toBeDisabled()
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+  expect(fetch).toHaveBeenLastCalledWith('/api/roadmaps/41', expect.objectContaining({ method: 'DELETE' }))
+  expect(vi.mocked(fetch).mock.calls.at(-1)?.[1]?.body).toBeUndefined()
+  await act(async () => { finish(new Response(null, { status: 204 })) })
+  await waitFor(() => {
+    expect(router.state.location.pathname).toBe('/roadmaps')
+    expect(router.state.historyAction).toBe('REPLACE')
+    for (const key of [['roadmaps', '41'], ['courses', '31'], ['courses', '32']]) expect(client.getQueryState(key)).toBeUndefined()
+    for (const key of [['roadmaps'], ['courses'], ['home', 'todos']]) expect(client.getQueryState(key)?.isInvalidated).toBe(true)
+    for (const key of [['courses', '33'], ['roadmaps', '42']]) expect(client.getQueryData(key)).toEqual({ preserved: true })
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+  await act(async () => { await router.navigate(-1) })
+  expect(router.state.location.pathname).toBe('/')
+})
+
+test.each(['server', 'network'])('로드맵 지우기 %s 실패는 확인·계획·캐시를 보존하고 재시도한다', async (kind) => {
+  const fetcher = vi.fn().mockResolvedValueOnce(response(review))
+  if (kind === 'server') fetcher.mockResolvedValueOnce(failure('NOT_FOUND', '찾을 수 없습니다'))
+  else fetcher.mockRejectedValueOnce(new Error('secret-network'))
+  vi.stubGlobal('fetch', fetcher.mockResolvedValue(new Response(null, { status: 204 })))
+  const { client, router } = open()
+  fireEvent.click(await screen.findByRole('button', { name: '로드맵 지우기' }))
+  fireEvent.click(screen.getByRole('button', { name: '지우기' }))
+  await screen.findByRole('alert')
+  await waitFor(() => {
+    expect(screen.getByRole('alert')).toHaveTextContent(kind === 'server' ? '찾을 수 없습니다' : '연결하지 못했어요. 다시 시도해 주세요.')
+    expect(screen.getByRole('region', { name: '로드맵을 지울까요?' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '지우기' })).toBeEnabled()
+    expect(screen.getByRole('list', { name: '로드맵 계획' })).toBeVisible()
+    expect(client.getQueryData(['roadmaps', '41'])).toEqual(review)
+    expect(router.state.location.pathname).toBe('/roadmaps/41')
+    expect(screen.getByRole('main')).not.toHaveTextContent(/NOT_FOUND|secret-network/)
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+  fireEvent.click(screen.getByRole('button', { name: '지우기' }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/roadmaps'))
+  expect(fetch).toHaveBeenCalledTimes(3)
 })

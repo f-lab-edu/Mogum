@@ -3,11 +3,12 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, CONNECTION_ERROR_MESSAGE } from '../api/client'
-import { useCourse, useCourseAction } from '../api/useCourse'
+import { useCourse, useCourseAction, useCourseDeletion } from '../api/useCourse'
 import { receiveJob } from '../api/useJob'
 import Button from '../components/Button'
 import CreationBlockedNotice, { isCreationBlockedError } from '../components/CreationBlockedNotice'
 import FailureNotice from '../components/FailureNotice'
+import InlineConfirmation from '../components/InlineConfirmation'
 import Mogumi from '../components/Mogumi'
 import ProgressBar from '../components/ProgressBar'
 import StatusBadge from '../components/StatusBadge'
@@ -34,6 +35,8 @@ export default function CoursePage() {
   const navigate = useNavigate()
   const course = useCourse(courseId)
   const action = useCourseAction(courseId)
+  const deletion = useCourseDeletion(courseId)
+  const [confirming, setConfirming] = useState(false)
   const submitting = useRef(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState('')
@@ -50,7 +53,7 @@ export default function CoursePage() {
     onSuccess: (job) => { void navigate(`/jobs/${job.id}`) },
     onSettled: () => { submitting.current = false },
   })
-  const busy = action.isPending || replan.isPending
+  const busy = action.isPending || replan.isPending || deletion.isPending
   const data = course.data
   const status = data && statuses.get(data.status)
 
@@ -195,5 +198,20 @@ export default function CoursePage() {
     {(learning || completed) && data.todayReviewCount > 0 && <div>
       <PageLink to={`/review?courseId=${data.id}`}>이 코스 복습하기 · {data.todayReviewCount}장</PageLink>
     </div>}
+
+    {data.roadmapId === undefined && <InlineConfirmation open={confirming} onOpenChange={setConfirming} disabled={busy}
+      triggerLabel="코스 지우기" title="코스를 지울까요?" confirmLabel="지우기"
+      message={reviewing ? '이 코스의 강의 목록이 사라져요. 되돌릴 수 없어요.' : '강의는 사라지고 카드는 복습에 나오지 않아요. 그동안의 카드와 복습 기록은 다음 강의를 내 수준에 맞추는 데 계속 쓰여요.'}
+      onConfirm={() => {
+        if (submitting.current) return
+        submitting.current = true
+        deletion.mutate(undefined, {
+          onSuccess: () => { void navigate('/courses', { replace: true }) },
+          onSettled: () => { submitting.current = false },
+        })
+      }} />}
+    {deletion.isError && <FailureNotice title="코스를 지우지 못했어요." message={message(deletion.error)}>
+      <p className="text-small">안내를 확인한 뒤 지우기를 다시 눌러 주세요.</p>
+    </FailureNotice>}
   </div>
 }

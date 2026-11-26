@@ -359,3 +359,40 @@ test('거른 복습에서 복습 탭을 누르면 쿼리를 지우고 같은 경
   expect(screen.queryByText('자바 기초')).not.toBeInTheDocument()
   expect(screen.getByText('1장 남음')).toBeVisible()
 })
+
+test.each([
+  { detail: '/courses/31', list: '/courses', tab: '코스', trigger: '코스 지우기', empty: '아직 만든 코스가 없어요' },
+  { detail: '/roadmaps/41', list: '/roadmaps', tab: '로드맵', trigger: '로드맵 지우기', empty: '아직 만든 로드맵이 없어요' },
+])('실제 라우터에서 $trigger 성공은 $tab 탭으로 가고 지운 결과를 다시 읽지 않는다', async ({ detail, list, tab, trigger, empty }) => {
+  window.history.replaceState(null, '', list)
+  let deleted = false
+  const course = { id: 31, title: '지울 코스', status: 'REVIEWING', lessons: [], todayReviewCount: 0, progress: { completedLessons: 0, totalLessons: 0 } }
+  const roadmap = { id: 41, title: '지울 로드맵', description: '계획', status: 'REVIEWING', courses: [], completedCourses: 0, totalCourses: 2 }
+  const item = tab === '코스' ? course : roadmap
+  stubFetch(vi.fn().mockImplementation((path, options) => {
+    if (options?.method === 'DELETE') {
+      deleted = true
+      return Promise.resolve(new Response(null, { status: 204 }))
+    }
+    let data: unknown
+    if (path === '/api/me') data = { status: 'APPROVED', name: '민서', email: 'minseo@example.com' }
+    else if (path === `/api${list}`) data = { [tab === '코스' ? 'courses' : 'roadmaps']: deleted ? [] : [item] }
+    else if (path === `/api${detail}` && !deleted) data = item
+    else throw new Error(`Unexpected test request: ${path}`)
+    return Promise.resolve(new Response(JSON.stringify({ data })))
+  }))
+  render(<App />)
+  fireEvent.click(await screen.findByRole('link', { name: new RegExp(item.title) }))
+  fireEvent.click(await screen.findByRole('button', { name: trigger }))
+  fireEvent.click(screen.getByRole('button', { name: '지우기' }))
+  await screen.findByText(empty)
+  await waitFor(() => {
+    expect(window.location.pathname).toBe(list)
+    for (const nav of screen.getAllByRole('navigation')) expect(within(nav).getByRole('link', { name: tab })).toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByRole('link', { name: new RegExp(item.title) })).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(vi.mocked(fetch).mock.calls.filter(([path, options]) => path === `/api${detail}` && options?.method === 'GET')).toHaveLength(1)
+    expect(vi.mocked(fetch).mock.calls.filter(([path, options]) => path === `/api${detail}` && options?.method === 'DELETE')).toHaveLength(1)
+    expect(vi.mocked(fetch).mock.calls.filter(([path]) => path === `/api${list}`)).toHaveLength(2)
+  })
+})
