@@ -32,7 +32,15 @@
     {
       "step": 2,
       "name": "account-withdraw",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-26T09:03:11+0900",
+      "summary": "POST /api/account/withdraw → 승인된 사람만 204·본문 없음·SESSION 만료 쿠키(Max-Age=0, Secure, HttpOnly, SameSite=Lax, Path=/, Domain 없음), 승인 전 ACCOUNT_NOT_APPROVED(403)·비로그인 401; 작업→사용자 잠금 뒤 네이티브 SQL로 전체 탈퇴 범위와 principal_name=사용자 ID인 모든 기기 세션 삭제·커밋 뒤 현재 세션 invalidate(), 크레딧 복구 없이 호출 기록 연결만 해제; 새 ArchUnit ACCOUNT_DOES_NOT_DEPEND_ON_LEARNING_DOMAINS, 재로그인·새 신청·늦은 워커 성공/실패·호출 기록 보존·두 순서 경합 검증, 서버 테스트 2,830→2,848개, 지정 AC 467개 및 전체 build 통과.",
+      "completed_at": "2026-11-26T11:19:46+0900",
+      "review_notes": [
+        "backend/src/test/java/com/mogum/account/service/WithdrawServiceIntegrationTest.java:107 — 이 클래스의 주 시험은 서비스가 아니라 실제 HTTP → 보안 필터 → 컨트롤러 → 서비스 전체 흐름(지우기 범위 · 세션 · 쿠키)을 확인한다. step 0 의 JpaCourseDeletionRepositoryIntegrationTest 와 같은 성질이다. 이름 · 위치(예: `WithdrawControllerIntegrationTest`)와 07 §1 근거 칸을 phase /review 에서 맞출지 판단한다.",
+        "backend/src/main/java/com/mogum/account/service/WithdrawService.java:23 — 사용자 행이 없으면 `NOT_FOUND`(404)다. 동시에 두 번 탈퇴하면 뒤쪽 요청이 SessionUserFilter 를 지난 뒤 이 경로에 닿을 수 있다. 그러면 트랜잭션이 되돌려지고, 세션은 이미 지워졌으므로 데이터 피해는 없다. 05 §4 구현 줄에 이 응답은 적혀 있지 않다. MVP 에서는 그대로 둬도 된다.",
+        "backend/src/main/java/com/mogum/account/service/WithdrawService.java:22 — 탈퇴도 작업 행 → 사용자 행 순서로 잠근다. 그래서 같은 사람의 retry · discard(사용자 행 → 작업 행)가 같은 순간에 오면 step 0 권고와 같은 교착(500)이 날 수 있다. ADR-102 범위라 계약 위반은 아니다. phase /review 에서 02 §8.6 ③ 에 함께 적을지 판단한다."
+      ]
     },
     {
       "step": 3,
