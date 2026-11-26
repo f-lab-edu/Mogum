@@ -19,7 +19,15 @@
     {
       "step": 1,
       "name": "roadmap-delete",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-26T08:52:24+0900",
+      "summary": "DELETE /api/roadmaps/{id} → 상태와 상관없이 204·본문 없음, 없는·남의·두 번째 지우기는 NOT_FOUND(404); 로드맵·모든 코스·강의의 작업을 함께 잠근 뒤 사용자 잠금·크레딧 복구·삭제, 공통 CourseDeletionService.deleteContentAfterJobs(long userId, long courseId) 분리(기존 deleteContent(long userId, long courseId) 유지); 짜기 전 코스 포함 삭제·카드/복습/개념/호출·크레딧 기록 보존·늦은 결과 차단·두 순서 동시성 검증, 서버 테스트 2,801→2,830개, 지정 AC 823개 및 전체 build 통과.",
+      "completed_at": "2026-11-26T09:03:11+0900",
+      "review_notes": [
+        "docs/02-domain-data.md:400 — step 0 구현 줄에는 아직 `CourseDeletionService.deleteContent(long userId, long courseId)` 가 코스 하나의 내용 지우기를 맡는다고 적혀 있다. 이번 step 에서 내용 지우기는 `deleteContentAfterJobs` 로 옮겨졌다. → 05 §4 처럼 02 §8.6 구현 줄도 「작업 처리는 deleteContent · lockRoadmapJobs, 내용 지우기는 deleteContentAfterJobs」로 맞춘다. 계약 문장이 아니라 구현 기록 줄이라 phase /review 에서 Claude 가 고쳐도 된다.",
+        "backend/src/main/java/com/mogum/course/service/CourseDeletionService.java:53 — `deleteContentAfterJobs` 는 public 이지만, 호출자가 작업을 먼저 지우고 사용자 행을 잡았을 때만 안전하다. 이 전제는 Javadoc 에 적혀 있다. 탈퇴 step 에서 다시 쓸 때 이 전제를 지키는지 확인한다.",
+        "backend/src/main/java/com/mogum/course/repository/JpaCourseDeletionRepository.java:41 — lockRoadmapJobs 의 하위 질의는 문장을 시작할 때의 스냅샷으로 평가된다. 그래서 잠금을 기다리는 사이에 새로 들어온 작업은 잡히지 않고, 뒤의 deleteCourse 가 FK 오류로 500 이 될 수 있다. 02 §8.6 ③ 이 받기와 지우기의 경합은 넘어간다(ADR-102)고 했으므로 계약 위반은 아니다. 탈퇴 step 을 설계할 때 같은 성질임을 알아 둔다."
+      ]
     },
     {
       "step": 2,
