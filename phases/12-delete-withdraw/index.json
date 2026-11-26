@@ -64,8 +64,17 @@
       "review_notes": [
         "frontend/src/pages/ProfilePage.tsx:22,36 — 로그아웃 성공은 `['me']` 만 지우고, 탈퇴 성공은 전체 캐시를 지운다. 계약대로다. 다만 로그아웃 뒤에도 앞 사람의 코스 · 카드 캐시가 남을 수 있는 성질은 이번 step 과 무관하게 그대로 있다. 다른 사람이 같은 브라우저로 로그인하는 경우를 phase `/review` 에서 짚을지 판단한다."
       ]
+    },
+    {
+      "step": 5,
+      "name": "test-names",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "query-keys",
+      "status": "pending"
     }
   ],
-  "created_at": "2026-11-26T08:39:40+0900",
-  "completed_at": "2026-11-26T11:31:16+0900"
+  "created_at": "2026-11-26T08:39:40+0900"
 }
