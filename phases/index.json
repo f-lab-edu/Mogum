@@ -98,7 +98,8 @@
     },
     {
       "dir": "12-delete-withdraw",
-      "status": "pending"
+      "status": "completed",
+      "completed_at": "2026-11-26T11:31:16+0900"
     }
   ]
 }
